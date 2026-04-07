@@ -1,9 +1,13 @@
-#!/bin/bash
+const fs = require('fs');
+const path = require('path');
 
-mkdir -p src/components src/app/pricing src/app/signin
+function writeFile(filePath, content) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, content.trimStart());
+  console.log('✅ Created ' + filePath);
+}
 
-cat > src/components/Navbar.tsx << 'EOF'
-'use client';
+writeFile('src/components/Navbar.tsx', `'use client';
 import Link from 'next/link';
 
 export default function Navbar() {
@@ -24,22 +28,16 @@ export default function Navbar() {
     </nav>
   );
 }
-EOF
+`);
 
-echo "✅ Navbar created"
-
-cat > src/app/globals.css << 'EOF'
-@import "tailwindcss";
+writeFile('src/app/globals.css', `@import "tailwindcss";
 
 html {
   scroll-behavior: smooth;
 }
-EOF
+`);
 
-echo "✅ globals.css created"
-
-cat > src/app/layout.tsx << 'EOF'
-import type { Metadata } from 'next';
+writeFile('src/app/layout.tsx', `import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import Navbar from '@/components/Navbar';
@@ -61,12 +59,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
-EOF
+`);
 
-echo "✅ layout.tsx created"
-
-cat > src/app/page.tsx << 'EOF'
-import Link from 'next/link';
+writeFile('src/app/page.tsx', `import Link from 'next/link';
 
 export default function Home() {
   return (
@@ -138,12 +133,9 @@ export default function Home() {
     </main>
   );
 }
-EOF
+`);
 
-echo "✅ Homepage created"
-
-cat > src/app/pricing/page.tsx << 'EOF'
-export default function Pricing() {
+writeFile('src/app/pricing/page.tsx', `export default function Pricing() {
   return (
     <main className="min-h-screen bg-gray-950 text-white pt-24 px-6">
       <div className="max-w-4xl mx-auto text-center">
@@ -153,12 +145,9 @@ export default function Pricing() {
     </main>
   );
 }
-EOF
+`);
 
-echo "✅ Pricing placeholder created"
-
-cat > src/app/signin/page.tsx << 'EOF'
-export default function SignIn() {
+writeFile('src/app/signin/page.tsx', `export default function SignIn() {
   return (
     <main className="min-h-screen bg-gray-950 text-white pt-24 px-6">
       <div className="max-w-4xl mx-auto text-center">
@@ -168,8 +157,7 @@ export default function SignIn() {
     </main>
   );
 }
-EOF
+`);
 
-echo "✅ Sign In placeholder created"
-echo ""
-echo "🏈 ALL FILES CREATED! Refresh http://localhost:3000"
+console.log('');
+console.log('🏈 ALL FILES CREATED! Refresh http://localhost:3000');
