@@ -10,12 +10,9 @@ const playerTiers = [
     period: '/yr',
     description: 'Essential tools for the competitive player.',
     features: [
-      { name: 'Cross-Platform Access', included: true },
-      { name: '1 League Sync', included: true },
-      { name: 'Basic Player Rankings', included: true },
-      { name: 'Dynamic Trade Values', included: false },
-      { name: 'PPR Boost Engine', included: false },
-      { name: 'Position Scarcity Multipliers', included: false },
+      'Cross-Platform Access',
+      'Up to 2 Leagues Synced',
+      'Basic Player Rankings',
     ],
     highlight: false,
     badge: null,
@@ -26,12 +23,10 @@ const playerTiers = [
     period: '/yr',
     description: 'Advanced tools for the serious competitor.',
     features: [
-      { name: 'Cross-Platform Access', included: true },
-      { name: 'Unlimited League Sync', included: true },
-      { name: 'Basic Player Rankings', included: true },
-      { name: 'Dynamic Trade Values', included: true },
-      { name: 'PPR Boost Engine', included: true },
-      { name: 'Position Scarcity Multipliers', included: false },
+      'Everything in Pro',
+      'Up to 5 League Syncs',
+      'Dynamic Trade Values',
+      'PPR Boost Engine',
     ],
     highlight: true,
     badge: 'Most Popular',
@@ -42,12 +37,9 @@ const playerTiers = [
     period: '/yr',
     description: 'The ultimate edge. Every tool. No limits.',
     features: [
-      { name: 'Cross-Platform Access', included: true },
-      { name: 'Unlimited League Sync', included: true },
-      { name: 'Basic Player Rankings', included: true },
-      { name: 'Dynamic Trade Values', included: true },
-      { name: 'PPR Boost Engine', included: true },
-      { name: 'Position Scarcity Multipliers', included: true },
+      'Everything in All-Pro',
+      'Unlimited League Sync',
+      'Position Scarcity Multipliers',
     ],
     highlight: false,
     badge: 'Full Access',
@@ -65,14 +57,42 @@ const commissionerPricing: Record<string, { pro: string; allPro: string; elite: 
   '32': { pro: '159.99', allPro: '239.99', elite: '299.99' },
 };
 
-const commissionerFeatures = [
-  { name: 'Everything in Player Tier', included: [true, true, true] },
-  { name: 'League Dashboard', included: [true, true, true] },
-  { name: 'Due Collection Tools', included: [true, true, true] },
-  { name: 'Dynamic Trade Chart', included: [false, true, true] },
-  { name: 'Trade Grade Engine', included: [false, true, true] },
-  { name: 'Advanced League Analytics', included: [false, false, true] },
-  { name: 'Priority Support', included: [false, false, true] },
+const commissionerTiers = [
+  {
+    name: 'Commissioner Pro',
+    key: 'pro' as const,
+    description: 'Run your league with confidence.',
+    features: [
+      'League Dashboard',
+      'Due Collection Tools',
+    ],
+    highlight: false,
+    badge: null,
+  },
+  {
+    name: 'Commissioner All-Pro',
+    key: 'allPro' as const,
+    description: 'The complete commissioner toolkit.',
+    features: [
+      'Everything in Pro',
+      'Dynamic Trade Chart',
+      'Trade Grade Engine',
+    ],
+    highlight: true,
+    badge: 'Most Popular',
+  },
+  {
+    name: 'Commissioner Elite',
+    key: 'elite' as const,
+    description: 'Maximum power. Maximum trust.',
+    features: [
+      'Everything in All-Pro',
+      'Advanced League Analytics',
+      'Priority Support',
+    ],
+    highlight: false,
+    badge: 'Full Access',
+  },
 ];
 
 export default function Pricing() {
@@ -129,7 +149,7 @@ export default function Pricing() {
       {/* Player Plans */}
       {activeTab === 'player' && (
         <section className="px-6 mb-20">
-          <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-6">
+          <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-6 items-start">
             {playerTiers.map((tier) => (
               <div
                 key={tier.name}
@@ -154,15 +174,9 @@ export default function Pricing() {
                 </div>
                 <ul className="space-y-3 mb-8">
                   {tier.features.map((feature) => (
-                    <li key={feature.name} className="flex items-center gap-3 text-sm">
-                      {feature.included ? (
-                        <span className="text-[#C9A227] text-lg">&#10003;</span>
-                      ) : (
-                        <span className="text-gray-600 text-lg">&#10005;</span>
-                      )}
-                      <span className={feature.included ? 'text-gray-200' : 'text-gray-600'}>
-                        {feature.name}
-                      </span>
+                    <li key={feature} className="flex items-center gap-3 text-sm">
+                      <span className="text-[#C9A227] text-lg">&#10003;</span>
+                      <span className="text-gray-200">{feature}</span>
                     </li>
                   ))}
                 </ul>
@@ -206,100 +220,49 @@ export default function Pricing() {
             </div>
           </div>
 
-          <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-6">
-            {/* Commissioner Pro */}
-            <div className="bg-gray-900 rounded-2xl p-8 border border-gray-800 hover:border-[#C9A227]/50 transition">
-              <h3 className="text-xl font-bold mb-2">Commissioner Pro</h3>
-              <p className="text-gray-400 text-sm mb-6">Run your league with confidence.</p>
-              <div className="mb-2">
-                <span className="text-4xl font-bold">${prices.pro}</span>
-                <span className="text-gray-400 text-sm">/yr</span>
-              </div>
-              <p className="text-gray-500 text-xs mb-8">{teamSize}-team league</p>
-              <ul className="space-y-3 mb-8">
-                {commissionerFeatures.map((feature) => (
-                  <li key={feature.name} className="flex items-center gap-3 text-sm">
-                    {feature.included[0] ? (
-                      <span className="text-[#C9A227] text-lg">&#10003;</span>
-                    ) : (
-                      <span className="text-gray-600 text-lg">&#10005;</span>
-                    )}
-                    <span className={feature.included[0] ? 'text-gray-200' : 'text-gray-600'}>
-                      {feature.name}
+          <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-6 items-start">
+            {commissionerTiers.map((tier) => (
+              <div
+                key={tier.name}
+                className={`relative bg-gray-900 rounded-2xl p-8 border ${
+                  tier.highlight
+                    ? 'border-[#C9A227] shadow-lg shadow-[#C9A227]/10'
+                    : 'border-gray-800'
+                } hover:border-[#C9A227]/50 transition`}
+              >
+                {tier.badge && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span className="bg-[#C9A227] text-gray-950 text-xs font-bold px-4 py-1 rounded-full">
+                      {tier.badge}
                     </span>
-                  </li>
-                ))}
-              </ul>
-              <button className="w-full py-3 rounded-lg font-semibold border border-gray-700 hover:border-[#C9A227] text-white transition">
-                Get Started
-              </button>
-            </div>
-
-            {/* Commissioner All-Pro */}
-            <div className="relative bg-gray-900 rounded-2xl p-8 border border-[#C9A227] shadow-lg shadow-[#C9A227]/10 hover:border-[#C9A227]/50 transition">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                <span className="bg-[#C9A227] text-gray-950 text-xs font-bold px-4 py-1 rounded-full">
-                  Most Popular
-                </span>
-              </div>
-              <h3 className="text-xl font-bold mb-2">Commissioner All-Pro</h3>
-              <p className="text-gray-400 text-sm mb-6">The complete commissioner toolkit.</p>
-              <div className="mb-2">
-                <span className="text-4xl font-bold">${prices.allPro}</span>
-                <span className="text-gray-400 text-sm">/yr</span>
-              </div>
-              <p className="text-gray-500 text-xs mb-8">{teamSize}-team league</p>
-              <ul className="space-y-3 mb-8">
-                {commissionerFeatures.map((feature) => (
-                  <li key={feature.name} className="flex items-center gap-3 text-sm">
-                    {feature.included[1] ? (
+                  </div>
+                )}
+                <h3 className="text-xl font-bold mb-2">{tier.name}</h3>
+                <p className="text-gray-400 text-sm mb-6">{tier.description}</p>
+                <div className="mb-2">
+                  <span className="text-4xl font-bold">${prices[tier.key]}</span>
+                  <span className="text-gray-400 text-sm">/yr</span>
+                </div>
+                <p className="text-gray-500 text-xs mb-8">{teamSize}-team league</p>
+                <ul className="space-y-3 mb-8">
+                  {tier.features.map((feature) => (
+                    <li key={feature} className="flex items-center gap-3 text-sm">
                       <span className="text-[#C9A227] text-lg">&#10003;</span>
-                    ) : (
-                      <span className="text-gray-600 text-lg">&#10005;</span>
-                    )}
-                    <span className={feature.included[1] ? 'text-gray-200' : 'text-gray-600'}>
-                      {feature.name}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <button className="w-full py-3 rounded-lg font-semibold bg-[#C9A227] hover:bg-[#B8911F] text-gray-950 transition">
-                Get Started
-              </button>
-            </div>
-
-            {/* Commissioner Elite */}
-            <div className="relative bg-gray-900 rounded-2xl p-8 border border-gray-800 hover:border-[#C9A227]/50 transition">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                <span className="bg-[#C9A227] text-gray-950 text-xs font-bold px-4 py-1 rounded-full">
-                  Full Access
-                </span>
+                      <span className="text-gray-200">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  className={`w-full py-3 rounded-lg font-semibold transition ${
+                    tier.highlight
+                      ? 'bg-[#C9A227] hover:bg-[#B8911F] text-gray-950'
+                      : 'border border-gray-700 hover:border-[#C9A227] text-white'
+                  }`}
+                >
+                  Get Started
+                </button>
               </div>
-              <h3 className="text-xl font-bold mb-2">Commissioner Elite</h3>
-              <p className="text-gray-400 text-sm mb-6">Maximum power. Maximum trust.</p>
-              <div className="mb-2">
-                <span className="text-4xl font-bold">${prices.elite}</span>
-                <span className="text-gray-400 text-sm">/yr</span>
-              </div>
-              <p className="text-gray-500 text-xs mb-8">{teamSize}-team league</p>
-              <ul className="space-y-3 mb-8">
-                {commissionerFeatures.map((feature) => (
-                  <li key={feature.name} className="flex items-center gap-3 text-sm">
-                    {feature.included[2] ? (
-                      <span className="text-[#C9A227] text-lg">&#10003;</span>
-                    ) : (
-                      <span className="text-gray-600 text-lg">&#10005;</span>
-                    )}
-                    <span className={feature.included[2] ? 'text-gray-200' : 'text-gray-600'}>
-                      {feature.name}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <button className="w-full py-3 rounded-lg font-semibold border border-gray-700 hover:border-[#C9A227] text-white transition">
-                Get Started
-              </button>
-            </div>
+            ))}
           </div>
         </section>
       )}
