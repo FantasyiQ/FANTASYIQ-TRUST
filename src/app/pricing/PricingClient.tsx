@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { createCheckoutSession } from '@/app/actions/stripe';
 import catalog from '../../../stripe-catalog-ids.json';
@@ -356,7 +355,6 @@ function resolveCardStatus(
 
 /* ── Main component ───────────────────────────────────────────────── */
 export default function PricingClient({ activeSub }: Props) {
-    const router = useRouter();
     const { update: updateSession } = useSession();
     const [tab, setTab]       = useState<Tab>('player');
     const [size, setSize]     = useState<TeamSize>(12);
@@ -394,11 +392,11 @@ export default function PricingClient({ activeSub }: Props) {
                 return;
             }
             setPending(null);
-            // Refresh JWT so Navbar + dashboard reflect the new tier immediately
+            // Refresh the JWT cookie before the full-page redirect
             await updateSession();
-            // Re-render this page's server component to update "Current Plan" badges
-            router.refresh();
-            router.push('/dashboard?upgraded=1');
+            // Full page load — forces the root layout (navbar) to re-execute
+            // its DB query, so the tier badge is accurate immediately
+            window.location.href = '/dashboard?upgraded=1';
         } catch {
             setUpgradeError('Network error. Please try again.');
         } finally {
