@@ -422,7 +422,7 @@ export default function PricingClient({ activeSub }: Props) {
                     <div className="text-center mb-10">
                         <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-4">Choose Your Plan</h1>
                         <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-                            Cross-platform access · Unlimited league syncing · One price per year
+                            Cross-platform access · Zero Fees Guaranteed · League Dues Protected
                         </p>
                     </div>
 
