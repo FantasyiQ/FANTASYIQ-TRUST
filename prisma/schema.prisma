@@ -89,19 +89,22 @@ model Subscription {
 }
 
 model League {
-    id               String    @id @default(cuid())
-    userId           String
-    platform         String
-    platformLeagueId String
-    leagueName       String
-    seasonYear       Int
-    leagueSize       Int?
-    scoringFormat    String?
-    lastSyncedAt     DateTime?
-    createdAt        DateTime  @default(now())
-    updatedAt        DateTime  @updatedAt
+    id              String    @id @default(cuid())
+    userId          String
+    platform        String    @default("sleeper")
+    leagueId        String    // External platform league ID
+    leagueName      String
+    season          String
+    status          String    // pre_draft | drafting | in_season | complete
+    totalRosters    Int
+    scoringType     String?
+    avatar          String?
+    rosterPositions Json?
+    lastSyncedAt    DateTime?
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@unique([userId, platform, platformLeagueId, seasonYear])
+    @@unique([userId, platform, leagueId])
 }

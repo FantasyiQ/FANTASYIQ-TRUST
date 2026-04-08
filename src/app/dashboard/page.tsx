@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { auth, signOut } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { unsyncLeague } from '@/app/actions/leagues';
 import type { SubscriptionTier } from '@prisma/client';
 
 function formatTier(tier: SubscriptionTier): string {
@@ -24,6 +25,23 @@ const STATUS_STYLES: Record<string, string> = {
     canceled:  'bg-red-900/40 text-red-400 border-red-800',
     inactive:  'bg-gray-800 text-gray-500 border-gray-700',
 };
+
+const LEAGUE_STATUS_STYLES: Record<string, string> = {
+    in_season: 'bg-green-900/40 text-green-400 border-green-800',
+    drafting:  'bg-blue-900/40 text-blue-400 border-blue-800',
+    pre_draft: 'bg-yellow-900/40 text-yellow-400 border-yellow-800',
+    complete:  'bg-gray-800 text-gray-500 border-gray-700',
+};
+
+function leagueStatusLabel(status: string) {
+    switch (status) {
+        case 'in_season':  return 'In Season';
+        case 'drafting':   return 'Drafting';
+        case 'pre_draft':  return 'Pre-Draft';
+        case 'complete':   return 'Complete';
+        default:           return status;
+    }
+}
 
 export default async function DashboardPage() {
     const session = await auth();
@@ -47,10 +65,14 @@ export default async function DashboardPage() {
                 orderBy: { lastSyncedAt: 'desc' },
                 select: {
                     id: true,
+                    leagueId: true,
                     leagueName: true,
                     platform: true,
-                    seasonYear: true,
-                    leagueSize: true,
+                    season: true,
+                    status: true,
+                    totalRosters: true,
+                    scoringType: true,
+                    avatar: true,
                     lastSyncedAt: true,
                 },
             },
@@ -147,44 +169,73 @@ export default async function DashboardPage() {
                 {/* Leagues */}
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
                     <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
-                        <h2 className="font-semibold text-lg">Synced Leagues</h2>
-                        <span className="text-gray-500 text-sm">
-                            {leagues.length} league{leagues.length !== 1 ? 's' : ''}
-                        </span>
+                        <div>
+                            <h2 className="font-semibold text-lg">Synced Leagues</h2>
+                            <p className="text-gray-500 text-sm">{leagues.length} league{leagues.length !== 1 ? 's' : ''}</p>
+                        </div>
+                        <Link
+                            href="/dashboard/sync"
+                            className="text-sm bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold px-4 py-2 rounded-lg transition"
+                        >
+                            + Sync League
+                        </Link>
                     </div>
 
                     {leagues.length === 0 ? (
                         <div className="px-6 py-14 text-center">
                             <p className="text-gray-400 mb-1">No leagues synced yet.</p>
-                            <p className="text-gray-600 text-sm">Connect a Sleeper, ESPN, or Yahoo league to get started.</p>
+                            <p className="text-gray-600 text-sm mb-4">Connect your Sleeper account to get started.</p>
+                            <Link
+                                href="/dashboard/sync"
+                                className="inline-block bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-5 py-2.5 rounded-lg transition text-sm"
+                            >
+                                Sync a Sleeper League
+                            </Link>
                         </div>
                     ) : (
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="text-gray-400 text-left border-b border-gray-800">
-                                    <th className="px-6 py-3 font-medium">League</th>
-                                    <th className="px-6 py-3 font-medium">Platform</th>
-                                    <th className="px-6 py-3 font-medium">Season</th>
-                                    <th className="px-6 py-3 font-medium">Size</th>
-                                    <th className="px-6 py-3 font-medium">Last Synced</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {leagues.map((league) => (
-                                    <tr key={league.id} className="border-b border-gray-800/50 last:border-0 hover:bg-gray-800/30 transition-colors">
-                                        <td className="px-6 py-4 font-medium text-white">{league.leagueName}</td>
-                                        <td className="px-6 py-4 text-gray-300 capitalize">{league.platform}</td>
-                                        <td className="px-6 py-4 text-gray-300">{league.seasonYear}</td>
-                                        <td className="px-6 py-4 text-gray-300">{league.leagueSize ?? '—'}</td>
-                                        <td className="px-6 py-4 text-gray-400">
-                                            {league.lastSyncedAt
-                                                ? new Date(league.lastSyncedAt).toLocaleDateString()
-                                                : 'Never'}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                        <ul className="divide-y divide-gray-800/50">
+                            {leagues.map((league) => (
+                                <li key={league.id} className="flex items-center gap-4 px-6 py-4 hover:bg-gray-800/20 transition">
+                                    {league.avatar ? (
+                                        <Image
+                                            src={`https://sleepercdn.com/avatars/thumbs/${league.avatar}`}
+                                            alt={league.leagueName}
+                                            width={40}
+                                            height={40}
+                                            className="rounded-lg shrink-0"
+                                        />
+                                    ) : (
+                                        <div className="w-10 h-10 rounded-lg bg-gray-800 shrink-0 flex items-center justify-center text-gray-600 text-xs font-bold">
+                                            FF
+                                        </div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-medium text-white truncate">{league.leagueName}</p>
+                                        <p className="text-gray-500 text-xs mt-0.5 capitalize">
+                                            {league.platform} · {league.season} · {league.totalRosters} teams
+                                            {league.scoringType ? ` · ${league.scoringType.toUpperCase().replace('_', ' ')}` : ''}
+                                        </p>
+                                    </div>
+                                    <span className={`shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${LEAGUE_STATUS_STYLES[league.status] ?? LEAGUE_STATUS_STYLES.complete}`}>
+                                        {leagueStatusLabel(league.status)}
+                                    </span>
+                                    <span className="text-gray-600 text-xs shrink-0 hidden sm:block">
+                                        {league.lastSyncedAt
+                                            ? new Date(league.lastSyncedAt).toLocaleDateString()
+                                            : 'Never'}
+                                    </span>
+                                    <form action={unsyncLeague.bind(null, league.leagueId)}>
+                                        <button
+                                            type="submit"
+                                            className="shrink-0 text-gray-600 hover:text-red-400 transition text-sm px-2 py-1 rounded"
+                                            title="Unsync"
+                                        >
+                                            ✕
+                                        </button>
+                                    </form>
+                                </li>
+                            ))}
+                        </ul>
                     )}
                 </div>
 
@@ -192,10 +243,10 @@ export default async function DashboardPage() {
                 <div>
                     <h2 className="font-semibold text-lg mb-4">Quick Actions</h2>
                     <div className="grid sm:grid-cols-3 gap-3">
-                        <Link href="/leagues/sync" className="bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">
+                        <Link href="/dashboard/sync" className="bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">
                             <div className="text-2xl mb-2">🔗</div>
                             <p className="font-semibold text-white group-hover:text-[#C8A951] transition">Sync a League</p>
-                            <p className="text-gray-500 text-sm mt-0.5">Connect Sleeper, ESPN, or Yahoo</p>
+                            <p className="text-gray-500 text-sm mt-0.5">Connect your Sleeper account</p>
                         </Link>
                         <Link href="/trade-chart" className="bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">
                             <div className="text-2xl mb-2">📊</div>
