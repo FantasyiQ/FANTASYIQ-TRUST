@@ -35,7 +35,7 @@ const TIER_RANK: Record<string, number> = {
 
 export async function POST(request: NextRequest): Promise<Response> {
     const session = await auth();
-    if (!session?.user?.id) {
+    if (!session?.user?.email) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -52,11 +52,18 @@ export async function POST(request: NextRequest): Promise<Response> {
         return Response.json({ error: 'Invalid priceId' }, { status: 400 });
     }
 
-    // Load user's current subscription
-    const sub = await prisma.subscription.findUnique({
-        where: { userId: session.user.id },
-        select: { stripeSubscriptionId: true, status: true },
+    // Look up user by email — same source as dashboard/pricing/navbar
+    const dbUser = await prisma.user.findUnique({
+        where: { email: session.user.email },
+        select: { id: true, subscription: { select: { stripeSubscriptionId: true, status: true } } },
     });
+
+    if (!dbUser) {
+        return Response.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const userId = dbUser.id;
+    const sub = dbUser.subscription;
 
     if (!sub?.stripeSubscriptionId) {
         return Response.json({ error: 'No active subscription found' }, { status: 404 });
@@ -104,13 +111,13 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     await prisma.$transaction([
         prisma.user.update({
-            where: { id: session.user.id },
+            where: { id: userId },
             data: { subscriptionTier: newTier },
         }),
         prisma.subscription.upsert({
-            where: { userId: session.user.id },
+            where: { userId },
             create: {
-                userId: session.user.id,
+                userId,
                 stripeSubscriptionId: updated.id,
                 stripeCustomerId: updated.customer as string,
                 tier: newTier,
