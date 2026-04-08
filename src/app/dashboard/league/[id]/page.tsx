@@ -7,11 +7,15 @@ import {
     getLeague,
     getLeagueUsers,
     getLeagueRosters,
+    getPlayers,
     scoringLabel,
     summariseRosterPositions,
     type SleeperLeagueMember,
     type SleeperRoster,
 } from '@/lib/sleeper';
+import RosterCards, { type TeamRosterData } from './RosterCards';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const LEAGUE_STATUS_STYLES: Record<string, string> = {
     in_season: 'bg-green-900/40 text-green-400 border-green-800',
@@ -38,6 +42,9 @@ function ppts(roster: SleeperRoster): number {
     return (roster.settings?.ppts ?? 0) + (roster.settings?.ppts_decimal ?? 0) / 100;
 }
 
+/** Positions that are starter slots (not bench/IR) */
+const BENCH_SLOTS = new Set(['BN', 'IR']);
+
 interface StandingsRow {
     rank: number;
     roster: SleeperRoster;
@@ -49,6 +56,8 @@ interface StandingsRow {
     pointsFor: number;
     pointsAgainst: number;
 }
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function LeagueDetailPage({
     params,
@@ -78,18 +87,19 @@ export default async function LeagueDetailPage({
 
     if (!league || league.userId !== session.user.id) notFound();
 
-    // Fetch live Sleeper data in parallel
-    const [sleeperLeague, members, rosters] = await Promise.all([
+    // Fetch live Sleeper data + player cache in parallel
+    const [sleeperLeague, members, rosters, allPlayers] = await Promise.all([
         getLeague(league.leagueId),
         getLeagueUsers(league.leagueId),
         getLeagueRosters(league.leagueId),
+        getPlayers(),
     ]);
 
     const memberMap = new Map<string, SleeperLeagueMember>(
         members.map((m) => [m.user_id, m])
     );
 
-    // Build standings — rosters without an owner go to the end
+    // Build standings
     const rows: StandingsRow[] = rosters
         .map((roster) => {
             const member = roster.owner_id ? memberMap.get(roster.owner_id) : undefined;
@@ -117,8 +127,50 @@ export default async function LeagueDetailPage({
         sleeperLeague.roster_positions ??
         [];
 
+    // Starter slot labels = rosterPositions with BN/IR removed
+    const starterSlots = rosterPositions.filter((pos) => !BENCH_SLOTS.has(pos));
+
+    // Collect only the player IDs referenced across all rosters
+    const neededIds = new Set<string>();
+    for (const roster of rosters) {
+        for (const pid of roster.players ?? []) neededIds.add(pid);
+        for (const pid of roster.starters ?? []) neededIds.add(pid);
+    }
+    neededIds.delete('0'); // empty slot sentinel
+
+    const players: Record<string, (typeof allPlayers)[string]> = {};
+    for (const pid of neededIds) {
+        if (allPlayers[pid]) players[pid] = allPlayers[pid];
+    }
+
+    // Build team roster data for the client component (standings order)
+    const teamRosters: TeamRosterData[] = rows.map((row) => {
+        const starterSet = new Set(
+            (row.roster.starters ?? []).filter((pid) => pid !== '0')
+        );
+        const bench = (row.roster.players ?? [])
+            .filter((pid) => !starterSet.has(pid));
+
+        return {
+            rosterId: row.roster.roster_id,
+            rank: row.rank,
+            teamName: row.teamName,
+            username: row.member?.username,
+            avatar: row.member?.avatar,
+            wins: row.wins,
+            losses: row.losses,
+            ties: row.ties,
+            pointsFor: row.pointsFor,
+            starters: row.roster.starters ?? [],
+            bench,
+            starterSlots,
+        };
+    });
+
     const currentScoringType = league.scoringType ?? 'std';
     const leagueSettings = sleeperLeague.settings;
+    const hasTies = rows.some((r) => r.ties > 0);
+    const hasPA = rows.some((r) => r.pointsAgainst > 0);
 
     return (
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
@@ -174,78 +226,57 @@ export default async function LeagueDetailPage({
                                     <th className="px-4 py-3 font-medium">Team</th>
                                     <th className="px-4 py-3 font-medium text-center">W</th>
                                     <th className="px-4 py-3 font-medium text-center">L</th>
-                                    {rows.some((r) => r.ties > 0) && (
-                                        <th className="px-4 py-3 font-medium text-center">T</th>
-                                    )}
+                                    {hasTies && <th className="px-4 py-3 font-medium text-center">T</th>}
                                     <th className="px-4 py-3 font-medium text-right">PF</th>
-                                    {rows.some((r) => r.pointsAgainst > 0) && (
-                                        <th className="px-4 py-3 font-medium text-right pr-6">PA</th>
-                                    )}
+                                    {hasPA && <th className="px-4 py-3 font-medium text-right pr-6">PA</th>}
                                 </tr>
                             </thead>
                             <tbody>
-                                {rows.map((row) => {
-                                    const isMe = row.member?.user_id
-                                        ? members.find(
-                                              (m) =>
-                                                  m.user_id === row.member?.user_id &&
-                                                  m.is_owner
-                                          )
-                                        : false;
-                                    const hasTies = rows.some((r) => r.ties > 0);
-                                    const hasPA = rows.some((r) => r.pointsAgainst > 0);
-
-                                    return (
-                                        <tr
-                                            key={row.roster.roster_id}
-                                            className={`border-b border-gray-800/50 last:border-0 transition-colors ${
-                                                isMe
-                                                    ? 'bg-[#C8A951]/5 border-l-2 border-l-[#C8A951]'
-                                                    : 'hover:bg-gray-800/20'
-                                            }`}
-                                        >
-                                            <td className="px-6 py-4 text-gray-500 font-medium">{row.rank}</td>
-                                            <td className="px-4 py-4">
-                                                <div className="flex items-center gap-3">
-                                                    {row.member?.avatar ? (
-                                                        <Image
-                                                            src={`https://sleepercdn.com/avatars/thumbs/${row.member.avatar}`}
-                                                            alt={row.teamName}
-                                                            width={28}
-                                                            height={28}
-                                                            className="rounded-full shrink-0"
-                                                        />
-                                                    ) : (
-                                                        <div className="w-7 h-7 rounded-full bg-gray-800 shrink-0 flex items-center justify-center text-xs font-bold text-gray-600">
-                                                            {row.teamName[0]?.toUpperCase() ?? '?'}
-                                                        </div>
-                                                    )}
-                                                    <div>
-                                                        <p className={`font-medium ${isMe ? 'text-[#C8A951]' : 'text-white'}`}>
-                                                            {row.teamName}
-                                                            {isMe && <span className="ml-2 text-xs text-[#C8A951]/70">(You)</span>}
-                                                        </p>
-                                                        {row.member && (
-                                                            <p className="text-gray-600 text-xs">@{row.member.username}</p>
-                                                        )}
+                                {rows.map((row) => (
+                                    <tr
+                                        key={row.roster.roster_id}
+                                        className="border-b border-gray-800/50 last:border-0 hover:bg-gray-800/20 transition-colors"
+                                    >
+                                        <td className="px-6 py-4 text-gray-500 font-medium">{row.rank}</td>
+                                        <td className="px-4 py-4">
+                                            <div className="flex items-center gap-3">
+                                                {row.member?.avatar ? (
+                                                    <Image
+                                                        src={`https://sleepercdn.com/avatars/thumbs/${row.member.avatar}`}
+                                                        alt={row.teamName}
+                                                        width={28}
+                                                        height={28}
+                                                        className="rounded-full shrink-0"
+                                                    />
+                                                ) : (
+                                                    <div className="w-7 h-7 rounded-full bg-gray-800 shrink-0 flex items-center justify-center text-xs font-bold text-gray-600">
+                                                        {row.teamName[0]?.toUpperCase() ?? '?'}
                                                     </div>
+                                                )}
+                                                <div>
+                                                    <p className="font-medium text-white">{row.teamName}</p>
+                                                    {row.member && (
+                                                        <p className="text-gray-600 text-xs">@{row.member.username}</p>
+                                                    )}
                                                 </div>
-                                            </td>
-                                            <td className="px-4 py-4 text-center font-semibold text-white">{row.wins}</td>
-                                            <td className="px-4 py-4 text-center text-gray-400">{row.losses}</td>
-                                            {hasTies && (
-                                                <td className="px-4 py-4 text-center text-gray-500">{row.ties}</td>
-                                            )}
-                                            <td className="px-4 py-4 text-right text-gray-300">{row.pointsFor.toFixed(2)}</td>
-                                            {hasPA && (
-                                                <td className="px-4 py-4 text-right text-gray-500 pr-6">{row.pointsAgainst.toFixed(2)}</td>
-                                            )}
-                                        </tr>
-                                    );
-                                })}
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-4 text-center font-semibold text-white">{row.wins}</td>
+                                        <td className="px-4 py-4 text-center text-gray-400">{row.losses}</td>
+                                        {hasTies && <td className="px-4 py-4 text-center text-gray-500">{row.ties}</td>}
+                                        <td className="px-4 py-4 text-right text-gray-300">{row.pointsFor.toFixed(2)}</td>
+                                        {hasPA && <td className="px-4 py-4 text-right text-gray-500 pr-6">{row.pointsAgainst.toFixed(2)}</td>}
+                                    </tr>
+                                ))}
                             </tbody>
                         </table>
                     </div>
+                </div>
+
+                {/* Team Rosters */}
+                <div>
+                    <h2 className="font-semibold text-lg mb-4">Team Rosters</h2>
+                    <RosterCards teams={teamRosters} players={players} />
                 </div>
 
                 {/* League info grid */}

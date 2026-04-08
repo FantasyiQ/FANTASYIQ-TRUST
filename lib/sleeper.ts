@@ -92,6 +92,57 @@ export async function getLeagueRosters(leagueId: string): Promise<SleeperRoster[
     return sleeperFetch<SleeperRoster[]>(`/league/${leagueId}/rosters`);
 }
 
+// ─── Player cache ────────────────────────────────────────────────────────────
+
+export interface SlimPlayer {
+    full_name: string;
+    position: string;
+    team: string;
+}
+
+type RawPlayer = {
+    active?: boolean;
+    position?: string;
+    full_name?: string;
+    first_name?: string;
+    last_name?: string;
+    team?: string;
+};
+
+let playersCache: Record<string, SlimPlayer> | null = null;
+let playersCacheTime = 0;
+
+export async function getPlayers(): Promise<Record<string, SlimPlayer>> {
+    const ONE_DAY = 24 * 60 * 60 * 1000;
+    if (playersCache && Date.now() - playersCacheTime < ONE_DAY) {
+        return playersCache;
+    }
+
+    const res = await fetch('https://api.sleeper.app/v1/players/nfl');
+    if (!res.ok) throw new Error(`Sleeper players fetch failed: ${res.status}`);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const data: Record<string, RawPlayer> = await res.json();
+
+    const slim: Record<string, SlimPlayer> = {};
+    for (const [id, player] of Object.entries(data)) {
+        if (player.active && player.position) {
+            slim[id] = {
+                full_name:
+                    player.full_name ||
+                    `${player.first_name ?? ''} ${player.last_name ?? ''}`.trim(),
+                position: player.position,
+                team: player.team ?? 'FA',
+            };
+        }
+    }
+
+    playersCache = slim;
+    playersCacheTime = Date.now();
+    return slim;
+}
+
+// ─── Derived helpers ──────────────────────────────────────────────────────────
+
 export function deriveScoringType(league: SleeperLeague): string {
     const rec = league.scoring_settings?.rec ?? 0;
     if (rec === 1) return 'ppr';
