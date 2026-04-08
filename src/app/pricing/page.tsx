@@ -13,19 +13,23 @@ export default async function PricingPage() {
         const user = await prisma.user.findUnique({
             where: { email: session.user.email },
             select: {
+                // subscriptionTier on the User row is the authoritative source —
+                // the upgrade API updates this directly and it's what the navbar uses
+                subscriptionTier: true,
                 subscription: {
-                    select: { status: true, tier: true, stripeSubscriptionId: true },
+                    select: { status: true, stripeSubscriptionId: true },
                 },
             },
         });
 
         const sub = user?.subscription;
         if (
+            user &&
             sub?.stripeSubscriptionId &&
             (sub.status === 'active' || sub.status === 'trialing')
         ) {
             activeSub = {
-                tier: sub.tier,
+                tier: user.subscriptionTier,   // User table, not Subscription table
                 stripeSubscriptionId: sub.stripeSubscriptionId,
             };
         }
