@@ -67,12 +67,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             }
             return true;
         },
-        async jwt({ token, user }) {
+        async jwt({ token, user, trigger }) {
             if (user) {
                 token.sub = user.id;
                 token.picture = user.image;
                 // @ts-expect-error — extended field
                 token.subscriptionTier = user.subscriptionTier;
+            }
+            // Re-fetch tier from DB when client calls session.update()
+            if (trigger === 'update' && token.sub) {
+                const fresh = await prisma.user.findUnique({
+                    where: { id: token.sub },
+                    select: { subscriptionTier: true },
+                });
+                if (fresh) {
+                    token.subscriptionTier = fresh.subscriptionTier;
+                }
             }
             return token;
         },
