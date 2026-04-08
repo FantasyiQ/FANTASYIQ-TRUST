@@ -93,17 +93,38 @@ export async function POST(request: NextRequest): Promise<Response> {
         proration_behavior: 'always_invoice',
     });
 
-    // Update DB — the webhook will also fire but update eagerly for instant UI
+    // Update DB synchronously — do not wait for the webhook
+    const updatedItem = updated.items.data[0];
+    const periodStart = updatedItem?.current_period_start
+        ? new Date(updatedItem.current_period_start * 1000)
+        : null;
+    const periodEnd = updatedItem?.current_period_end
+        ? new Date(updatedItem.current_period_end * 1000)
+        : null;
+
     await prisma.$transaction([
         prisma.user.update({
             where: { id: session.user.id },
             data: { subscriptionTier: newTier },
         }),
-        prisma.subscription.update({
+        prisma.subscription.upsert({
             where: { userId: session.user.id },
-            data: {
+            create: {
+                userId: session.user.id,
+                stripeSubscriptionId: updated.id,
+                stripeCustomerId: updated.customer as string,
                 tier: newTier,
                 status: updated.status,
+                currentPeriodStart: periodStart,
+                currentPeriodEnd: periodEnd,
+                cancelAtPeriodEnd: updated.cancel_at_period_end,
+            },
+            update: {
+                tier: newTier,
+                status: updated.status,
+                currentPeriodStart: periodStart,
+                currentPeriodEnd: periodEnd,
+                cancelAtPeriodEnd: updated.cancel_at_period_end,
             },
         }),
     ]);

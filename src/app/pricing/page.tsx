@@ -2,6 +2,8 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import PricingClient from './PricingClient';
 
+export const dynamic = 'force-dynamic';
+
 export default async function PricingPage() {
     const session = await auth();
 
