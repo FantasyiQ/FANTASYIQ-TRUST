@@ -15,13 +15,28 @@ export interface SleeperLeague {
     total_rosters: number;
     avatar: string | null;
     settings: {
-        type: number;       // 0 = redraft, 2 = dynasty
+        type: number;           // 0 = redraft, 2 = dynasty
         scoring_type?: string;
+        playoff_teams?: number;
+        trade_deadline?: number;
+        num_teams?: number;
+        roster_positions?: string[];
     };
     scoring_settings: {
-        rec?: number;       // 0 = std, 0.5 = half_ppr, 1 = ppr
+        rec?: number;           // 0 = std, 0.5 = half_ppr, 1 = ppr
     };
     roster_positions: string[];
+}
+
+export interface SleeperLeagueMember {
+    user_id: string;
+    username: string;
+    display_name: string;
+    avatar: string | null;
+    metadata: {
+        team_name?: string;
+    };
+    is_owner?: boolean;
 }
 
 export interface SleeperRoster {
@@ -29,6 +44,15 @@ export interface SleeperRoster {
     owner_id: string | null;
     players: string[] | null;
     starters: string[] | null;
+    settings: {
+        wins: number;
+        losses: number;
+        ties?: number;
+        fpts: number;
+        fpts_decimal?: number;
+        ppts?: number;
+        ppts_decimal?: number;
+    };
 }
 
 export interface SleeperNflState {
@@ -56,6 +80,14 @@ export async function getNflState(): Promise<SleeperNflState> {
     return sleeperFetch<SleeperNflState>('/state/nfl');
 }
 
+export async function getLeague(leagueId: string): Promise<SleeperLeague> {
+    return sleeperFetch<SleeperLeague>(`/league/${leagueId}`);
+}
+
+export async function getLeagueUsers(leagueId: string): Promise<SleeperLeagueMember[]> {
+    return sleeperFetch<SleeperLeagueMember[]>(`/league/${leagueId}/users`);
+}
+
 export async function getLeagueRosters(leagueId: string): Promise<SleeperRoster[]> {
     return sleeperFetch<SleeperRoster[]>(`/league/${leagueId}/rosters`);
 }
@@ -65,4 +97,36 @@ export function deriveScoringType(league: SleeperLeague): string {
     if (rec === 1) return 'ppr';
     if (rec === 0.5) return 'half_ppr';
     return 'std';
+}
+
+export function scoringLabel(scoringType: string): string {
+    switch (scoringType) {
+        case 'ppr':      return 'PPR';
+        case 'half_ppr': return 'Half PPR';
+        default:         return 'Standard';
+    }
+}
+
+/** Summarise roster_positions into "1 QB, 2 RB, …, 6 BN" */
+export function summariseRosterPositions(positions: string[]): string {
+    const counts = new Map<string, number>();
+    for (const pos of positions) {
+        counts.set(pos, (counts.get(pos) ?? 0) + 1);
+    }
+    // Preferred display order
+    const order = ['QB', 'RB', 'WR', 'TE', 'FLEX', 'SUPER_FLEX', 'K', 'DEF', 'IDP_FLEX', 'BN', 'IR'];
+    const parts: string[] = [];
+    for (const pos of order) {
+        const n = counts.get(pos);
+        if (n) {
+            const label = pos === 'SUPER_FLEX' ? 'SF' : pos === 'IDP_FLEX' ? 'IDP' : pos;
+            parts.push(`${n} ${label}`);
+            counts.delete(pos);
+        }
+    }
+    // Remaining unknown positions
+    for (const [pos, n] of counts) {
+        parts.push(`${n} ${pos}`);
+    }
+    return parts.join(', ');
 }

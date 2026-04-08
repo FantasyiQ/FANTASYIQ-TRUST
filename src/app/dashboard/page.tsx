@@ -195,7 +195,10 @@ export default async function DashboardPage() {
                     ) : (
                         <ul className="divide-y divide-gray-800/50">
                             {leagues.map((league) => (
-                                <li key={league.id} className="flex items-center gap-4 px-6 py-4 hover:bg-gray-800/20 transition">
+                                <li key={league.id} className="relative flex items-center gap-4 px-6 py-4 hover:bg-gray-800/30 hover:border-l-2 hover:border-l-[#C8A951]/40 transition-all group">
+                                    {/* Clickable overlay — entire row navigates to detail page */}
+                                    <Link href={`/dashboard/league/${league.id}`} className="absolute inset-0" aria-label={league.leagueName} />
+
                                     {league.avatar ? (
                                         <Image
                                             src={`https://sleepercdn.com/avatars/thumbs/${league.avatar}`}
@@ -210,7 +213,7 @@ export default async function DashboardPage() {
                                         </div>
                                     )}
                                     <div className="flex-1 min-w-0">
-                                        <p className="font-medium text-white truncate">{league.leagueName}</p>
+                                        <p className="font-medium text-white truncate group-hover:text-[#C8A951] transition-colors">{league.leagueName}</p>
                                         <p className="text-gray-500 text-xs mt-0.5 capitalize">
                                             {league.platform} · {league.season} · {league.totalRosters} teams
                                             {league.scoringType ? ` · ${league.scoringType.toUpperCase().replace('_', ' ')}` : ''}
@@ -224,7 +227,8 @@ export default async function DashboardPage() {
                                             ? new Date(league.lastSyncedAt).toLocaleDateString()
                                             : 'Never'}
                                     </span>
-                                    <form action={unsyncLeague.bind(null, league.leagueId)}>
+                                    {/* Unsync button sits above the overlay link */}
+                                    <form action={unsyncLeague.bind(null, league.leagueId)} className="relative z-10">
                                         <button
                                             type="submit"
                                             className="shrink-0 text-gray-600 hover:text-red-400 transition text-sm px-2 py-1 rounded"
