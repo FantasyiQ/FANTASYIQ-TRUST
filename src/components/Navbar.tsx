@@ -1,15 +1,22 @@
 import Link from 'next/link';
 import { auth, signOut } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 
 export default async function Navbar() {
   const session = await auth();
   const loggedIn = !!session?.user;
 
-  // subscriptionTier is injected into the JWT by auth.ts callbacks
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const subscriptionTier = (session?.user as any)?.subscriptionTier as string | undefined;
-  const isElite =
-    subscriptionTier === 'PLAYER_ELITE' || subscriptionTier === 'COMMISSIONER_ELITE';
+  // Read tier from DB — not from JWT, which is stale after an upgrade
+  let isElite = false;
+  if (session?.user?.email) {
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { subscriptionTier: true },
+    });
+    isElite =
+      user?.subscriptionTier === 'PLAYER_ELITE' ||
+      user?.subscriptionTier === 'COMMISSIONER_ELITE';
+  }
 
   return (
     <nav className="fixed top-0 w-full z-50 bg-gray-950/90 backdrop-blur-sm border-b border-gray-800">

@@ -284,7 +284,7 @@ export default async function DashboardPage() {
                         <Link href="/pricing" className="bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">
                             <div className="text-2xl mb-2">💳</div>
                             <p className="font-semibold text-white group-hover:text-[#C8A951] transition">Manage Subscription</p>
-                            <p className="text-gray-500 text-sm mt-0.5">Plans, billing, and upgrades</p>
+                            <p className="text-gray-500 text-sm mt-0.5">{isElite ? 'Billing and plan details' : 'Plans, billing, and upgrades'}</p>
                         </Link>
                     </div>
                 </div>
