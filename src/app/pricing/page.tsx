@@ -10,7 +10,6 @@ type TeamSize = 8 | 10 | 12 | 14 | 16 | 32;
 interface Feature {
   name: string;
   included: boolean;
-  inherit?: boolean;
 }
 
 /* ── Data ─────────────────────────────────────────────────────────── */
@@ -36,59 +35,115 @@ const PLAYER_PRICE_IDS = {
   elite:   findPriceId('Player Elite'),
 };
 
-function commPriceId(
-  tier: 'Pro' | 'All-Pro' | 'Elite',
-  size: TeamSize
-): string {
+function commPriceId(tier: 'Pro' | 'All-Pro' | 'Elite', size: TeamSize): string {
   return findPriceId(`Commissioner ${tier} — ${size} Team`);
 }
 
 /* ── Feature lists ────────────────────────────────────────────────── */
-const PRO_FEATURES: Feature[] = [
-  { name: 'Zero Fees', included: true },
-  { name: 'League Funds Secured', included: true },
-  { name: 'League Dues & Payouts Tracked', included: true },
-  { name: 'Immediate Payouts', included: true },
-  { name: 'Commissioner Hub', included: true },
-  { name: 'Sync Up to 2 Leagues', included: true },
-  { name: 'Optimized Lineups', included: true },
-  { name: 'Player Rankings & Auction Values', included: true },
-  { name: 'Personalized Waiver Wire Strategy', included: false },
-  { name: 'Dynamic Trade Calculator', included: false },
-  { name: 'Power League Rankings', included: false },
-  { name: 'Player Indicators & Mock Drafts', included: false },
-  { name: 'Dynamic Mock Drafts', included: false },
-  { name: 'League Analysis & Team Builder', included: false },
+
+// Player Plans — all features shown on every card
+const PLAYER_PRO_FEATURES: Feature[] = [
+  { name: 'Zero Fees',                          included: true  },
+  { name: 'League Funds Secured',               included: true  },
+  { name: 'League Dues & Payouts Tracked',      included: true  },
+  { name: 'Immediate Payouts',                  included: true  },
+  { name: 'Commissioner Hub',                   included: true  },
+  { name: 'Optimized Lineups',                  included: true  },
+  { name: 'Player Rankings & Auction Values',   included: true  },
+  { name: 'Sync Up to 2 Leagues',               included: true  },
+  { name: 'Personalized Waiver Wire Strategy',  included: false },
+  { name: 'Dynamic Trade Calculator',           included: false },
+  { name: 'Power League Rankings',              included: false },
+  { name: 'Player Indicators & Mock Drafts',    included: false },
+  { name: 'Dynamic Mock Drafts',                included: false },
+  { name: 'League Analysis & Team Builder',     included: false },
 ];
 
-const ALL_PRO_FEATURES: Feature[] = [
-  { name: 'Everything in Pro', included: true, inherit: true },
-  { name: 'Sync Up to 5 Leagues', included: true },
-  { name: 'Personalized Waiver Wire Strategy', included: true },
-  { name: 'Dynamic Trade Calculator', included: true },
-  { name: 'Power League Rankings', included: true },
-  { name: 'Player Indicators & Mock Drafts', included: true },
-  { name: 'Dynamic Mock Drafts', included: false },
-  { name: 'League Analysis & Team Builder', included: false },
+const PLAYER_ALL_PRO_FEATURES: Feature[] = [
+  { name: 'Zero Fees',                          included: true  },
+  { name: 'League Funds Secured',               included: true  },
+  { name: 'League Dues & Payouts Tracked',      included: true  },
+  { name: 'Immediate Payouts',                  included: true  },
+  { name: 'Commissioner Hub',                   included: true  },
+  { name: 'Optimized Lineups',                  included: true  },
+  { name: 'Player Rankings & Auction Values',   included: true  },
+  { name: 'Sync Up to 5 Leagues',               included: true  },
+  { name: 'Personalized Waiver Wire Strategy',  included: true  },
+  { name: 'Dynamic Trade Calculator',           included: true  },
+  { name: 'Power League Rankings',              included: true  },
+  { name: 'Player Indicators & Mock Drafts',    included: true  },
+  { name: 'Dynamic Mock Drafts',                included: false },
+  { name: 'League Analysis & Team Builder',     included: false },
 ];
 
-const ELITE_FEATURES: Feature[] = [
-  { name: 'Everything in All-Pro', included: true, inherit: true },
-  { name: 'Unlimited League Syncs', included: true },
-  { name: 'Dynamic Mock Drafts', included: true },
-  { name: 'League Analysis & Team Builder', included: true },
+const PLAYER_ELITE_FEATURES: Feature[] = [
+  { name: 'Zero Fees',                          included: true },
+  { name: 'League Funds Secured',               included: true },
+  { name: 'League Dues & Payouts Tracked',      included: true },
+  { name: 'Immediate Payouts',                  included: true },
+  { name: 'Commissioner Hub',                   included: true },
+  { name: 'Optimized Lineups',                  included: true },
+  { name: 'Player Rankings & Auction Values',   included: true },
+  { name: 'Unlimited League Syncs',             included: true },
+  { name: 'Personalized Waiver Wire Strategy',  included: true },
+  { name: 'Dynamic Trade Calculator',           included: true },
+  { name: 'Power League Rankings',              included: true },
+  { name: 'Player Indicators & Mock Drafts',    included: true },
+  { name: 'Dynamic Mock Drafts',                included: true },
+  { name: 'League Analysis & Team Builder',     included: true },
+];
+
+// Commissioner Plans — no sync features
+const COMM_PRO_FEATURES: Feature[] = [
+  { name: 'Zero Fees',                          included: true  },
+  { name: 'League Funds Secured',               included: true  },
+  { name: 'League Dues & Payouts Tracked',      included: true  },
+  { name: 'Immediate Payouts',                  included: true  },
+  { name: 'Commissioner Hub',                   included: true  },
+  { name: 'Optimized Lineups',                  included: true  },
+  { name: 'Player Rankings & Auction Values',   included: true  },
+  { name: 'Personalized Waiver Wire Strategy',  included: false },
+  { name: 'Dynamic Trade Calculator',           included: false },
+  { name: 'Power League Rankings',              included: false },
+  { name: 'Player Indicators & Mock Drafts',    included: false },
+  { name: 'Dynamic Mock Drafts',                included: false },
+  { name: 'League Analysis & Team Builder',     included: false },
+];
+
+const COMM_ALL_PRO_FEATURES: Feature[] = [
+  { name: 'Zero Fees',                          included: true  },
+  { name: 'League Funds Secured',               included: true  },
+  { name: 'League Dues & Payouts Tracked',      included: true  },
+  { name: 'Immediate Payouts',                  included: true  },
+  { name: 'Commissioner Hub',                   included: true  },
+  { name: 'Optimized Lineups',                  included: true  },
+  { name: 'Player Rankings & Auction Values',   included: true  },
+  { name: 'Personalized Waiver Wire Strategy',  included: true  },
+  { name: 'Dynamic Trade Calculator',           included: true  },
+  { name: 'Power League Rankings',              included: true  },
+  { name: 'Player Indicators & Mock Drafts',    included: true  },
+  { name: 'Dynamic Mock Drafts',                included: false },
+  { name: 'League Analysis & Team Builder',     included: false },
+];
+
+const COMM_ELITE_FEATURES: Feature[] = [
+  { name: 'Zero Fees',                          included: true },
+  { name: 'League Funds Secured',               included: true },
+  { name: 'League Dues & Payouts Tracked',      included: true },
+  { name: 'Immediate Payouts',                  included: true },
+  { name: 'Commissioner Hub',                   included: true },
+  { name: 'Optimized Lineups',                  included: true },
+  { name: 'Player Rankings & Auction Values',   included: true },
+  { name: 'Personalized Waiver Wire Strategy',  included: true },
+  { name: 'Dynamic Trade Calculator',           included: true },
+  { name: 'Power League Rankings',              included: true },
+  { name: 'Player Indicators & Mock Drafts',    included: true },
+  { name: 'Dynamic Mock Drafts',                included: true },
+  { name: 'League Analysis & Team Builder',     included: true },
 ];
 
 /* ── Sub-components ───────────────────────────────────────────────── */
 function FeatureRow({ f }: { f: Feature }) {
-  if (f.inherit) {
-    return (
-      <li className="flex items-center gap-2.5 py-1.5">
-        <span className="text-[#C9A227] text-sm">★</span>
-        <span className="text-[#C9A227] font-semibold text-sm">{f.name}</span>
-      </li>
-    );
-  }
   return (
     <li className="flex items-center gap-2.5 py-1.5">
       {f.included ? (
@@ -100,10 +155,10 @@ function FeatureRow({ f }: { f: Feature }) {
         </>
       ) : (
         <>
-          <svg className="w-4 h-4 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+          <svg className="w-4 h-4 text-red-500/60 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
-          <span className="text-gray-500 text-sm line-through">{f.name}</span>
+          <span className="text-gray-600 text-sm">{f.name}</span>
         </>
       )}
     </li>
@@ -209,24 +264,24 @@ export default function PricingPage() {
           </div>
         </div>
 
-        {/* Team-size selector (commissioner only) */}
+        {/* Team-size selector — full width, Commissioner only */}
         {tab === 'commissioner' && (
-          <div className="flex justify-center mb-10">
-            <div className="flex items-center gap-3 flex-wrap justify-center">
-              <span className="text-gray-400 text-sm font-medium">League Size:</span>
-              <div className="inline-flex bg-gray-900 rounded-lg p-1 border border-gray-800">
-                {TEAM_SIZES.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setSize(s)}
-                    className={`px-3 py-1.5 rounded-md text-sm font-semibold transition-colors ${
-                      size === s ? 'bg-[#C9A227] text-black' : 'text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    {s}T
-                  </button>
-                ))}
-              </div>
+          <div className="mb-10 max-w-5xl mx-auto">
+            <p className="text-center text-gray-400 text-sm font-medium mb-3">League Size</p>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              {TEAM_SIZES.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setSize(s)}
+                  className={`py-2.5 rounded-xl text-sm font-semibold transition-all border ${
+                    size === s
+                      ? 'bg-[#C9A227] text-black border-[#C9A227]'
+                      : 'bg-gray-900 text-gray-400 border-gray-800 hover:border-gray-600 hover:text-white'
+                  }`}
+                >
+                  {s} Teams
+                </button>
+              ))}
             </div>
           </div>
         )}
@@ -239,7 +294,7 @@ export default function PricingPage() {
                 name="Pro"
                 price="5.99"
                 period="/yr"
-                features={PRO_FEATURES}
+                features={PLAYER_PRO_FEATURES}
                 priceId={PLAYER_PRICE_IDS.pro}
                 tier="PLAYER_PRO"
               />
@@ -250,7 +305,7 @@ export default function PricingPage() {
                 badge="Most Popular"
                 badgeGold
                 ring
-                features={ALL_PRO_FEATURES}
+                features={PLAYER_ALL_PRO_FEATURES}
                 priceId={PLAYER_PRICE_IDS.all_pro}
                 tier="PLAYER_ALL_PRO"
               />
@@ -259,7 +314,7 @@ export default function PricingPage() {
                 price="17.99"
                 period="/yr"
                 badge="Full Access"
-                features={ELITE_FEATURES}
+                features={PLAYER_ELITE_FEATURES}
                 priceId={PLAYER_PRICE_IDS.elite}
                 tier="PLAYER_ELITE"
               />
@@ -270,7 +325,7 @@ export default function PricingPage() {
                 name="Commissioner Pro"
                 price={proPx}
                 period="/season"
-                features={PRO_FEATURES}
+                features={COMM_PRO_FEATURES}
                 priceId={commPriceId('Pro', size)}
                 tier="COMMISSIONER_PRO"
               />
@@ -281,7 +336,7 @@ export default function PricingPage() {
                 badge="Most Popular"
                 badgeGold
                 ring
-                features={ALL_PRO_FEATURES}
+                features={COMM_ALL_PRO_FEATURES}
                 priceId={commPriceId('All-Pro', size)}
                 tier="COMMISSIONER_ALL_PRO"
               />
@@ -290,7 +345,7 @@ export default function PricingPage() {
                 price={elPx}
                 period="/season"
                 badge="Full Access"
-                features={ELITE_FEATURES}
+                features={COMM_ELITE_FEATURES}
                 priceId={commPriceId('Elite', size)}
                 tier="COMMISSIONER_ELITE"
               />

@@ -84,6 +84,7 @@ export default async function DashboardPage() {
     const { name, image, subscriptionTier, subscription, leagues } = user;
     const displayName = name ?? session.user.email;
     const isActive = subscription?.status === 'active' || subscription?.status === 'trialing';
+    const isElite = subscriptionTier === 'PLAYER_ELITE' || subscriptionTier === 'COMMISSIONER_ELITE';
     const statusKey = subscription?.status ?? 'inactive';
     const statusStyle = STATUS_STYLES[statusKey] ?? STATUS_STYLES.inactive;
 
@@ -153,14 +154,21 @@ export default async function DashboardPage() {
                                 href="/pricing"
                                 className="shrink-0 bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-5 py-2.5 rounded-lg transition text-sm"
                             >
-                                Get a Plan
+                                Plans
+                            </Link>
+                        ) : isElite ? (
+                            <Link
+                                href="/pricing"
+                                className="shrink-0 bg-[#C8A951]/15 border border-[#C8A951]/50 text-[#C8A951] font-bold px-5 py-2.5 rounded-lg transition text-sm"
+                            >
+                                Elite ✦
                             </Link>
                         ) : (
                             <Link
                                 href="/pricing"
                                 className="shrink-0 border border-gray-700 hover:border-gray-500 text-gray-300 font-semibold px-5 py-2.5 rounded-lg transition text-sm"
                             >
-                                Manage
+                                Upgrade
                             </Link>
                         )}
                     </div>
@@ -246,25 +254,20 @@ export default async function DashboardPage() {
                 {/* Quick actions */}
                 <div>
                     <h2 className="font-semibold text-lg mb-4">Quick Actions</h2>
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="grid sm:grid-cols-3 gap-3">
                         <Link href="/dashboard/sync" className="bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">
                             <div className="text-2xl mb-2">🔗</div>
                             <p className="font-semibold text-white group-hover:text-[#C8A951] transition">Sync a League</p>
                             <p className="text-gray-500 text-sm mt-0.5">Connect your Sleeper account</p>
                         </Link>
-                        <Link href="/dashboard/drafts" className="bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">
-                            <div className="text-2xl mb-2">📋</div>
-                            <p className="font-semibold text-white group-hover:text-[#C8A951] transition">View Drafts</p>
-                            <p className="text-gray-500 text-sm mt-0.5">Draft boards & history</p>
-                        </Link>
-                        <Link href="/trade-chart" className="bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">
-                            <div className="text-2xl mb-2">📊</div>
-                            <p className="font-semibold text-white group-hover:text-[#C8A951] transition">Trade Chart</p>
-                            <p className="text-gray-500 text-sm mt-0.5">Dynamic player valuations</p>
+                        <Link href="/dashboard/commissioner" className="bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">
+                            <div className="text-2xl mb-2">🏆</div>
+                            <p className="font-semibold text-white group-hover:text-[#C8A951] transition">Commissioner Hub</p>
+                            <p className="text-gray-500 text-sm mt-0.5">Manage your league</p>
                         </Link>
                         <Link href="/pricing" className="bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">
                             <div className="text-2xl mb-2">💳</div>
-                            <p className="font-semibold text-white group-hover:text-[#C8A951] transition">Subscription</p>
+                            <p className="font-semibold text-white group-hover:text-[#C8A951] transition">Manage Subscription</p>
                             <p className="text-gray-500 text-sm mt-0.5">Plans, billing, and upgrades</p>
                         </Link>
                     </div>
