@@ -22,6 +22,12 @@ export default async function Navbar() {
               >
                 Dashboard
               </Link>
+              <Link
+                href="/dashboard/drafts"
+                className="text-gray-300 hover:text-white transition"
+              >
+                Drafts
+              </Link>
               <form
                 action={async () => {
                   'use server';

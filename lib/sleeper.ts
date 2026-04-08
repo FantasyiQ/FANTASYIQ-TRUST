@@ -92,7 +92,73 @@ export async function getLeagueRosters(leagueId: string): Promise<SleeperRoster[
     return sleeperFetch<SleeperRoster[]>(`/league/${leagueId}/rosters`);
 }
 
-// ─── Player cache ────────────────────────────────────────────────────────────
+// ─── Draft types ─────────────────────────────────────────────────────────────
+
+export interface SleeperDraft {
+    draft_id: string;
+    type: 'snake' | 'linear' | 'auction';
+    status: 'pre_draft' | 'drafting' | 'paused' | 'complete';
+    sport: string;
+    season: string;
+    start_time: number | null;
+    settings: {
+        teams: number;
+        rounds: number;
+        pick_timer: number;
+        [key: string]: number;
+    };
+    metadata: {
+        scoring_type?: string;
+        name?: string;
+        description?: string;
+    };
+    league_id: string | null;
+    draft_order: Record<string, number> | null; // user_id → draft_slot
+    slot_to_roster_id: Record<string, number> | null;
+    created: number; // ms timestamp
+}
+
+export interface SleeperDraftPick {
+    player_id: string;
+    picked_by: string; // user_id
+    roster_id: string;
+    round: number;
+    draft_slot: number;
+    pick_no: number;
+    is_keeper: boolean | null;
+    draft_id: string;
+    metadata: {
+        team: string;
+        status?: string;
+        position: string;
+        player_id: string;
+        number?: string;
+        last_name: string;
+        first_name: string;
+        injury_status?: string | null;
+        sport?: string;
+    };
+}
+
+export async function getUserDrafts(userId: string, season: string): Promise<SleeperDraft[]> {
+    return sleeperFetch<SleeperDraft[]>(`/user/${userId}/drafts/nfl/${season}`);
+}
+
+export async function getLeagueDrafts(leagueId: string): Promise<SleeperDraft[]> {
+    return sleeperFetch<SleeperDraft[]>(`/league/${leagueId}/drafts`);
+}
+
+export async function getDraft(draftId: string): Promise<SleeperDraft> {
+    return sleeperFetch<SleeperDraft>(`/draft/${draftId}`);
+}
+
+export async function getDraftPicks(draftId: string): Promise<SleeperDraftPick[]> {
+    const res = await fetch(`${BASE}/draft/${draftId}/picks`, { next: { revalidate: 30 } });
+    if (!res.ok) throw new Error(`Sleeper API error ${res.status}: /draft/${draftId}/picks`);
+    return res.json() as Promise<SleeperDraftPick[]>;
+}
+
+// ─── Player cache ─────────────────────────────────────────────────────────────
 
 export interface SlimPlayer {
     full_name: string;
