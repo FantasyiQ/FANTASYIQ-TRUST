@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { auth, signOut } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { unsyncLeague } from '@/app/actions/leagues';
+import { createPortalSession } from '@/app/actions/stripe';
 import type { SubscriptionTier } from '@prisma/client';
 
 function formatTier(tier: SubscriptionTier): string {
@@ -172,6 +173,21 @@ export default async function DashboardPage() {
                             </Link>
                         )}
                     </div>
+                    {isActive && (
+                        <div className="mt-4 pt-4 border-t border-gray-800 flex items-center justify-between gap-4 flex-wrap">
+                            <p className="text-gray-500 text-xs">
+                                Need to change plans? Upgrade anytime above. To switch plan types, cancel first then resubscribe.
+                            </p>
+                            <form action={createPortalSession}>
+                                <button
+                                    type="submit"
+                                    className="text-[#C8A951]/70 hover:text-[#C8A951] text-sm font-medium transition shrink-0"
+                                >
+                                    Manage Subscription →
+                                </button>
+                            </form>
+                        </div>
+                    )}
                 </div>
 
                 {/* Leagues */}

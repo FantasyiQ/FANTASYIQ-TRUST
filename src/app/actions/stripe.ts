@@ -14,6 +14,25 @@ function appUrl(): string {
     );
 }
 
+export async function createPortalSession(): Promise<never> {
+    const session = await auth();
+    if (!session?.user?.id) redirect('/sign-in');
+
+    const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { stripeCustomerId: true },
+    });
+
+    if (!user?.stripeCustomerId) redirect('/dashboard');
+
+    const portalSession = await stripe.billingPortal.sessions.create({
+        customer: user.stripeCustomerId,
+        return_url: `${appUrl()}/dashboard`,
+    });
+
+    redirect(portalSession.url);
+}
+
 export async function createCheckoutSession(formData: FormData): Promise<never> {
     const session = await auth();
     if (!session?.user?.email) redirect('/sign-in');
