@@ -56,7 +56,8 @@ const PLAYER_PRO_FEATURES: Feature[] = [
   { name: 'Power League Rankings',              included: false },
   { name: 'Player Indicators & Mock Drafts',    included: false },
   { name: 'Dynamic Mock Drafts',                included: false },
-  { name: 'League Analysis & Team Builder',     included: false },
+  { name: 'League Analysis',                    included: false },
+  { name: 'Team Builder',                       included: false },
 ];
 
 const PLAYER_ALL_PRO_FEATURES: Feature[] = [
@@ -73,7 +74,8 @@ const PLAYER_ALL_PRO_FEATURES: Feature[] = [
   { name: 'Power League Rankings',              included: true  },
   { name: 'Player Indicators & Mock Drafts',    included: true  },
   { name: 'Dynamic Mock Drafts',                included: false },
-  { name: 'League Analysis & Team Builder',     included: false },
+  { name: 'League Analysis',                    included: false },
+  { name: 'Team Builder',                       included: false },
 ];
 
 const PLAYER_ELITE_FEATURES: Feature[] = [
@@ -90,7 +92,8 @@ const PLAYER_ELITE_FEATURES: Feature[] = [
   { name: 'Power League Rankings',              included: true },
   { name: 'Player Indicators & Mock Drafts',    included: true },
   { name: 'Dynamic Mock Drafts',                included: true },
-  { name: 'League Analysis & Team Builder',     included: true },
+  { name: 'League Analysis',                    included: true },
+  { name: 'Team Builder',                       included: true },
 ];
 
 // Commissioner Plans — no sync features
@@ -107,7 +110,8 @@ const COMM_PRO_FEATURES: Feature[] = [
   { name: 'Power League Rankings',              included: false },
   { name: 'Player Indicators & Mock Drafts',    included: false },
   { name: 'Dynamic Mock Drafts',                included: false },
-  { name: 'League Analysis & Team Builder',     included: false },
+  { name: 'League Analysis',                    included: false },
+  { name: 'Team Builder',                       included: false },
 ];
 
 const COMM_ALL_PRO_FEATURES: Feature[] = [
@@ -123,7 +127,8 @@ const COMM_ALL_PRO_FEATURES: Feature[] = [
   { name: 'Power League Rankings',              included: true  },
   { name: 'Player Indicators & Mock Drafts',    included: true  },
   { name: 'Dynamic Mock Drafts',                included: false },
-  { name: 'League Analysis & Team Builder',     included: false },
+  { name: 'League Analysis',                    included: false },
+  { name: 'Team Builder',                       included: false },
 ];
 
 const COMM_ELITE_FEATURES: Feature[] = [
@@ -139,7 +144,8 @@ const COMM_ELITE_FEATURES: Feature[] = [
   { name: 'Power League Rankings',              included: true },
   { name: 'Player Indicators & Mock Drafts',    included: true },
   { name: 'Dynamic Mock Drafts',                included: true },
-  { name: 'League Analysis & Team Builder',     included: true },
+  { name: 'League Analysis',                    included: true },
+  { name: 'Team Builder',                       included: true },
 ];
 
 /* ── Sub-components ───────────────────────────────────────────────── */
@@ -324,7 +330,7 @@ export default function PricingPage() {
               <PlanCard
                 name="Commissioner Pro"
                 price={proPx}
-                period="/season"
+                period="/year"
                 features={COMM_PRO_FEATURES}
                 priceId={commPriceId('Pro', size)}
                 tier="COMMISSIONER_PRO"
@@ -332,7 +338,7 @@ export default function PricingPage() {
               <PlanCard
                 name="Commissioner All-Pro"
                 price={apPx}
-                period="/season"
+                period="/year"
                 badge="Most Popular"
                 badgeGold
                 ring
@@ -343,7 +349,7 @@ export default function PricingPage() {
               <PlanCard
                 name="Commissioner Elite"
                 price={elPx}
-                period="/season"
+                period="/year"
                 badge="Full Access"
                 features={COMM_ELITE_FEATURES}
                 priceId={commPriceId('Elite', size)}
