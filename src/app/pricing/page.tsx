@@ -9,12 +9,17 @@ export default async function PricingPage() {
 
     let activeSub: { tier: string; stripeSubscriptionId: string } | null = null;
 
-    if (session?.user?.id) {
-        const sub = await prisma.subscription.findUnique({
-            where: { userId: session.user.id },
-            select: { status: true, tier: true, stripeSubscriptionId: true },
+    if (session?.user?.email) {
+        const user = await prisma.user.findUnique({
+            where: { email: session.user.email },
+            select: {
+                subscription: {
+                    select: { status: true, tier: true, stripeSubscriptionId: true },
+                },
+            },
         });
 
+        const sub = user?.subscription;
         if (
             sub?.stripeSubscriptionId &&
             (sub.status === 'active' || sub.status === 'trialing')
