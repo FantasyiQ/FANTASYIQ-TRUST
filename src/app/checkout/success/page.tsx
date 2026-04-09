@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation';
-import { stripe } from '@/lib/stripe';
+import { stripe, planInfo } from '@/lib/stripe';
+import { prisma } from '@/lib/prisma';
+import type { SubscriptionTier } from '@prisma/client';
 
 export default async function CheckoutSuccessPage({
     searchParams,
@@ -9,38 +11,85 @@ export default async function CheckoutSuccessPage({
     const { session_id } = await searchParams;
     if (!session_id) redirect('/pricing');
 
-    const session = await stripe.checkout.sessions.retrieve(session_id);
-    if (session.payment_status !== 'paid' && session.status !== 'complete') {
+    // Expand subscription so we have all the data we need in one call.
+    const cs = await stripe.checkout.sessions.retrieve(session_id, {
+        expand: ['subscription'],
+    });
+
+    if (cs.payment_status !== 'paid' && cs.status !== 'complete') {
         redirect('/pricing');
     }
 
-    return (
-        <main className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-6">
-            <div className="max-w-md w-full text-center">
-                <div className="text-6xl mb-6">🏆</div>
-                <h1 className="text-3xl font-bold mb-3">Welcome to FantasyIQ Trust!</h1>
-                <p className="text-gray-400 text-lg mb-8">
-                    Setting up your account…
-                </p>
-                {/* Spinner */}
-                <div className="flex justify-center mb-8">
-                    <div className="w-8 h-8 border-2 border-[#C8A951] border-t-transparent rounded-full animate-spin" />
-                </div>
-                <p className="text-gray-600 text-sm mb-4">Redirecting you to your dashboard…</p>
-                <a
-                    href="/dashboard"
-                    className="text-[#C8A951] hover:underline text-sm font-medium"
-                >
-                    Click here if not redirected
-                </a>
-            </div>
+    const customerId  = cs.customer as string | null;
+    const sub         = cs.subscription as import('stripe').default.Subscription | null;
+    const stripeSubId = sub?.id ?? null;
 
-            {/* Auto-redirect — full page load so navbar gets fresh session data */}
-            <script
-                dangerouslySetInnerHTML={{
-                    __html: `window.location.href = '/dashboard';`,
-                }}
-            />
-        </main>
-    );
+    // Fulfill synchronously so the dashboard always reflects the purchase.
+    if (customerId && stripeSubId && sub) {
+        const user = await prisma.user.findUnique({
+            where: { stripeCustomerId: customerId },
+            select: { id: true },
+        });
+
+        if (user) {
+            const metaTier       = cs.metadata?.tier as SubscriptionTier | undefined;
+            const metaPlanType   = (cs.metadata?.planType ?? 'player') as 'player' | 'commissioner';
+            const metaSize       = cs.metadata?.leagueSize ? parseInt(cs.metadata.leagueSize) : null;
+            const metaLeagueName = cs.metadata?.leagueName ?? null;
+            const metaDiscountPct = cs.metadata?.discountPct ? parseInt(cs.metadata.discountPct) : null;
+
+            // Fall back to PLAN_CATALOG if metadata is somehow missing
+            const priceId = sub.items.data[0]?.price.id ?? null;
+            const catalogInfo = priceId ? planInfo(priceId) : null;
+
+            const tier: SubscriptionTier = metaTier ?? catalogInfo?.tier ?? 'FREE';
+            const subType  = metaPlanType ?? catalogInfo?.type ?? 'player';
+            const leagueSize = metaSize ?? catalogInfo?.leagueSize ?? null;
+
+            const item = sub.items.data[0];
+            const periodStart = item?.current_period_start
+                ? new Date(item.current_period_start * 1000) : null;
+            const periodEnd = item?.current_period_end
+                ? new Date(item.current_period_end * 1000) : null;
+
+            await prisma.$transaction([
+                ...(subType === 'player' ? [
+                    prisma.user.update({
+                        where: { id: user.id },
+                        data: { subscriptionTier: tier },
+                    }),
+                ] : []),
+                prisma.subscription.upsert({
+                    where: { stripeSubscriptionId: stripeSubId },
+                    create: {
+                        userId: user.id,
+                        stripeSubscriptionId: stripeSubId,
+                        stripeCustomerId: customerId,
+                        type: subType,
+                        leagueSize,
+                        leagueName: metaLeagueName,
+                        discountPct: metaDiscountPct,
+                        tier,
+                        status: 'active',
+                        currentPeriodStart: periodStart,
+                        currentPeriodEnd: periodEnd,
+                    },
+                    update: {
+                        type: subType,
+                        leagueSize,
+                        leagueName: metaLeagueName,
+                        discountPct: metaDiscountPct,
+                        tier,
+                        status: 'active',
+                        currentPeriodStart: periodStart,
+                        currentPeriodEnd: periodEnd,
+                        cancelAtPeriodEnd: false,
+                    },
+                }),
+            ]);
+        }
+    }
+
+    // DB is now up to date — redirect straight to dashboard.
+    redirect('/dashboard');
 }
