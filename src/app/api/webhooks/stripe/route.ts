@@ -4,6 +4,22 @@ import { stripe, planInfo } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 import type { SubscriptionTier } from '@prisma/client';
 
+const PLAYER_TIERS = new Set<SubscriptionTier>(['PLAYER_PRO', 'PLAYER_ALL_PRO', 'PLAYER_ELITE']);
+
+// Derive plan type using the tier prefix as the authoritative signal.
+// Metadata alone can be missing or wrong; the tier string never lies.
+function resolveSubType(
+    tier: string | null | undefined,
+    metaPlanType: string | null | undefined,
+    catalogType: string | null | undefined,
+): 'player' | 'commissioner' {
+    if (tier?.startsWith('COMMISSIONER_')) return 'commissioner';
+    if (tier?.startsWith('PLAYER_'))       return 'player';
+    if (metaPlanType === 'commissioner')   return 'commissioner';
+    if (catalogType  === 'commissioner')   return 'commissioner';
+    return 'player';
+}
+
 export async function POST(request: NextRequest): Promise<Response> {
     const body = await request.text();
     const signature = request.headers.get('stripe-signature');
@@ -45,12 +61,13 @@ export async function POST(request: NextRequest): Promise<Response> {
 
                 // Derive from PLAN_CATALOG if metadata is absent (e.g. manually created subs)
                 const tier: SubscriptionTier = metaTier ?? 'FREE';
-                const subType  = metaPlanType as 'player' | 'commissioner';
+                const subType  = resolveSubType(tier, metaPlanType, null);
                 const leagueSize = metaSize;
 
                 await prisma.$transaction([
-                    // Only update user.subscriptionTier for player plans
-                    ...(subType === 'player' ? [
+                    // Only update user.subscriptionTier for genuine player plans.
+                    // Double-guard: subType AND tier must both confirm it's a player plan.
+                    ...(subType === 'player' && PLAYER_TIERS.has(tier) ? [
                         prisma.user.update({
                             where: { id: user.id },
                             data: { subscriptionTier: tier },
@@ -96,7 +113,7 @@ export async function POST(request: NextRequest): Promise<Response> {
                 // Derive from PLAN_CATALOG
                 const info     = priceId ? planInfo(priceId) : null;
                 const tier     = metaTier ?? info?.tier ?? null;
-                const subType  = (metaPlanType ?? info?.type ?? 'player') as 'player' | 'commissioner';
+                const subType  = resolveSubType(tier, metaPlanType, info?.type);
                 const leagueSize = metaSize ?? info?.leagueSize ?? null;
 
                 if (!tier) break;
@@ -114,11 +131,12 @@ export async function POST(request: NextRequest): Promise<Response> {
                     ? new Date(item.current_period_end * 1000) : null;
 
                 await prisma.$transaction([
-                    // Only update user.subscriptionTier for active player plans
-                    ...(subType === 'player' && sub.status === 'active' ? [
+                    // Only update user.subscriptionTier for active player plans.
+                    // Double-guard: subType AND tier must both confirm it's a player plan.
+                    ...(subType === 'player' && PLAYER_TIERS.has(tier as SubscriptionTier) && sub.status === 'active' ? [
                         prisma.user.update({
                             where: { id: user.id },
-                            data: { subscriptionTier: tier },
+                            data: { subscriptionTier: tier as SubscriptionTier },
                         }),
                     ] : []),
                     // Reset player tier when player plan is no longer active

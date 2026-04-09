@@ -3,6 +3,20 @@ import { stripe, planInfo } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 import type { SubscriptionTier } from '@prisma/client';
 
+const PLAYER_TIERS = new Set<SubscriptionTier>(['PLAYER_PRO', 'PLAYER_ALL_PRO', 'PLAYER_ELITE']);
+
+function resolveSubType(
+    tier: string | null | undefined,
+    metaPlanType: string | null | undefined,
+    catalogType: string | null | undefined,
+): 'player' | 'commissioner' {
+    if (tier?.startsWith('COMMISSIONER_')) return 'commissioner';
+    if (tier?.startsWith('PLAYER_'))       return 'player';
+    if (metaPlanType === 'commissioner')   return 'commissioner';
+    if (catalogType  === 'commissioner')   return 'commissioner';
+    return 'player';
+}
+
 export default async function CheckoutSuccessPage({
     searchParams,
 }: {
@@ -43,7 +57,7 @@ export default async function CheckoutSuccessPage({
             const catalogInfo = priceId ? planInfo(priceId) : null;
 
             const tier: SubscriptionTier = metaTier ?? catalogInfo?.tier ?? 'FREE';
-            const subType  = metaPlanType ?? catalogInfo?.type ?? 'player';
+            const subType  = resolveSubType(tier, cs.metadata?.planType, catalogInfo?.type);
             const leagueSize = metaSize ?? catalogInfo?.leagueSize ?? null;
 
             const item = sub.items.data[0];
@@ -53,7 +67,8 @@ export default async function CheckoutSuccessPage({
                 ? new Date(item.current_period_end * 1000) : null;
 
             await prisma.$transaction([
-                ...(subType === 'player' ? [
+                // Double-guard: subType AND tier must both confirm it's a player plan.
+                ...(subType === 'player' && PLAYER_TIERS.has(tier) ? [
                     prisma.user.update({
                         where: { id: user.id },
                         data: { subscriptionTier: tier },
