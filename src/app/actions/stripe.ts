@@ -36,18 +36,18 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
     const session = await auth();
     if (!session?.user?.email) redirect('/sign-in');
 
-    const priceId = formData.get('priceId') as string;
-    if (!priceId) throw new Error('Missing priceId');
+    const priceId = formData.get('priceId') as string | null;
+    if (!priceId) redirect('/pricing?error=invalid-plan');
 
     const info = planInfo(priceId);
-    if (!info) throw new Error('Invalid priceId');
+    if (!info) redirect('/pricing?error=invalid-plan');
 
     const leagueName = info.type === 'commissioner'
         ? (formData.get('leagueName') as string | null)?.trim() ?? ''
         : '';
 
     if (info.type === 'commissioner' && !leagueName) {
-        throw new Error('League name is required for commissioner plans.');
+        redirect('/pricing?tab=commissioner&error=league-name-required');
     }
 
     const user = await prisma.user.findUnique({
@@ -65,13 +65,13 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
     });
     if (!user) redirect('/sign-in');
 
-    const activePlayerSubs   = user.subscriptions.filter(s => s.type === 'player');
-    const activeCommSubs     = user.subscriptions.filter(s => s.type === 'commissioner');
-    const activeCommCount    = activeCommSubs.length;
+    const activePlayerSubs = user.subscriptions.filter(s => s.type === 'player');
+    const activeCommSubs   = user.subscriptions.filter(s => s.type === 'commissioner');
+    const activeCommCount  = activeCommSubs.length;
 
-    // Block a second player plan — use the upgrade flow instead
+    // Block a second player plan — redirect to pricing with upgrade note
     if (info.type === 'player' && activePlayerSubs.length > 0) {
-        throw new Error('You already have a Player plan. Use Upgrade to change tiers.');
+        redirect('/pricing?error=already-subscribed');
     }
 
     // Volume discount coupon for commissioner plans
@@ -90,39 +90,49 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
     // Get or create Stripe customer
     let customerId = user.stripeCustomerId;
     if (!customerId) {
-        const customer = await stripe.customers.create({
-            email: user.email ?? undefined,
-            name: user.name ?? undefined,
-            metadata: { userId: user.id },
-        });
-        customerId = customer.id;
-        await prisma.user.update({
-            where: { id: user.id },
-            data: { stripeCustomerId: customerId },
-        });
+        try {
+            const customer = await stripe.customers.create({
+                email: user.email ?? undefined,
+                name: user.name ?? undefined,
+                metadata: { userId: user.id },
+            });
+            customerId = customer.id;
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { stripeCustomerId: customerId },
+            });
+        } catch {
+            redirect('/pricing?error=checkout-failed');
+        }
     }
 
-    const sharedMeta = {
+    // Build metadata — omit keys with empty/null values so Stripe never
+    // receives empty strings (which cause InvalidRequestError).
+    const sharedMeta: Record<string, string> = {
         userId: user.id,
-        tier: info.tier,
+        tier:   info.tier,
         planType: info.type,
-        leagueSize: info.leagueSize?.toString() ?? '',
-        leagueName,
-        discountPct: discountPct.toString(),
     };
+    if (info.leagueSize != null) sharedMeta.leagueSize = info.leagueSize.toString();
+    if (leagueName)              sharedMeta.leagueName  = leagueName;
+    if (discountPct > 0)        sharedMeta.discountPct  = discountPct.toString();
 
-    const checkoutSession = await stripe.checkout.sessions.create({
-        customer: customerId,
-        mode: 'subscription',
-        line_items: [{ price: priceId, quantity: 1 }],
-        ...(couponId ? { discounts: [{ coupon: couponId }] } : {}),
-        success_url: `${appUrl()}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${appUrl()}/pricing?tab=${info.type === 'commissioner' ? 'commissioner' : 'player'}`,
-        metadata: sharedMeta,
-        subscription_data: {
+    let checkoutUrl: string;
+    try {
+        const cs = await stripe.checkout.sessions.create({
+            customer: customerId!,
+            mode: 'subscription',
+            line_items: [{ price: priceId, quantity: 1 }],
+            ...(couponId ? { discounts: [{ coupon: couponId }] } : {}),
+            success_url: `${appUrl()}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url:  `${appUrl()}/pricing?tab=${info.type === 'commissioner' ? 'commissioner' : 'player'}`,
             metadata: sharedMeta,
-        },
-    });
+            subscription_data: { metadata: sharedMeta },
+        });
+        checkoutUrl = cs.url!;
+    } catch {
+        redirect('/pricing?error=checkout-failed');
+    }
 
-    redirect(checkoutSession.url!);
+    redirect(checkoutUrl);
 }

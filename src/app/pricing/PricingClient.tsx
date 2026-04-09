@@ -26,6 +26,8 @@ interface Props {
     activeCommCount: number;
     activePlayerLeagueCount: number;
     defaultTab: Tab;
+    alreadySubscribed?: boolean;
+    checkoutError?: string | null;
 }
 
 /* ── Tier helpers ─────────────────────────────────────────────────── */
@@ -300,6 +302,7 @@ function PlanCard({ name, price, period, badge, badgeGold, ring, features, price
                     <form action={createCheckoutSession}>
                         <input type="hidden" name="priceId" value={priceId} />
                         <input type="hidden" name="tier" value={tier} />
+                        <input type="hidden" name="leagueName" value="" />
                         <button type="submit" disabled={!priceId}
                             className="w-full py-3 rounded-xl font-bold transition-colors bg-[#C9A227] text-black hover:bg-[#b8912a] disabled:opacity-50 disabled:cursor-not-allowed">
                             Get Started
@@ -429,7 +432,7 @@ function resolveCommCardStatus(cardTier: string, size: TeamSize, commSubs: CommS
 }
 
 /* ── Main component ───────────────────────────────────────────────── */
-export default function PricingClient({ playerSub, commSubs, activeCommCount, activePlayerLeagueCount, defaultTab }: Props) {
+export default function PricingClient({ playerSub, commSubs, activeCommCount, activePlayerLeagueCount, defaultTab, alreadySubscribed, checkoutError }: Props) {
     const { update: updateSession } = useSession();
     const [tab, setTab]       = useState<Tab>(defaultTab);
     const [size, setSize]     = useState<TeamSize>(12);
@@ -493,6 +496,18 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
 
             <section className="min-h-screen bg-gray-950 pt-28 pb-20 px-4">
                 <div className="max-w-6xl mx-auto">
+                    {/* Error notices */}
+                    {alreadySubscribed && (
+                        <div className="mb-8 px-4 py-3 bg-yellow-900/20 border border-yellow-800/50 rounded-xl text-yellow-400 text-sm text-center">
+                            You already have a Player plan. Use <strong>Upgrade</strong> below to change tiers.
+                        </div>
+                    )}
+                    {checkoutError && (
+                        <div className="mb-8 px-4 py-3 bg-red-900/20 border border-red-800/50 rounded-xl text-red-400 text-sm text-center">
+                            {checkoutError}
+                        </div>
+                    )}
+
                     {/* Header */}
                     <div className="text-center mb-10">
                         <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-4">Choose Your Plan</h1>

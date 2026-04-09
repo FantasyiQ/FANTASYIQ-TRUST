@@ -9,10 +9,16 @@ export const dynamic = 'force-dynamic';
 export default async function PricingPage({
     searchParams,
 }: {
-    searchParams: Promise<{ tab?: string }>;
+    searchParams: Promise<{ tab?: string; error?: string }>;
 }) {
-    const { tab } = await searchParams;
+    const { tab, error } = await searchParams;
     const defaultTab = tab === 'commissioner' ? 'commissioner' : 'player';
+    const alreadySubscribed = error === 'already-subscribed';
+    const checkoutError =
+        error === 'checkout-failed'       ? 'Something went wrong starting checkout. Please try again.' :
+        error === 'invalid-plan'          ? 'Invalid plan selected. Please try again.' :
+        error === 'league-name-required'  ? 'Enter your league name before selecting a commissioner plan.' :
+        null;
 
     const session = await auth();
 
@@ -79,6 +85,8 @@ export default async function PricingPage({
             activeCommCount={commSubs.length}
             activePlayerLeagueCount={activePlayerLeagueCount}
             defaultTab={defaultTab as 'player' | 'commissioner'}
+            alreadySubscribed={alreadySubscribed}
+            checkoutError={checkoutError}
         />
     );
 }
