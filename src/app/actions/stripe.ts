@@ -103,7 +103,7 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
             });
         } catch (err) {
             console.error('[createCheckoutSession] stripe.customers.create failed:', err);
-            redirect('/pricing?error=checkout-failed');
+            const msg=err instanceof Error?err.message:String(err);redirect('/pricing?error=checkout-failed&detail='+encodeURIComponent(msg));
         }
     }
 
@@ -133,7 +133,7 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
         checkoutUrl = cs.url!;
     } catch (err) {
         console.error('[createCheckoutSession] stripe.checkout.sessions.create failed:', err);
-        redirect('/pricing?error=checkout-failed');
+        const msg=err instanceof Error?err.message:String(err);redirect('/pricing?error=checkout-failed&detail='+encodeURIComponent(msg));
     }
 
     redirect(checkoutUrl);
