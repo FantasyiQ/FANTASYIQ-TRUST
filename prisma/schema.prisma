@@ -23,15 +23,17 @@ model User {
     hashedPassword   String?
     emailVerified    DateTime?
     image            String?
+    // Tracks the active Player plan tier for fast JWT/navbar reads.
+    // Commissioner plans are tracked only in the subscriptions table.
     subscriptionTier SubscriptionTier @default(FREE)
     stripeCustomerId String?          @unique
     createdAt        DateTime         @default(now())
     updatedAt        DateTime         @updatedAt
 
-    accounts     Account[]
-    sessions     Session[]
-    leagues      League[]
-    subscription Subscription?
+    accounts      Account[]
+    sessions      Session[]
+    leagues       League[]
+    subscriptions Subscription[]
 }
 
 // Auth.js (NextAuth v5) required models
@@ -74,9 +76,13 @@ model VerificationToken {
 
 model Subscription {
     id                   String           @id @default(cuid())
-    userId               String           @unique
+    userId               String           // No longer @unique — users can have multiple subs
     stripeSubscriptionId String?          @unique
     stripeCustomerId     String?
+    // "player" | "commissioner"
+    // @default("player") ensures existing rows migrated from the one-sub model get the right value
+    type                 String           @default("player")
+    leagueSize           Int?             // null for player plans; 8/10/12/14/16/32 for commissioner
     tier                 SubscriptionTier @default(FREE)
     status               String           @default("inactive")
     currentPeriodStart   DateTime?

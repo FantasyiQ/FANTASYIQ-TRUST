@@ -3,8 +3,7 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { stripe } from '@/lib/stripe';
-import type { SubscriptionTier } from '@prisma/client';
+import { stripe, planInfo } from '@/lib/stripe';
 
 function appUrl(): string {
     return (
@@ -16,10 +15,10 @@ function appUrl(): string {
 
 export async function createPortalSession(): Promise<never> {
     const session = await auth();
-    if (!session?.user?.id) redirect('/sign-in');
+    if (!session?.user?.email) redirect('/sign-in');
 
     const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
+        where: { email: session.user.email },
         select: { stripeCustomerId: true },
     });
 
@@ -38,15 +37,30 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
     if (!session?.user?.email) redirect('/sign-in');
 
     const priceId = formData.get('priceId') as string;
-    const tier = formData.get('tier') as SubscriptionTier;
+    if (!priceId) throw new Error('Missing priceId');
 
-    if (!priceId || !tier) throw new Error('Missing priceId or tier');
+    const info = planInfo(priceId);
+    if (!info) throw new Error('Invalid priceId');
 
     const user = await prisma.user.findUnique({
         where: { email: session.user.email },
-        select: { id: true, email: true, name: true, stripeCustomerId: true },
+        select: {
+            id: true,
+            email: true,
+            name: true,
+            stripeCustomerId: true,
+            subscriptions: {
+                where: { type: 'player', status: { in: ['active', 'trialing'] } },
+                select: { id: true },
+            },
+        },
     });
     if (!user) redirect('/sign-in');
+
+    // Block a second player plan — use the upgrade flow instead
+    if (info.type === 'player' && user.subscriptions.length > 0) {
+        throw new Error('You already have a Player plan. Use Upgrade to change tiers.');
+    }
 
     // Get or create Stripe customer
     let customerId = user.stripeCustomerId;
@@ -69,9 +83,19 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
         line_items: [{ price: priceId, quantity: 1 }],
         success_url: `${appUrl()}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${appUrl()}/pricing`,
-        metadata: { userId: user.id, tier },
+        metadata: {
+            userId: user.id,
+            tier: info.tier,
+            planType: info.type,
+            leagueSize: info.leagueSize?.toString() ?? '',
+        },
         subscription_data: {
-            metadata: { userId: user.id, tier },
+            metadata: {
+                userId: user.id,
+                tier: info.tier,
+                planType: info.type,
+                leagueSize: info.leagueSize?.toString() ?? '',
+            },
         },
     });
 

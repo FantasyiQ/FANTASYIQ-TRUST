@@ -1,8 +1,7 @@
 import type { NextRequest } from 'next/server';
 import Stripe from 'stripe';
-import { stripe } from '@/lib/stripe';
+import { stripe, planInfo } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
-import { priceIdToTier } from '@/lib/stripe';
 import type { SubscriptionTier } from '@prisma/client';
 
 export async function POST(request: NextRequest): Promise<Response> {
@@ -27,12 +26,14 @@ export async function POST(request: NextRequest): Promise<Response> {
     try {
         switch (event.type) {
             case 'checkout.session.completed': {
-                const session = event.data.object as Stripe.Checkout.Session;
-                const customerId = session.customer as string;
-                const stripeSubId = session.subscription as string | null;
-                const tier = session.metadata?.tier as SubscriptionTier | undefined;
+                const cs = event.data.object as Stripe.Checkout.Session;
+                const customerId   = cs.customer as string;
+                const stripeSubId  = cs.subscription as string | null;
+                const metaTier     = cs.metadata?.tier as SubscriptionTier | undefined;
+                const metaPlanType = cs.metadata?.planType ?? 'player';
+                const metaSize     = cs.metadata?.leagueSize ? parseInt(cs.metadata.leagueSize) : null;
 
-                if (!customerId || !tier) break;
+                if (!customerId || !stripeSubId) break;
 
                 const user = await prisma.user.findUnique({
                     where: { stripeCustomerId: customerId },
@@ -40,24 +41,33 @@ export async function POST(request: NextRequest): Promise<Response> {
                 });
                 if (!user) break;
 
-                // Set tier + status now. Period dates arrive via customer.subscription.updated
-                // which Stripe fires immediately after this event.
+                // Derive from PLAN_CATALOG if metadata is absent (e.g. manually created subs)
+                const tier: SubscriptionTier = metaTier ?? 'FREE';
+                const subType  = metaPlanType as 'player' | 'commissioner';
+                const leagueSize = metaSize;
+
                 await prisma.$transaction([
-                    prisma.user.update({
-                        where: { id: user.id },
-                        data: { subscriptionTier: tier },
-                    }),
+                    // Only update user.subscriptionTier for player plans
+                    ...(subType === 'player' ? [
+                        prisma.user.update({
+                            where: { id: user.id },
+                            data: { subscriptionTier: tier },
+                        }),
+                    ] : []),
                     prisma.subscription.upsert({
-                        where: { userId: user.id },
+                        where: { stripeSubscriptionId: stripeSubId },
                         create: {
                             userId: user.id,
                             stripeSubscriptionId: stripeSubId,
                             stripeCustomerId: customerId,
+                            type: subType,
+                            leagueSize,
                             tier,
                             status: 'active',
                         },
                         update: {
-                            stripeSubscriptionId: stripeSubId,
+                            type: subType,
+                            leagueSize,
                             tier,
                             status: 'active',
                             cancelAtPeriodEnd: false,
@@ -69,12 +79,21 @@ export async function POST(request: NextRequest): Promise<Response> {
 
             case 'customer.subscription.updated': {
                 const sub = event.data.object as Stripe.Subscription;
-                const customerId = sub.customer as string;
-                const metaTier = sub.metadata?.tier as SubscriptionTier | undefined;
-                const priceId = sub.items.data[0]?.price.id;
-                const tier = metaTier ?? (priceId ? priceIdToTier(priceId) : null);
+                const customerId   = sub.customer as string;
+                const priceId      = sub.items.data[0]?.price.id;
+                const metaTier     = sub.metadata?.tier as SubscriptionTier | undefined;
+                const metaPlanType = sub.metadata?.planType;
+                const metaSize     = sub.metadata?.leagueSize ? parseInt(sub.metadata.leagueSize) : null;
 
-                if (!customerId || !tier) break;
+                if (!customerId) break;
+
+                // Derive from PLAN_CATALOG
+                const info     = priceId ? planInfo(priceId) : null;
+                const tier     = metaTier ?? info?.tier ?? null;
+                const subType  = (metaPlanType ?? info?.type ?? 'player') as 'player' | 'commissioner';
+                const leagueSize = metaSize ?? info?.leagueSize ?? null;
+
+                if (!tier) break;
 
                 const user = await prisma.user.findUnique({
                     where: { stripeCustomerId: customerId },
@@ -84,25 +103,33 @@ export async function POST(request: NextRequest): Promise<Response> {
 
                 const item = sub.items.data[0];
                 const periodStart = item?.current_period_start
-                    ? new Date(item.current_period_start * 1000)
-                    : null;
+                    ? new Date(item.current_period_start * 1000) : null;
                 const periodEnd = item?.current_period_end
-                    ? new Date(item.current_period_end * 1000)
-                    : null;
+                    ? new Date(item.current_period_end * 1000) : null;
 
                 await prisma.$transaction([
-                    ...(sub.status === 'active' ? [
+                    // Only update user.subscriptionTier for active player plans
+                    ...(subType === 'player' && sub.status === 'active' ? [
                         prisma.user.update({
                             where: { id: user.id },
                             data: { subscriptionTier: tier },
                         }),
                     ] : []),
+                    // Reset player tier when player plan is no longer active
+                    ...(subType === 'player' && sub.status !== 'active' && sub.status !== 'trialing' ? [
+                        prisma.user.update({
+                            where: { id: user.id },
+                            data: { subscriptionTier: 'FREE' },
+                        }),
+                    ] : []),
                     prisma.subscription.upsert({
-                        where: { userId: user.id },
+                        where: { stripeSubscriptionId: sub.id },
                         create: {
                             userId: user.id,
                             stripeSubscriptionId: sub.id,
                             stripeCustomerId: customerId,
+                            type: subType,
+                            leagueSize,
                             tier,
                             status: sub.status,
                             currentPeriodStart: periodStart,
@@ -110,6 +137,8 @@ export async function POST(request: NextRequest): Promise<Response> {
                             cancelAtPeriodEnd: sub.cancel_at_period_end,
                         },
                         update: {
+                            type: subType,
+                            leagueSize,
                             tier,
                             status: sub.status,
                             currentPeriodStart: periodStart,
@@ -124,7 +153,6 @@ export async function POST(request: NextRequest): Promise<Response> {
             case 'customer.subscription.deleted': {
                 const sub = event.data.object as Stripe.Subscription;
                 const customerId = sub.customer as string;
-
                 if (!customerId) break;
 
                 const user = await prisma.user.findUnique({
@@ -133,16 +161,27 @@ export async function POST(request: NextRequest): Promise<Response> {
                 });
                 if (!user) break;
 
+                // Look up the subscription record to know its type
+                const subRecord = await prisma.subscription.findUnique({
+                    where: { stripeSubscriptionId: sub.id },
+                    select: { type: true },
+                });
+
                 await prisma.$transaction([
-                    prisma.user.update({
-                        where: { id: user.id },
-                        data: { subscriptionTier: 'FREE' },
-                    }),
+                    // Only reset subscriptionTier for player plan cancellations
+                    ...(subRecord?.type === 'player' ? [
+                        prisma.user.update({
+                            where: { id: user.id },
+                            data: { subscriptionTier: 'FREE' },
+                        }),
+                    ] : []),
                     prisma.subscription.upsert({
-                        where: { userId: user.id },
+                        where: { stripeSubscriptionId: sub.id },
                         create: {
                             userId: user.id,
+                            stripeSubscriptionId: sub.id,
                             stripeCustomerId: customerId,
+                            type: subRecord?.type ?? 'player',
                             tier: 'FREE',
                             status: 'canceled',
                         },

@@ -2,58 +2,76 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { stripe, priceIdToTier } from '@/lib/stripe';
 import PricingClient from './PricingClient';
+import type { PlayerSub, CommSub } from './types';
 
 export const dynamic = 'force-dynamic';
 
-export default async function PricingPage() {
+export default async function PricingPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ tab?: string }>;
+}) {
+    const { tab } = await searchParams;
+    const defaultTab = tab === 'commissioner' ? 'commissioner' : 'player';
+
     const session = await auth();
 
-    let activeSub: { tier: string; stripeSubscriptionId: string } | null = null;
+    let playerSub: PlayerSub | null = null;
+    let commSubs: CommSub[] = [];
 
     if (session?.user?.email) {
         const user = await prisma.user.findUnique({
             where: { email: session.user.email },
             select: {
                 subscriptionTier: true,
-                subscription: {
-                    select: { status: true, stripeSubscriptionId: true },
+                subscriptions: {
+                    where: { status: { in: ['active', 'trialing'] } },
+                    select: { type: true, tier: true, leagueSize: true, stripeSubscriptionId: true },
                 },
             },
         });
 
-        const sub = user?.subscription;
-        if (
-            user &&
-            sub?.stripeSubscriptionId &&
-            (sub.status === 'active' || sub.status === 'trialing')
-        ) {
-            // Read the current price directly from Stripe — this is always authoritative.
-            // The DB tier can be stale if previous upgrade API calls failed to write back.
-            let tier: string = user.subscriptionTier;
-            try {
-                const stripeSub = await stripe.subscriptions.retrieve(sub.stripeSubscriptionId);
-                const currentPriceId = stripeSub.items.data[0]?.price.id;
-                const stripeTier = currentPriceId ? priceIdToTier(currentPriceId) : null;
-                if (stripeTier) {
-                    tier = stripeTier;
-                    // Passively heal the DB if it's out of sync (non-blocking)
-                    if (stripeTier !== user.subscriptionTier) {
-                        prisma.user.update({
-                            where: { email: session.user.email },
-                            data: { subscriptionTier: stripeTier },
-                        }).catch(() => {});
+        if (user) {
+            // Player sub — verify against Stripe for accuracy
+            const rawPlayerSub = user.subscriptions.find(s => s.type === 'player');
+            if (rawPlayerSub?.stripeSubscriptionId) {
+                let tier: string = user.subscriptionTier;
+                try {
+                    const stripeSub = await stripe.subscriptions.retrieve(rawPlayerSub.stripeSubscriptionId);
+                    const currentPriceId = stripeSub.items.data[0]?.price.id;
+                    const stripeTier = currentPriceId ? priceIdToTier(currentPriceId) : null;
+                    if (stripeTier) {
+                        tier = stripeTier;
+                        // Passively heal stale user.subscriptionTier
+                        if (stripeTier !== user.subscriptionTier) {
+                            prisma.user.update({
+                                where: { email: session.user.email },
+                                data: { subscriptionTier: stripeTier },
+                            }).catch(() => {});
+                        }
                     }
+                } catch {
+                    // Stripe unreachable — fall back to DB
                 }
-            } catch {
-                // Stripe unreachable — fall back to DB tier
+                playerSub = { tier, stripeSubscriptionId: rawPlayerSub.stripeSubscriptionId };
             }
 
-            activeSub = {
-                tier,
-                stripeSubscriptionId: sub.stripeSubscriptionId,
-            };
+            // Commissioner subs — read from DB (webhook keeps these accurate)
+            commSubs = user.subscriptions
+                .filter(s => s.type === 'commissioner' && s.stripeSubscriptionId && s.leagueSize)
+                .map(s => ({
+                    tier: s.tier,
+                    leagueSize: s.leagueSize!,
+                    stripeSubscriptionId: s.stripeSubscriptionId!,
+                }));
         }
     }
 
-    return <PricingClient activeSub={activeSub} />;
+    return (
+        <PricingClient
+            playerSub={playerSub}
+            commSubs={commSubs}
+            defaultTab={defaultTab as 'player' | 'commissioner'}
+        />
+    );
 }
