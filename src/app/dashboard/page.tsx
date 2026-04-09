@@ -189,7 +189,7 @@ export default async function DashboardPage() {
                             </div>
                             <div className="mt-4 pt-4 border-t border-gray-800 flex items-center justify-between gap-4 flex-wrap">
                                 <p className="text-gray-500 text-xs">
-                                    Upgrade anytime. To switch plan types, cancel first then resubscribe.
+                                    Upgrade anytime for the pro-rated cost of the year.
                                 </p>
                                 <form action={createPortalSession}>
                                     <button type="submit"

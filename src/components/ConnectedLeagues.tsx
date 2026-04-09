@@ -93,7 +93,7 @@ export default function ConnectedLeagues({ leagues: initial, limit, nextTier, ti
                         {nextTier && (
                             <Link href="/pricing"
                                 className="text-xs font-semibold text-[#C8A951] hover:underline">
-                                Upgrade to {tierLabel.replace('Pro', nextTier).replace('All-Pro', nextTier)} →
+                                Upgrade to Player {nextTier} →
                             </Link>
                         )}
                     </div>
