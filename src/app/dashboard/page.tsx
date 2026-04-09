@@ -34,6 +34,12 @@ const STATUS_STYLES: Record<string, string> = {
     inactive:  'bg-gray-800 text-gray-500 border-gray-700',
 };
 
+const COMM_TIER_BADGE: Record<string, { label: string; className: string }> = {
+    COMMISSIONER_PRO:     { label: 'Pro',     className: 'bg-gray-800 text-gray-300 border-gray-600' },
+    COMMISSIONER_ALL_PRO: { label: 'All-Pro', className: 'bg-[#C8A951]/15 text-[#C8A951] border-[#C8A951]/40' },
+    COMMISSIONER_ELITE:   { label: 'Elite ✦', className: 'bg-[#C8A951]/25 text-[#C8A951] border-[#C8A951]/60' },
+};
+
 const LEAGUE_STATUS_STYLES: Record<string, string> = {
     in_season: 'bg-green-900/40 text-green-400 border-green-800',
     drafting:  'bg-blue-900/40 text-blue-400 border-blue-800',
@@ -254,12 +260,19 @@ export default async function DashboardPage() {
                                             )}
                                         </div>
                                     </div>
-                                    <form action={createPortalSession}>
-                                        <button type="submit"
-                                            className="text-[#C8A951]/70 hover:text-[#C8A951] text-sm font-medium transition shrink-0">
-                                            Manage →
-                                        </button>
-                                    </form>
+                                    <div className="flex items-center gap-4 shrink-0">
+                                        {COMM_TIER_BADGE[sub.tier] && (
+                                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${COMM_TIER_BADGE[sub.tier].className}`}>
+                                                {COMM_TIER_BADGE[sub.tier].label}
+                                            </span>
+                                        )}
+                                        <form action={createPortalSession}>
+                                            <button type="submit"
+                                                className="text-[#C8A951]/70 hover:text-[#C8A951] text-sm font-medium transition">
+                                                Manage →
+                                            </button>
+                                        </form>
+                                    </div>
                                 </div>
                             ))}
                         </div>
