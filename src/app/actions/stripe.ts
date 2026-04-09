@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { stripe, planInfo } from '@/lib/stripe';
+import { stripe, planInfo, COMMISSIONER_PRICING } from '@/lib/stripe';
 
 function appUrl(): string {
     return (
@@ -11,6 +11,18 @@ function appUrl(): string {
         process.env.AUTH_URL ??
         'http://localhost:3000'
     );
+}
+
+// Look up annual price (in dollars) for any commissioner tier + size combo.
+function commPrice(tier: string, leagueSize: number | null): number {
+    if (!leagueSize) return 0;
+    const key =
+        tier === 'COMMISSIONER_PRO'     ? 'pro'
+      : tier === 'COMMISSIONER_ALL_PRO' ? 'all_pro'
+      : tier === 'COMMISSIONER_ELITE'   ? 'elite'
+      : null;
+    if (!key) return 0;
+    return (COMMISSIONER_PRICING[key].sizes as Record<number, number>)[leagueSize] ?? 0;
 }
 
 export async function createPortalSession(): Promise<never> {
@@ -59,7 +71,14 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
             stripeCustomerId: true,
             subscriptions: {
                 where: { status: { in: ['active', 'trialing'] } },
-                select: { id: true, type: true },
+                select: {
+                    id: true,
+                    type: true,
+                    tier: true,
+                    leagueSize: true,
+                    discountPct: true,
+                    stripeSubscriptionId: true,
+                },
             },
         },
     });
@@ -74,9 +93,12 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
         redirect('/pricing?error=already-subscribed');
     }
 
-    // Volume discount coupon for commissioner plans
+    // ── Volume discount ───────────────────────────────────────────────────────
+    // Discount always lands on the CHEAPEST plan in the portfolio to prevent
+    // gaming (stacking cheap plans to discount an expensive one).
     let discountPct = 0;
     let couponId: string | undefined;
+
     if (info.type === 'commissioner') {
         if (activeCommCount >= 3) {
             discountPct = 25;
@@ -84,6 +106,52 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
         } else if (activeCommCount >= 1) {
             discountPct = 15;
             couponId = 'MULTI_LEAGUE_15';
+        }
+    }
+
+    // Price of the plan being purchased right now
+    const newPlanPrice = commPrice(info.tier, info.leagueSize);
+
+    // If a discount applies, check whether an existing plan is cheaper.
+    // If so, redirect the discount there instead of the new (expensive) plan.
+    let applyDiscountToExistingSubId: string | null = null;
+
+    if (discountPct > 0 && couponId && info.type === 'commissioner') {
+        // Find the cheapest ACTIVE commissioner sub that doesn't already carry
+        // an equal-or-better discount.
+        const cheapestExisting = activeCommSubs
+            .map(s => ({
+                stripeSubscriptionId: s.stripeSubscriptionId,
+                price: commPrice(s.tier as string, s.leagueSize),
+                currentDiscountPct: s.discountPct ?? 0,
+            }))
+            .sort((a, b) => a.price - b.price)
+            .find(s => s.price < newPlanPrice && s.currentDiscountPct < discountPct);
+
+        if (cheapestExisting?.stripeSubscriptionId) {
+            // Move the discount to this cheaper existing subscription.
+            applyDiscountToExistingSubId = cheapestExisting.stripeSubscriptionId;
+            couponId    = undefined; // new plan pays full price
+            discountPct = 0;
+        }
+
+        // When crossing the 3→4 threshold, upgrade all existing 15% → 25%.
+        if (activeCommCount >= 3) {
+            for (const sub of activeCommSubs) {
+                if ((sub.discountPct ?? 0) < 25 && sub.stripeSubscriptionId) {
+                    try {
+                        await stripe.subscriptions.update(sub.stripeSubscriptionId, {
+                            coupon: 'MULTI_LEAGUE_25',
+                        });
+                        await prisma.subscription.update({
+                            where: { stripeSubscriptionId: sub.stripeSubscriptionId },
+                            data: { discountPct: 25 },
+                        });
+                    } catch {
+                        // Non-fatal — discount will self-correct on next purchase
+                    }
+                }
+            }
         }
     }
 
@@ -103,15 +171,30 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
             });
         } catch (err) {
             console.error('[createCheckoutSession] stripe.customers.create failed:', err);
-            const msg=err instanceof Error?err.message:String(err);redirect('/pricing?error=checkout-failed&detail='+encodeURIComponent(msg));
+            const msg = err instanceof Error ? err.message : String(err);
+            redirect('/pricing?error=checkout-failed&detail=' + encodeURIComponent(msg));
         }
     }
 
-    // Build metadata — omit keys with empty/null values so Stripe never
-    // receives empty strings (which cause InvalidRequestError).
+    // Apply discount to cheapest existing sub if needed
+    if (applyDiscountToExistingSubId) {
+        const coupon = activeCommCount >= 3 ? 'MULTI_LEAGUE_25' : 'MULTI_LEAGUE_15';
+        const pct    = activeCommCount >= 3 ? 25 : 15;
+        try {
+            await stripe.subscriptions.update(applyDiscountToExistingSubId, { coupon });
+            await prisma.subscription.update({
+                where: { stripeSubscriptionId: applyDiscountToExistingSubId },
+                data: { discountPct: pct },
+            });
+        } catch (err) {
+            console.error('[createCheckoutSession] discount redirect failed:', err);
+        }
+    }
+
+    // Build metadata
     const sharedMeta: Record<string, string> = {
-        userId: user.id,
-        tier:   info.tier,
+        userId:   user.id,
+        tier:     info.tier,
         planType: info.type,
     };
     if (info.leagueSize != null) sharedMeta.leagueSize = info.leagueSize.toString();
@@ -133,7 +216,8 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
         checkoutUrl = cs.url!;
     } catch (err) {
         console.error('[createCheckoutSession] stripe.checkout.sessions.create failed:', err);
-        const msg=err instanceof Error?err.message:String(err);redirect('/pricing?error=checkout-failed&detail='+encodeURIComponent(msg));
+        const msg = err instanceof Error ? err.message : String(err);
+        redirect('/pricing?error=checkout-failed&detail=' + encodeURIComponent(msg));
     }
 
     redirect(checkoutUrl);
