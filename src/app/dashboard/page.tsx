@@ -108,7 +108,7 @@ export default async function DashboardPage() {
     if (!user) redirect('/sign-in');
 
     const { name, image, subscriptionTier, subscriptions, connectedLeagues, leagues } = user;
-    const displayName = name ?? session.user.email;
+    const displayName = (name ?? session.user.email ?? '').split(' ')[0];
 
     const activeSubs = subscriptions.filter(
         s => s.status === 'active' || s.status === 'trialing'
