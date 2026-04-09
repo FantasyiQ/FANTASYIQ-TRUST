@@ -6,5 +6,6 @@ export interface PlayerSub {
 export interface CommSub {
     tier: string;
     leagueSize: number;
+    leagueName: string | null;
     stripeSubscriptionId: string;
 }

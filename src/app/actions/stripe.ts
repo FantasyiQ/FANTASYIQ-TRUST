@@ -42,6 +42,14 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
     const info = planInfo(priceId);
     if (!info) throw new Error('Invalid priceId');
 
+    const leagueName = info.type === 'commissioner'
+        ? (formData.get('leagueName') as string | null)?.trim() ?? ''
+        : '';
+
+    if (info.type === 'commissioner' && !leagueName) {
+        throw new Error('League name is required for commissioner plans.');
+    }
+
     const user = await prisma.user.findUnique({
         where: { email: session.user.email },
         select: {
@@ -50,16 +58,33 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
             name: true,
             stripeCustomerId: true,
             subscriptions: {
-                where: { type: 'player', status: { in: ['active', 'trialing'] } },
-                select: { id: true },
+                where: { status: { in: ['active', 'trialing'] } },
+                select: { id: true, type: true },
             },
         },
     });
     if (!user) redirect('/sign-in');
 
+    const activePlayerSubs   = user.subscriptions.filter(s => s.type === 'player');
+    const activeCommSubs     = user.subscriptions.filter(s => s.type === 'commissioner');
+    const activeCommCount    = activeCommSubs.length;
+
     // Block a second player plan — use the upgrade flow instead
-    if (info.type === 'player' && user.subscriptions.length > 0) {
+    if (info.type === 'player' && activePlayerSubs.length > 0) {
         throw new Error('You already have a Player plan. Use Upgrade to change tiers.');
+    }
+
+    // Volume discount coupon for commissioner plans
+    let discountPct = 0;
+    let couponId: string | undefined;
+    if (info.type === 'commissioner') {
+        if (activeCommCount >= 3) {
+            discountPct = 25;
+            couponId = 'MULTI_LEAGUE_25';
+        } else if (activeCommCount >= 1) {
+            discountPct = 15;
+            couponId = 'MULTI_LEAGUE_15';
+        }
     }
 
     // Get or create Stripe customer
@@ -77,25 +102,25 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
         });
     }
 
+    const sharedMeta = {
+        userId: user.id,
+        tier: info.tier,
+        planType: info.type,
+        leagueSize: info.leagueSize?.toString() ?? '',
+        leagueName,
+        discountPct: discountPct.toString(),
+    };
+
     const checkoutSession = await stripe.checkout.sessions.create({
         customer: customerId,
         mode: 'subscription',
         line_items: [{ price: priceId, quantity: 1 }],
+        ...(couponId ? { discounts: [{ coupon: couponId }] } : {}),
         success_url: `${appUrl()}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${appUrl()}/pricing`,
-        metadata: {
-            userId: user.id,
-            tier: info.tier,
-            planType: info.type,
-            leagueSize: info.leagueSize?.toString() ?? '',
-        },
+        cancel_url: `${appUrl()}/pricing?tab=${info.type === 'commissioner' ? 'commissioner' : 'player'}`,
+        metadata: sharedMeta,
         subscription_data: {
-            metadata: {
-                userId: user.id,
-                tier: info.tier,
-                planType: info.type,
-                leagueSize: info.leagueSize?.toString() ?? '',
-            },
+            metadata: sharedMeta,
         },
     });
 

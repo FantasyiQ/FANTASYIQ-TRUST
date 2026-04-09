@@ -29,9 +29,11 @@ export async function POST(request: NextRequest): Promise<Response> {
                 const cs = event.data.object as Stripe.Checkout.Session;
                 const customerId   = cs.customer as string;
                 const stripeSubId  = cs.subscription as string | null;
-                const metaTier     = cs.metadata?.tier as SubscriptionTier | undefined;
-                const metaPlanType = cs.metadata?.planType ?? 'player';
-                const metaSize     = cs.metadata?.leagueSize ? parseInt(cs.metadata.leagueSize) : null;
+                const metaTier       = cs.metadata?.tier as SubscriptionTier | undefined;
+                const metaPlanType   = cs.metadata?.planType ?? 'player';
+                const metaSize       = cs.metadata?.leagueSize ? parseInt(cs.metadata.leagueSize) : null;
+                const metaLeagueName = cs.metadata?.leagueName ?? null;
+                const metaDiscountPct = cs.metadata?.discountPct ? parseInt(cs.metadata.discountPct) : null;
 
                 if (!customerId || !stripeSubId) break;
 
@@ -62,12 +64,16 @@ export async function POST(request: NextRequest): Promise<Response> {
                             stripeCustomerId: customerId,
                             type: subType,
                             leagueSize,
+                            leagueName: metaLeagueName,
+                            discountPct: metaDiscountPct,
                             tier,
                             status: 'active',
                         },
                         update: {
                             type: subType,
                             leagueSize,
+                            leagueName: metaLeagueName,
+                            discountPct: metaDiscountPct,
                             tier,
                             status: 'active',
                             cancelAtPeriodEnd: false,

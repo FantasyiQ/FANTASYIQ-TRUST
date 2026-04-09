@@ -18,6 +18,7 @@ export default async function PricingPage({
 
     let playerSub: PlayerSub | null = null;
     let commSubs: CommSub[] = [];
+    let activePlayerLeagueCount = 0;
 
     if (session?.user?.email) {
         const user = await prisma.user.findUnique({
@@ -26,12 +27,15 @@ export default async function PricingPage({
                 subscriptionTier: true,
                 subscriptions: {
                     where: { status: { in: ['active', 'trialing'] } },
-                    select: { type: true, tier: true, leagueSize: true, stripeSubscriptionId: true },
+                    select: { type: true, tier: true, leagueSize: true, leagueName: true, stripeSubscriptionId: true },
                 },
+                _count: { select: { connectedLeagues: true } },
             },
         });
 
         if (user) {
+            activePlayerLeagueCount = user._count.connectedLeagues;
+
             // Player sub — verify against Stripe for accuracy
             const rawPlayerSub = user.subscriptions.find(s => s.type === 'player');
             if (rawPlayerSub?.stripeSubscriptionId) {
@@ -62,6 +66,7 @@ export default async function PricingPage({
                 .map(s => ({
                     tier: s.tier,
                     leagueSize: s.leagueSize!,
+                    leagueName: s.leagueName ?? null,
                     stripeSubscriptionId: s.stripeSubscriptionId!,
                 }));
         }
@@ -71,6 +76,8 @@ export default async function PricingPage({
         <PricingClient
             playerSub={playerSub}
             commSubs={commSubs}
+            activeCommCount={commSubs.length}
+            activePlayerLeagueCount={activePlayerLeagueCount}
             defaultTab={defaultTab as 'player' | 'commissioner'}
         />
     );

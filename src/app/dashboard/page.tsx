@@ -5,6 +5,8 @@ import { auth, signOut } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { unsyncLeague } from '@/app/actions/leagues';
 import { createPortalSession } from '@/app/actions/stripe';
+import ConnectedLeagues from '@/components/ConnectedLeagues';
+import { getLeagueLimit, tierToLimitKey, nextTierName } from '@/lib/league-limits';
 import type { SubscriptionTier } from '@prisma/client';
 
 function formatTier(tier: SubscriptionTier | string): string {
@@ -68,17 +70,22 @@ export default async function DashboardPage() {
             image: true,
             subscriptionTier: true,
             subscriptions: {
-                orderBy: { createdAt: 'asc' },
                 select: {
                     id: true,
                     type: true,
                     tier: true,
                     leagueSize: true,
+                    leagueName: true,
+                    discountPct: true,
                     status: true,
                     stripeSubscriptionId: true,
                     currentPeriodEnd: true,
                     cancelAtPeriodEnd: true,
                 },
+            },
+            connectedLeagues: {
+                orderBy: { createdAt: 'asc' },
+                select: { id: true, leagueName: true, platform: true },
             },
             leagues: {
                 orderBy: { lastSyncedAt: 'desc' },
@@ -100,17 +107,23 @@ export default async function DashboardPage() {
 
     if (!user) redirect('/sign-in');
 
-    const { name, image, subscriptionTier, subscriptions, leagues } = user;
+    const { name, image, subscriptionTier, subscriptions, connectedLeagues, leagues } = user;
     const displayName = name ?? session.user.email;
 
     const activeSubs = subscriptions.filter(
         s => s.status === 'active' || s.status === 'trialing'
     );
     const playerSub  = activeSubs.find(s => s.type === 'player') ?? null;
-    const commSubs   = activeSubs.filter(s => s.type === 'commissioner');
+    const commSubs   = activeSubs
+        .filter(s => s.type === 'commissioner')
+        .sort((a, b) => (a.leagueName ?? '').localeCompare(b.leagueName ?? ''));
 
     const hasAnyActiveSub = activeSubs.length > 0;
     const isElite = subscriptionTier === 'PLAYER_ELITE' || subscriptionTier === 'COMMISSIONER_ELITE';
+
+    const leagueLimitKey = tierToLimitKey(subscriptionTier);
+    const leagueLimit    = getLeagueLimit(leagueLimitKey);
+    const nextTier       = nextTierName(subscriptionTier);
 
     return (
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
@@ -185,6 +198,12 @@ export default async function DashboardPage() {
                                     </button>
                                 </form>
                             </div>
+                            <ConnectedLeagues
+                                leagues={connectedLeagues}
+                                limit={leagueLimit}
+                                nextTier={nextTier}
+                                tierLabel={formatTier(subscriptionTier)}
+                            />
                         </>
                     ) : (
                         <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -217,11 +236,19 @@ export default async function DashboardPage() {
                                 <div key={sub.id}
                                     className="flex items-center justify-between gap-4 flex-wrap p-4 bg-gray-800/40 rounded-xl border border-gray-800">
                                     <div>
-                                        <p className="font-semibold text-white text-sm">{commLabel(sub.tier, sub.leagueSize)}</p>
-                                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                        {sub.leagueName && (
+                                            <p className="text-[#C8A951] font-semibold text-sm">{sub.leagueName}</p>
+                                        )}
+                                        <p className="font-medium text-gray-300 text-xs mt-0.5">{commLabel(sub.tier, sub.leagueSize)}</p>
+                                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${STATUS_STYLES[sub.status] ?? STATUS_STYLES.inactive}`}>
                                                 {sub.status.replace('_', ' ')}
                                             </span>
+                                            {sub.discountPct != null && sub.discountPct > 0 && (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border bg-green-900/40 text-green-400 border-green-800">
+                                                    {sub.discountPct}% discount
+                                                </span>
+                                            )}
                                             {periodLabel(sub) && (
                                                 <span className="text-gray-500 text-xs">{periodLabel(sub)}</span>
                                             )}

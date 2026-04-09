@@ -23,6 +23,8 @@ interface PendingUpgrade {
 interface Props {
     playerSub: PlayerSub | null;
     commSubs: CommSub[];
+    activeCommCount: number;
+    activePlayerLeagueCount: number;
     defaultTab: Tab;
 }
 
@@ -253,9 +255,11 @@ interface CardProps {
     onUpgrade: (upgrade: PendingUpgrade) => void;
     // For commissioner cards: the stripe sub ID to upgrade from (if upgrading)
     sourceStripeSubId?: string;
+    leagueLimitNote?: string;  // e.g. "Up to 2 Leagues"
+    atLeagueLimit?: boolean;   // true when user has maxed leagues on this tier
 }
 
-function PlanCard({ name, price, period, badge, badgeGold, ring, features, priceId, tier, cardStatus, onUpgrade, sourceStripeSubId }: CardProps) {
+function PlanCard({ name, price, period, badge, badgeGold, ring, features, priceId, tier, cardStatus, onUpgrade, sourceStripeSubId, leagueLimitNote, atLeagueLimit }: CardProps) {
     return (
         <div className={`relative flex flex-col bg-gray-900 rounded-2xl p-6 border transition-shadow hover:shadow-lg hover:shadow-[#C9A227]/5 ${
             ring ? 'border-[#C9A227] shadow-md shadow-[#C9A227]/10' : 'border-gray-800'
@@ -272,10 +276,20 @@ function PlanCard({ name, price, period, badge, badgeGold, ring, features, price
             )}
 
             <h3 className="text-xl font-bold text-white mt-1">{name}</h3>
-            <div className="mt-4 mb-6">
+            <div className="mt-4 mb-3">
                 <span className="text-4xl font-extrabold text-white">${price}</span>
                 <span className="text-gray-400 text-sm ml-1.5">{period}</span>
             </div>
+            {leagueLimitNote && (
+                <div className="mb-4 flex items-center gap-2">
+                    <span className="text-xs font-semibold text-[#C9A227] bg-[#C9A227]/10 border border-[#C9A227]/30 px-2.5 py-1 rounded-full">
+                        {leagueLimitNote}
+                    </span>
+                    {atLeagueLimit && (
+                        <span className="text-xs text-yellow-500/70">League slots full</span>
+                    )}
+                </div>
+            )}
 
             <ul className="space-y-0.5 flex-1">
                 {features.map((f, i) => <FeatureRow key={i} f={f} />)}
@@ -314,6 +328,86 @@ function PlanCard({ name, price, period, badge, badgeGold, ring, features, price
     );
 }
 
+/* ── Commissioner plan card (always checkout, includes leagueName) ── */
+interface CommCardProps {
+    name: string;
+    price: string;
+    period: string;
+    badge?: string;
+    badgeGold?: boolean;
+    ring?: boolean;
+    features: Feature[];
+    priceId: string;
+    tier: string;
+    leagueName: string;
+    discountPct: number;
+}
+
+function CommPlanCard({ name, price, period, badge, badgeGold, ring, features, priceId, tier, leagueName, discountPct }: CommCardProps) {
+    const canCheckout = leagueName.trim().length > 0 && !!priceId;
+
+    // Discounted price display
+    let displayPrice = price;
+    if (discountPct > 0) {
+        const numeric = parseFloat(price);
+        const discounted = (numeric * (1 - discountPct / 100)).toFixed(2);
+        displayPrice = discounted;
+    }
+
+    return (
+        <div className={`relative flex flex-col bg-gray-900 rounded-2xl p-6 border transition-shadow hover:shadow-lg hover:shadow-[#C9A227]/5 ${
+            ring ? 'border-[#C9A227] shadow-md shadow-[#C9A227]/10' : 'border-gray-800'
+        }`}>
+            {badge && (
+                <span className={`absolute -top-3.5 left-1/2 -translate-x-1/2 text-xs font-bold px-4 py-1 rounded-full whitespace-nowrap ${
+                    badgeGold ? 'bg-[#C9A227] text-black' : 'bg-white text-black'
+                }`}>{badge}</span>
+            )}
+
+            <h3 className="text-xl font-bold text-white mt-1">{name}</h3>
+            <div className="mt-4 mb-1">
+                {discountPct > 0 ? (
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-4xl font-extrabold text-white">${displayPrice}</span>
+                        <span className="text-gray-500 text-sm line-through">${price}</span>
+                        <span className="text-gray-400 text-sm ml-0.5">{period}</span>
+                    </div>
+                ) : (
+                    <div>
+                        <span className="text-4xl font-extrabold text-white">${price}</span>
+                        <span className="text-gray-400 text-sm ml-1.5">{period}</span>
+                    </div>
+                )}
+                {discountPct > 0 && (
+                    <span className="inline-block mt-1.5 text-xs font-semibold bg-green-900/40 text-green-400 border border-green-800 px-2 py-0.5 rounded-full">
+                        {discountPct}% multi-league discount
+                    </span>
+                )}
+            </div>
+
+            <ul className="space-y-0.5 flex-1 mt-4">
+                {features.map((f, i) => <FeatureRow key={i} f={f} />)}
+            </ul>
+
+            <div className="mt-8">
+                <form action={createCheckoutSession}>
+                    <input type="hidden" name="priceId" value={priceId} />
+                    <input type="hidden" name="tier" value={tier} />
+                    <input type="hidden" name="leagueName" value={leagueName.trim()} />
+                    <button type="submit" disabled={!canCheckout}
+                        className="w-full py-3 rounded-xl font-bold transition-colors bg-[#C9A227] text-black hover:bg-[#b8912a] disabled:opacity-40 disabled:cursor-not-allowed"
+                        title={!leagueName.trim() ? 'Enter your league name above' : undefined}>
+                        Get Started
+                    </button>
+                </form>
+                {!leagueName.trim() && (
+                    <p className="text-center text-gray-600 text-xs mt-2">Enter league name to continue</p>
+                )}
+            </div>
+        </div>
+    );
+}
+
 /* ── Status logic ─────────────────────────────────────────────────── */
 function resolvePlayerCardStatus(cardTier: string, playerSub: PlayerSub | null): CardStatus {
     if (!playerSub) return 'checkout';
@@ -335,15 +429,19 @@ function resolveCommCardStatus(cardTier: string, size: TeamSize, commSubs: CommS
 }
 
 /* ── Main component ───────────────────────────────────────────────── */
-export default function PricingClient({ playerSub, commSubs, defaultTab }: Props) {
+export default function PricingClient({ playerSub, commSubs, activeCommCount, activePlayerLeagueCount, defaultTab }: Props) {
     const { update: updateSession } = useSession();
     const [tab, setTab]       = useState<Tab>(defaultTab);
     const [size, setSize]     = useState<TeamSize>(12);
+    const [leagueName, setLeagueName] = useState('');
     const [pending, setPending]       = useState<PendingUpgrade | null>(null);
     const [upgrading, setUpgrading]   = useState(false);
     const [upgradeError, setUpgradeError] = useState<string | null>(null);
 
     const [proPx, apPx, elPx] = COMM_PRICES[size];
+
+    // Volume discount for the *next* commissioner purchase
+    const discountPct = activeCommCount >= 3 ? 25 : activeCommCount >= 1 ? 15 : 0;
 
     // Which sizes have an active commissioner subscription
     const activeSizes = new Set(commSubs.map(s => s.leagueSize));
@@ -421,30 +519,55 @@ export default function PricingClient({ playerSub, commSubs, defaultTab }: Props
                         </div>
                     </div>
 
-                    {/* Commissioner: size selector */}
+                    {/* Commissioner: size selector + league name input */}
                     {tab === 'commissioner' && (
-                        <div className="mb-10 max-w-5xl mx-auto">
-                            <p className="text-center text-gray-400 text-sm font-medium mb-3">League Size</p>
-                            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                                {TEAM_SIZES.map((s) => (
-                                    <button key={s} onClick={() => setSize(s)}
-                                        className={`relative py-2.5 rounded-xl text-sm font-semibold transition-all border ${
-                                            size === s
-                                                ? 'bg-[#C9A227] text-black border-[#C9A227]'
-                                                : 'bg-gray-900 text-gray-400 border-gray-800 hover:border-gray-600 hover:text-white'
-                                        }`}>
-                                        {s} Teams
-                                        {activeSizes.has(s) && (
-                                            <span className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-950" title="Active plan" />
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
-                            {activeSizes.has(size) && (
-                                <p className="text-center text-green-400 text-xs mt-3">
-                                    You have an active plan for {size}-team leagues.
-                                </p>
+                        <div className="mb-10 max-w-5xl mx-auto space-y-6">
+                            {/* Multi-League Savings callout */}
+                            {discountPct > 0 && (
+                                <div className="flex items-center justify-center gap-2 bg-[#C9A227]/10 border border-[#C9A227]/30 rounded-xl px-5 py-3 text-sm">
+                                    <span className="text-[#C9A227] font-bold">Multi-League Savings:</span>
+                                    <span className="text-gray-300">
+                                        {discountPct}% off your next league
+                                        {activeCommCount >= 3 ? ' (4th+ league)' : ' (2nd–3rd league)'}
+                                    </span>
+                                </div>
                             )}
+
+                            {/* League name input */}
+                            <div>
+                                <label htmlFor="leagueName" className="block text-center text-gray-400 text-sm font-medium mb-2">
+                                    League Name <span className="text-red-400">*</span>
+                                </label>
+                                <input
+                                    id="leagueName"
+                                    type="text"
+                                    value={leagueName}
+                                    onChange={e => setLeagueName(e.target.value)}
+                                    placeholder="e.g. Monday Night Mayhem"
+                                    maxLength={80}
+                                    className="block mx-auto w-full max-w-sm bg-gray-900 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#C9A227]/60"
+                                />
+                            </div>
+
+                            {/* Size picker */}
+                            <div>
+                                <p className="text-center text-gray-400 text-sm font-medium mb-3">League Size</p>
+                                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                                    {TEAM_SIZES.map((s) => (
+                                        <button key={s} onClick={() => setSize(s)}
+                                            className={`relative py-2.5 rounded-xl text-sm font-semibold transition-all border ${
+                                                size === s
+                                                    ? 'bg-[#C9A227] text-black border-[#C9A227]'
+                                                    : 'bg-gray-900 text-gray-400 border-gray-800 hover:border-gray-600 hover:text-white'
+                                            }`}>
+                                            {s} Teams
+                                            {activeSizes.has(s) && (
+                                                <span className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-950" title="Active plan" />
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
                     )}
 
@@ -459,6 +582,8 @@ export default function PricingClient({ playerSub, commSubs, defaultTab }: Props
                                     cardStatus={resolvePlayerCardStatus('PLAYER_PRO', playerSub)}
                                     sourceStripeSubId={playerSub?.stripeSubscriptionId}
                                     onUpgrade={handleUpgradeClick}
+                                    leagueLimitNote="Up to 2 Leagues"
+                                    atLeagueLimit={resolvePlayerCardStatus('PLAYER_PRO', playerSub) === 'current' && activePlayerLeagueCount >= 2}
                                 />
                                 <PlanCard
                                     name="All-Pro" price="10.99" period="/yr"
@@ -468,6 +593,8 @@ export default function PricingClient({ playerSub, commSubs, defaultTab }: Props
                                     cardStatus={resolvePlayerCardStatus('PLAYER_ALL_PRO', playerSub)}
                                     sourceStripeSubId={playerSub?.stripeSubscriptionId}
                                     onUpgrade={handleUpgradeClick}
+                                    leagueLimitNote="Up to 5 Leagues"
+                                    atLeagueLimit={resolvePlayerCardStatus('PLAYER_ALL_PRO', playerSub) === 'current' && activePlayerLeagueCount >= 5}
                                 />
                                 <PlanCard
                                     name="Elite" price="17.99" period="/yr"
@@ -477,35 +604,33 @@ export default function PricingClient({ playerSub, commSubs, defaultTab }: Props
                                     cardStatus={resolvePlayerCardStatus('PLAYER_ELITE', playerSub)}
                                     sourceStripeSubId={playerSub?.stripeSubscriptionId}
                                     onUpgrade={handleUpgradeClick}
+                                    leagueLimitNote="Unlimited Leagues"
                                 />
                             </>
                         ) : (
                             <>
-                                <PlanCard
+                                <CommPlanCard
                                     name="Commissioner Pro" price={proPx} period="/year"
                                     features={COMM_PRO_FEATURES}
                                     priceId={commPriceId('Pro', size)} tier="COMMISSIONER_PRO"
-                                    cardStatus={resolveCommCardStatus('COMMISSIONER_PRO', size, commSubs)}
-                                    sourceStripeSubId={commSubs.find(s => s.leagueSize === size)?.stripeSubscriptionId}
-                                    onUpgrade={handleUpgradeClick}
+                                    leagueName={leagueName}
+                                    discountPct={discountPct}
                                 />
-                                <PlanCard
+                                <CommPlanCard
                                     name="Commissioner All-Pro" price={apPx} period="/year"
                                     badge="Most Popular" badgeGold ring
                                     features={COMM_ALL_PRO_FEATURES}
                                     priceId={commPriceId('All-Pro', size)} tier="COMMISSIONER_ALL_PRO"
-                                    cardStatus={resolveCommCardStatus('COMMISSIONER_ALL_PRO', size, commSubs)}
-                                    sourceStripeSubId={commSubs.find(s => s.leagueSize === size)?.stripeSubscriptionId}
-                                    onUpgrade={handleUpgradeClick}
+                                    leagueName={leagueName}
+                                    discountPct={discountPct}
                                 />
-                                <PlanCard
+                                <CommPlanCard
                                     name="Commissioner Elite" price={elPx} period="/year"
                                     badge="Full Access"
                                     features={COMM_ELITE_FEATURES}
                                     priceId={commPriceId('Elite', size)} tier="COMMISSIONER_ELITE"
-                                    cardStatus={resolveCommCardStatus('COMMISSIONER_ELITE', size, commSubs)}
-                                    sourceStripeSubId={commSubs.find(s => s.leagueSize === size)?.stripeSubscriptionId}
-                                    onUpgrade={handleUpgradeClick}
+                                    leagueName={leagueName}
+                                    discountPct={discountPct}
                                 />
                             </>
                         )}

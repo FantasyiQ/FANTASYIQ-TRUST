@@ -30,10 +30,11 @@ model User {
     createdAt        DateTime         @default(now())
     updatedAt        DateTime         @updatedAt
 
-    accounts      Account[]
-    sessions      Session[]
-    leagues       League[]
-    subscriptions Subscription[]
+    accounts         Account[]
+    sessions         Session[]
+    leagues          League[]
+    subscriptions    Subscription[]
+    connectedLeagues ConnectedLeague[]
 }
 
 // Auth.js (NextAuth v5) required models
@@ -82,7 +83,9 @@ model Subscription {
     // "player" | "commissioner"
     // @default("player") ensures existing rows migrated from the one-sub model get the right value
     type                 String           @default("player")
+    leagueName           String?          // human-readable league name, set at commissioner checkout
     leagueSize           Int?             // null for player plans; 8/10/12/14/16/32 for commissioner
+    discountPct          Int?             // 0, 15, or 25 — stored for display/receipts
     tier                 SubscriptionTier @default(FREE)
     status               String           @default("inactive")
     currentPeriodStart   DateTime?
@@ -92,6 +95,19 @@ model Subscription {
     updatedAt            DateTime         @updatedAt
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ConnectedLeague {
+    id          String   @id @default(cuid())
+    userId      String
+    leagueName  String
+    platform    String?  // "ESPN", "Yahoo", "Sleeper", "NFL", "CBS", "Other"
+    leagueExtId String?  // external league ID from platform
+    createdAt   DateTime @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
 }
 
 model League {
