@@ -101,7 +101,8 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
                 where: { id: user.id },
                 data: { stripeCustomerId: customerId },
             });
-        } catch {
+        } catch (err) {
+            console.error('[createCheckoutSession] stripe.customers.create failed:', err);
             redirect('/pricing?error=checkout-failed');
         }
     }
@@ -130,7 +131,8 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
             subscription_data: { metadata: sharedMeta },
         });
         checkoutUrl = cs.url!;
-    } catch {
+    } catch (err) {
+        console.error('[createCheckoutSession] stripe.checkout.sessions.create failed:', err);
         redirect('/pricing?error=checkout-failed');
     }
 
