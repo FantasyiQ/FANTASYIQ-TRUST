@@ -2,35 +2,20 @@ import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { stripe, planInfo } from '@/lib/stripe';
+import type { PlanInfo } from '@/lib/stripe';
 
-// Tier rank within each plan type — higher = more premium
-const TIER_RANK: Record<string, number> = {
-    // Player
-    'price_1TJevr2RJtQwVGBEk9OZg70Q': 1,   // Player Pro
-    'price_1TJevr2RJtQwVGBEjPGtY3xl': 2,   // Player All-Pro
-    'price_1TJevs2RJtQwVGBEr9oJF91P': 3,   // Player Elite
-    // Commissioner Pro
-    'price_1TJevs2RJtQwVGBEJsY8pjzW': 10,  // Comm Pro 8T
-    'price_1TJevt2RJtQwVGBE0NH94Ln0': 11,  // Comm Pro 10T
-    'price_1TJevt2RJtQwVGBEhVTD6tSN': 12,  // Comm Pro 12T
-    'price_1TJevu2RJtQwVGBEONGWLyZ1': 13,  // Comm Pro 14T
-    'price_1TJevu2RJtQwVGBEBtvsN2wD': 14,  // Comm Pro 16T
-    'price_1TJevv2RJtQwVGBEHg2I2zIo': 15,  // Comm Pro 32T
-    // Commissioner All-Pro
-    'price_1TJevv2RJtQwVGBEzlCf01v2': 20,  // Comm All-Pro 8T
-    'price_1TJevw2RJtQwVGBEFZWHQ2U8': 21,  // Comm All-Pro 10T
-    'price_1TJevx2RJtQwVGBEYS7UwvO7': 22,  // Comm All-Pro 12T
-    'price_1TJevx2RJtQwVGBEQnE3ySf2': 23,  // Comm All-Pro 14T
-    'price_1TJevy2RJtQwVGBERHTlBc8R': 24,  // Comm All-Pro 16T
-    'price_1TJevz2RJtQwVGBEy8BTKIEy': 25,  // Comm All-Pro 32T
-    // Commissioner Elite
-    'price_1TJevz2RJtQwVGBE0hnaSc7R': 30,  // Comm Elite 8T
-    'price_1TJew02RJtQwVGBEh7b4ouVh': 31,  // Comm Elite 10T
-    'price_1TJew02RJtQwVGBE0sCYXfTw': 32,  // Comm Elite 12T
-    'price_1TJew12RJtQwVGBEW9pgN0sI': 33,  // Comm Elite 14T
-    'price_1TJew22RJtQwVGBEUzuZWBkD': 34,  // Comm Elite 16T
-    'price_1TJew22RJtQwVGBE0mw4lTfA': 35,  // Comm Elite 32T
-};
+// Derive a comparable rank from PlanInfo so this never goes stale with price ID changes.
+function tierRank(info: PlanInfo): number {
+    const tierBase: Record<string, number> = {
+        PLAYER_PRO:           10,
+        PLAYER_ALL_PRO:       20,
+        PLAYER_ELITE:         30,
+        COMMISSIONER_PRO:     40,
+        COMMISSIONER_ALL_PRO: 50,
+        COMMISSIONER_ELITE:   60,
+    };
+    return (tierBase[info.tier] ?? 0);
+}
 
 export async function POST(request: NextRequest): Promise<Response> {
     const session = await auth();
@@ -95,8 +80,8 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
 
     // Rank check — block downgrades
-    const currentRank = TIER_RANK[currentPriceId] ?? 0;
-    const newRank     = TIER_RANK[priceId] ?? 0;
+    const currentRank = currentInfo ? tierRank(currentInfo) : 0;
+    const newRank     = tierRank(newInfo);
 
     if (newRank <= currentRank) {
         return Response.json({
