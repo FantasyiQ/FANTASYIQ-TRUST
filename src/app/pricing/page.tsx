@@ -33,7 +33,7 @@ export default async function PricingPage({
                 subscriptionTier: true,
                 subscriptions: {
                     where: { status: { in: ['active', 'trialing'] } },
-                    select: { type: true, tier: true, leagueSize: true, leagueName: true, stripeSubscriptionId: true },
+                    select: { type: true, tier: true, leagueSize: true, leagueName: true, stripeSubscriptionId: true, discountPct: true },
                 },
                 _count: { select: { connectedLeagues: true } },
             },
@@ -74,6 +74,7 @@ export default async function PricingPage({
                     leagueSize: s.leagueSize!,
                     leagueName: s.leagueName ?? null,
                     stripeSubscriptionId: s.stripeSubscriptionId!,
+                    discountPct: s.discountPct ?? 0,
                 }));
         }
     }

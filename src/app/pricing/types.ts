@@ -8,4 +8,5 @@ export interface CommSub {
     leagueSize: number;
     leagueName: string | null;
     stripeSubscriptionId: string;
+    discountPct: number;
 }

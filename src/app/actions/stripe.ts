@@ -141,7 +141,7 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
                 if ((sub.discountPct ?? 0) < 25 && sub.stripeSubscriptionId) {
                     try {
                         await stripe.subscriptions.update(sub.stripeSubscriptionId, {
-                            coupon: 'MULTI_LEAGUE_25',
+                            discounts: [{ coupon: 'MULTI_LEAGUE_25' }],
                         });
                         await prisma.subscription.update({
                             where: { stripeSubscriptionId: sub.stripeSubscriptionId },
@@ -181,7 +181,7 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
         const coupon = activeCommCount >= 3 ? 'MULTI_LEAGUE_25' : 'MULTI_LEAGUE_15';
         const pct    = activeCommCount >= 3 ? 25 : 15;
         try {
-            await stripe.subscriptions.update(applyDiscountToExistingSubId, { coupon });
+            await stripe.subscriptions.update(applyDiscountToExistingSubId, { discounts: [{ coupon }] });
             await prisma.subscription.update({
                 where: { stripeSubscriptionId: applyDiscountToExistingSubId },
                 data: { discountPct: pct },
