@@ -467,14 +467,10 @@ function resolvePlayerCardStatus(cardTier: string, playerSub: PlayerSub | null):
     return 'unavailable';
 }
 
-function resolveCommCardStatus(cardTier: string, size: TeamSize, commSubs: CommSub[]): CardStatus {
-    const match = commSubs.find(s => s.leagueSize === size);
-    if (!match) return 'checkout';  // No sub for this size — new purchase
-    const currentRank = tierGroupRank(match.tier);
-    const cardRank    = tierGroupRank(cardTier);
-    if (cardRank > currentRank)  return 'upgrade';
-    if (cardRank === currentRank) return 'current';
-    return 'unavailable';
+function resolveCommCardStatus(_cardTier: string, _size: TeamSize, _commSubs: CommSub[]): CardStatus {
+    // Commissioners can have unlimited leagues at any tier/size combination.
+    // The pricing page is always a new league purchase — never block checkout.
+    return 'checkout';
 }
 
 /* ── Main component ───────────────────────────────────────────────── */
