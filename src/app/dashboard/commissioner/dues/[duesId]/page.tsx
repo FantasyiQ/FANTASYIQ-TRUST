@@ -2,7 +2,6 @@ import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import AddMemberForm from './AddMemberForm';
 import MemberRow from './MemberRow';
 
 function potProgress(paid: number, total: number) {
@@ -128,9 +127,9 @@ export default async function DuesTrackerPage({ params }: { params: Promise<{ du
                         </ul>
                     )}
 
-                    {dues.members.length < dues.teamCount && (
-                        <div className="px-6 py-5 border-t border-gray-800">
-                            <AddMemberForm duesId={duesId} />
+                    {dues.members.length === 0 && (
+                        <div className="px-6 py-5 border-t border-gray-800 text-center">
+                            <p className="text-gray-500 text-sm">Roster will be imported automatically when Sleeper/ESPN integration is connected.</p>
                         </div>
                     )}
                 </div>

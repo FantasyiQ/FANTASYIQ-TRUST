@@ -10,6 +10,12 @@ const FEATURES = [
         description: 'Track every dollar in and out. Know exactly who\'s paid, who owes, and where the money goes.',
     },
     {
+        href:        '/dashboard/commissioner/pro-bowl',
+        icon:        '🏈',
+        title:       'Pro Bowl Contest',
+        description: 'Week 18 free contest — DraftKings-style lineup picks, no salary cap. Open to all league members.',
+    },
+    {
         href:        '/dashboard/commissioner/settings',
         icon:        '⚙️',
         title:       'League Settings Manager',

@@ -21,8 +21,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!proposal || proposal.leagueDuesId !== duesId) return Response.json({ error: 'Proposal not found.' }, { status: 404 });
     if (proposal.status !== 'pending_commissioner') return Response.json({ error: 'Proposal cannot be rejected at this stage.' }, { status: 400 });
 
-    // Open a poll — expires in 7 days
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    // Open a poll — expires in 48 hours
+    const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
     await prisma.$transaction([
         prisma.payoutProposal.update({ where: { id: proposalId }, data: { status: 'polling' } }),
