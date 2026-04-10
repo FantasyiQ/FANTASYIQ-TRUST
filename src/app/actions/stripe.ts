@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { stripe, planInfo, COMMISSIONER_PRICING } from '@/lib/stripe';
+import { stripe, planInfo } from '@/lib/stripe';
 
 function appUrl(): string {
     return (
@@ -13,17 +13,6 @@ function appUrl(): string {
     );
 }
 
-// Look up annual price (in dollars) for any commissioner tier + size combo.
-function commPrice(tier: string, leagueSize: number | null): number {
-    if (!leagueSize) return 0;
-    const key =
-        tier === 'COMMISSIONER_PRO'     ? 'pro'
-      : tier === 'COMMISSIONER_ALL_PRO' ? 'all_pro'
-      : tier === 'COMMISSIONER_ELITE'   ? 'elite'
-      : null;
-    if (!key) return 0;
-    return (COMMISSIONER_PRICING[key].sizes as Record<number, number>)[leagueSize] ?? 0;
-}
 
 export async function createPortalSession(): Promise<never> {
     const session = await auth();
@@ -94,12 +83,11 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
     }
 
     // ── Volume discount ───────────────────────────────────────────────────────
-    // Discount always lands on the CHEAPEST plan in the portfolio to prevent
-    // gaming (stacking cheap plans to discount an expensive one).
+    // Discount applies to the plan being purchased at checkout.
+    // 1st league = full price, 2nd = 10%, 3rd+ = 15%
     let discountPct = 0;
     let couponId: string | undefined;
 
-    // 1st league = full price, 2nd = 10%, 3rd+ = 15%
     if (info.type === 'commissioner') {
         if (activeCommCount >= 2) {
             discountPct = 15;
@@ -110,43 +98,19 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
         }
     }
 
-    // Price of the plan being purchased right now
-    const newPlanPrice = commPrice(info.tier, info.leagueSize);
-
-    // If a discount applies, check whether an existing plan is cheaper.
-    // If so, redirect the discount there instead of the new (expensive) plan.
-    let applyDiscountToExistingSubId: string | null = null;
-
-    if (discountPct > 0 && couponId && info.type === 'commissioner') {
-        const cheapestExisting = activeCommSubs
-            .map(s => ({
-                stripeSubscriptionId: s.stripeSubscriptionId,
-                price: commPrice(s.tier as string, s.leagueSize),
-                currentDiscountPct: s.discountPct ?? 0,
-            }))
-            .sort((a, b) => a.price - b.price)
-            .find(s => s.price < newPlanPrice && s.currentDiscountPct < discountPct);
-
-        if (cheapestExisting?.stripeSubscriptionId) {
-            applyDiscountToExistingSubId = cheapestExisting.stripeSubscriptionId;
-            couponId    = undefined;
-            discountPct = 0;
-        }
-
-        // When crossing the 2nd→3rd threshold, upgrade existing 10% → 15%.
-        if (activeCommCount >= 2) {
-            for (const sub of activeCommSubs) {
-                if ((sub.discountPct ?? 0) < 15 && sub.stripeSubscriptionId) {
-                    try {
-                        await stripe.subscriptions.update(sub.stripeSubscriptionId, {
-                            discounts: [{ coupon: 'MULTI_LEAGUE_15' }],
-                        });
-                        await prisma.subscription.update({
-                            where: { stripeSubscriptionId: sub.stripeSubscriptionId },
-                            data: { discountPct: 15 },
-                        });
-                    } catch { /* non-fatal */ }
-                }
+    // When crossing the 2nd→3rd threshold, upgrade any existing 10% subs to 15%.
+    if (info.type === 'commissioner' && activeCommCount >= 2) {
+        for (const sub of activeCommSubs) {
+            if ((sub.discountPct ?? 0) < 15 && sub.stripeSubscriptionId) {
+                try {
+                    await stripe.subscriptions.update(sub.stripeSubscriptionId, {
+                        discounts: [{ coupon: 'MULTI_LEAGUE_15' }],
+                    });
+                    await prisma.subscription.update({
+                        where: { stripeSubscriptionId: sub.stripeSubscriptionId },
+                        data: { discountPct: 15 },
+                    });
+                } catch { /* non-fatal */ }
             }
         }
     }
@@ -169,21 +133,6 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
             console.error('[createCheckoutSession] stripe.customers.create failed:', err);
             const msg = err instanceof Error ? err.message : String(err);
             redirect('/pricing?error=checkout-failed&detail=' + encodeURIComponent(msg));
-        }
-    }
-
-    // Apply discount to cheapest existing sub if needed
-    if (applyDiscountToExistingSubId) {
-        const coupon = activeCommCount >= 2 ? 'MULTI_LEAGUE_15' : 'MULTI_LEAGUE_10';
-        const pct    = activeCommCount >= 2 ? 15 : 10;
-        try {
-            await stripe.subscriptions.update(applyDiscountToExistingSubId, { discounts: [{ coupon }] });
-            await prisma.subscription.update({
-                where: { stripeSubscriptionId: applyDiscountToExistingSubId },
-                data: { discountPct: pct },
-            });
-        } catch (err) {
-            console.error('[createCheckoutSession] discount redirect failed:', err);
         }
     }
 

@@ -360,21 +360,18 @@ interface CommCardProps {
     tier: string;
     leagueName: string;
     discountPct: number;
-    discountRedirectNote?: string;
     cardStatus: CardStatus;
     sourceStripeSubId?: string;
     onUpgrade: (upgrade: PendingUpgrade) => void;
 }
 
-function CommPlanCard({ name, price, period, badge, badgeGold, ring, features, priceId, tier, leagueName, discountPct, discountRedirectNote, cardStatus, sourceStripeSubId, onUpgrade }: CommCardProps) {
+function CommPlanCard({ name, price, period, badge, badgeGold, ring, features, priceId, tier, leagueName, discountPct, cardStatus, sourceStripeSubId, onUpgrade }: CommCardProps) {
     const canCheckout = leagueName.trim().length > 0 && !!priceId;
 
-    // Discounted price display — only when discount lands HERE, not on an existing plan
     let displayPrice = price;
-    if (discountPct > 0 && !discountRedirectNote) {
+    if (discountPct > 0) {
         const numeric = parseFloat(price);
-        const discounted = (numeric * (1 - discountPct / 100)).toFixed(2);
-        displayPrice = discounted;
+        displayPrice = (numeric * (1 - discountPct / 100)).toFixed(2);
     }
 
     return (
@@ -389,7 +386,7 @@ function CommPlanCard({ name, price, period, badge, badgeGold, ring, features, p
 
             <h3 className="text-xl font-bold text-white mt-1">{name}</h3>
             <div className="mt-4 mb-1">
-                {discountPct > 0 && !discountRedirectNote ? (
+                {discountPct > 0 ? (
                     <div className="flex items-baseline gap-2">
                         <span className="text-4xl font-extrabold text-white">${displayPrice}</span>
                         <span className="text-gray-500 text-sm line-through">${price}</span>
@@ -401,15 +398,10 @@ function CommPlanCard({ name, price, period, badge, badgeGold, ring, features, p
                         <span className="text-gray-400 text-sm ml-1.5">{period}</span>
                     </div>
                 )}
-                {discountPct > 0 && !discountRedirectNote && (
+                {discountPct > 0 && (
                     <span className="inline-block mt-1.5 text-xs font-semibold bg-green-900/40 text-green-400 border border-green-800 px-2 py-0.5 rounded-full">
                         {discountPct}% multi-league discount
                     </span>
-                )}
-                {discountRedirectNote && (
-                    <p className="mt-2 text-xs text-[#C9A227]/80 bg-[#C9A227]/8 border border-[#C9A227]/20 rounded-lg px-3 py-2 leading-snug">
-                        {discountRedirectNote}
-                    </p>
                 )}
             </div>
 
@@ -493,21 +485,6 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
 
     // Find cheapest existing commissioner plan that would absorb the discount
     // instead of the new plan (to prevent gaming via cheap-plan stacking).
-    const cheapestExistingSub = discountPct > 0
-        ? commSubs
-            .map(s => ({ ...s, price: subPrice(s.tier, s.leagueSize) }))
-            .sort((a, b) => a.price - b.price)
-            .find(s => s.discountPct < discountPct) ?? null
-        : null;
-
-    function discountNoteFor(newPlanPrice: number): string | undefined {
-        if (!cheapestExistingSub) return undefined;
-        if (cheapestExistingSub.price >= newPlanPrice) return undefined;
-        const saving = (cheapestExistingSub.price * discountPct / 100).toFixed(2);
-        const label = cheapestExistingSub.leagueName ?? 'your lowest plan';
-        return `Your ${discountPct}% discount will be applied to "${label}" (saving $${saving}/yr) — this plan is charged at full price.`;
-    }
-
     // For commissioner plan upgrades: explain what happens to the discount
     function upgradeDiscountNote(upgradingSubId: string, newTier: string): string | undefined {
         if (activeCommCount < 2) return undefined;
@@ -640,18 +617,9 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                         <div className="mb-10 max-w-5xl mx-auto space-y-6">
                             {/* Multi-League Savings callout */}
                             {discountPct > 0 && (
-                                <div className="bg-[#C9A227]/10 border border-[#C9A227]/30 rounded-xl px-5 py-3 text-sm text-center space-y-0.5">
-                                    <p>
-                                        <span className="text-[#C9A227] font-bold">Multi-League Savings: </span>
-                                        <span className="text-gray-300">{discountPct}% off applied to your lowest plan</span>
-                                    </p>
-                                    {cheapestExistingSub && (
-                                        <p className="text-gray-500 text-xs">
-                                            Currently saving on{' '}
-                                            <span className="text-gray-300">{cheapestExistingSub.leagueName ?? 'your lowest plan'}</span>
-                                            {' '}— adding a pricier league won&apos;t move this discount.
-                                        </p>
-                                    )}
+                                <div className="bg-[#C9A227]/10 border border-[#C9A227]/30 rounded-xl px-5 py-3 text-sm text-center">
+                                    <span className="text-[#C9A227] font-bold">Multi-League Savings: </span>
+                                    <span className="text-gray-300">{discountPct}% off applied at checkout</span>
                                 </div>
                             )}
 
@@ -737,7 +705,6 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     priceId={commPriceId('Pro', size)} tier="COMMISSIONER_PRO"
                                     leagueName={leagueName}
                                     discountPct={discountPct}
-                                    discountRedirectNote={discountNoteFor(parseFloat(proPx))}
                                     cardStatus={resolveCommCardStatus('COMMISSIONER_PRO', size, commSubs)}
                                     sourceStripeSubId={commSubs.find(s => s.leagueSize === size)?.stripeSubscriptionId}
                                     onUpgrade={handleUpgradeClick}
@@ -749,7 +716,6 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     priceId={commPriceId('All-Pro', size)} tier="COMMISSIONER_ALL_PRO"
                                     leagueName={leagueName}
                                     discountPct={discountPct}
-                                    discountRedirectNote={discountNoteFor(parseFloat(apPx))}
                                     cardStatus={resolveCommCardStatus('COMMISSIONER_ALL_PRO', size, commSubs)}
                                     sourceStripeSubId={commSubs.find(s => s.leagueSize === size)?.stripeSubscriptionId}
                                     onUpgrade={handleUpgradeClick}
@@ -761,7 +727,6 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     priceId={commPriceId('Elite', size)} tier="COMMISSIONER_ELITE"
                                     leagueName={leagueName}
                                     discountPct={discountPct}
-                                    discountRedirectNote={discountNoteFor(parseFloat(elPx))}
                                     cardStatus={resolveCommCardStatus('COMMISSIONER_ELITE', size, commSubs)}
                                     sourceStripeSubId={commSubs.find(s => s.leagueSize === size)?.stripeSubscriptionId}
                                     onUpgrade={handleUpgradeClick}
