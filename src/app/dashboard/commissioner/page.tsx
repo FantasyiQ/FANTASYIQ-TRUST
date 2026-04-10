@@ -18,8 +18,8 @@ const FEATURES = [
     {
         href:        '/dashboard/commissioner/settings',
         icon:        '⚙️',
-        title:       'League Settings & Bylaws Manager',
-        description: 'Store your rulebook and league bylaws, then review and compare settings across all synced leagues in one place.',
+        title:       'League Settings Manager',
+        description: 'Review and compare your league settings across all synced leagues in one place.',
     },
     {
         href:        '/dashboard/commissioner/calendar',
@@ -31,7 +31,7 @@ const FEATURES = [
         href:        '/dashboard/commissioner/announcements',
         icon:        '📣',
         title:       'Commissioner Announcements',
-        description: 'Draft and send league announcements to keep your managers in the loop.',
+        description: 'Store your rulebook, bylaws, and league documents. Draft and send announcements to keep your managers in the loop.',
     },
 ] as const;
 
