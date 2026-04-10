@@ -36,7 +36,7 @@ const STATUS_STYLES: Record<string, string> = {
 
 const COMM_TIER_BADGE: Record<string, { label: string; className: string }> = {
     COMMISSIONER_PRO:     { label: 'Pro',     className: 'bg-gray-800 text-gray-300 border-gray-600' },
-    COMMISSIONER_ALL_PRO: { label: 'All-Pro', className: 'bg-[#C8A951]/15 text-[#C8A951] border-[#C8A951]/40' },
+    COMMISSIONER_ALL_PRO: { label: 'All-Pro', className: 'bg-[#C8A951] text-black border-[#C8A951]' },
     COMMISSIONER_ELITE:   { label: 'Elite ✦', className: 'bg-[#C8A951]/25 text-[#C8A951] border-[#C8A951]/60' },
 };
 
