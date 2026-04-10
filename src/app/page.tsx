@@ -20,26 +20,26 @@ export default function Home() {
 
           {/* Feature cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12 text-left">
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 hover:border-[#C9A227]/50 transition">
+            <Link href="/pricing" className="block group bg-gray-900 border border-gray-800 rounded-2xl p-5 hover:border-[#C9A227]/50 transition">
               <div className="text-2xl mb-3">💸</div>
-              <h3 className="text-white font-bold text-sm mb-1">IMMEDIATE PAYOUTS</h3>
+              <h3 className="text-white font-bold text-sm mb-1 group-hover:text-[#C9A227] transition">IMMEDIATE PAYOUTS</h3>
               <p className="text-gray-500 text-xs leading-relaxed">Winners paid instantly. No delays, no holds.</p>
-            </div>
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 hover:border-[#C9A227]/50 transition">
+            </Link>
+            <Link href="/sign-in" className="block group bg-gray-900 border border-gray-800 rounded-2xl p-5 hover:border-[#C9A227]/50 transition">
               <div className="text-2xl mb-3">🏆</div>
-              <h3 className="text-white font-bold text-sm mb-1">COMMISSIONER HUB</h3>
+              <h3 className="text-white font-bold text-sm mb-1 group-hover:text-[#C9A227] transition">COMMISSIONER HUB</h3>
               <p className="text-gray-500 text-xs leading-relaxed">Full league control in one place.</p>
-            </div>
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 hover:border-[#C9A227]/50 transition">
+            </Link>
+            <Link href="/pricing" className="block group bg-gray-900 border border-gray-800 rounded-2xl p-5 hover:border-[#C9A227]/50 transition">
               <div className="text-2xl mb-3">📋</div>
-              <h3 className="text-white font-bold text-sm mb-1">TRACK DUES &amp; PAYOUTS</h3>
+              <h3 className="text-white font-bold text-sm mb-1 group-hover:text-[#C9A227] transition">TRACK DUES &amp; PAYOUTS</h3>
               <p className="text-gray-500 text-xs leading-relaxed">Every dollar accounted for, every season.</p>
-            </div>
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 hover:border-[#C9A227]/50 transition">
+            </Link>
+            <Link href="/sign-in" className="block group bg-gray-900 border border-gray-800 rounded-2xl p-5 hover:border-[#C9A227]/50 transition">
               <div className="text-2xl mb-3">🔗</div>
-              <h3 className="text-white font-bold text-sm mb-1">SYNC CROSS-PLATFORM</h3>
+              <h3 className="text-white font-bold text-sm mb-1 group-hover:text-[#C9A227] transition">SYNC CROSS-PLATFORM</h3>
               <p className="text-gray-500 text-xs leading-relaxed">Sleeper, ESPN, Yahoo and more.</p>
-            </div>
+            </Link>
           </div>
 
           <div className="flex gap-4 justify-center flex-wrap">
@@ -63,21 +63,21 @@ export default function Home() {
             Built by a commissioner who desired a streamlined system for league dues and payouts — with absolutely <span className="text-[#C9A227] font-bold">ZERO FEES.</span>
           </p>
           <div className="grid md:grid-cols-3 gap-8">
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 hover:border-[#C9A227]/50 transition">
+            <Link href="/pricing" className="block group bg-gray-900 border border-gray-800 rounded-2xl p-8 hover:border-[#C9A227]/50 transition">
               <div className="text-4xl mb-4">🛡️</div>
-              <h3 className="text-xl font-bold mb-3">Zero Fee Guarantee</h3>
+              <h3 className="text-xl font-bold mb-3 group-hover:text-[#C9A227] transition">Zero Fee Guarantee</h3>
               <p className="text-gray-400 leading-relaxed">Your league dues go where they belong — to your league. We never take a cut. Ever.</p>
-            </div>
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 hover:border-[#C9A227]/50 transition">
+            </Link>
+            <Link href="/pricing" className="block group bg-gray-900 border border-gray-800 rounded-2xl p-8 hover:border-[#C9A227]/50 transition">
               <div className="text-4xl mb-4">📊</div>
-              <h3 className="text-xl font-bold mb-3">Dynamic Trade Values</h3>
+              <h3 className="text-xl font-bold mb-3 group-hover:text-[#C9A227] transition">Dynamic Trade Values</h3>
               <p className="text-gray-400 leading-relaxed">Player valuations that adapt to your league settings, scoring format, and roster construction in real time.</p>
-            </div>
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 hover:border-[#C9A227]/50 transition">
+            </Link>
+            <Link href="/pricing" className="block group bg-gray-900 border border-gray-800 rounded-2xl p-8 hover:border-[#C9A227]/50 transition">
               <div className="text-4xl mb-4">💰</div>
-              <h3 className="text-xl font-bold mb-3">One Price. All Access.</h3>
+              <h3 className="text-xl font-bold mb-3 group-hover:text-[#C9A227] transition">One Price. All Access.</h3>
               <p className="text-gray-400 leading-relaxed">One annual subscription. Every tool. Every platform. No hidden fees. No surprises.</p>
-            </div>
+            </Link>
           </div>
         </div>
       </section>
