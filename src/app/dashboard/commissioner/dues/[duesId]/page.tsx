@@ -3,6 +3,7 @@ import { redirect, notFound } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import MemberRow from './MemberRow';
+import CreateProBowlButton from './CreateProBowlButton';
 
 function potProgress(paid: number, total: number) {
     if (total <= 0) return 0;
@@ -30,6 +31,7 @@ export default async function DuesTrackerPage({ params }: { params: Promise<{ du
                 take: 1,
                 include: { items: { include: { member: true, payoutSpot: true } }, poll: true },
             },
+            proBowl: { select: { id: true, season: true, week: true, status: true, _count: { select: { entries: true } } } },
         },
     });
 
@@ -131,6 +133,36 @@ export default async function DuesTrackerPage({ params }: { params: Promise<{ du
                         <div className="px-6 py-5 border-t border-gray-800 text-center">
                             <p className="text-gray-500 text-sm">Roster will be imported automatically when Sleeper/ESPN integration is connected.</p>
                         </div>
+                    )}
+                </div>
+
+                {/* Pro Bowl Contest */}
+                <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+                    <div className="flex items-center justify-between mb-1">
+                        <h2 className="font-bold">Pro Bowl Contest</h2>
+                        {dues.proBowl && (
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                                dues.proBowl.status === 'open'     ? 'bg-green-900/40 text-green-400 border-green-800' :
+                                dues.proBowl.status === 'locked'   ? 'bg-yellow-900/40 text-yellow-400 border-yellow-800' :
+                                dues.proBowl.status === 'scoring'  ? 'bg-blue-900/40 text-blue-400 border-blue-800' :
+                                dues.proBowl.status === 'complete' ? 'bg-gray-800 text-gray-500 border-gray-700' :
+                                'bg-gray-800 text-gray-400 border-gray-700'
+                            }`}>
+                                {dues.proBowl.status.charAt(0).toUpperCase() + dues.proBowl.status.slice(1)}
+                            </span>
+                        )}
+                    </div>
+                    <p className="text-gray-500 text-sm mb-4">Week 18 free contest — DraftKings-style lineup picks, no salary cap.</p>
+                    {dues.proBowl ? (
+                        <div className="flex items-center justify-between">
+                            <p className="text-gray-400 text-sm">{dues.proBowl.season} Season · Week {dues.proBowl.week} · {dues.proBowl._count.entries} entries</p>
+                            <Link href={`/dashboard/commissioner/pro-bowl/${dues.proBowl.id}`}
+                                className="bg-[#C8A951] hover:bg-[#b8992f] text-black font-bold px-4 py-2 rounded-lg text-sm transition">
+                                Manage →
+                            </Link>
+                        </div>
+                    ) : (
+                        <CreateProBowlButton duesId={duesId} />
                     )}
                 </div>
 
