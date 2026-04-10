@@ -1,0 +1,422 @@
+[
+  {
+    "name": "Patrick Mahomes",
+    "position": "QB",
+    "team": "KC",
+    "age": 29,
+    "baseValue": 95.0
+  },
+  {
+    "name": "Josh Allen",
+    "position": "QB",
+    "team": "BUF",
+    "age": 30,
+    "baseValue": 93.0
+  },
+  {
+    "name": "Lamar Jackson",
+    "position": "QB",
+    "team": "BAL",
+    "age": 29,
+    "baseValue": 92.0
+  },
+  {
+    "name": "Jalen Hurts",
+    "position": "QB",
+    "team": "PHI",
+    "age": 27,
+    "baseValue": 89.0
+  },
+  {
+    "name": "Joe Burrow",
+    "position": "QB",
+    "team": "CIN",
+    "age": 29,
+    "baseValue": 88.0
+  },
+  {
+    "name": "CJ Stroud",
+    "position": "QB",
+    "team": "HOU",
+    "age": 23,
+    "baseValue": 85.0
+  },
+  {
+    "name": "Anthony Richardson",
+    "position": "QB",
+    "team": "IND",
+    "age": 23,
+    "baseValue": 82.0
+  },
+  {
+    "name": "Caleb Williams",
+    "position": "QB",
+    "team": "CHI",
+    "age": 23,
+    "baseValue": 80.0
+  },
+  {
+    "name": "Jayden Daniels",
+    "position": "QB",
+    "team": "WAS",
+    "age": 24,
+    "baseValue": 83.0
+  },
+  {
+    "name": "Dak Prescott",
+    "position": "QB",
+    "team": "DAL",
+    "age": 32,
+    "baseValue": 78.0
+  },
+  {
+    "name": "Bijan Robinson",
+    "position": "RB",
+    "team": "ATL",
+    "age": 23,
+    "baseValue": 94.0
+  },
+  {
+    "name": "Breece Hall",
+    "position": "RB",
+    "team": "NYJ",
+    "age": 23,
+    "baseValue": 89.0
+  },
+  {
+    "name": "Jahmyr Gibbs",
+    "position": "RB",
+    "team": "DET",
+    "age": 23,
+    "baseValue": 87.0
+  },
+  {
+    "name": "Jonathan Taylor",
+    "position": "RB",
+    "team": "IND",
+    "age": 26,
+    "baseValue": 85.0
+  },
+  {
+    "name": "Saquon Barkley",
+    "position": "RB",
+    "team": "PHI",
+    "age": 28,
+    "baseValue": 86.0
+  },
+  {
+    "name": "Josh Jacobs",
+    "position": "RB",
+    "team": "GB",
+    "age": 27,
+    "baseValue": 82.0
+  },
+  {
+    "name": "Derrick Henry",
+    "position": "RB",
+    "team": "BAL",
+    "age": 32,
+    "baseValue": 80.0
+  },
+  {
+    "name": "Isiah Pacheco",
+    "position": "RB",
+    "team": "KC",
+    "age": 25,
+    "baseValue": 79.0
+  },
+  {
+    "name": "De'Von Achane",
+    "position": "RB",
+    "team": "MIA",
+    "age": 23,
+    "baseValue": 84.0
+  },
+  {
+    "name": "Travis Etienne",
+    "position": "RB",
+    "team": "JAX",
+    "age": 27,
+    "baseValue": 78.0
+  },
+  {
+    "name": "Kenneth Walker III",
+    "position": "RB",
+    "team": "SEA",
+    "age": 24,
+    "baseValue": 77.0
+  },
+  {
+    "name": "Kyren Williams",
+    "position": "RB",
+    "team": "LAR",
+    "age": 25,
+    "baseValue": 76.0
+  },
+  {
+    "name": "Ja'Marr Chase",
+    "position": "WR",
+    "team": "CIN",
+    "age": 25,
+    "baseValue": 96.0
+  },
+  {
+    "name": "CeeDee Lamb",
+    "position": "WR",
+    "team": "DAL",
+    "age": 26,
+    "baseValue": 93.0
+  },
+  {
+    "name": "Tyreek Hill",
+    "position": "WR",
+    "team": "MIA",
+    "age": 32,
+    "baseValue": 88.0
+  },
+  {
+    "name": "Amon-Ra St. Brown",
+    "position": "WR",
+    "team": "DET",
+    "age": 25,
+    "baseValue": 90.0
+  },
+  {
+    "name": "Malik Nabers",
+    "position": "WR",
+    "team": "NYG",
+    "age": 22,
+    "baseValue": 87.0
+  },
+  {
+    "name": "Puka Nacua",
+    "position": "WR",
+    "team": "LAR",
+    "age": 24,
+    "baseValue": 86.0
+  },
+  {
+    "name": "Garrett Wilson",
+    "position": "WR",
+    "team": "NYJ",
+    "age": 25,
+    "baseValue": 84.0
+  },
+  {
+    "name": "Drake London",
+    "position": "WR",
+    "team": "ATL",
+    "age": 24,
+    "baseValue": 83.0
+  },
+  {
+    "name": "Nico Collins",
+    "position": "WR",
+    "team": "HOU",
+    "age": 26,
+    "baseValue": 85.0
+  },
+  {
+    "name": "Marvin Harrison Jr",
+    "position": "WR",
+    "team": "ARI",
+    "age": 23,
+    "baseValue": 88.0
+  },
+  {
+    "name": "Chris Olave",
+    "position": "WR",
+    "team": "NO",
+    "age": 25,
+    "baseValue": 81.0
+  },
+  {
+    "name": "DK Metcalf",
+    "position": "WR",
+    "team": "SEA",
+    "age": 28,
+    "baseValue": 82.0
+  },
+  {
+    "name": "Davante Adams",
+    "position": "WR",
+    "team": "NYJ",
+    "age": 33,
+    "baseValue": 79.0
+  },
+  {
+    "name": "Stefon Diggs",
+    "position": "WR",
+    "team": "HOU",
+    "age": 33,
+    "baseValue": 77.0
+  },
+  {
+    "name": "Brandon Aiyuk",
+    "position": "WR",
+    "team": "SF",
+    "age": 27,
+    "baseValue": 80.0
+  },
+  {
+    "name": "Rashee Rice",
+    "position": "WR",
+    "team": "KC",
+    "age": 25,
+    "baseValue": 78.0
+  },
+  {
+    "name": "Deebo Samuel",
+    "position": "WR",
+    "team": "SF",
+    "age": 29,
+    "baseValue": 76.0
+  },
+  {
+    "name": "Zay Flowers",
+    "position": "WR",
+    "team": "BAL",
+    "age": 24,
+    "baseValue": 79.0
+  },
+  {
+    "name": "Travis Kelce",
+    "position": "TE",
+    "team": "KC",
+    "age": 36,
+    "baseValue": 82.0
+  },
+  {
+    "name": "Sam LaPorta",
+    "position": "TE",
+    "team": "DET",
+    "age": 24,
+    "baseValue": 84.0
+  },
+  {
+    "name": "Trey McBride",
+    "position": "TE",
+    "team": "ARI",
+    "age": 25,
+    "baseValue": 80.0
+  },
+  {
+    "name": "Dallas Goedert",
+    "position": "TE",
+    "team": "PHI",
+    "age": 30,
+    "baseValue": 74.0
+  },
+  {
+    "name": "George Kittle",
+    "position": "TE",
+    "team": "SF",
+    "age": 32,
+    "baseValue": 76.0
+  },
+  {
+    "name": "Mark Andrews",
+    "position": "TE",
+    "team": "BAL",
+    "age": 30,
+    "baseValue": 75.0
+  },
+  {
+    "name": "Harrison Butker",
+    "position": "K",
+    "team": "KC",
+    "age": 30,
+    "baseValue": 70.0
+  },
+  {
+    "name": "Justin Tucker",
+    "position": "K",
+    "team": "BAL",
+    "age": 36,
+    "baseValue": 68.0
+  },
+  {
+    "name": "Jake Elliott",
+    "position": "K",
+    "team": "PHI",
+    "age": 29,
+    "baseValue": 65.0
+  },
+  {
+    "name": "Tyler Bass",
+    "position": "K",
+    "team": "BUF",
+    "age": 27,
+    "baseValue": 63.0
+  },
+  {
+    "name": "San Francisco 49ers",
+    "position": "DEF",
+    "team": "SF",
+    "age": 0,
+    "baseValue": 72.0
+  },
+  {
+    "name": "Dallas Cowboys",
+    "position": "DEF",
+    "team": "DAL",
+    "age": 0,
+    "baseValue": 70.0
+  },
+  {
+    "name": "Buffalo Bills",
+    "position": "DEF",
+    "team": "BUF",
+    "age": 0,
+    "baseValue": 69.0
+  },
+  {
+    "name": "Cleveland Browns",
+    "position": "DEF",
+    "team": "CLE",
+    "age": 0,
+    "baseValue": 68.0
+  },
+  {
+    "name": "New York Jets",
+    "position": "DEF",
+    "team": "NYJ",
+    "age": 0,
+    "baseValue": 67.0
+  },
+  {
+    "name": "Baltimore Ravens",
+    "position": "DEF",
+    "team": "BAL",
+    "age": 0,
+    "baseValue": 66.0
+  },
+  {
+    "name": "Pittsburgh Steelers",
+    "position": "DEF",
+    "team": "PIT",
+    "age": 0,
+    "baseValue": 65.0
+  },
+  {
+    "name": "Miami Dolphins",
+    "position": "DEF",
+    "team": "MIA",
+    "age": 0,
+    "baseValue": 64.0
+  },
+  {
+    "name": "Kansas City Chiefs",
+    "position": "DEF",
+    "team": "KC",
+    "age": 0,
+    "baseValue": 63.0
+  },
+  {
+    "name": "Detroit Lions",
+    "position": "DEF",
+    "team": "DET",
+    "age": 0,
+    "baseValue": 62.0
+  }
+]
