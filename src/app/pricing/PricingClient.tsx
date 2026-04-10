@@ -504,7 +504,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
         if (!cheapestExistingSub) return undefined;
         if (cheapestExistingSub.price >= newPlanPrice) return undefined;
         const saving = (cheapestExistingSub.price * discountPct / 100).toFixed(2);
-        const label = cheapestExistingSub.leagueName ?? 'your cheapest league';
+        const label = cheapestExistingSub.leagueName ?? 'your lowest plan';
         return `Your ${discountPct}% discount will be applied to "${label}" (saving $${saving}/yr) — this plan is charged at full price.`;
     }
 
@@ -527,7 +527,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
         if (newPrice > cheapestOther.price) {
             // Upgraded plan is no longer cheapest — discount moves to cheapest other
             const saving = (cheapestOther.price * targetPct / 100).toFixed(2);
-            const label = cheapestOther.leagueName ?? 'your cheapest league';
+            const label = cheapestOther.leagueName ?? 'your lowest plan';
             return `After upgrading, your ${targetPct}% multi-league discount moves to "${label}" (saving $${saving}/yr). This plan will be charged at full price.`;
         }
 
@@ -643,12 +643,12 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                 <div className="bg-[#C9A227]/10 border border-[#C9A227]/30 rounded-xl px-5 py-3 text-sm text-center space-y-0.5">
                                     <p>
                                         <span className="text-[#C9A227] font-bold">Multi-League Savings: </span>
-                                        <span className="text-gray-300">{discountPct}% off applied to your cheapest league</span>
+                                        <span className="text-gray-300">{discountPct}% off applied to your lowest plan</span>
                                     </p>
                                     {cheapestExistingSub && (
                                         <p className="text-gray-500 text-xs">
                                             Currently saving on{' '}
-                                            <span className="text-gray-300">{cheapestExistingSub.leagueName ?? 'your cheapest league'}</span>
+                                            <span className="text-gray-300">{cheapestExistingSub.leagueName ?? 'your lowest plan'}</span>
                                             {' '}— adding a pricier league won&apos;t move this discount.
                                         </p>
                                     )}
