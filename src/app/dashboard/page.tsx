@@ -240,32 +240,34 @@ export default async function DashboardPage() {
                         <div className="space-y-3">
                             {commSubs.map((sub) => (
                                 <div key={sub.id}
-                                    className="flex items-center justify-between gap-4 flex-wrap p-4 bg-gray-800/40 rounded-xl border border-gray-800">
-                                    <div>
-                                        {sub.leagueName && (
-                                            <p className="text-[#C8A951] font-semibold text-sm">{sub.leagueName}</p>
-                                        )}
-                                        <p className="font-medium text-gray-300 text-xs mt-0.5">{commLabel(sub.tier, sub.leagueSize)}</p>
-                                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${STATUS_STYLES[sub.status] ?? STATUS_STYLES.inactive}`}>
-                                                {sub.status.replace('_', ' ')}
-                                            </span>
-                                            {sub.discountPct != null && sub.discountPct > 0 && (
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border bg-green-900/40 text-green-400 border-green-800">
-                                                    {sub.discountPct}% discount
+                                    className="flex flex-col p-4 bg-gray-800/40 rounded-xl border border-gray-800">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div>
+                                            {sub.leagueName && (
+                                                <p className="text-[#C8A951] font-semibold text-sm">{sub.leagueName}</p>
+                                            )}
+                                            <p className="font-medium text-gray-300 text-xs mt-0.5">{commLabel(sub.tier, sub.leagueSize)}</p>
+                                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${STATUS_STYLES[sub.status] ?? STATUS_STYLES.inactive}`}>
+                                                    {sub.status.replace('_', ' ')}
                                                 </span>
-                                            )}
-                                            {periodLabel(sub) && (
-                                                <span className="text-gray-500 text-xs">{periodLabel(sub)}</span>
-                                            )}
+                                                {sub.discountPct != null && sub.discountPct > 0 && (
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border bg-green-900/40 text-green-400 border-green-800">
+                                                        {sub.discountPct}% discount
+                                                    </span>
+                                                )}
+                                                {periodLabel(sub) && (
+                                                    <span className="text-gray-500 text-xs">{periodLabel(sub)}</span>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="flex items-center gap-4 shrink-0">
                                         {COMM_TIER_BADGE[sub.tier] && (
-                                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${COMM_TIER_BADGE[sub.tier].className}`}>
+                                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border shrink-0 ${COMM_TIER_BADGE[sub.tier].className}`}>
                                                 {COMM_TIER_BADGE[sub.tier].label}
                                             </span>
                                         )}
+                                    </div>
+                                    <div className="flex justify-end mt-3">
                                         <form action={createPortalSession}>
                                             <button type="submit"
                                                 className="text-[#C8A951]/70 hover:text-[#C8A951] text-sm font-medium transition">
