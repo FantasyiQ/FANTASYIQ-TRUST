@@ -60,7 +60,7 @@ export default function Home() {
             Why Commissioners <span className="text-[#C9A227]">Trust</span> Us
           </h2>
           <p className="text-gray-400 text-center mb-16 text-lg">
-            Built by a commissioner who was tired of platforms skimming league dues.
+            Built by a commissioner who desired a streamlined system for league dues and payouts — with absolutely <span className="text-[#C8A951] font-bold">ZERO FEES.</span>
           </p>
           <div className="grid md:grid-cols-3 gap-8">
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 hover:border-[#C9A227]/50 transition">
