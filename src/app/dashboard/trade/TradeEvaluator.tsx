@@ -14,12 +14,13 @@ const TIER_COLORS: Record<string, string> = {
 };
 
 const POS_COLORS: Record<string, string> = {
-    QB:  'bg-red-900/40 text-red-300 border-red-800',
-    RB:  'bg-green-900/40 text-green-300 border-green-800',
-    WR:  'bg-blue-900/40 text-blue-300 border-blue-800',
-    TE:  'bg-yellow-900/40 text-yellow-300 border-yellow-800',
-    K:   'bg-gray-800 text-gray-400 border-gray-700',
-    DEF: 'bg-purple-900/40 text-purple-300 border-purple-800',
+    QB:   'bg-red-900/40 text-red-300 border-red-800',
+    RB:   'bg-green-900/40 text-green-300 border-green-800',
+    WR:   'bg-blue-900/40 text-blue-300 border-blue-800',
+    TE:   'bg-yellow-900/40 text-yellow-300 border-yellow-800',
+    K:    'bg-gray-800 text-gray-400 border-gray-700',
+    DEF:  'bg-purple-900/40 text-purple-300 border-purple-800',
+    PICK: 'bg-indigo-900/40 text-indigo-300 border-indigo-700',
 };
 
 function verdictColor(v: string) {
@@ -44,7 +45,7 @@ function PlayerPill({ result, onRemove }: { result: DtvResult; onRemove: () => v
                 </span>
                 <div className="min-w-0">
                     <p className="text-white text-sm font-semibold truncate">{result.name}</p>
-                    <p className="text-gray-500 text-xs">{result.team}{result.age ? ` · Age ${result.age}` : ''}</p>
+                    <p className="text-gray-500 text-xs">{result.position === 'PICK' ? `${result.team} Draft` : `${result.team}${result.age ? ` · Age ${result.age}` : ''}`}</p>
                 </div>
             </div>
             <div className="text-right shrink-0">
@@ -129,7 +130,7 @@ export default function TradeEvaluator() {
         return evaluateTrade(sideA, sideB, ppr, leagueType);
     }, [sideA, sideB, ppr, leagueType]);
 
-    const positions = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
+    const positions = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'PICK'];
 
     const filteredPlayers = useMemo(() =>
         PLAYERS.filter(p => posFilter === 'ALL' || p.position === posFilter),

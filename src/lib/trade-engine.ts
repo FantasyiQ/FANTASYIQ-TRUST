@@ -38,26 +38,28 @@ const WEIGHTS = {
 };
 
 const SCARCITY: Record<string, number> = {
-    QB:  0.95,
-    RB:  1.25,
-    WR:  1.20,
-    TE:  1.10,
-    K:   0.85,
-    DEF: 0.85,
+    QB:   0.95,
+    RB:   1.25,
+    WR:   1.20,
+    TE:   1.10,
+    K:    0.85,
+    DEF:  0.85,
+    PICK: 1.00,
 };
 
 const CATCH_RATE: Record<string, number> = {
-    RB:  0.5,
-    WR:  1.0,
-    TE:  0.8,
-    QB:  0,
-    K:   0,
-    DEF: 0,
+    RB:   0.5,
+    WR:   1.0,
+    TE:   0.8,
+    QB:   0,
+    K:    0,
+    DEF:  0,
+    PICK: 0,
 };
 
 function ageMultiplier(position: string, age: number, leagueType: LeagueType): number {
     if (leagueType === 'Redraft') return 1.0;
-    if (position === 'K' || position === 'DEF') return 1.0;
+    if (position === 'K' || position === 'DEF' || position === 'PICK') return 1.0;
     if (age <= 24) return 1.15;
     if (age <= 27) return 1.05;
     if (age <= 30) return 0.95;
@@ -207,7 +209,7 @@ export const PLAYERS: Player[] = [
     { rank: 35, name: 'Tee Higgins',           position: 'WR',  team: 'CIN', age: 27, baseValue: 74 },
     { rank: 36, name: 'Brian Thomas Jr',       position: 'WR',  team: 'JAX', age: 23, baseValue: 74 },
     { rank: 37, name: 'Chris Olave',           position: 'WR',  team: 'NO',  age: 25, baseValue: 73 },
-    { rank: 38, name: 'Jaylen Waddle',         position: 'WR',  team: 'MIA', age: 26, baseValue: 72 },
+    { rank: 38, name: 'Jaylen Waddle',         position: 'WR',  team: 'DEN', age: 27, baseValue: 72 },
     { rank: 39, name: 'Isiah Pacheco',         position: 'RB',  team: 'KC',  age: 26, baseValue: 72 },
     { rank: 40, name: 'George Kittle',         position: 'TE',  team: 'SF',  age: 32, baseValue: 71 },
     { rank: 41, name: 'Zay Flowers',           position: 'WR',  team: 'BAL', age: 24, baseValue: 70 },
@@ -233,7 +235,7 @@ export const PLAYERS: Player[] = [
 
     // ── RANKS 61–120 ─────────────────────────────────────────────────────────
     { rank:  61, name: 'Justin Jefferson',     position: 'WR',  team: 'MIN', age: 26, baseValue: 93 },
-    { rank:  62, name: 'Christian McCaffrey',  position: 'RB',  team: 'SF',  age: 28, baseValue: 91 },
+    { rank:  62, name: 'Christian McCaffrey',  position: 'RB',  team: 'SF',  age: 30, baseValue: 87 },
     { rank:  63, name: 'Caleb Williams',       position: 'QB',  team: 'CHI', age: 23, baseValue: 76 },
     { rank:  64, name: 'Jake Ferguson',        position: 'TE',  team: 'DAL', age: 25, baseValue: 61 },
     { rank:  65, name: 'Evan Engram',          position: 'TE',  team: 'JAX', age: 31, baseValue: 60 },
@@ -258,11 +260,11 @@ export const PLAYERS: Player[] = [
     { rank:  84, name: 'Stefon Diggs',         position: 'WR',  team: 'HOU', age: 32, baseValue: 61 },
     { rank:  85, name: 'Quentin Johnston',     position: 'WR',  team: 'LAC', age: 23, baseValue: 63 },
     { rank:  86, name: 'Javonte Williams',     position: 'RB',  team: 'DEN', age: 25, baseValue: 60 },
-    { rank:  87, name: 'Ezekiel Elliott',      position: 'RB',  team: 'DAL', age: 30, baseValue: 53 },
-    { rank:  88, name: 'Tyler Lockett',        position: 'WR',  team: 'SEA', age: 33, baseValue: 56 },
+    { rank:  87, name: 'Ezekiel Elliott',      position: 'RB',  team: 'FA',  age: 31, baseValue: 40 },
+    { rank:  88, name: 'Tyler Lockett',        position: 'WR',  team: 'KC',  age: 34, baseValue: 53 },
     { rank:  89, name: 'Curtis Samuel',        position: 'WR',  team: 'BUF', age: 29, baseValue: 55 },
     { rank:  90, name: 'Elijah Moore',         position: 'WR',  team: 'CLE', age: 25, baseValue: 58 },
-    { rank:  91, name: 'Sam Darnold',          position: 'QB',  team: 'MIN', age: 28, baseValue: 70 },
+    { rank:  91, name: 'Sam Darnold',          position: 'QB',  team: 'SEA', age: 29, baseValue: 78 },
     { rank:  92, name: 'Gus Edwards',          position: 'RB',  team: 'LAC', age: 30, baseValue: 55 },
     { rank:  93, name: 'Zach Charbonnet',      position: 'RB',  team: 'SEA', age: 24, baseValue: 61 },
     { rank:  94, name: 'Miles Sanders',        position: 'RB',  team: 'CAR', age: 28, baseValue: 52 },
@@ -294,15 +296,15 @@ export const PLAYERS: Player[] = [
     { rank: 120, name: 'Ben Sinnott',         position: 'TE',  team: 'WSH', age: 24, baseValue: 51 },
 
     // ── RANKS 121–180 ────────────────────────────────────────────────────────
-    { rank: 121, name: 'C.J. Stroud',         position: 'QB',  team: 'HOU', age: 24, baseValue: 78 },
+    { rank: 121, name: 'Ashton Jeanty',        position: 'RB',  team: 'LV',  age: 22, baseValue: 75 },
     { rank: 122, name: 'Khalil Shakir',       position: 'WR',  team: 'BUF', age: 25, baseValue: 62 },
     { rank: 123, name: 'Cedric Tillman',      position: 'WR',  team: 'CLE', age: 25, baseValue: 58 },
     { rank: 124, name: 'Courtland Sutton',    position: 'WR',  team: 'DEN', age: 29, baseValue: 60 },
     { rank: 125, name: 'Diontae Johnson',     position: 'WR',  team: 'HOU', age: 29, baseValue: 58 },
-    { rank: 126, name: 'Jaxon Smith-Njigba',  position: 'WR',  team: 'SEA', age: 23, baseValue: 65 },
-    { rank: 127, name: 'Brandin Cooks',       position: 'WR',  team: 'DAL', age: 32, baseValue: 55 },
-    { rank: 128, name: 'Adam Thielen',        position: 'WR',  team: 'CAR', age: 35, baseValue: 47 },
-    { rank: 129, name: 'DJ Moore',            position: 'WR',  team: 'CHI', age: 28, baseValue: 63 },
+    { rank: 126, name: 'Jaxon Smith-Njigba',  position: 'WR',  team: 'SEA', age: 24, baseValue: 87 },
+    { rank: 127, name: 'Brandin Cooks',       position: 'WR',  team: 'FA',  age: 33, baseValue: 40 },
+    { rank: 128, name: 'Adam Thielen',        position: 'WR',  team: 'FA',  age: 36, baseValue: 35 },
+    { rank: 129, name: 'DJ Moore',            position: 'WR',  team: 'FA',  age: 29, baseValue: 61 },
     { rank: 130, name: 'Dontayvion Wicks',    position: 'WR',  team: 'GB',  age: 24, baseValue: 59 },
     { rank: 131, name: 'Elijah Mitchell',     position: 'RB',  team: 'SF',  age: 27, baseValue: 56 },
     { rank: 132, name: 'Kareem Hunt',         position: 'RB',  team: 'KC',  age: 30, baseValue: 54 },
@@ -330,13 +332,13 @@ export const PLAYERS: Player[] = [
     { rank: 154, name: 'Demarcus Robinson',   position: 'WR',  team: 'LAR', age: 30, baseValue: 51 },
     { rank: 155, name: 'Nelson Agholor',      position: 'WR',  team: 'NE',  age: 32, baseValue: 48 },
     { rank: 156, name: 'Jerry Jeudy',         position: 'WR',  team: 'CLE', age: 26, baseValue: 59 },
-    { rank: 157, name: 'Allen Robinson II',   position: 'WR',  team: 'PIT', age: 32, baseValue: 48 },
+    { rank: 157, name: 'Allen Robinson II',   position: 'WR',  team: 'FA',  age: 33, baseValue: 35 },
     { rank: 158, name: 'Van Jefferson',       position: 'WR',  team: 'ATL', age: 28, baseValue: 52 },
-    { rank: 159, name: 'Kadarius Toney',      position: 'WR',  team: 'KC',  age: 26, baseValue: 53 },
+    { rank: 159, name: 'Kadarius Toney',      position: 'WR',  team: 'FA',  age: 27, baseValue: 42 },
     { rank: 160, name: 'Parris Campbell',     position: 'WR',  team: 'PIT', age: 29, baseValue: 50 },
     { rank: 161, name: 'Donovan Peoples-Jones',position:'WR',  team: 'DET', age: 26, baseValue: 55 },
     { rank: 162, name: 'Jordan Addison',      position: 'WR',  team: 'MIN', age: 23, baseValue: 65 },
-    { rank: 163, name: 'George Pickens',      position: 'WR',  team: 'PIT', age: 24, baseValue: 68 },
+    { rank: 163, name: 'George Pickens',      position: 'WR',  team: 'DAL', age: 25, baseValue: 83 },
     { rank: 164, name: 'Dalton Schultz',      position: 'TE',  team: 'HOU', age: 30, baseValue: 48 },
     { rank: 165, name: 'Tyler Higbee',        position: 'TE',  team: 'LAR', age: 31, baseValue: 47 },
     { rank: 166, name: 'Hayden Hurst',        position: 'TE',  team: 'CAR', age: 32, baseValue: 44 },
@@ -356,25 +358,25 @@ export const PLAYERS: Player[] = [
     { rank: 180, name: 'Adam Trautman',       position: 'TE',  team: 'DEN', age: 28, baseValue: 42 },
 
     // ── RANKS 181–240 ────────────────────────────────────────────────────────
-    { rank: 181, name: 'Geno Smith',          position: 'QB',  team: 'SEA', age: 35, baseValue: 65 },
+    { rank: 181, name: 'Geno Smith',          position: 'QB',  team: 'NYJ', age: 36, baseValue: 63 },
     { rank: 182, name: 'Baker Mayfield',      position: 'QB',  team: 'TB',  age: 30, baseValue: 68 },
     { rank: 183, name: 'Derek Carr',          position: 'QB',  team: 'NO',  age: 34, baseValue: 63 },
     { rank: 184, name: 'Justin Fields',       position: 'QB',  team: 'PIT', age: 26, baseValue: 67 },
-    { rank: 185, name: 'Tua Tagovailoa',      position: 'QB',  team: 'MIA', age: 27, baseValue: 72 },
-    { rank: 186, name: 'Kirk Cousins',        position: 'QB',  team: 'ATL', age: 37, baseValue: 66 },
+    { rank: 185, name: 'Tua Tagovailoa',      position: 'QB',  team: 'ATL', age: 28, baseValue: 67 },
+    { rank: 186, name: 'Kirk Cousins',        position: 'QB',  team: 'LV',  age: 38, baseValue: 71 },
     { rank: 187, name: 'Matthew Stafford',    position: 'QB',  team: 'LAR', age: 37, baseValue: 64 },
     { rank: 188, name: 'Russell Wilson',      position: 'QB',  team: 'PIT', age: 37, baseValue: 63 },
     { rank: 189, name: 'Trevor Lawrence',     position: 'QB',  team: 'JAX', age: 26, baseValue: 73 },
     { rank: 190, name: 'Deshaun Watson',      position: 'QB',  team: 'CLE', age: 30, baseValue: 65 },
     { rank: 191, name: 'Zach Wilson',         position: 'QB',  team: 'DEN', age: 26, baseValue: 60 },
     { rank: 192, name: 'Kenny Pickett',       position: 'QB',  team: 'PHI', age: 27, baseValue: 61 },
-    { rank: 193, name: 'Marcus Mariota',      position: 'QB',  team: 'PHI', age: 32, baseValue: 57 },
+    { rank: 193, name: 'Kyler Murray',         position: 'QB',  team: 'MIN', age: 29, baseValue: 72 },
     { rank: 194, name: 'Aidan O\'Connell',   position: 'QB',  team: 'LV',  age: 26, baseValue: 59 },
     { rank: 195, name: 'Gardner Minshew',     position: 'QB',  team: 'LV',  age: 29, baseValue: 58 },
     { rank: 196, name: 'Will Levis',          position: 'QB',  team: 'TEN', age: 26, baseValue: 63 },
     { rank: 197, name: 'Tyson Bagent',        position: 'QB',  team: 'CHI', age: 25, baseValue: 55 },
     { rank: 198, name: 'Joshua Dobbs',        position: 'QB',  team: 'SF',  age: 30, baseValue: 53 },
-    { rank: 199, name: 'Malik Willis',        position: 'QB',  team: 'TEN', age: 26, baseValue: 57 },
+    { rank: 199, name: 'Malik Willis',        position: 'QB',  team: 'MIA', age: 27, baseValue: 72 },
     { rank: 200, name: 'Taylor Heinicke',     position: 'QB',  team: 'ATL', age: 31, baseValue: 54 },
     { rank: 201, name: 'Raheem Mostert',      position: 'RB',  team: 'MIA', age: 33, baseValue: 50 },
     { rank: 202, name: 'Samaje Perine',       position: 'RB',  team: 'DEN', age: 29, baseValue: 50 },
@@ -438,7 +440,7 @@ export const PLAYERS: Player[] = [
     { rank: 258, name: 'Houston DEF',         position: 'DEF', team: 'HOU', age:  0, baseValue: 39 },
     { rank: 259, name: 'Detroit DEF',         position: 'DEF', team: 'DET', age:  0, baseValue: 40 },
     { rank: 260, name: 'Indianapolis DEF',    position: 'DEF', team: 'IND', age:  0, baseValue: 37 },
-    { rank: 261, name: 'Stefon Diggs',        position: 'WR',  team: 'HOU', age: 32, baseValue: 60 },
+    { rank: 261, name: 'Tetairoa McMillan',   position: 'WR',  team: 'CAR', age: 22, baseValue: 62 },
     { rank: 262, name: 'Trent Sherfield',     position: 'WR',  team: 'MIN', age: 29, baseValue: 48 },
     { rank: 263, name: 'Montrell Washington', position: 'WR',  team: 'DEN', age: 25, baseValue: 50 },
     { rank: 264, name: 'Ray-Ray McCloud',     position: 'WR',  team: 'SF',  age: 28, baseValue: 45 },
@@ -451,7 +453,7 @@ export const PLAYERS: Player[] = [
     { rank: 271, name: 'Jamari Thrash',       position: 'WR',  team: 'CLE', age: 24, baseValue: 52 },
     { rank: 272, name: 'Tutu Atwell',         position: 'WR',  team: 'LAR', age: 24, baseValue: 53 },
     { rank: 273, name: 'Elijah Higgins',      position: 'WR',  team: 'ARI', age: 24, baseValue: 51 },
-    { rank: 274, name: 'Rashee Rice',         position: 'WR',  team: 'KC',  age: 24, baseValue: 70 },
+    { rank: 274, name: 'Travis Hunter',        position: 'WR',  team: 'JAX', age: 22, baseValue: 66 },
     { rank: 275, name: 'Devaughn Vele',       position: 'WR',  team: 'DEN', age: 24, baseValue: 52 },
     { rank: 276, name: 'Luke McCaffrey',      position: 'WR',  team: 'WSH', age: 23, baseValue: 54 },
     { rank: 277, name: 'Jalen McMillan',      position: 'WR',  team: 'TB',  age: 23, baseValue: 55 },
@@ -469,7 +471,7 @@ export const PLAYERS: Player[] = [
     { rank: 289, name: 'Isaac Guerendo',      position: 'RB',  team: 'SF',  age: 25, baseValue: 54 },
     { rank: 290, name: 'Quinshon Judkins',    position: 'RB',  team: 'CLE', age: 21, baseValue: 55 },
     { rank: 291, name: 'Rhamondre Stevenson',  position: 'RB',  team: 'FA',  age: 27, baseValue: 48 },
-    { rank: 292, name: 'Cody Schrader',       position: 'RB',  team: 'LA',  age: 25, baseValue: 48 },
+    { rank: 292, name: 'Cody Schrader',       position: 'RB',  team: 'LAR', age: 26, baseValue: 48 },
     { rank: 293, name: 'Tyrone Tracy Jr',     position: 'RB',  team: 'NYG', age: 24, baseValue: 54 },
     { rank: 294, name: 'Keaton Mitchell',      position: 'RB',  team: 'BAL', age: 23, baseValue: 51 },
     { rank: 295, name: 'Spencer Sanders',     position: 'QB',  team: 'CAR', age: 26, baseValue: 50 },
@@ -478,4 +480,37 @@ export const PLAYERS: Player[] = [
     { rank: 298, name: 'Jacoby Brissett',     position: 'QB',  team: 'NE',  age: 32, baseValue: 49 },
     { rank: 299, name: 'Brandon Allen',       position: 'QB',  team: 'CIN', age: 32, baseValue: 46 },
     { rank: 300, name: 'Trace McSorley',      position: 'QB',  team: 'ARI', age: 29, baseValue: 45 },
+
+    // ── 2025 NOTABLE ROOKIES ─────────────────────────────────────────────────
+    { rank: 301, name: 'Cam Ward',             position: 'QB',  team: 'TEN', age: 23, baseValue: 72 },
+    { rank: 302, name: 'Shedeur Sanders',      position: 'QB',  team: 'CLE', age: 24, baseValue: 64 },
+    { rank: 303, name: 'Omarion Hampton',      position: 'RB',  team: 'LAR', age: 22, baseValue: 63 },
+
+    // ── 2026 NFL DRAFT PICKS ─────────────────────────────────────────────────
+    // Dynasty pick values reflect expected rookie talent + positional scarcity
+    { rank: 304, name: '2026 1st Round Pick (Early, 1-4)',   position: 'PICK', team: '2026', age: 22, baseValue: 82 },
+    { rank: 305, name: '2026 1st Round Pick (Mid, 5-8)',     position: 'PICK', team: '2026', age: 22, baseValue: 73 },
+    { rank: 306, name: '2026 1st Round Pick (Late, 9-12)',   position: 'PICK', team: '2026', age: 22, baseValue: 65 },
+    { rank: 307, name: '2026 1st Round Pick (Picks 13-20)', position: 'PICK', team: '2026', age: 22, baseValue: 57 },
+    { rank: 308, name: '2026 2nd Round Pick (Early)',        position: 'PICK', team: '2026', age: 22, baseValue: 48 },
+    { rank: 309, name: '2026 2nd Round Pick (Late)',         position: 'PICK', team: '2026', age: 22, baseValue: 40 },
+    { rank: 310, name: '2026 3rd Round Pick',               position: 'PICK', team: '2026', age: 22, baseValue: 30 },
+
+    // ── 2027 NFL DRAFT PICKS ─────────────────────────────────────────────────
+    { rank: 311, name: '2027 1st Round Pick (Early, 1-4)',   position: 'PICK', team: '2027', age: 22, baseValue: 68 },
+    { rank: 312, name: '2027 1st Round Pick (Mid, 5-8)',     position: 'PICK', team: '2027', age: 22, baseValue: 59 },
+    { rank: 313, name: '2027 1st Round Pick (Late, 9-12)',   position: 'PICK', team: '2027', age: 22, baseValue: 52 },
+    { rank: 314, name: '2027 1st Round Pick (Picks 13-20)', position: 'PICK', team: '2027', age: 22, baseValue: 45 },
+    { rank: 315, name: '2027 2nd Round Pick (Early)',        position: 'PICK', team: '2027', age: 22, baseValue: 37 },
+    { rank: 316, name: '2027 2nd Round Pick (Late)',         position: 'PICK', team: '2027', age: 22, baseValue: 30 },
+    { rank: 317, name: '2027 3rd Round Pick',               position: 'PICK', team: '2027', age: 22, baseValue: 24 },
+
+    // ── 2028 NFL DRAFT PICKS ─────────────────────────────────────────────────
+    { rank: 318, name: '2028 1st Round Pick (Early, 1-4)',   position: 'PICK', team: '2028', age: 22, baseValue: 56 },
+    { rank: 319, name: '2028 1st Round Pick (Mid, 5-8)',     position: 'PICK', team: '2028', age: 22, baseValue: 49 },
+    { rank: 320, name: '2028 1st Round Pick (Late, 9-12)',   position: 'PICK', team: '2028', age: 22, baseValue: 43 },
+    { rank: 321, name: '2028 1st Round Pick (Picks 13-20)', position: 'PICK', team: '2028', age: 22, baseValue: 37 },
+    { rank: 322, name: '2028 2nd Round Pick (Early)',        position: 'PICK', team: '2028', age: 22, baseValue: 30 },
+    { rank: 323, name: '2028 2nd Round Pick (Late)',         position: 'PICK', team: '2028', age: 22, baseValue: 24 },
+    { rank: 324, name: '2028 3rd Round Pick',               position: 'PICK', team: '2028', age: 22, baseValue: 19 },
 ];
