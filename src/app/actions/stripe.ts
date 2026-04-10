@@ -191,15 +191,15 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
 
     let checkoutUrl: string;
     try {
-        const isAllProComm = info.tier === 'COMMISSIONER_ALL_PRO';
         const cs = await stripe.checkout.sessions.create({
             customer: customerId!,
             mode: 'subscription',
             line_items: [{ price: priceId, quantity: 1 }],
-            ...(couponId ? { discounts: [{ coupon: couponId }] } : {}),
-            // Allow promo codes only on All-Pro commissioner plans
-            // (couponId and allow_promotion_codes are mutually exclusive in Stripe)
-            ...(!couponId && isAllProComm ? { allow_promotion_codes: true } : {}),
+            // allow_promotion_codes lets anyone enter a promo code (e.g. ALLPRO100).
+            // Stripe doesn't allow discounts[] and allow_promotion_codes together,
+            // so we always use allow_promotion_codes and apply multi-league discounts
+            // to the subscription after checkout via the webhook.
+            allow_promotion_codes: true,
             success_url: `${appUrl()}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
             cancel_url:  `${appUrl()}/pricing?tab=${info.type === 'commissioner' ? 'commissioner' : 'player'}`,
             metadata: sharedMeta,

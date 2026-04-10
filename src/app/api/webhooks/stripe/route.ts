@@ -97,6 +97,30 @@ export async function POST(request: NextRequest): Promise<Response> {
                         },
                     }),
                 ]);
+
+                // Apply multi-league discount to the new commissioner sub if applicable.
+                // We do this here (post-checkout) because allow_promotion_codes and
+                // discounts[] are mutually exclusive in Stripe checkout sessions.
+                if (subType === 'commissioner') {
+                    const allCommSubs = await prisma.subscription.findMany({
+                        where: { userId: user.id, type: 'commissioner', status: { in: ['active', 'trialing'] } },
+                        select: { stripeSubscriptionId: true },
+                    });
+                    const count = allCommSubs.length;
+                    if (count >= 2) {
+                        const coupon = count >= 3 ? 'MULTI_LEAGUE_15' : 'MULTI_LEAGUE_10';
+                        const pct    = count >= 3 ? 15 : 10;
+                        try {
+                            await stripe.subscriptions.update(stripeSubId, {
+                                discounts: [{ coupon }],
+                            });
+                            await prisma.subscription.update({
+                                where: { stripeSubscriptionId: stripeSubId },
+                                data: { discountPct: pct },
+                            });
+                        } catch { /* non-fatal */ }
+                    }
+                }
                 break;
             }
 
