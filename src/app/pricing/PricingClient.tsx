@@ -347,7 +347,7 @@ function PlanCard({ name, price, period, badge, badgeGold, ring, features, price
     );
 }
 
-/* ── Commissioner plan card (always checkout, includes leagueName) ── */
+/* ── Commissioner plan card ───────────────────────────────────────── */
 interface CommCardProps {
     name: string;
     price: string;
@@ -360,11 +360,13 @@ interface CommCardProps {
     tier: string;
     leagueName: string;
     discountPct: number;
-    // Set when the discount is redirected to a cheaper existing plan instead
     discountRedirectNote?: string;
+    cardStatus: CardStatus;
+    sourceStripeSubId?: string;
+    onUpgrade: (upgrade: PendingUpgrade) => void;
 }
 
-function CommPlanCard({ name, price, period, badge, badgeGold, ring, features, priceId, tier, leagueName, discountPct, discountRedirectNote }: CommCardProps) {
+function CommPlanCard({ name, price, period, badge, badgeGold, ring, features, priceId, tier, leagueName, discountPct, discountRedirectNote, cardStatus, sourceStripeSubId, onUpgrade }: CommCardProps) {
     const canCheckout = leagueName.trim().length > 0 && !!priceId;
 
     // Discounted price display — only when discount lands HERE, not on an existing plan
@@ -416,18 +418,39 @@ function CommPlanCard({ name, price, period, badge, badgeGold, ring, features, p
             </ul>
 
             <div className="mt-8">
-                <form action={createCheckoutSession}>
-                    <input type="hidden" name="priceId" value={priceId} />
-                    <input type="hidden" name="tier" value={tier} />
-                    <input type="hidden" name="leagueName" value={leagueName.trim()} />
-                    <button type="submit" disabled={!canCheckout}
-                        className="w-full py-3 rounded-xl font-bold transition-colors bg-[#C9A227] text-black hover:bg-[#b8912a] disabled:opacity-40 disabled:cursor-not-allowed"
-                        title={!leagueName.trim() ? 'Enter your league name above' : undefined}>
-                        Get Started
+                {cardStatus === 'checkout' && (
+                    <>
+                        <form action={createCheckoutSession}>
+                            <input type="hidden" name="priceId" value={priceId} />
+                            <input type="hidden" name="tier" value={tier} />
+                            <input type="hidden" name="leagueName" value={leagueName.trim()} />
+                            <button type="submit" disabled={!canCheckout}
+                                className="w-full py-3 rounded-xl font-bold transition-colors bg-[#C9A227] text-black hover:bg-[#b8912a] disabled:opacity-40 disabled:cursor-not-allowed"
+                                title={!leagueName.trim() ? 'Enter your league name above' : undefined}>
+                                Get Started
+                            </button>
+                        </form>
+                        {!leagueName.trim() && (
+                            <p className="text-center text-gray-600 text-xs mt-2">Enter league name to continue</p>
+                        )}
+                    </>
+                )}
+                {cardStatus === 'upgrade' && (
+                    <button
+                        onClick={() => onUpgrade({ priceId, planName: name, price, period, sourceStripeSubId: sourceStripeSubId! })}
+                        className="w-full py-3 rounded-xl font-bold transition-colors bg-[#C9A227] text-black hover:bg-[#b8912a]">
+                        Upgrade
                     </button>
-                </form>
-                {!leagueName.trim() && (
-                    <p className="text-center text-gray-600 text-xs mt-2">Enter league name to continue</p>
+                )}
+                {cardStatus === 'current' && (
+                    <div className="w-full py-3 rounded-xl text-center text-sm font-semibold text-green-400 bg-green-900/20 border border-green-800/50">
+                        Current Plan
+                    </div>
+                )}
+                {cardStatus === 'unavailable' && (
+                    <div className="w-full py-3 rounded-xl text-center text-sm font-semibold text-gray-600 bg-gray-800/50 cursor-not-allowed">
+                        Not Available
+                    </div>
                 )}
             </div>
         </div>
@@ -719,6 +742,9 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     leagueName={leagueName}
                                     discountPct={discountPct}
                                     discountRedirectNote={discountNoteFor(parseFloat(proPx))}
+                                    cardStatus={resolveCommCardStatus('COMMISSIONER_PRO', size, commSubs)}
+                                    sourceStripeSubId={commSubs.find(s => s.leagueSize === size)?.stripeSubscriptionId}
+                                    onUpgrade={handleUpgradeClick}
                                 />
                                 <CommPlanCard
                                     name="Commissioner All-Pro" price={apPx} period="/year"
@@ -728,6 +754,9 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     leagueName={leagueName}
                                     discountPct={discountPct}
                                     discountRedirectNote={discountNoteFor(parseFloat(apPx))}
+                                    cardStatus={resolveCommCardStatus('COMMISSIONER_ALL_PRO', size, commSubs)}
+                                    sourceStripeSubId={commSubs.find(s => s.leagueSize === size)?.stripeSubscriptionId}
+                                    onUpgrade={handleUpgradeClick}
                                 />
                                 <CommPlanCard
                                     name="Commissioner Elite" price={elPx} period="/year"
@@ -737,6 +766,9 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     leagueName={leagueName}
                                     discountPct={discountPct}
                                     discountRedirectNote={discountNoteFor(parseFloat(elPx))}
+                                    cardStatus={resolveCommCardStatus('COMMISSIONER_ELITE', size, commSubs)}
+                                    sourceStripeSubId={commSubs.find(s => s.leagueSize === size)?.stripeSubscriptionId}
+                                    onUpgrade={handleUpgradeClick}
                                 />
                             </>
                         )}
