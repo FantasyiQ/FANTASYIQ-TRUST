@@ -36,7 +36,7 @@ async function rebalanceCommDiscounts(userId: string): Promise<void> {
         select: { stripeSubscriptionId: true, tier: true, leagueSize: true, discountPct: true },
     });
 
-    if (allSubs.length < 2) {
+    if (allSubs.length < 2) {  // Only 1 plan — no multi-league discount
         // Only 1 plan — no multi-league discount applies; remove any stale discount
         for (const sub of allSubs) {
             if ((sub.discountPct ?? 0) > 0 && sub.stripeSubscriptionId) {
@@ -52,8 +52,8 @@ async function rebalanceCommDiscounts(userId: string): Promise<void> {
         return;
     }
 
-    const targetPct = allSubs.length >= 4 ? 25 : 15;
-    const couponId  = allSubs.length >= 4 ? 'MULTI_LEAGUE_25' : 'MULTI_LEAGUE_15';
+    const targetPct = allSubs.length >= 3 ? 15 : 10;
+    const couponId  = allSubs.length >= 3 ? 'MULTI_LEAGUE_15' : 'MULTI_LEAGUE_10';
 
     // Sort cheapest first
     const sorted = [...allSubs]

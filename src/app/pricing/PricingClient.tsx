@@ -489,8 +489,8 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
 
     const [proPx, apPx, elPx] = COMM_PRICES[size];
 
-    // Volume discount for the *next* commissioner purchase
-    const discountPct = activeCommCount >= 3 ? 25 : activeCommCount >= 1 ? 15 : 0;
+    // 1st league = full price, 2nd = 10%, 3rd+ = 15%
+    const discountPct = activeCommCount >= 2 ? 15 : activeCommCount === 1 ? 10 : 0;
 
     // Which sizes have an active commissioner subscription
     const activeSizes = new Set(commSubs.map(s => s.leagueSize));

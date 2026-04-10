@@ -99,13 +99,14 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
     let discountPct = 0;
     let couponId: string | undefined;
 
+    // 1st league = full price, 2nd = 10%, 3rd+ = 15%
     if (info.type === 'commissioner') {
-        if (activeCommCount >= 3) {
-            discountPct = 25;
-            couponId = 'MULTI_LEAGUE_25';
-        } else if (activeCommCount >= 1) {
+        if (activeCommCount >= 2) {
             discountPct = 15;
             couponId = 'MULTI_LEAGUE_15';
+        } else if (activeCommCount === 1) {
+            discountPct = 10;
+            couponId = 'MULTI_LEAGUE_10';
         }
     }
 
@@ -117,8 +118,6 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
     let applyDiscountToExistingSubId: string | null = null;
 
     if (discountPct > 0 && couponId && info.type === 'commissioner') {
-        // Find the cheapest ACTIVE commissioner sub that doesn't already carry
-        // an equal-or-better discount.
         const cheapestExisting = activeCommSubs
             .map(s => ({
                 stripeSubscriptionId: s.stripeSubscriptionId,
@@ -129,27 +128,24 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
             .find(s => s.price < newPlanPrice && s.currentDiscountPct < discountPct);
 
         if (cheapestExisting?.stripeSubscriptionId) {
-            // Move the discount to this cheaper existing subscription.
             applyDiscountToExistingSubId = cheapestExisting.stripeSubscriptionId;
-            couponId    = undefined; // new plan pays full price
+            couponId    = undefined;
             discountPct = 0;
         }
 
-        // When crossing the 3→4 threshold, upgrade all existing 15% → 25%.
-        if (activeCommCount >= 3) {
+        // When crossing the 2nd→3rd threshold, upgrade existing 10% → 15%.
+        if (activeCommCount >= 2) {
             for (const sub of activeCommSubs) {
-                if ((sub.discountPct ?? 0) < 25 && sub.stripeSubscriptionId) {
+                if ((sub.discountPct ?? 0) < 15 && sub.stripeSubscriptionId) {
                     try {
                         await stripe.subscriptions.update(sub.stripeSubscriptionId, {
-                            discounts: [{ coupon: 'MULTI_LEAGUE_25' }],
+                            discounts: [{ coupon: 'MULTI_LEAGUE_15' }],
                         });
                         await prisma.subscription.update({
                             where: { stripeSubscriptionId: sub.stripeSubscriptionId },
-                            data: { discountPct: 25 },
+                            data: { discountPct: 15 },
                         });
-                    } catch {
-                        // Non-fatal — discount will self-correct on next purchase
-                    }
+                    } catch { /* non-fatal */ }
                 }
             }
         }
@@ -178,8 +174,8 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
 
     // Apply discount to cheapest existing sub if needed
     if (applyDiscountToExistingSubId) {
-        const coupon = activeCommCount >= 3 ? 'MULTI_LEAGUE_25' : 'MULTI_LEAGUE_15';
-        const pct    = activeCommCount >= 3 ? 25 : 15;
+        const coupon = activeCommCount >= 2 ? 'MULTI_LEAGUE_15' : 'MULTI_LEAGUE_10';
+        const pct    = activeCommCount >= 2 ? 15 : 10;
         try {
             await stripe.subscriptions.update(applyDiscountToExistingSubId, { discounts: [{ coupon }] });
             await prisma.subscription.update({
