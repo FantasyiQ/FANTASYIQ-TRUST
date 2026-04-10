@@ -35,6 +35,9 @@ model User {
     leagues          League[]
     subscriptions    Subscription[]
     connectedLeagues ConnectedLeague[]
+    commissionerDues LeagueDues[]     @relation("CommissionerDues")
+    duesMemberships  DuesMember[]     @relation("MemberDues")
+    proBowlEntries   ProBowlEntry[]   @relation("ProBowlEntries")
 }
 
 // Auth.js (NextAuth v5) required models
@@ -94,7 +97,8 @@ model Subscription {
     createdAt            DateTime         @default(now())
     updatedAt            DateTime         @updatedAt
 
-    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+    user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+    leagueDues LeagueDues?
 }
 
 model ConnectedLeague {
@@ -129,4 +133,169 @@ model League {
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@unique([userId, platform, leagueId])
+}
+
+// ── League Dues & Payout Tracker ─────────────────────────────────────────────
+
+// One tracker per commissioner subscription. Holds the buy-in, pot, and status.
+model LeagueDues {
+    id                   String    @id @default(cuid())
+    subscriptionId       String    @unique  // one tracker per commissioner sub
+    commissionerId       String              // userId of the commissioner
+    leagueName           String
+    season               String             // e.g. "2025"
+    buyInAmount          Float              // per-player buy-in in dollars
+    teamCount            Int                // number of teams in the league
+    potTotal             Float              @default(0) // running total of verified payments in
+    // setup | active | season_ended | pending_approval | approved | paid_out
+    status               String             @default("setup")
+    platform             String?            // "Sleeper" | "ESPN" | "Yahoo" | "Manual"
+    externalLeagueId     String?            // for future API integration
+    createdAt            DateTime           @default(now())
+    updatedAt            DateTime           @updatedAt
+
+    commissioner         User               @relation("CommissionerDues", fields: [commissionerId], references: [id], onDelete: Cascade)
+    subscription         Subscription       @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+    members              DuesMember[]
+    payoutSpots          PayoutSpot[]
+    proposals            PayoutProposal[]
+    proBowl              ProBowlContest?
+
+    @@index([commissionerId])
+}
+
+// One row per league member (roster player).
+model DuesMember {
+    id              String    @id @default(cuid())
+    leagueDuesId    String
+    userId          String?   // null until member creates a FantasyIQ account and links
+    displayName     String    // name entered by commissioner or pulled from platform
+    email           String?   // for payment link delivery
+    teamName        String?
+    // unpaid | paid | pending_refund
+    duesStatus      String    @default("unpaid")
+    paidAt          DateTime?
+    paymentMethod   String?   // "stripe_direct" | "stripe_on_behalf" | null
+    stripePaymentId String?   // Stripe payment intent or checkout session ID
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
+
+    leagueDues      LeagueDues  @relation(fields: [leagueDuesId], references: [id], onDelete: Cascade)
+    user            User?       @relation("MemberDues", fields: [userId], references: [id], onDelete: SetNull)
+    payoutItems     PayoutProposalItem[]
+    pollVotes       PollVote[]
+
+    @@index([leagueDuesId])
+    @@index([userId])
+}
+
+// Configurable payout spots set by the commissioner before season end.
+// Amounts across all spots must sum to the full pot.
+model PayoutSpot {
+    id           String  @id @default(cuid())
+    leagueDuesId String
+    label        String  // "1st Place", "2nd Place", "Weekly High Score Wk 1", etc.
+    amount       Float   // dollar amount for this spot
+    sortOrder    Int     @default(0)
+
+    leagueDues   LeagueDues           @relation(fields: [leagueDuesId], references: [id], onDelete: Cascade)
+    proposalItem PayoutProposalItem[]
+
+    @@index([leagueDuesId])
+}
+
+// Auto-generated at season end. Commissioner reviews and approves/rejects.
+model PayoutProposal {
+    id           String   @id @default(cuid())
+    leagueDuesId String
+    // pending_commissioner | approved | rejected | polling | poll_passed | poll_failed
+    status       String   @default("pending_commissioner")
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    leagueDues   LeagueDues           @relation(fields: [leagueDuesId], references: [id], onDelete: Cascade)
+    items        PayoutProposalItem[]
+    poll         LeaguePoll?
+
+    @@index([leagueDuesId])
+}
+
+// Each line in the proposal: which member wins which spot.
+model PayoutProposalItem {
+    id           String  @id @default(cuid())
+    proposalId   String
+    memberId     String
+    payoutSpotId String
+    amount       Float
+    // pending | payment_link_sent | claimed | paid_out
+    status       String  @default("pending")
+    stripePaymentLinkId String?
+    claimedAt    DateTime?
+
+    proposal     PayoutProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+    member       DuesMember     @relation(fields: [memberId], references: [id], onDelete: Cascade)
+    payoutSpot   PayoutSpot     @relation(fields: [payoutSpotId], references: [id], onDelete: Cascade)
+
+    @@index([proposalId])
+}
+
+// Created when commissioner rejects a proposal. 75%+ yes = proposal stands.
+model LeaguePoll {
+    id          String    @id @default(cuid())
+    proposalId  String    @unique
+    question    String    @default("Do you approve the proposed payout?")
+    expiresAt   DateTime  // commissioner sets deadline
+    // open | passed | failed
+    status      String    @default("open")
+    createdAt   DateTime  @default(now())
+
+    proposal    PayoutProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+    votes       PollVote[]
+}
+
+// One vote per member per poll.
+model PollVote {
+    id         String    @id @default(cuid())
+    pollId     String
+    memberId   String
+    vote       Boolean   // true = yes (approve), false = no (reject)
+    votedAt    DateTime  @default(now())
+
+    poll       LeaguePoll  @relation(fields: [pollId], references: [id], onDelete: Cascade)
+    member     DuesMember  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+    @@unique([pollId, memberId])  // one vote per member per poll
+}
+
+// Week 18 free contest — DK-style, no salary, uses league scoring settings.
+model ProBowlContest {
+    id           String    @id @default(cuid())
+    leagueDuesId String    @unique
+    season       String
+    week         Int       @default(18)
+    // setup | open | locked | scoring | complete
+    status       String    @default("setup")
+    scoringSettings Json?  // copied from league scoring settings
+    createdAt    DateTime  @default(now())
+
+    leagueDues   LeagueDues       @relation(fields: [leagueDuesId], references: [id], onDelete: Cascade)
+    entries      ProBowlEntry[]
+}
+
+// One entry per user per contest. Lineup is a JSON array of picked players.
+model ProBowlEntry {
+    id        String   @id @default(cuid())
+    contestId String
+    userId    String
+    lineup    Json     // [{ position, playerName, nflTeam, projectedPoints }]
+    totalPoints Float? // filled in after Week 18 scoring
+    rank      Int?
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    contest   ProBowlContest @relation(fields: [contestId], references: [id], onDelete: Cascade)
+    user      User           @relation("ProBowlEntries", fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([contestId, userId]) // one entry per user per contest
+    @@index([contestId])
 }
