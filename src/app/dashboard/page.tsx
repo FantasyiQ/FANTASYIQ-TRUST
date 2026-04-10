@@ -58,11 +58,11 @@ function leagueStatusLabel(status: string) {
 }
 
 function periodLabel(sub: { cancelAtPeriodEnd: boolean; currentPeriodEnd: Date | null } | undefined) {
-    if (!sub?.currentPeriodEnd) return null;
+    if (!sub?.cancelAtPeriodEnd || !sub?.currentPeriodEnd) return null;
     const date = new Date(sub.currentPeriodEnd).toLocaleDateString('en-US', {
         month: 'short', day: 'numeric', year: 'numeric',
     });
-    return `${sub.cancelAtPeriodEnd ? 'Cancels' : 'Renews'} ${date}`;
+    return `Cancels ${date}`;
 }
 
 export default async function DashboardPage() {
