@@ -68,7 +68,7 @@ export default function Home() {
               <h3 className="text-xl font-bold mb-3 group-hover:text-[#C9A227] transition">Zero Fee Guarantee</h3>
               <p className="text-gray-400 leading-relaxed">Your league dues go where they belong — to your league. We never take a cut. Ever.</p>
             </Link>
-            <Link href="/pricing" className="block group bg-gray-900 border border-gray-800 rounded-2xl p-8 hover:border-[#C9A227]/50 transition">
+            <Link href="/dashboard/trade" className="block group bg-gray-900 border border-gray-800 rounded-2xl p-8 hover:border-[#C9A227]/50 transition">
               <div className="text-4xl mb-4">📊</div>
               <h3 className="text-xl font-bold mb-3 group-hover:text-[#C9A227] transition">Dynamic Trade Values</h3>
               <p className="text-gray-400 leading-relaxed">Player valuations that adapt to your league settings, scoring format, and roster construction in real time.</p>

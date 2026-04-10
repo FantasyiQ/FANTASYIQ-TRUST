@@ -356,25 +356,25 @@ export default async function DashboardPage() {
                     <h2 className="font-semibold text-lg mb-4">Quick Actions</h2>
                     <div className="grid sm:grid-cols-4 gap-3">
                         <Link href="/dashboard/trade"
-                            className="bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">
+                            className="block bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">
                             <div className="text-2xl mb-2">📊</div>
                             <p className="font-semibold text-white group-hover:text-[#C8A951] transition">Trade Values</p>
                             <p className="text-gray-500 text-sm mt-0.5">Dynamic trade evaluator</p>
                         </Link>
                         <Link href="/dashboard/sync"
-                            className="bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">
+                            className="block bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">
                             <div className="text-2xl mb-2">🔗</div>
                             <p className="font-semibold text-white group-hover:text-[#C8A951] transition">Sync a League</p>
                             <p className="text-gray-500 text-sm mt-0.5">Connect your Sleeper account</p>
                         </Link>
                         <Link href="/dashboard/commissioner"
-                            className="bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">
+                            className="block bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">
                             <div className="text-2xl mb-2">🏆</div>
                             <p className="font-semibold text-white group-hover:text-[#C8A951] transition">Commissioner Hub</p>
                             <p className="text-gray-500 text-sm mt-0.5">Manage your league</p>
                         </Link>
                         <Link href="/pricing"
-                            className="bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">
+                            className="block bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">
                             <div className="text-2xl mb-2">💳</div>
                             <p className="font-semibold text-white group-hover:text-[#C8A951] transition">Manage Subscription</p>
                             <p className="text-gray-500 text-sm mt-0.5">
