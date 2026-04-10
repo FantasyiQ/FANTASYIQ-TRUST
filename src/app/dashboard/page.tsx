@@ -262,9 +262,15 @@ export default async function DashboardPage() {
                                             </div>
                                         </div>
                                         {COMM_TIER_BADGE[sub.tier] && (
-                                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border shrink-0 ${COMM_TIER_BADGE[sub.tier].className}`}>
-                                                {COMM_TIER_BADGE[sub.tier].label}
-                                            </span>
+                                            sub.tier === 'COMMISSIONER_ELITE' ? (
+                                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border shrink-0 ${COMM_TIER_BADGE[sub.tier].className}`}>
+                                                    {COMM_TIER_BADGE[sub.tier].label}
+                                                </span>
+                                            ) : (
+                                                <Link href="/pricing?tab=commissioner" className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border shrink-0 transition hover:opacity-80 ${COMM_TIER_BADGE[sub.tier].className}`}>
+                                                    {COMM_TIER_BADGE[sub.tier].label} ↑
+                                                </Link>
+                                            )
                                         )}
                                     </div>
                                     <div className="flex justify-end mt-3">
