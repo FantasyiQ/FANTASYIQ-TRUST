@@ -3,18 +3,41 @@ import Link from 'next/link';
 export default function Home() {
   return (
     <main className="min-h-screen bg-gray-950 text-white">
+
+      {/* ── Hero ─────────────────────────────────────────────────────── */}
       <section className="pt-32 pb-20 px-6">
         <div className="max-w-4xl mx-auto text-center">
           <div className="inline-block mb-6 px-4 py-1.5 rounded-full border border-[#C9A227]/30 bg-[#C9A227]/10 text-[#C9A227] text-sm font-medium">
             ★★★★★ Trusted by Commissioners
           </div>
           <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
-            Your League Dues.{' '}
+            Your League Dues{' '}
             <span className="text-[#C9A227]">Protected.</span>
           </h1>
           <p className="text-xl text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed">
-            The fantasy football platform that never touches your money. Zero fees. Zero skimming. Total trust.
+            ZERO FEES GUARANTEED.
           </p>
+
+          {/* Feature pills */}
+          <div className="flex flex-wrap justify-center gap-3 mb-12">
+            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-950/60 border border-emerald-800/60 text-emerald-400 text-sm font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+              IMMEDIATE PAYOUTS
+            </span>
+            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#C9A227]/10 border border-[#C9A227]/30 text-[#C9A227] text-sm font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#C9A227] shrink-0" />
+              COMMISSIONER HUB
+            </span>
+            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-950/60 border border-blue-800/60 text-blue-400 text-sm font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+              TRACK LEAGUE DUES &amp; PAYOUTS
+            </span>
+            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-950/60 border border-purple-800/60 text-purple-400 text-sm font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0" />
+              SYNC LEAGUES CROSS-PLATFORM
+            </span>
+          </div>
+
           <div className="flex gap-4 justify-center flex-wrap">
             <Link href="/pricing" className="bg-[#C9A227] hover:bg-[#B8911F] text-gray-950 font-bold px-8 py-4 rounded-lg text-lg transition">
               Get Started
@@ -26,6 +49,7 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── Features ─────────────────────────────────────────────────── */}
       <section id="features" className="py-20 px-6 border-t border-gray-800">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">
@@ -54,6 +78,7 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── CTA ──────────────────────────────────────────────────────── */}
       <section className="py-20 px-6 border-t border-gray-800">
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Protect Your League?</h2>
