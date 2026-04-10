@@ -17,7 +17,8 @@ interface PendingUpgrade {
     planName: string;
     price: string;
     period: string;
-    sourceStripeSubId: string;  // The subscription being upgraded
+    sourceStripeSubId: string;
+    discountNote?: string; // Explains what happens to the discount after upgrade
 }
 
 interface Props {
@@ -229,9 +230,14 @@ function UpgradeModal({
                     Upgrade to <span className="text-white font-semibold">{pending.planName}</span> for{' '}
                     <span className="text-[#C9A227] font-bold">${pending.price}{pending.period}</span>?
                 </p>
-                <p className="text-gray-500 text-xs mb-6">
+                <p className="text-gray-500 text-xs mb-4">
                     You&apos;ll be charged the prorated difference immediately. Your new plan takes effect right away.
                 </p>
+                {pending.discountNote && (
+                    <div className="mb-4 px-4 py-3 bg-[#C9A227]/10 border border-[#C9A227]/30 rounded-lg text-[#C9A227] text-xs leading-relaxed">
+                        {pending.discountNote}
+                    </div>
+                )}
                 {error && (
                     <div className="mb-4 px-4 py-3 bg-red-900/30 border border-red-800 rounded-lg text-red-400 text-sm">
                         {error}
@@ -483,9 +489,51 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
         return `Your ${discountPct}% discount will be applied to "${label}" (saving $${saving}/yr) — this plan is charged at full price.`;
     }
 
+    // For commissioner plan upgrades: explain what happens to the discount
+    function upgradeDiscountNote(upgradingSubId: string, newTier: string): string | undefined {
+        if (activeCommCount < 2) return undefined;
+        const upgradingSub = commSubs.find(s => s.stripeSubscriptionId === upgradingSubId);
+        if (!upgradingSub) return undefined;
+
+        const newPrice = subPrice(newTier, upgradingSub.leagueSize);
+        const others = commSubs.filter(s => s.stripeSubscriptionId !== upgradingSubId);
+        const cheapestOther = others
+            .map(s => ({ ...s, price: subPrice(s.tier, s.leagueSize) }))
+            .sort((a, b) => a.price - b.price)[0];
+
+        if (!cheapestOther) return undefined;
+
+        const targetPct = activeCommCount >= 4 ? 25 : 15;
+
+        if (newPrice > cheapestOther.price) {
+            // Upgraded plan is no longer cheapest — discount moves to cheapest other
+            const saving = (cheapestOther.price * targetPct / 100).toFixed(2);
+            const label = cheapestOther.leagueName ?? 'your cheapest league';
+            return `After upgrading, your ${targetPct}% multi-league discount moves to "${label}" (saving $${saving}/yr). This plan will be charged at full price.`;
+        }
+
+        if (upgradingSub.discountPct > 0 && newPrice <= cheapestOther.price) {
+            // Upgraded plan stays cheapest — discount stays here
+            const saving = (newPrice * targetPct / 100).toFixed(2);
+            return `Your ${targetPct}% multi-league discount stays on this plan after upgrading (saving $${saving}/yr on the new price).`;
+        }
+
+        return undefined;
+    }
+
     function handleUpgradeClick(upgrade: PendingUpgrade) {
         setUpgradeError(null);
-        setPending(upgrade);
+        // Attach discount note for commissioner upgrades so the modal informs the customer
+        // Derive tier from catalog name embedded in the plan name (e.g. "Commissioner Elite")
+        const newTier =
+            upgrade.planName.includes('Elite')   ? 'COMMISSIONER_ELITE'
+          : upgrade.planName.includes('All-Pro') ? 'COMMISSIONER_ALL_PRO'
+          : upgrade.planName.includes('Pro')     ? 'COMMISSIONER_PRO'
+          : '';
+        const note = upgrade.sourceStripeSubId && newTier
+            ? upgradeDiscountNote(upgrade.sourceStripeSubId, newTier)
+            : undefined;
+        setPending({ ...upgrade, discountNote: note });
     }
 
     async function handleUpgradeConfirm() {
