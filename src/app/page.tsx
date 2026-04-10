@@ -18,24 +18,28 @@ export default function Home() {
             ZERO FEES GUARANTEED.
           </p>
 
-          {/* Feature pills */}
-          <div className="flex flex-wrap justify-center gap-3 mb-12">
-            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#C9A227] text-gray-950 text-sm font-bold">
-              <span className="w-1.5 h-1.5 rounded-full bg-gray-950 shrink-0" />
-              IMMEDIATE PAYOUTS
-            </span>
-            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/20 bg-white/5 text-white text-sm font-bold">
-              <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-              COMMISSIONER HUB
-            </span>
-            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#C9A227]/40 bg-[#C9A227]/10 text-[#C9A227] text-sm font-bold">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#C9A227] shrink-0" />
-              TRACK LEAGUE DUES &amp; PAYOUTS
-            </span>
-            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-gray-900 text-gray-300 text-sm font-bold">
-              <span className="w-1.5 h-1.5 rounded-full bg-gray-300 shrink-0" />
-              SYNC LEAGUES CROSS-PLATFORM
-            </span>
+          {/* Feature cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12 text-left">
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 hover:border-[#C9A227]/50 transition">
+              <div className="text-2xl mb-3">💸</div>
+              <h3 className="text-white font-bold text-sm mb-1">IMMEDIATE PAYOUTS</h3>
+              <p className="text-gray-500 text-xs leading-relaxed">Winners paid instantly. No delays, no holds.</p>
+            </div>
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 hover:border-[#C9A227]/50 transition">
+              <div className="text-2xl mb-3">🏆</div>
+              <h3 className="text-white font-bold text-sm mb-1">COMMISSIONER HUB</h3>
+              <p className="text-gray-500 text-xs leading-relaxed">Full league control in one place.</p>
+            </div>
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 hover:border-[#C9A227]/50 transition">
+              <div className="text-2xl mb-3">📋</div>
+              <h3 className="text-white font-bold text-sm mb-1">TRACK DUES &amp; PAYOUTS</h3>
+              <p className="text-gray-500 text-xs leading-relaxed">Every dollar accounted for, every season.</p>
+            </div>
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 hover:border-[#C9A227]/50 transition">
+              <div className="text-2xl mb-3">🔗</div>
+              <h3 className="text-white font-bold text-sm mb-1">SYNC CROSS-PLATFORM</h3>
+              <p className="text-gray-500 text-xs leading-relaxed">Sleeper, ESPN, Yahoo and more.</p>
+            </div>
           </div>
 
           <div className="flex gap-4 justify-center flex-wrap">
