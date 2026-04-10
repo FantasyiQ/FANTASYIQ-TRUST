@@ -20,20 +20,20 @@ export default function Home() {
 
           {/* Feature pills */}
           <div className="flex flex-wrap justify-center gap-3 mb-12">
-            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-950/60 border border-emerald-800/60 text-emerald-400 text-sm font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#C9A227] text-gray-950 text-sm font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-950 shrink-0" />
               IMMEDIATE PAYOUTS
             </span>
-            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#C9A227]/10 border border-[#C9A227]/30 text-[#C9A227] text-sm font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#C9A227] shrink-0" />
+            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/20 bg-white/5 text-white text-sm font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
               COMMISSIONER HUB
             </span>
-            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-950/60 border border-blue-800/60 text-blue-400 text-sm font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#C9A227]/40 bg-[#C9A227]/10 text-[#C9A227] text-sm font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#C9A227] shrink-0" />
               TRACK LEAGUE DUES &amp; PAYOUTS
             </span>
-            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-950/60 border border-purple-800/60 text-purple-400 text-sm font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0" />
+            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-gray-900 text-gray-300 text-sm font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-300 shrink-0" />
               SYNC LEAGUES CROSS-PLATFORM
             </span>
           </div>
