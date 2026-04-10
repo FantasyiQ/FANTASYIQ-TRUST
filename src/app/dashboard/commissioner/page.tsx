@@ -52,7 +52,7 @@ export default async function CommissionerHubPage() {
                         <Link
                             key={f.href}
                             href={f.href}
-                            className="group bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-2xl p-6 transition"
+                            className="group block bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-2xl p-6 transition"
                         >
                             <div className="text-3xl mb-3">{f.icon}</div>
                             <h2 className="text-lg font-bold text-white group-hover:text-[#C8A951] transition mb-2">
