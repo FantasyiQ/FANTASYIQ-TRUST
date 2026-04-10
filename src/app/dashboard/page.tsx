@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { auth, signOut } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { unsyncLeague } from '@/app/actions/leagues';
-import { createPortalSession } from '@/app/actions/stripe';
+import { createPortalSession, syncCommDiscounts } from '@/app/actions/stripe';
 import ConnectedLeagues from '@/components/ConnectedLeagues';
 import { getLeagueLimit, tierToLimitKey, nextTierName } from '@/lib/league-limits';
 import type { SubscriptionTier } from '@prisma/client';
@@ -226,10 +226,20 @@ export default async function DashboardPage() {
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
                     <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
                         <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Commissioner Plans</p>
-                        <Link href="/pricing?tab=commissioner"
-                            className="text-sm border border-gray-700 hover:border-[#C8A951]/50 text-gray-300 font-semibold px-4 py-1.5 rounded-lg transition">
-                            + Add League
-                        </Link>
+                        <div className="flex items-center gap-2">
+                            {commSubs.length > 0 && (
+                                <form action={syncCommDiscounts}>
+                                    <button type="submit"
+                                        className="text-xs text-gray-500 hover:text-gray-300 transition px-3 py-1.5 rounded-lg border border-gray-800 hover:border-gray-600">
+                                        Sync Discounts
+                                    </button>
+                                </form>
+                            )}
+                            <Link href="/pricing?tab=commissioner"
+                                className="text-sm border border-gray-700 hover:border-[#C8A951]/50 text-gray-300 font-semibold px-4 py-1.5 rounded-lg transition">
+                                + Add League
+                            </Link>
+                        </div>
                     </div>
 
                     {commSubs.length === 0 ? (
