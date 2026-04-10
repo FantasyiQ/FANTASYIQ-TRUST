@@ -160,6 +160,7 @@ model LeagueDues {
     payoutSpots          PayoutSpot[]
     proposals            PayoutProposal[]
     proBowl              ProBowlContest?
+    documents            LeagueDocument[]
 
     @@index([commissionerId])
 }
@@ -280,6 +281,20 @@ model ProBowlContest {
 
     leagueDues   LeagueDues       @relation(fields: [leagueDuesId], references: [id], onDelete: Cascade)
     entries      ProBowlEntry[]
+}
+
+// ── League Documents (bylaws, rulebooks, etc.) ────────────────────────────────
+
+model LeagueDocument {
+    id           String   @id @default(cuid())
+    leagueDuesId String
+    label        String   // e.g. "Rulebook 2025", "League Bylaws"
+    url          String   // Google Drive / Dropbox share link
+    createdAt    DateTime @default(now())
+
+    leagueDues   LeagueDues @relation(fields: [leagueDuesId], references: [id], onDelete: Cascade)
+
+    @@index([leagueDuesId])
 }
 
 // One entry per user per contest. Lineup is a JSON array of picked players.

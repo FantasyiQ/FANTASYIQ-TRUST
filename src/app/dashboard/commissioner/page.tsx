@@ -18,8 +18,8 @@ const FEATURES = [
     {
         href:        '/dashboard/commissioner/settings',
         icon:        '⚙️',
-        title:       'League Settings Manager',
-        description: 'Review and compare your league settings across all synced leagues in one place.',
+        title:       'League Settings & Bylaws Manager',
+        description: 'Store your rulebook and league bylaws, then review and compare settings across all synced leagues in one place.',
     },
     {
         href:        '/dashboard/commissioner/calendar',
