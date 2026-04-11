@@ -45,13 +45,14 @@ function tierGroupRank(tier: string): number {
 /* ── Catalog helpers ──────────────────────────────────────────────── */
 const TEAM_SIZES: TeamSize[] = [8, 10, 12, 14, 16, 32];
 
-const COMM_PRICES: Record<TeamSize, [string, string, string]> = {
-    8:  ['39.99',  '69.99',  '109.99'],
-    10: ['49.99',  '89.99',  '129.99'],
-    12: ['59.99',  '104.99', '149.99'],
-    14: ['69.99',  '124.99', '169.99'],
-    16: ['79.99',  '139.99', '189.99'],
-    32: ['159.99', '239.99', '299.99'],
+// [Pro, All-Pro, Elite] — null means Pro is not offered at that size
+const COMM_PRICES: Record<TeamSize, [string | null, string, string]> = {
+    8:  [null,    '49.99',  '59.99'],
+    10: ['49.99', '59.99',  '69.99'],
+    12: ['59.99', '69.99',  '79.99'],
+    14: ['69.99', '79.99',  '89.99'],
+    16: ['79.99', '89.99',  '99.99'],
+    32: [null,    '169.99', '179.99'],
 };
 
 // Index 0=Pro, 1=All-Pro, 2=Elite
@@ -62,6 +63,10 @@ const TIER_INDEX: Record<string, number> = {
 function subPrice(tier: string, leagueSize: number): number {
     const idx = TIER_INDEX[tier] ?? 0;
     return parseFloat(COMM_PRICES[leagueSize as TeamSize]?.[idx] ?? '0');
+}
+
+function proAvailable(size: TeamSize): boolean {
+    return COMM_PRICES[size][0] !== null;
 }
 
 function findPriceId(name: string): string {
@@ -85,13 +90,13 @@ const PLAYER_PRO_FEATURES: Feature[] = [
     { name: 'League Dues & Payouts Tracked',     included: true  },
     { name: 'Immediate Payouts',                 included: true  },
     { name: 'Commissioner Hub',                  included: true  },
-    { name: 'Optimized Lineups',                 included: true  },
-    { name: 'Player Rankings & Auction Values',  included: true  },
     { name: 'Sync Up to 2 Leagues',              included: true  },
+    { name: 'Optimized Lineups',                 included: false },
+    { name: 'Player Rankings',                   included: false },
+    { name: 'Auction Values',                    included: false },
     { name: 'Personalized Waiver Wire Strategy', included: false },
     { name: 'Dynamic Trade Calculator',          included: false },
     { name: 'Power League Rankings',             included: false },
-    { name: 'Player Indicators & Mock Drafts',   included: false },
     { name: 'Dynamic Mock Drafts',               included: false },
     { name: 'League Analysis',                   included: false },
     { name: 'Team Builder',                      included: false },
@@ -103,13 +108,13 @@ const PLAYER_ALL_PRO_FEATURES: Feature[] = [
     { name: 'League Dues & Payouts Tracked',     included: true  },
     { name: 'Immediate Payouts',                 included: true  },
     { name: 'Commissioner Hub',                  included: true  },
-    { name: 'Optimized Lineups',                 included: true  },
-    { name: 'Player Rankings & Auction Values',  included: true  },
     { name: 'Sync Up to 5 Leagues',              included: true  },
+    { name: 'Optimized Lineups',                 included: true  },
+    { name: 'Player Rankings',                   included: true  },
+    { name: 'Auction Values',                    included: true  },
     { name: 'Personalized Waiver Wire Strategy', included: true  },
     { name: 'Dynamic Trade Calculator',          included: true  },
     { name: 'Power League Rankings',             included: true  },
-    { name: 'Player Indicators & Mock Drafts',   included: true  },
     { name: 'Dynamic Mock Drafts',               included: false },
     { name: 'League Analysis',                   included: false },
     { name: 'Team Builder',                      included: false },
@@ -121,13 +126,13 @@ const PLAYER_ELITE_FEATURES: Feature[] = [
     { name: 'League Dues & Payouts Tracked',     included: true },
     { name: 'Immediate Payouts',                 included: true },
     { name: 'Commissioner Hub',                  included: true },
-    { name: 'Optimized Lineups',                 included: true },
-    { name: 'Player Rankings & Auction Values',  included: true },
     { name: 'Unlimited League Syncs',            included: true },
+    { name: 'Optimized Lineups',                 included: true },
+    { name: 'Player Rankings',                   included: true },
+    { name: 'Auction Values',                    included: true },
     { name: 'Personalized Waiver Wire Strategy', included: true },
     { name: 'Dynamic Trade Calculator',          included: true },
     { name: 'Power League Rankings',             included: true },
-    { name: 'Player Indicators & Mock Drafts',   included: true },
     { name: 'Dynamic Mock Drafts',               included: true },
     { name: 'League Analysis',                   included: true },
     { name: 'Team Builder',                      included: true },
@@ -139,12 +144,12 @@ const COMM_PRO_FEATURES: Feature[] = [
     { name: 'League Dues & Payouts Tracked',     included: true  },
     { name: 'Immediate Payouts',                 included: true  },
     { name: 'Commissioner Hub',                  included: true  },
-    { name: 'Optimized Lineups',                 included: true  },
-    { name: 'Player Rankings & Auction Values',  included: true  },
+    { name: 'Optimized Lineups',                 included: false },
+    { name: 'Player Rankings',                   included: false },
+    { name: 'Auction Values',                    included: false },
     { name: 'Personalized Waiver Wire Strategy', included: false },
     { name: 'Dynamic Trade Calculator',          included: false },
     { name: 'Power League Rankings',             included: false },
-    { name: 'Player Indicators & Mock Drafts',   included: false },
     { name: 'Dynamic Mock Drafts',               included: false },
     { name: 'League Analysis',                   included: false },
     { name: 'Team Builder',                      included: false },
@@ -157,11 +162,11 @@ const COMM_ALL_PRO_FEATURES: Feature[] = [
     { name: 'Immediate Payouts',                 included: true  },
     { name: 'Commissioner Hub',                  included: true  },
     { name: 'Optimized Lineups',                 included: true  },
-    { name: 'Player Rankings & Auction Values',  included: true  },
+    { name: 'Player Rankings',                   included: true  },
+    { name: 'Auction Values',                    included: true  },
     { name: 'Personalized Waiver Wire Strategy', included: true  },
     { name: 'Dynamic Trade Calculator',          included: true  },
     { name: 'Power League Rankings',             included: true  },
-    { name: 'Player Indicators & Mock Drafts',   included: true  },
     { name: 'Dynamic Mock Drafts',               included: false },
     { name: 'League Analysis',                   included: false },
     { name: 'Team Builder',                      included: false },
@@ -174,11 +179,11 @@ const COMM_ELITE_FEATURES: Feature[] = [
     { name: 'Immediate Payouts',                 included: true },
     { name: 'Commissioner Hub',                  included: true },
     { name: 'Optimized Lineups',                 included: true },
-    { name: 'Player Rankings & Auction Values',  included: true },
+    { name: 'Player Rankings',                   included: true },
+    { name: 'Auction Values',                    included: true },
     { name: 'Personalized Waiver Wire Strategy', included: true },
     { name: 'Dynamic Trade Calculator',          included: true },
     { name: 'Power League Rankings',             included: true },
-    { name: 'Player Indicators & Mock Drafts',   included: true },
     { name: 'Dynamic Mock Drafts',               included: true },
     { name: 'League Analysis',                   included: true },
     { name: 'Team Builder',                      included: true },
@@ -477,59 +482,12 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
 
     const [proPx, apPx, elPx] = COMM_PRICES[size];
 
-    // 1st league = full price, 2nd = 10%, 3rd+ = 15%
-    const discountPct = activeCommCount >= 2 ? 15 : activeCommCount === 1 ? 10 : 0;
-
     // Which sizes have an active commissioner subscription
     const activeSizes = new Set(commSubs.map(s => s.leagueSize));
 
-    // Find cheapest existing commissioner plan that would absorb the discount
-    // instead of the new plan (to prevent gaming via cheap-plan stacking).
-    // For commissioner plan upgrades: explain what happens to the discount
-    function upgradeDiscountNote(upgradingSubId: string, newTier: string): string | undefined {
-        if (activeCommCount < 2) return undefined;
-        const upgradingSub = commSubs.find(s => s.stripeSubscriptionId === upgradingSubId);
-        if (!upgradingSub) return undefined;
-
-        const newPrice = subPrice(newTier, upgradingSub.leagueSize);
-        const others = commSubs.filter(s => s.stripeSubscriptionId !== upgradingSubId);
-        const cheapestOther = others
-            .map(s => ({ ...s, price: subPrice(s.tier, s.leagueSize) }))
-            .sort((a, b) => a.price - b.price)[0];
-
-        if (!cheapestOther) return undefined;
-
-        const targetPct = activeCommCount >= 4 ? 25 : 15;
-
-        if (newPrice > cheapestOther.price) {
-            // Upgraded plan is no longer cheapest — discount moves to cheapest other
-            const saving = (cheapestOther.price * targetPct / 100).toFixed(2);
-            const label = cheapestOther.leagueName ?? 'your lowest plan';
-            return `After upgrading, your ${targetPct}% multi-league discount moves to "${label}" (saving $${saving}/yr). This plan will be charged at full price.`;
-        }
-
-        if (upgradingSub.discountPct > 0 && newPrice <= cheapestOther.price) {
-            // Upgraded plan stays cheapest — discount stays here
-            const saving = (newPrice * targetPct / 100).toFixed(2);
-            return `Your ${targetPct}% multi-league discount stays on this plan after upgrading (saving $${saving}/yr on the new price).`;
-        }
-
-        return undefined;
-    }
-
     function handleUpgradeClick(upgrade: PendingUpgrade) {
         setUpgradeError(null);
-        // Attach discount note for commissioner upgrades so the modal informs the customer
-        // Derive tier from catalog name embedded in the plan name (e.g. "Commissioner Elite")
-        const newTier =
-            upgrade.planName.includes('Elite')   ? 'COMMISSIONER_ELITE'
-          : upgrade.planName.includes('All-Pro') ? 'COMMISSIONER_ALL_PRO'
-          : upgrade.planName.includes('Pro')     ? 'COMMISSIONER_PRO'
-          : '';
-        const note = upgrade.sourceStripeSubId && newTier
-            ? upgradeDiscountNote(upgrade.sourceStripeSubId, newTier)
-            : undefined;
-        setPending({ ...upgrade, discountNote: note });
+        setPending(upgrade);
     }
 
     async function handleUpgradeConfirm() {
@@ -615,13 +573,6 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                     {/* Commissioner: size selector + league name input */}
                     {tab === 'commissioner' && (
                         <div className="mb-10 max-w-5xl mx-auto space-y-6">
-                            {/* Multi-League Savings callout */}
-                            {discountPct > 0 && (
-                                <div className="bg-[#C9A227]/10 border border-[#C9A227]/30 rounded-xl px-5 py-3 text-sm text-center">
-                                    <span className="text-[#C9A227] font-bold">Multi-League Savings: </span>
-                                    <span className="text-gray-300">{discountPct}% off applied at checkout</span>
-                                </div>
-                            )}
 
                             {/* League name input */}
                             <div>
@@ -700,12 +651,12 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                         ) : (
                             <>
                                 <CommPlanCard
-                                    name="Commissioner Pro" price={proPx} period="/year"
+                                    name="Commissioner Pro" price={proPx ?? '—'} period="/year"
                                     features={COMM_PRO_FEATURES}
                                     priceId={commPriceId('Pro', size)} tier="COMMISSIONER_PRO"
                                     leagueName={leagueName}
-                                    discountPct={discountPct}
-                                    cardStatus={resolveCommCardStatus('COMMISSIONER_PRO', size, commSubs)}
+                                    discountPct={0}
+                                    cardStatus={proAvailable(size) ? resolveCommCardStatus('COMMISSIONER_PRO', size, commSubs) : 'unavailable'}
                                     sourceStripeSubId={commSubs.find(s => s.leagueSize === size)?.stripeSubscriptionId}
                                     onUpgrade={handleUpgradeClick}
                                 />
@@ -715,7 +666,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     features={COMM_ALL_PRO_FEATURES}
                                     priceId={commPriceId('All-Pro', size)} tier="COMMISSIONER_ALL_PRO"
                                     leagueName={leagueName}
-                                    discountPct={discountPct}
+                                    discountPct={0}
                                     cardStatus={resolveCommCardStatus('COMMISSIONER_ALL_PRO', size, commSubs)}
                                     sourceStripeSubId={commSubs.find(s => s.leagueSize === size)?.stripeSubscriptionId}
                                     onUpgrade={handleUpgradeClick}
@@ -726,7 +677,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     features={COMM_ELITE_FEATURES}
                                     priceId={commPriceId('Elite', size)} tier="COMMISSIONER_ELITE"
                                     leagueName={leagueName}
-                                    discountPct={discountPct}
+                                    discountPct={0}
                                     cardStatus={resolveCommCardStatus('COMMISSIONER_ELITE', size, commSubs)}
                                     sourceStripeSubId={commSubs.find(s => s.leagueSize === size)?.stripeSubscriptionId}
                                     onUpgrade={handleUpgradeClick}

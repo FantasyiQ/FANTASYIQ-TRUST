@@ -108,7 +108,6 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
                     type: true,
                     tier: true,
                     leagueSize: true,
-                    discountPct: true,
                     stripeSubscriptionId: true,
                 },
             },
@@ -117,45 +116,10 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
     if (!user) redirect('/sign-in');
 
     const activePlayerSubs = user.subscriptions.filter(s => s.type === 'player');
-    const activeCommSubs   = user.subscriptions.filter(s => s.type === 'commissioner');
-    const activeCommCount  = activeCommSubs.length;
 
     // Block a second player plan — redirect to pricing with upgrade note
     if (info.type === 'player' && activePlayerSubs.length > 0) {
         redirect('/pricing?error=already-subscribed');
-    }
-
-    // ── Volume discount ───────────────────────────────────────────────────────
-    // Discount applies to the plan being purchased at checkout.
-    // 1st league = full price, 2nd = 10%, 3rd+ = 15%
-    let discountPct = 0;
-    let couponId: string | undefined;
-
-    if (info.type === 'commissioner') {
-        if (activeCommCount >= 2) {
-            discountPct = 15;
-            couponId = 'MULTI_LEAGUE_15';
-        } else if (activeCommCount === 1) {
-            discountPct = 10;
-            couponId = 'MULTI_LEAGUE_10';
-        }
-    }
-
-    // When crossing the 2nd→3rd threshold, upgrade any existing 10% subs to 15%.
-    if (info.type === 'commissioner' && activeCommCount >= 2) {
-        for (const sub of activeCommSubs) {
-            if ((sub.discountPct ?? 0) < 15 && sub.stripeSubscriptionId) {
-                try {
-                    await stripe.subscriptions.update(sub.stripeSubscriptionId, {
-                        discounts: [{ coupon: 'MULTI_LEAGUE_15' }],
-                    });
-                    await prisma.subscription.update({
-                        where: { stripeSubscriptionId: sub.stripeSubscriptionId },
-                        data: { discountPct: 15 },
-                    });
-                } catch { /* non-fatal */ }
-            }
-        }
     }
 
     // Get or create Stripe customer
@@ -187,7 +151,6 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
     };
     if (info.leagueSize != null) sharedMeta.leagueSize = info.leagueSize.toString();
     if (leagueName)              sharedMeta.leagueName  = leagueName;
-    if (discountPct > 0)        sharedMeta.discountPct  = discountPct.toString();
 
     let checkoutUrl: string;
     try {
