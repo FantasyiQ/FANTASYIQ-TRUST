@@ -44,7 +44,7 @@ export async function POST(request: NextRequest): Promise<Response> {
             leagueName,
             platform: body.platform?.trim() || null,
         },
-        select: { id: true, leagueName: true, platform: true, createdAt: true },
+        select: { id: true, leagueName: true, platform: true, createdAt: true  },
     });
 
     return Response.json(league, { status: 201 });
@@ -71,13 +71,22 @@ export async function DELETE(request: NextRequest): Promise<Response> {
 
     const league = await prisma.connectedLeague.findUnique({
         where: { id: leagueId },
-        select: { userId: true },
+        select: { userId: true, createdAt: true },
     });
     if (!league) {
         return Response.json({ error: 'League not found' }, { status: 404 });
     }
     if (league.userId !== user.id) {
         return Response.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const lockedUntil = new Date(league.createdAt);
+    lockedUntil.setFullYear(lockedUntil.getFullYear() + 1);
+    if (new Date() < lockedUntil) {
+        return Response.json(
+            { error: 'This league slot is locked for the season. Connected leagues cannot be swapped mid-year to prevent abuse.' },
+            { status: 403 }
+        );
     }
 
     await prisma.connectedLeague.delete({ where: { id: leagueId } });

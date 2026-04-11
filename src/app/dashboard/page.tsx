@@ -91,7 +91,7 @@ export default async function DashboardPage() {
             },
             connectedLeagues: {
                 orderBy: { createdAt: 'asc' },
-                select: { id: true, leagueName: true, platform: true },
+                select: { id: true, leagueName: true, platform: true, createdAt: true },
             },
             leagues: {
                 orderBy: { lastSyncedAt: 'desc' },

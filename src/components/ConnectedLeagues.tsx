@@ -7,6 +7,7 @@ interface ConnectedLeague {
     id: string;
     leagueName: string;
     platform: string | null;
+    createdAt: string | Date;
 }
 
 interface Props {
@@ -17,6 +18,18 @@ interface Props {
 }
 
 const PLATFORMS = ['ESPN', 'Yahoo', 'Sleeper', 'NFL', 'CBS', 'Other'];
+
+function isLocked(createdAt: string | Date): boolean {
+    const lockedUntil = new Date(createdAt);
+    lockedUntil.setFullYear(lockedUntil.getFullYear() + 1);
+    return new Date() < lockedUntil;
+}
+
+function lockLabel(createdAt: string | Date): string {
+    const lockedUntil = new Date(createdAt);
+    lockedUntil.setFullYear(lockedUntil.getFullYear() + 1);
+    return lockedUntil.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 export default function ConnectedLeagues({ leagues: initial, limit, nextTier, tierLabel }: Props) {
     const [leagues, setLeagues] = useState<ConnectedLeague[]>(initial);
@@ -46,7 +59,7 @@ export default function ConnectedLeagues({ leagues: initial, limit, nextTier, ti
                 });
                 const data = await res.json() as ConnectedLeague & { error?: string };
                 if (!res.ok) {
-                    setError(data.error ?? 'Failed to add league.');
+                    setError((data as { error?: string }).error ?? 'Failed to add league.');
                     return;
                 }
                 setLeagues(prev => [...prev, data]);
@@ -108,31 +121,36 @@ export default function ConnectedLeagues({ leagues: initial, limit, nextTier, ti
 
             {/* Inline add form */}
             {showForm && (
-                <div className="mb-3 flex flex-col sm:flex-row gap-2 items-start sm:items-end">
-                    <div className="flex-1">
-                        <input
-                            type="text"
-                            placeholder="League name"
-                            value={leagueName}
-                            onChange={e => setLeagueName(e.target.value)}
-                            maxLength={80}
-                            onKeyDown={e => { if (e.key === 'Enter') void handleAdd(); }}
-                            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/60"
-                        />
+                <div className="mb-4 bg-gray-800/50 border border-gray-700 rounded-xl p-4">
+                    <p className="text-xs text-amber-400/80 mb-3 font-medium">
+                        ⚠ League slots are locked for 1 year once connected. Choose carefully.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-end">
+                        <div className="flex-1">
+                            <input
+                                type="text"
+                                placeholder="League name"
+                                value={leagueName}
+                                onChange={e => setLeagueName(e.target.value)}
+                                maxLength={80}
+                                onKeyDown={e => { if (e.key === 'Enter') void handleAdd(); }}
+                                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/60"
+                            />
+                        </div>
+                        <select
+                            value={platform}
+                            onChange={e => setPlatform(e.target.value)}
+                            className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-[#C8A951]/60">
+                            <option value="">Platform (optional)</option>
+                            {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                        <button
+                            onClick={() => { void handleAdd(); }}
+                            disabled={isPending || !leagueName.trim()}
+                            className="bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-4 py-2 rounded-lg transition text-sm disabled:opacity-50 disabled:cursor-not-allowed shrink-0">
+                            {isPending ? 'Adding…' : 'Add'}
+                        </button>
                     </div>
-                    <select
-                        value={platform}
-                        onChange={e => setPlatform(e.target.value)}
-                        className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-[#C8A951]/60">
-                        <option value="">Platform (optional)</option>
-                        {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
-                    </select>
-                    <button
-                        onClick={() => { void handleAdd(); }}
-                        disabled={isPending || !leagueName.trim()}
-                        className="bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-4 py-2 rounded-lg transition text-sm disabled:opacity-50 disabled:cursor-not-allowed shrink-0">
-                        {isPending ? 'Adding…' : 'Add'}
-                    </button>
                 </div>
             )}
 
@@ -143,23 +161,38 @@ export default function ConnectedLeagues({ leagues: initial, limit, nextTier, ti
             {/* League list */}
             {leagues.length > 0 && (
                 <ul className="space-y-1.5">
-                    {leagues.map(l => (
-                        <li key={l.id} className="flex items-center justify-between gap-3 px-3 py-2 bg-gray-800/50 rounded-lg">
-                            <div className="min-w-0">
-                                <span className="text-sm text-white font-medium truncate block">{l.leagueName}</span>
-                                {l.platform && (
-                                    <span className="text-gray-500 text-xs">{l.platform}</span>
+                    {leagues.map(l => {
+                        const locked = isLocked(l.createdAt);
+                        return (
+                            <li key={l.id} className="flex items-center justify-between gap-3 px-3 py-2 bg-gray-800/50 rounded-lg">
+                                <div className="min-w-0 flex-1">
+                                    <span className="text-sm text-white font-medium truncate block">{l.leagueName}</span>
+                                    <span className="text-gray-500 text-xs">
+                                        {l.platform ? `${l.platform} · ` : ''}
+                                        {locked
+                                            ? `Locked until ${lockLabel(l.createdAt)}`
+                                            : 'Removable'}
+                                    </span>
+                                </div>
+                                {locked ? (
+                                    <span
+                                        title={`Locked until ${lockLabel(l.createdAt)}`}
+                                        className="shrink-0 text-gray-600 text-sm px-1.5 py-0.5 rounded cursor-default select-none"
+                                        aria-label="League slot locked">
+                                        🔒
+                                    </span>
+                                ) : (
+                                    <button
+                                        onClick={() => { void handleRemove(l.id); }}
+                                        disabled={isPending}
+                                        className="shrink-0 text-gray-600 hover:text-red-400 transition text-sm px-1.5 py-0.5 rounded disabled:opacity-50"
+                                        title="Remove">
+                                        ✕
+                                    </button>
                                 )}
-                            </div>
-                            <button
-                                onClick={() => { void handleRemove(l.id); }}
-                                disabled={isPending}
-                                className="shrink-0 text-gray-600 hover:text-red-400 transition text-sm px-1.5 py-0.5 rounded disabled:opacity-50"
-                                title="Remove">
-                                ✕
-                            </button>
-                        </li>
-                    ))}
+                            </li>
+                        );
+                    })}
                 </ul>
             )}
         </div>
