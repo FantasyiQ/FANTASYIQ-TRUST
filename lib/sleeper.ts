@@ -101,6 +101,18 @@ export async function getLeagueMatchups(leagueId: string, week: number): Promise
     return sleeperFetch<SleeperMatchup[]>(`/league/${leagueId}/matchups/${week}`, 0);
 }
 
+export interface SleeperTradedPick {
+    season:           string;
+    round:            number;
+    roster_id:        number;  // original team whose pick this is
+    previous_owner_id: number;
+    owner_id:         number;  // current owner
+}
+
+export async function getTradedPicks(leagueId: string): Promise<SleeperTradedPick[]> {
+    return sleeperFetch<SleeperTradedPick[]>(`/league/${leagueId}/traded_picks`, 0);
+}
+
 // ─── Player cache ──────────────────────────────────────────────────────────────
 
 export interface SlimPlayer {
