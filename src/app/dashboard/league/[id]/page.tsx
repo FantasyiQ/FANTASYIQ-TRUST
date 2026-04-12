@@ -54,11 +54,12 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
 
     if (!league || league.userId !== session.user.id) notFound();
 
-    const [sleeperLeague, members, rosters, allPlayers] = await Promise.all([
+    const [sleeperLeague, members, rosters, allPlayers, dbUser] = await Promise.all([
         getLeague(league.leagueId),
         getLeagueUsers(league.leagueId),
         getLeagueRosters(league.leagueId),
         getPlayers(),
+        prisma.user.findUnique({ where: { id: session.user.id }, select: { sleeperUserId: true } }),
     ]);
 
     const memberMap = new Map<string, SleeperLeagueMember>(members.map(m => [m.user_id, m]));
@@ -84,6 +85,16 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
 
     const players: Record<string, typeof allPlayers[string]> = {};
     for (const pid of neededIds) { if (allPlayers[pid]) players[pid] = allPlayers[pid]; }
+
+    // Find the current user's roster for the trade evaluator quick-pick
+    const mySleeperRoster = rosters.find(r => r.owner_id === dbUser?.sleeperUserId);
+    const myRosterPlayers = (mySleeperRoster?.players ?? [])
+        .filter(pid => pid !== '0' && allPlayers[pid])
+        .map(pid => ({
+            name:     allPlayers[pid].full_name,
+            position: allPlayers[pid].position,
+            team:     allPlayers[pid].team,
+        }));
 
     const teamRosters: TeamRosterData[] = rows.map(row => {
         const starterSet = new Set((row.roster.starters ?? []).filter(pid => pid !== '0'));
@@ -257,6 +268,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                         scoringType={league.scoringType ?? null}
                         totalRosters={league.totalRosters}
                         leagueType={sleeperLeague.settings?.type === 2 ? 'Dynasty' : 'Redraft'}
+                        myRosterPlayers={myRosterPlayers}
                     />
                 </div>
 

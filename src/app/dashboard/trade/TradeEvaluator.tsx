@@ -60,6 +60,50 @@ function PlayerPill({ result, onRemove }: { result: DtvResult; onRemove: () => v
     );
 }
 
+function RosterQuickPick({ players, excluded, ppr, leagueType, onAdd }: {
+    players:    Player[];
+    excluded:   string[];
+    ppr:        PprFormat;
+    leagueType: LeagueType;
+    onAdd:      (p: Player) => void;
+}) {
+    const POS_ORDER: Record<string, number> = { QB: 0, RB: 1, WR: 2, TE: 3, K: 4, DEF: 5 };
+    const sorted = [...players].sort((a, b) =>
+        (POS_ORDER[a.position] ?? 9) - (POS_ORDER[b.position] ?? 9)
+    );
+    return (
+        <div>
+            <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-2">My Roster</p>
+            <div className="flex flex-wrap gap-1.5">
+                {sorted.map(p => {
+                    const used = excluded.includes(p.name);
+                    const dtv  = calcDtv(p, ppr, leagueType);
+                    return (
+                        <button
+                            key={p.name}
+                            type="button"
+                            disabled={used}
+                            onClick={() => onAdd(p)}
+                            title={`${p.name} — DTV ${dtv.finalDtv}`}
+                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium transition ${
+                                used
+                                    ? 'border-gray-800 text-gray-700 cursor-not-allowed'
+                                    : 'border-gray-700 text-gray-300 hover:border-[#C8A951]/60 hover:text-white'
+                            }`}
+                        >
+                            <span className={`font-bold ${POS_COLORS[p.position] ?? ''} px-1 rounded text-[10px]`}>
+                                {p.position}
+                            </span>
+                            {p.name.split(' ').pop()}
+                            <span className="text-gray-600">{dtv.finalDtv}</span>
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
 function PlayerSearch({ onAdd, excluded, ppr, leagueType, players }: {
     onAdd: (p: Player) => void;
     excluded: string[];
@@ -124,7 +168,8 @@ interface TradeEvaluatorProps {
     initialPpr?:        PprFormat;
     initialLeagueSize?: LeagueSize;
     initialLeagueType?: LeagueType;
-    leagueLabel?:       string;   // e.g. "Jungle League — PPR · 10 Teams"
+    leagueLabel?:       string;
+    myRoster?:          Player[];
 }
 
 export default function TradeEvaluator({
@@ -132,6 +177,7 @@ export default function TradeEvaluator({
     initialLeagueSize = 12,
     initialLeagueType = 'Redraft',
     leagueLabel,
+    myRoster          = [],
 }: TradeEvaluatorProps = {}) {
     const [ppr, setPpr]               = useState<PprFormat>(initialPpr);
     const [leagueType, setLeagueType] = useState<LeagueType>(initialLeagueType);
@@ -212,6 +258,15 @@ export default function TradeEvaluator({
                         <h2 className="font-bold text-white">You Give</h2>
                         {result && <span className="text-2xl font-extrabold text-white">{result.totalA}</span>}
                     </div>
+                    {myRoster.length > 0 && (
+                        <RosterQuickPick
+                            players={myRoster}
+                            excluded={allExcluded}
+                            ppr={ppr}
+                            leagueType={leagueType}
+                            onAdd={p => setSideA(prev => prev.length < 5 ? [...prev, p] : prev)}
+                        />
+                    )}
                     <PlayerSearch onAdd={p => setSideA(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} players={allPlayers} />
                     <div className="space-y-2">
                         {result?.sideA.map(r => (
@@ -227,6 +282,15 @@ export default function TradeEvaluator({
                         <h2 className="font-bold text-white">You Receive</h2>
                         {result && <span className="text-2xl font-extrabold text-white">{result.totalB}</span>}
                     </div>
+                    {myRoster.length > 0 && (
+                        <RosterQuickPick
+                            players={myRoster}
+                            excluded={allExcluded}
+                            ppr={ppr}
+                            leagueType={leagueType}
+                            onAdd={p => setSideB(prev => prev.length < 5 ? [...prev, p] : prev)}
+                        />
+                    )}
                     <PlayerSearch onAdd={p => setSideB(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} players={allPlayers} />
                     <div className="space-y-2">
                         {result?.sideB.map(r => (

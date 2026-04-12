@@ -1,7 +1,9 @@
 'use client';
 
+import { useMemo } from 'react';
 import TradeEvaluator from '@/app/dashboard/trade/TradeEvaluator';
-import type { PprFormat, LeagueType } from '@/lib/trade-engine';
+import { PLAYERS } from '@/lib/trade-engine';
+import type { PprFormat, LeagueType, Player } from '@/lib/trade-engine';
 
 const LEAGUE_SIZES = [8, 10, 12, 14, 16, 32] as const;
 type LeagueSize = typeof LEAGUE_SIZES[number];
@@ -24,17 +26,34 @@ function scoringLabel(scoringType: string | null): string {
     return 'Standard';
 }
 
-interface Props {
-    leagueName:  string;
-    scoringType: string | null;
-    totalRosters: number;
-    leagueType:  LeagueType;
+interface RosterPlayer {
+    name: string;
+    position: string;
+    team: string;
 }
 
-export default function LeagueTradeEvaluator({ leagueName, scoringType, totalRosters, leagueType }: Props) {
-    const ppr = scoringTypeToPpr(scoringType);
+interface Props {
+    leagueName:       string;
+    scoringType:      string | null;
+    totalRosters:     number;
+    leagueType:       LeagueType;
+    myRosterPlayers?: RosterPlayer[];
+}
+
+export default function LeagueTradeEvaluator({
+    leagueName, scoringType, totalRosters, leagueType, myRosterPlayers = [],
+}: Props) {
+    const ppr        = scoringTypeToPpr(scoringType);
     const leagueSize = nearestLeagueSize(totalRosters);
-    const label = `${leagueName} — ${scoringLabel(scoringType)} · ${totalRosters} Teams · ${leagueType}`;
+    const label      = `${leagueName} — ${scoringLabel(scoringType)} · ${totalRosters} Teams · ${leagueType}`;
+
+    // Match roster players to trade-engine PLAYERS by name (case-insensitive)
+    const myRoster = useMemo<Player[]>(() => {
+        const byName = new Map(PLAYERS.map(p => [p.name.toLowerCase(), p]));
+        return myRosterPlayers
+            .map(p => byName.get(p.name.toLowerCase()))
+            .filter((p): p is Player => p !== undefined);
+    }, [myRosterPlayers]);
 
     return (
         <TradeEvaluator
@@ -42,6 +61,7 @@ export default function LeagueTradeEvaluator({ leagueName, scoringType, totalRos
             initialLeagueSize={leagueSize}
             initialLeagueType={leagueType}
             leagueLabel={label}
+            myRoster={myRoster}
         />
     );
 }
