@@ -1,3 +1,5 @@
+export const maxDuration = 60;
+
 import Image from 'next/image';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
