@@ -120,10 +120,22 @@ function PlayerSearch({ onAdd, excluded, ppr, leagueType, players }: {
     );
 }
 
-export default function TradeEvaluator() {
-    const [ppr, setPpr]               = useState<PprFormat>(0.5);
-    const [leagueType, setLeagueType] = useState<LeagueType>('Redraft');
-    const [leagueSize, setLeagueSize] = useState<LeagueSize>(12);
+interface TradeEvaluatorProps {
+    initialPpr?:        PprFormat;
+    initialLeagueSize?: LeagueSize;
+    initialLeagueType?: LeagueType;
+    leagueLabel?:       string;   // e.g. "Jungle League — PPR · 10 Teams"
+}
+
+export default function TradeEvaluator({
+    initialPpr        = 0.5,
+    initialLeagueSize = 12,
+    initialLeagueType = 'Redraft',
+    leagueLabel,
+}: TradeEvaluatorProps = {}) {
+    const [ppr, setPpr]               = useState<PprFormat>(initialPpr);
+    const [leagueType, setLeagueType] = useState<LeagueType>(initialLeagueType);
+    const [leagueSize, setLeagueSize] = useState<LeagueSize>(initialLeagueSize);
     const [posFilter, setPosFilter]   = useState('ALL');
     const [pickYear, setPickYear]     = useState(2026);
     const [sideA, setSideA]           = useState<Player[]>([]);
@@ -148,6 +160,14 @@ export default function TradeEvaluator() {
 
     return (
         <div className="space-y-6">
+            {/* League badge */}
+            {leagueLabel && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-[#C8A951]/10 border border-[#C8A951]/30 rounded-xl w-fit">
+                    <span className="text-[#C8A951] text-xs font-semibold">⚙ Configured for:</span>
+                    <span className="text-[#C8A951]/80 text-xs">{leagueLabel}</span>
+                </div>
+            )}
+
             {/* Settings row */}
             <div className="flex flex-wrap gap-4 items-center">
                 <div className="flex items-center gap-2">

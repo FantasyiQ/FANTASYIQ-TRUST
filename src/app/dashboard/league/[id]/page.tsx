@@ -11,6 +11,7 @@ import {
     type SleeperLeagueMember, type SleeperRoster,
 } from '@/lib/sleeper';
 import RosterCards, { type TeamRosterData } from './RosterCards';
+import LeagueTradeEvaluator from './LeagueTradeEvaluator';
 
 const BENCH_SLOTS = new Set(['BN', 'IR']);
 
@@ -246,6 +247,17 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                             </div>
                         </dl>
                     </div>
+                </div>
+
+                {/* Trade Evaluator */}
+                <div>
+                    <h2 className="font-semibold text-lg mb-4">Trade Evaluator</h2>
+                    <LeagueTradeEvaluator
+                        leagueName={league.leagueName}
+                        scoringType={league.scoringType ?? null}
+                        totalRosters={league.totalRosters}
+                        leagueType={sleeperLeague.settings?.type === 2 ? 'Dynasty' : 'Redraft'}
+                    />
                 </div>
 
             </div>
