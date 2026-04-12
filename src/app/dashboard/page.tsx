@@ -290,7 +290,8 @@ export default async function DashboardPage() {
                             {leagues.map((league) => {
                                 const standing = (league.standings as { wins: number; losses: number; fpts: number }[] | null)?.[0];
                                 return (
-                                    <li key={league.id} className="flex items-center gap-4 px-6 py-4 hover:bg-gray-800/30 transition">
+                                    <li key={league.id} className="relative flex items-center gap-4 px-6 py-4 hover:bg-gray-800/30 transition group">
+                                        <Link href={`/dashboard/league/${league.id}`} className="absolute inset-0" aria-label={league.leagueName} />
                                         {league.avatar ? (
                                             <Image src={`https://sleepercdn.com/avatars/thumbs/${league.avatar}`}
                                                 alt={league.leagueName} width={40} height={40} className="rounded-lg shrink-0" />
@@ -320,7 +321,7 @@ export default async function DashboardPage() {
                                                 {league.lastSyncedAt ? new Date(league.lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Never'}
                                             </p>
                                         </div>
-                                        <form action={unsyncLeague.bind(null, league.leagueId)}>
+                                        <form action={unsyncLeague.bind(null, league.leagueId)} className="relative z-10">
                                             <button type="submit" title="Unsync"
                                                 className="text-gray-600 hover:text-red-400 transition text-sm px-2 py-1 rounded">
                                                 ✕
