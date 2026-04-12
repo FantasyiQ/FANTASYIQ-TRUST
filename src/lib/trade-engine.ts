@@ -486,31 +486,48 @@ export const PLAYERS: Player[] = [
     { rank: 302, name: 'Shedeur Sanders',      position: 'QB',  team: 'CLE', age: 24, baseValue: 64 },
     { rank: 303, name: 'Omarion Hampton',      position: 'RB',  team: 'LAR', age: 22, baseValue: 63 },
 
-    // ── 2026 NFL DRAFT PICKS ─────────────────────────────────────────────────
-    // Dynasty pick values reflect expected rookie talent + positional scarcity
-    { rank: 304, name: '2026 1st Round Pick (Early, 1-4)',   position: 'PICK', team: '2026', age: 22, baseValue: 82 },
-    { rank: 305, name: '2026 1st Round Pick (Mid, 5-8)',     position: 'PICK', team: '2026', age: 22, baseValue: 73 },
-    { rank: 306, name: '2026 1st Round Pick (Late, 9-12)',   position: 'PICK', team: '2026', age: 22, baseValue: 65 },
-    { rank: 307, name: '2026 1st Round Pick (Picks 13-20)', position: 'PICK', team: '2026', age: 22, baseValue: 57 },
-    { rank: 308, name: '2026 2nd Round Pick (Early)',        position: 'PICK', team: '2026', age: 22, baseValue: 48 },
-    { rank: 309, name: '2026 2nd Round Pick (Late)',         position: 'PICK', team: '2026', age: 22, baseValue: 40 },
-    { rank: 310, name: '2026 3rd Round Pick',               position: 'PICK', team: '2026', age: 22, baseValue: 30 },
-
-    // ── 2027 NFL DRAFT PICKS ─────────────────────────────────────────────────
-    { rank: 311, name: '2027 1st Round Pick (Early, 1-4)',   position: 'PICK', team: '2027', age: 22, baseValue: 68 },
-    { rank: 312, name: '2027 1st Round Pick (Mid, 5-8)',     position: 'PICK', team: '2027', age: 22, baseValue: 59 },
-    { rank: 313, name: '2027 1st Round Pick (Late, 9-12)',   position: 'PICK', team: '2027', age: 22, baseValue: 52 },
-    { rank: 314, name: '2027 1st Round Pick (Picks 13-20)', position: 'PICK', team: '2027', age: 22, baseValue: 45 },
-    { rank: 315, name: '2027 2nd Round Pick (Early)',        position: 'PICK', team: '2027', age: 22, baseValue: 37 },
-    { rank: 316, name: '2027 2nd Round Pick (Late)',         position: 'PICK', team: '2027', age: 22, baseValue: 30 },
-    { rank: 317, name: '2027 3rd Round Pick',               position: 'PICK', team: '2027', age: 22, baseValue: 24 },
-
-    // ── 2028 NFL DRAFT PICKS ─────────────────────────────────────────────────
-    { rank: 318, name: '2028 1st Round Pick (Early, 1-4)',   position: 'PICK', team: '2028', age: 22, baseValue: 56 },
-    { rank: 319, name: '2028 1st Round Pick (Mid, 5-8)',     position: 'PICK', team: '2028', age: 22, baseValue: 49 },
-    { rank: 320, name: '2028 1st Round Pick (Late, 9-12)',   position: 'PICK', team: '2028', age: 22, baseValue: 43 },
-    { rank: 321, name: '2028 1st Round Pick (Picks 13-20)', position: 'PICK', team: '2028', age: 22, baseValue: 37 },
-    { rank: 322, name: '2028 2nd Round Pick (Early)',        position: 'PICK', team: '2028', age: 22, baseValue: 30 },
-    { rank: 323, name: '2028 2nd Round Pick (Late)',         position: 'PICK', team: '2028', age: 22, baseValue: 24 },
-    { rank: 324, name: '2028 3rd Round Pick',               position: 'PICK', team: '2028', age: 22, baseValue: 19 },
 ];
+
+// Round value ranges: [pickOneValue, lastPickValue] for 2026 (anchor year)
+const ROUND_ANCHORS: [number, number][] = [
+    [82, 52], // Round 1
+    [46, 32], // Round 2
+    [26, 18], // Round 3
+    [16, 10], // Round 4
+    [10,  6], // Round 5
+];
+
+const YEAR_DISCOUNT: Record<number, number> = {
+    2026: 1.00,
+    2027: 0.83,
+    2028: 0.69,
+};
+
+// Generates individual draft picks (1.01 … 5.{leagueSize}) for 2026–2028.
+// Age is kept at 22 for dynasty age-curve logic; it is not shown in the UI.
+export function getDraftPicks(leagueSize: number): Player[] {
+    const picks: Player[] = [];
+    let rank = 500;
+
+    for (const year of [2026, 2027, 2028]) {
+        const discount = YEAR_DISCOUNT[year];
+        for (let round = 1; round <= 5; round++) {
+            const [hi, lo] = ROUND_ANCHORS[round - 1];
+            for (let pick = 1; pick <= leagueSize; pick++) {
+                const t = leagueSize === 1 ? 0 : (pick - 1) / (leagueSize - 1);
+                const value = Math.round((hi + t * (lo - hi)) * discount * 10) / 10;
+                const pickStr = pick.toString().padStart(2, '0');
+                picks.push({
+                    rank: rank++,
+                    name: `${year} ${round}.${pickStr}`,
+                    position: 'PICK',
+                    team: String(year),
+                    age: 22,
+                    baseValue: value,
+                });
+            }
+        }
+    }
+
+    return picks;
+}

@@ -1,8 +1,11 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { PLAYERS, evaluateTrade, calcDtv } from '@/lib/trade-engine';
+import { PLAYERS, getDraftPicks, evaluateTrade, calcDtv } from '@/lib/trade-engine';
 import type { Player, PprFormat, LeagueType, DtvResult } from '@/lib/trade-engine';
+
+const LEAGUE_SIZES = [8, 10, 12, 14, 16, 32] as const;
+type LeagueSize = typeof LEAGUE_SIZES[number];
 
 const TIER_COLORS: Record<string, string> = {
     Elite:   'text-[#C8A951]',
@@ -57,25 +60,26 @@ function PlayerPill({ result, onRemove }: { result: DtvResult; onRemove: () => v
     );
 }
 
-function PlayerSearch({ onAdd, excluded, ppr, leagueType }: {
+function PlayerSearch({ onAdd, excluded, ppr, leagueType, players }: {
     onAdd: (p: Player) => void;
     excluded: string[];
     ppr: PprFormat;
     leagueType: LeagueType;
+    players: Player[];
 }) {
     const [query, setQuery] = useState('');
 
     const results = useMemo(() => {
         if (!query.trim()) return [];
         const q = query.toLowerCase();
-        return PLAYERS
+        return players
             .filter(p => !excluded.includes(p.name) && (
                 p.name.toLowerCase().includes(q) ||
                 p.position.toLowerCase().includes(q) ||
                 p.team.toLowerCase().includes(q)
             ))
             .slice(0, 8);
-    }, [query, excluded]);
+    }, [query, excluded, players]);
 
     return (
         <div className="relative">
@@ -119,11 +123,16 @@ function PlayerSearch({ onAdd, excluded, ppr, leagueType }: {
 export default function TradeEvaluator() {
     const [ppr, setPpr]               = useState<PprFormat>(0.5);
     const [leagueType, setLeagueType] = useState<LeagueType>('Redraft');
+    const [leagueSize, setLeagueSize] = useState<LeagueSize>(12);
     const [posFilter, setPosFilter]   = useState('ALL');
+    const [pickYear, setPickYear]     = useState(2026);
     const [sideA, setSideA]           = useState<Player[]>([]);
     const [sideB, setSideB]           = useState<Player[]>([]);
 
     const allExcluded = [...sideA.map(p => p.name), ...sideB.map(p => p.name)];
+
+    const draftPicks = useMemo(() => getDraftPicks(leagueSize), [leagueSize]);
+    const allPlayers = useMemo(() => [...PLAYERS, ...draftPicks], [draftPicks]);
 
     const result = useMemo(() => {
         if (sideA.length === 0 && sideB.length === 0) return null;
@@ -133,8 +142,8 @@ export default function TradeEvaluator() {
     const positions = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'PICK'];
 
     const filteredPlayers = useMemo(() =>
-        PLAYERS.filter(p => posFilter === 'ALL' || p.position === posFilter),
-        [posFilter]
+        allPlayers.filter(p => posFilter === 'ALL' || p.position === posFilter),
+        [allPlayers, posFilter]
     );
 
     return (
@@ -159,6 +168,15 @@ export default function TradeEvaluator() {
                         </button>
                     ))}
                 </div>
+                <div className="flex items-center gap-2">
+                    <span className="text-gray-400 text-sm font-medium">League Size:</span>
+                    {LEAGUE_SIZES.map(s => (
+                        <button key={s} onClick={() => setLeagueSize(s)}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${leagueSize === s ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
+                            {s}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             {/* Trade sides */}
@@ -169,7 +187,7 @@ export default function TradeEvaluator() {
                         <h2 className="font-bold text-white">You Give</h2>
                         {result && <span className="text-2xl font-extrabold text-white">{result.totalA}</span>}
                     </div>
-                    <PlayerSearch onAdd={p => setSideA(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} />
+                    <PlayerSearch onAdd={p => setSideA(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} players={allPlayers} />
                     <div className="space-y-2">
                         {result?.sideA.map(r => (
                             <PlayerPill key={r.name} result={r} onRemove={() => setSideA(prev => prev.filter(p => p.name !== r.name))} />
@@ -184,7 +202,7 @@ export default function TradeEvaluator() {
                         <h2 className="font-bold text-white">You Receive</h2>
                         {result && <span className="text-2xl font-extrabold text-white">{result.totalB}</span>}
                     </div>
-                    <PlayerSearch onAdd={p => setSideB(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} />
+                    <PlayerSearch onAdd={p => setSideB(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} players={allPlayers} />
                     <div className="space-y-2">
                         {result?.sideB.map(r => (
                             <PlayerPill key={r.name} result={r} onRemove={() => setSideB(prev => prev.filter(p => p.name !== r.name))} />
@@ -267,41 +285,84 @@ export default function TradeEvaluator() {
                         ))}
                     </div>
                 </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead>
-                            <tr className="border-b border-gray-800">
-                                <th className="text-left px-4 py-3 text-gray-500 font-medium w-10">#</th>
-                                <th className="text-left px-3 py-3 text-gray-500 font-medium">Player</th>
-                                <th className="text-left px-3 py-3 text-gray-500 font-medium">Pos</th>
-                                <th className="text-left px-3 py-3 text-gray-500 font-medium">Team</th>
-                                <th className="text-right px-3 py-3 text-gray-500 font-medium">Age</th>
-                                <th className="text-right px-3 py-3 text-gray-500 font-medium">DTV</th>
-                                <th className="text-right px-4 py-3 text-gray-500 font-medium">Tier</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-800/50">
-                            {filteredPlayers.map(p => {
-                                const dtv = calcDtv(p, ppr, leagueType);
-                                return (
-                                    <tr key={p.name} className="hover:bg-gray-800/30 transition">
-                                        <td className="px-4 py-3 text-gray-600 text-xs">{p.rank}</td>
-                                        <td className="px-3 py-3 text-white font-medium">{p.name}</td>
-                                        <td className="px-3 py-3">
-                                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded border ${POS_COLORS[p.position] ?? ''}`}>
-                                                {p.position}
-                                            </span>
-                                        </td>
-                                        <td className="px-3 py-3 text-gray-400">{p.team}</td>
-                                        <td className="px-3 py-3 text-gray-400 text-right">{p.age || '—'}</td>
-                                        <td className="px-3 py-3 text-right font-bold text-white">{dtv.finalDtv}</td>
-                                        <td className={`px-4 py-3 text-right font-semibold text-xs ${TIER_COLORS[dtv.tier]}`}>{dtv.tier}</td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
+
+                {posFilter === 'PICK' ? (
+                    /* Pick grid view */
+                    <div className="p-6 space-y-6">
+                        {/* Year tabs */}
+                        <div className="flex gap-2">
+                            {[2026, 2027, 2028].map(y => (
+                                <button key={y} onClick={() => setPickYear(y)}
+                                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition border ${pickYear === y ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
+                                    {y}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Rounds */}
+                        {[1, 2, 3, 4, 5].map(round => {
+                            const roundPicks = draftPicks.filter(p =>
+                                p.team === String(pickYear) && p.name.startsWith(`${pickYear} ${round}.`)
+                            );
+                            return (
+                                <div key={round}>
+                                    <h3 className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-3">
+                                        Round {round}
+                                    </h3>
+                                    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
+                                        {roundPicks.map(p => {
+                                            const dtv = calcDtv(p, ppr, leagueType);
+                                            const pickLabel = p.name.split(' ')[1]; // e.g. "1.03"
+                                            return (
+                                                <div key={p.name}
+                                                    className="bg-gray-800 border border-gray-700 rounded-xl p-2.5 text-center hover:border-indigo-500/50 transition cursor-default">
+                                                    <p className="text-indigo-300 font-bold text-sm">{pickLabel}</p>
+                                                    <p className={`font-extrabold text-base ${TIER_COLORS[dtv.tier]}`}>{dtv.finalDtv}</p>
+                                                    <p className="text-gray-600 text-xs">{dtv.tier}</p>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    /* Standard player table */
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-gray-800">
+                                    <th className="text-left px-4 py-3 text-gray-500 font-medium w-10">#</th>
+                                    <th className="text-left px-3 py-3 text-gray-500 font-medium">Player</th>
+                                    <th className="text-left px-3 py-3 text-gray-500 font-medium">Pos</th>
+                                    <th className="text-left px-3 py-3 text-gray-500 font-medium">Team</th>
+                                    <th className="text-right px-3 py-3 text-gray-500 font-medium">DTV</th>
+                                    <th className="text-right px-4 py-3 text-gray-500 font-medium">Tier</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-800/50">
+                                {filteredPlayers.map(p => {
+                                    const dtv = calcDtv(p, ppr, leagueType);
+                                    return (
+                                        <tr key={p.name} className="hover:bg-gray-800/30 transition">
+                                            <td className="px-4 py-3 text-gray-600 text-xs">{p.rank}</td>
+                                            <td className="px-3 py-3 text-white font-medium">{p.name}</td>
+                                            <td className="px-3 py-3">
+                                                <span className={`text-xs font-bold px-1.5 py-0.5 rounded border ${POS_COLORS[p.position] ?? ''}`}>
+                                                    {p.position}
+                                                </span>
+                                            </td>
+                                            <td className="px-3 py-3 text-gray-400">{p.team}</td>
+                                            <td className="px-3 py-3 text-right font-bold text-white">{dtv.finalDtv}</td>
+                                            <td className={`px-4 py-3 text-right font-semibold text-xs ${TIER_COLORS[dtv.tier]}`}>{dtv.tier}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
         </div>
     );
