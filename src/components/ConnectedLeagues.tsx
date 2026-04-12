@@ -50,10 +50,15 @@ export default function ConnectedLeagues({ leagues: initial, syncedLeagues = [],
     const count = leagues.length;
     const atLimit = limit !== Infinity && count >= limit;
 
-    // Sleeper leagues not already connected
+    // Sleeper leagues not already connected (for the picker)
     const connectedNames = new Set(leagues.map(l => l.leagueName.toLowerCase()));
     const availableSynced = syncedLeagues.filter(
         sl => !connectedNames.has(sl.leagueName.toLowerCase())
+    );
+
+    // Map league name → synced league ID so connected entries can link to the detail page
+    const syncedIdByName = new Map(
+        syncedLeagues.map(sl => [sl.leagueName.toLowerCase(), sl.id])
     );
 
     function countLabel() {
@@ -212,10 +217,19 @@ export default function ConnectedLeagues({ leagues: initial, syncedLeagues = [],
                 <ul className="space-y-1.5">
                     {leagues.map(l => {
                         const locked = isLocked(l.createdAt);
+                        const syncedId = syncedIdByName.get(l.leagueName.toLowerCase());
                         return (
                             <li key={l.id} className="flex items-center justify-between gap-3 px-3 py-2 bg-gray-800/50 rounded-lg">
                                 <div className="min-w-0 flex-1">
-                                    <span className="text-sm text-white font-medium truncate block">{l.leagueName}</span>
+                                    {syncedId ? (
+                                        <Link
+                                            href={`/dashboard/league/${syncedId}`}
+                                            className="text-sm text-[#C8A951] font-medium truncate block hover:underline">
+                                            {l.leagueName} →
+                                        </Link>
+                                    ) : (
+                                        <span className="text-sm text-white font-medium truncate block">{l.leagueName}</span>
+                                    )}
                                     <span className="text-gray-500 text-xs">
                                         {l.platform ? `${l.platform} · ` : ''}
                                         {locked
