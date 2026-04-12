@@ -32,12 +32,11 @@ model User {
 
     accounts         Account[]
     sessions         Session[]
-    leagues          League[]
     subscriptions    Subscription[]
     connectedLeagues ConnectedLeague[]
-    commissionerDues LeagueDues[]     @relation("CommissionerDues")
-    duesMemberships  DuesMember[]     @relation("MemberDues")
-    proBowlEntries   ProBowlEntry[]   @relation("ProBowlEntries")
+    commissionerDues LeagueDues[]      @relation("CommissionerDues")
+    duesMemberships  DuesMember[]      @relation("MemberDues")
+    proBowlEntries   ProBowlEntry[]    @relation("ProBowlEntries")
 }
 
 // Auth.js (NextAuth v5) required models
@@ -112,27 +111,6 @@ model ConnectedLeague {
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@index([userId])
-}
-
-model League {
-    id              String    @id @default(cuid())
-    userId          String
-    platform        String    @default("sleeper")
-    leagueId        String    // External platform league ID
-    leagueName      String
-    season          String
-    status          String    // pre_draft | drafting | in_season | complete
-    totalRosters    Int
-    scoringType     String?
-    avatar          String?
-    rosterPositions Json?
-    lastSyncedAt    DateTime?
-    createdAt       DateTime  @default(now())
-    updatedAt       DateTime  @updatedAt
-
-    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-    @@unique([userId, platform, leagueId])
 }
 
 // ── League Dues & Payout Tracker ─────────────────────────────────────────────
