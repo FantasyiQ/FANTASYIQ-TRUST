@@ -39,6 +39,7 @@ model User {
     commissionerDues LeagueDues[]      @relation("CommissionerDues")
     duesMemberships  DuesMember[]      @relation("MemberDues")
     proBowlEntries   ProBowlEntry[]    @relation("ProBowlEntries")
+    announcements    Announcement[]    @relation("AuthorAnnouncements")
 }
 
 model League {
@@ -166,6 +167,7 @@ model LeagueDues {
     proBowl              ProBowlContest?
     documents            LeagueDocument[]
     futureDues           FutureDuesObligation[]
+    announcements        Announcement[]
 
     @@index([commissionerId])
 }
@@ -299,6 +301,24 @@ model LeagueDocument {
     createdAt    DateTime @default(now())
 
     leagueDues   LeagueDues @relation(fields: [leagueDuesId], references: [id], onDelete: Cascade)
+
+    @@index([leagueDuesId])
+}
+
+// ── League Announcements ─────────────────────────────────────────────────────
+
+model Announcement {
+    id           String   @id @default(cuid())
+    leagueDuesId String
+    authorId     String
+    body         String   @db.Text
+    mediaUrl     String?  // direct image / GIF URL (normalised from Giphy share links etc.)
+    pinned       Boolean  @default(false)
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    leagueDues   LeagueDues @relation(fields: [leagueDuesId], references: [id], onDelete: Cascade)
+    author       User       @relation("AuthorAnnouncements", fields: [authorId], references: [id], onDelete: Cascade)
 
     @@index([leagueDuesId])
 }
