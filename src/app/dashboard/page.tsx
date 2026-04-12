@@ -4,8 +4,8 @@ import { redirect } from 'next/navigation';
 import { auth, signOut } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { createPortalSession } from '@/app/actions/stripe';
-import { unsyncLeague } from '@/app/actions/leagues';
 import ConnectedLeagues from '@/components/ConnectedLeagues';
+import SleeperLeaguesList from './SleeperLeaguesList';
 import { getLeagueLimit, tierToLimitKey, nextTierName } from '@/lib/league-limits';
 import type { SubscriptionTier } from '@prisma/client';
 
@@ -276,63 +276,7 @@ export default async function DashboardPage() {
                         </Link>
                     </div>
 
-                    {leagues.length === 0 ? (
-                        <div className="px-6 py-14 text-center">
-                            <p className="text-gray-400 mb-1">No leagues synced yet.</p>
-                            <p className="text-gray-600 text-sm mb-4">Connect your Sleeper account to get started.</p>
-                            <Link href="/dashboard/sync"
-                                className="inline-block bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-5 py-2.5 rounded-lg transition text-sm">
-                                Sync a Sleeper League
-                            </Link>
-                        </div>
-                    ) : (
-                        <ul className="divide-y divide-gray-800/50">
-                            {leagues.map((league) => {
-                                const standing = (league.standings as { wins: number; losses: number; fpts: number }[] | null)?.[0];
-                                return (
-                                    <li key={league.id} className="flex items-center gap-4 px-6 py-4 hover:bg-gray-800/30 transition">
-                                        <Link href={`/dashboard/league/${league.id}`} className="flex items-center gap-4 flex-1 min-w-0">
-                                            {league.avatar ? (
-                                                <Image src={`https://sleepercdn.com/avatars/thumbs/${league.avatar}`}
-                                                    alt={league.leagueName} width={40} height={40} className="rounded-lg shrink-0" />
-                                            ) : (
-                                                <div className="w-10 h-10 rounded-lg bg-gray-800 shrink-0 flex items-center justify-center text-gray-600 text-xs font-bold">FF</div>
-                                            )}
-                                            <div className="flex-1 min-w-0">
-                                                <p className="font-medium text-white truncate">{league.leagueName}</p>
-                                                <p className="text-gray-500 text-xs mt-0.5 capitalize">
-                                                    {league.season} · {league.totalRosters} teams
-                                                    {league.scoringType ? ` · ${league.scoringType.replace('_', ' ').toUpperCase()}` : ''}
-                                                    {standing ? ` · ${standing.wins}-${standing.losses}` : ''}
-                                                </p>
-                                            </div>
-                                            <div className="text-right shrink-0">
-                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
-                                                    league.status === 'in_season'  ? 'bg-green-900/40 text-green-400 border-green-800' :
-                                                    league.status === 'drafting'   ? 'bg-blue-900/40 text-blue-400 border-blue-800' :
-                                                    league.status === 'pre_draft'  ? 'bg-yellow-900/40 text-yellow-400 border-yellow-800' :
-                                                    'bg-gray-800 text-gray-500 border-gray-700'
-                                                }`}>
-                                                    {league.status === 'in_season' ? 'In Season' :
-                                                     league.status === 'pre_draft' ? 'Pre-Draft' :
-                                                     league.status === 'drafting'  ? 'Drafting' : 'Complete'}
-                                                </span>
-                                                <p className="text-gray-700 text-xs mt-1">
-                                                    {league.lastSyncedAt ? new Date(league.lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Never'}
-                                                </p>
-                                            </div>
-                                        </Link>
-                                        <form action={unsyncLeague.bind(null, league.leagueId)}>
-                                            <button type="submit" title="Unsync"
-                                                className="text-gray-600 hover:text-red-400 transition text-sm px-2 py-1 rounded">
-                                                ✕
-                                            </button>
-                                        </form>
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    )}
+                    <SleeperLeaguesList leagues={leagues} />
                 </div>
 
                 {/* ── Quick actions ─────────────────────────────────────── */}
