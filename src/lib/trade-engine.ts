@@ -24,7 +24,7 @@ export interface DtvResult extends Player {
     tier:           string;
 }
 
-export type PprFormat = 0 | 0.5 | 1;
+export type PprFormat = 0 | 0.5 | 1 | 'te_prem';
 export type LeagueType = 'Redraft' | 'Dynasty';
 
 // Factor weights — sum to 1.0
@@ -107,8 +107,13 @@ export function calcDtv(
         injuryFactor * WEIGHTS.injuryRisk    +
         situFactor   * WEIGHTS.teamSituation;
 
+    // TE Premium: TEs score 1.5× per catch (full PPR + 0.5 bonus), everyone else full PPR
+    const effectivePpr = ppr === 'te_prem'
+        ? (player.position === 'TE' ? 1.5 : 1.0)
+        : ppr;
+
     const rawDtv   = Math.round(player.baseValue * composite * 10) / 10;
-    const pprBoost = (CATCH_RATE[player.position] ?? 0) * ppr;
+    const pprBoost = (CATCH_RATE[player.position] ?? 0) * effectivePpr;
     const finalDtv = Math.round((rawDtv + pprBoost) * 10) / 10;
 
     return {

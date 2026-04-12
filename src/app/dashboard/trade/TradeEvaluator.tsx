@@ -170,17 +170,22 @@ export default function TradeEvaluator({
 
             {/* Settings row */}
             <div className="flex flex-wrap gap-4 items-center">
-                <div className="flex items-center gap-2">
-                    <span className="text-gray-400 text-sm font-medium">PPR:</span>
-                    {([0, 0.5, 1] as PprFormat[]).map(v => (
-                        <button key={v} onClick={() => setPpr(v)}
+                <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-gray-400 text-sm font-medium">Format:</span>
+                    {([
+                        [0,         'Std'],
+                        [0.5,       '½ PPR'],
+                        [1,         'Full PPR'],
+                        ['te_prem', 'TE Prem'],
+                    ] as [PprFormat, string][]).map(([v, label]) => (
+                        <button key={String(v)} onClick={() => setPpr(v)}
                             className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${ppr === v ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
-                            {v === 0 ? 'Std' : v === 0.5 ? '½ PPR' : 'Full'}
+                            {label}
                         </button>
                     ))}
                 </div>
                 <div className="flex items-center gap-2">
-                    <span className="text-gray-400 text-sm font-medium">Format:</span>
+                    <span className="text-gray-400 text-sm font-medium">Type:</span>
                     {(['Redraft', 'Dynasty'] as LeagueType[]).map(t => (
                         <button key={t} onClick={() => setLeagueType(t)}
                             className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${leagueType === t ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
