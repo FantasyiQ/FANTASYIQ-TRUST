@@ -165,6 +165,7 @@ model LeagueDues {
     proposals            PayoutProposal[]
     proBowl              ProBowlContest?
     documents            LeagueDocument[]
+    futureDues           FutureDuesObligation[]
 
     @@index([commissionerId])
 }
@@ -189,6 +190,7 @@ model DuesMember {
     user            User?       @relation("MemberDues", fields: [userId], references: [id], onDelete: SetNull)
     payoutItems     PayoutProposalItem[]
     pollVotes       PollVote[]
+    futureDues      FutureDuesObligation[]
 
     @@index([leagueDuesId])
     @@index([userId])
@@ -299,6 +301,29 @@ model LeagueDocument {
     leagueDues   LeagueDues @relation(fields: [leagueDuesId], references: [id], onDelete: Cascade)
 
     @@index([leagueDuesId])
+}
+
+// Tracks which members owe dues in future seasons (e.g. acquired a future draft pick).
+model FutureDuesObligation {
+    id            String    @id @default(cuid())
+    leagueDuesId  String
+    memberId      String
+    season        String    // "2026" | "2027" | "2028"
+    amount        Float
+    notes         String?   // e.g. "Acquired 2027 1st round pick from Team X"
+    // pending | paid
+    status        String    @default("pending")
+    paidAt        DateTime?
+    paymentMethod String?   // "stripe_on_behalf" | "manual" | null
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
+
+    leagueDues    LeagueDues  @relation(fields: [leagueDuesId], references: [id], onDelete: Cascade)
+    member        DuesMember  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+    @@unique([leagueDuesId, memberId, season])
+    @@index([leagueDuesId])
+    @@index([memberId])
 }
 
 // One entry per user per contest. Lineup is a JSON array of picked players.

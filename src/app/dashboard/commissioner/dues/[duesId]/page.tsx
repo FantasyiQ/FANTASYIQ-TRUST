@@ -59,6 +59,10 @@ export default async function DuesTrackerPage({ params }: { params: Promise<{ du
                         <p className="text-gray-400 text-sm mt-0.5">{dues.season} Season · ${dues.buyInAmount}/team · {dues.teamCount} teams</p>
                     </div>
                     <div className="flex gap-2 flex-wrap">
+                        <Link href={`/dashboard/commissioner/dues/${duesId}/future-dues`}
+                            className="border border-gray-700 hover:border-[#C8A951]/50 text-gray-300 font-semibold px-4 py-2 rounded-lg text-sm transition">
+                            Future Dues
+                        </Link>
                         <Link href={`/dashboard/commissioner/dues/${duesId}/payouts`}
                             className="border border-gray-700 hover:border-[#C8A951]/50 text-gray-300 font-semibold px-4 py-2 rounded-lg text-sm transition">
                             Payout Spots
