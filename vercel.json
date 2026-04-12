@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/sleeper-sync",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/sleeper-matchups",
+      "schedule": "*/3 * * * *"
+    }
+  ]
+}

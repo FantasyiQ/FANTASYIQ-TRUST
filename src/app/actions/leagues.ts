@@ -8,12 +8,10 @@ export async function unsyncLeague(leagueId: string): Promise<void> {
     const session = await auth();
     if (!session?.user?.id) redirect('/sign-in');
 
-    const userId = session.user.id;
-
     await prisma.league.delete({
         where: {
             userId_platform_leagueId: {
-                userId,
+                userId: session.user.id,
                 platform: 'sleeper',
                 leagueId,
             },

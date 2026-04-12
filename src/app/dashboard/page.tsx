@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { auth, signOut } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { createPortalSession } from '@/app/actions/stripe';
+import { unsyncLeague } from '@/app/actions/leagues';
 import ConnectedLeagues from '@/components/ConnectedLeagues';
 import { getLeagueLimit, tierToLimitKey, nextTierName } from '@/lib/league-limits';
 import type { SubscriptionTier } from '@prisma/client';
@@ -75,12 +76,20 @@ export default async function DashboardPage() {
                 orderBy: { createdAt: 'asc' },
                 select: { id: true, leagueName: true, platform: true, createdAt: true },
             },
+            leagues: {
+                orderBy: { leagueName: 'asc' },
+                select: {
+                    id: true, leagueId: true, leagueName: true, platform: true,
+                    season: true, status: true, totalRosters: true, scoringType: true,
+                    avatar: true, standings: true, lastSyncedAt: true,
+                },
+            },
         },
     });
 
     if (!user) redirect('/sign-in');
 
-    const { name, image, subscriptionTier, subscriptions, connectedLeagues } = user;
+    const { name, image, subscriptionTier, subscriptions, connectedLeagues, leagues } = user;
     const displayName = (name ?? session.user.email ?? '').split(' ')[0];
 
     const activeSubs = subscriptions.filter(
@@ -254,15 +263,91 @@ export default async function DashboardPage() {
                     )}
                 </div>
 
+                {/* ── Synced Leagues ────────────────────────────────────── */}
+                <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+                    <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+                        <div>
+                            <h2 className="font-semibold text-lg">Sleeper Leagues</h2>
+                            <p className="text-gray-500 text-sm">{leagues.length} league{leagues.length !== 1 ? 's' : ''} · syncs hourly</p>
+                        </div>
+                        <Link href="/dashboard/sync"
+                            className="text-sm bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold px-4 py-2 rounded-lg transition">
+                            + Sync League
+                        </Link>
+                    </div>
+
+                    {leagues.length === 0 ? (
+                        <div className="px-6 py-14 text-center">
+                            <p className="text-gray-400 mb-1">No leagues synced yet.</p>
+                            <p className="text-gray-600 text-sm mb-4">Connect your Sleeper account to get started.</p>
+                            <Link href="/dashboard/sync"
+                                className="inline-block bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-5 py-2.5 rounded-lg transition text-sm">
+                                Sync a Sleeper League
+                            </Link>
+                        </div>
+                    ) : (
+                        <ul className="divide-y divide-gray-800/50">
+                            {leagues.map((league) => {
+                                const standing = (league.standings as { wins: number; losses: number; fpts: number }[] | null)?.[0];
+                                return (
+                                    <li key={league.id} className="flex items-center gap-4 px-6 py-4 hover:bg-gray-800/30 transition">
+                                        {league.avatar ? (
+                                            <Image src={`https://sleepercdn.com/avatars/thumbs/${league.avatar}`}
+                                                alt={league.leagueName} width={40} height={40} className="rounded-lg shrink-0" />
+                                        ) : (
+                                            <div className="w-10 h-10 rounded-lg bg-gray-800 shrink-0 flex items-center justify-center text-gray-600 text-xs font-bold">FF</div>
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-medium text-white truncate">{league.leagueName}</p>
+                                            <p className="text-gray-500 text-xs mt-0.5 capitalize">
+                                                {league.season} · {league.totalRosters} teams
+                                                {league.scoringType ? ` · ${league.scoringType.replace('_', ' ').toUpperCase()}` : ''}
+                                                {standing ? ` · ${standing.wins}-${standing.losses}` : ''}
+                                            </p>
+                                        </div>
+                                        <div className="text-right shrink-0">
+                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                                                league.status === 'in_season'  ? 'bg-green-900/40 text-green-400 border-green-800' :
+                                                league.status === 'drafting'   ? 'bg-blue-900/40 text-blue-400 border-blue-800' :
+                                                league.status === 'pre_draft'  ? 'bg-yellow-900/40 text-yellow-400 border-yellow-800' :
+                                                'bg-gray-800 text-gray-500 border-gray-700'
+                                            }`}>
+                                                {league.status === 'in_season' ? 'In Season' :
+                                                 league.status === 'pre_draft' ? 'Pre-Draft' :
+                                                 league.status === 'drafting'  ? 'Drafting' : 'Complete'}
+                                            </span>
+                                            <p className="text-gray-700 text-xs mt-1">
+                                                {league.lastSyncedAt ? new Date(league.lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Never'}
+                                            </p>
+                                        </div>
+                                        <form action={unsyncLeague.bind(null, league.leagueId)}>
+                                            <button type="submit" title="Unsync"
+                                                className="text-gray-600 hover:text-red-400 transition text-sm px-2 py-1 rounded">
+                                                ✕
+                                            </button>
+                                        </form>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    )}
+                </div>
+
                 {/* ── Quick actions ─────────────────────────────────────── */}
                 <div>
                     <h2 className="font-semibold text-lg mb-4">Quick Actions</h2>
-                    <div className="grid sm:grid-cols-3 gap-3">
+                    <div className="grid sm:grid-cols-4 gap-3">
                         <Link href="/dashboard/trade"
                             className="block bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">
                             <div className="text-2xl mb-2">📊</div>
                             <p className="font-semibold text-white group-hover:text-[#C8A951] transition">Trade Values</p>
                             <p className="text-gray-500 text-sm mt-0.5">Dynamic trade evaluator</p>
+                        </Link>
+                        <Link href="/dashboard/sync"
+                            className="block bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">
+                            <div className="text-2xl mb-2">🔗</div>
+                            <p className="font-semibold text-white group-hover:text-[#C8A951] transition">Sync League</p>
+                            <p className="text-gray-500 text-sm mt-0.5">Connect your Sleeper account</p>
                         </Link>
                         <Link href="/dashboard/commissioner"
                             className="block bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">

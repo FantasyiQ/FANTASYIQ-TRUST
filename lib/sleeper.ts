@@ -16,11 +16,8 @@ export interface SleeperLeague {
     avatar: string | null;
     settings: {
         type: number;           // 0 = redraft, 2 = dynasty
-        scoring_type?: string;
         playoff_teams?: number;
         trade_deadline?: number;
-        num_teams?: number;
-        roster_positions?: string[];
     };
     scoring_settings: {
         rec?: number;           // 0 = std, 0.5 = half_ppr, 1 = ppr
@@ -33,9 +30,7 @@ export interface SleeperLeagueMember {
     username: string;
     display_name: string;
     avatar: string | null;
-    metadata: {
-        team_name?: string;
-    };
+    metadata: { team_name?: string };
     is_owner?: boolean;
 }
 
@@ -55,6 +50,15 @@ export interface SleeperRoster {
     };
 }
 
+export interface SleeperMatchup {
+    matchup_id: number | null; // null = bye week
+    roster_id: number;
+    points: number;
+    custom_points: number | null;
+    starters: string[];
+    players: string[];
+}
+
 export interface SleeperNflState {
     week: number;
     season: string;
@@ -62,9 +66,10 @@ export interface SleeperNflState {
     display_week: number;
 }
 
-async function sleeperFetch<T>(path: string): Promise<T> {
-    const res = await fetch(`${BASE}${path}`, { next: { revalidate: 60 } });
-    if (!res.ok) throw new Error(`Sleeper API error ${res.status}: ${path}`);
+// revalidate=0 for cron routes (fresh), default 60s for pages
+async function sleeperFetch<T>(path: string, revalidate = 60): Promise<T> {
+    const res = await fetch(`${BASE}${path}`, { next: { revalidate } });
+    if (!res.ok) throw new Error(`Sleeper API ${res.status}: ${path}`);
     return res.json() as Promise<T>;
 }
 
@@ -73,11 +78,11 @@ export async function getSleeperUser(username: string): Promise<SleeperUser> {
 }
 
 export async function getSleeperLeagues(userId: string, season: string): Promise<SleeperLeague[]> {
-    return sleeperFetch<SleeperLeague[]>(`/user/${userId}/leagues/nfl/${season}`);
+    return sleeperFetch<SleeperLeague[]>(`/user/${userId}/leagues/nfl/${season}`, 0);
 }
 
 export async function getNflState(): Promise<SleeperNflState> {
-    return sleeperFetch<SleeperNflState>('/state/nfl');
+    return sleeperFetch<SleeperNflState>('/state/nfl', 0);
 }
 
 export async function getLeague(leagueId: string): Promise<SleeperLeague> {
@@ -89,76 +94,14 @@ export async function getLeagueUsers(leagueId: string): Promise<SleeperLeagueMem
 }
 
 export async function getLeagueRosters(leagueId: string): Promise<SleeperRoster[]> {
-    return sleeperFetch<SleeperRoster[]>(`/league/${leagueId}/rosters`);
+    return sleeperFetch<SleeperRoster[]>(`/league/${leagueId}/rosters`, 0);
 }
 
-// ─── Draft types ─────────────────────────────────────────────────────────────
-
-export interface SleeperDraft {
-    draft_id: string;
-    type: 'snake' | 'linear' | 'auction';
-    status: 'pre_draft' | 'drafting' | 'paused' | 'complete';
-    sport: string;
-    season: string;
-    start_time: number | null;
-    settings: {
-        teams: number;
-        rounds: number;
-        pick_timer: number;
-        [key: string]: number;
-    };
-    metadata: {
-        scoring_type?: string;
-        name?: string;
-        description?: string;
-    };
-    league_id: string | null;
-    draft_order: Record<string, number> | null; // user_id → draft_slot
-    slot_to_roster_id: Record<string, number> | null;
-    created: number; // ms timestamp
+export async function getLeagueMatchups(leagueId: string, week: number): Promise<SleeperMatchup[]> {
+    return sleeperFetch<SleeperMatchup[]>(`/league/${leagueId}/matchups/${week}`, 0);
 }
 
-export interface SleeperDraftPick {
-    player_id: string;
-    picked_by: string; // user_id
-    roster_id: string;
-    round: number;
-    draft_slot: number;
-    pick_no: number;
-    is_keeper: boolean | null;
-    draft_id: string;
-    metadata: {
-        team: string;
-        status?: string;
-        position: string;
-        player_id: string;
-        number?: string;
-        last_name: string;
-        first_name: string;
-        injury_status?: string | null;
-        sport?: string;
-    };
-}
-
-export async function getUserDrafts(userId: string, season: string): Promise<SleeperDraft[]> {
-    return sleeperFetch<SleeperDraft[]>(`/user/${userId}/drafts/nfl/${season}`);
-}
-
-export async function getLeagueDrafts(leagueId: string): Promise<SleeperDraft[]> {
-    return sleeperFetch<SleeperDraft[]>(`/league/${leagueId}/drafts`);
-}
-
-export async function getDraft(draftId: string): Promise<SleeperDraft> {
-    return sleeperFetch<SleeperDraft>(`/draft/${draftId}`);
-}
-
-export async function getDraftPicks(draftId: string): Promise<SleeperDraftPick[]> {
-    const res = await fetch(`${BASE}/draft/${draftId}/picks`, { next: { revalidate: 30 } });
-    if (!res.ok) throw new Error(`Sleeper API error ${res.status}: /draft/${draftId}/picks`);
-    return res.json() as Promise<SleeperDraftPick[]>;
-}
-
-// ─── Player cache ─────────────────────────────────────────────────────────────
+// ─── Player cache ──────────────────────────────────────────────────────────────
 
 export interface SlimPlayer {
     full_name: string;
@@ -180,11 +123,9 @@ let playersCacheTime = 0;
 
 export async function getPlayers(): Promise<Record<string, SlimPlayer>> {
     const ONE_DAY = 24 * 60 * 60 * 1000;
-    if (playersCache && Date.now() - playersCacheTime < ONE_DAY) {
-        return playersCache;
-    }
+    if (playersCache && Date.now() - playersCacheTime < ONE_DAY) return playersCache;
 
-    const res = await fetch('https://api.sleeper.app/v1/players/nfl');
+    const res = await fetch('https://api.sleeper.app/v1/players/nfl', { next: { revalidate: 86400 } });
     if (!res.ok) throw new Error(`Sleeper players fetch failed: ${res.status}`);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const data: Record<string, RawPlayer> = await res.json();
@@ -193,9 +134,7 @@ export async function getPlayers(): Promise<Record<string, SlimPlayer>> {
     for (const [id, player] of Object.entries(data)) {
         if (player.active && player.position) {
             slim[id] = {
-                full_name:
-                    player.full_name ||
-                    `${player.first_name ?? ''} ${player.last_name ?? ''}`.trim(),
+                full_name: player.full_name || `${player.first_name ?? ''} ${player.last_name ?? ''}`.trim(),
                 position: player.position,
                 team: player.team ?? 'FA',
             };
@@ -207,7 +146,7 @@ export async function getPlayers(): Promise<Record<string, SlimPlayer>> {
     return slim;
 }
 
-// ─── Derived helpers ──────────────────────────────────────────────────────────
+// ─── Derived helpers ───────────────────────────────────────────────────────────
 
 export function deriveScoringType(league: SleeperLeague): string {
     const rec = league.scoring_settings?.rec ?? 0;
@@ -224,26 +163,38 @@ export function scoringLabel(scoringType: string): string {
     }
 }
 
-/** Summarise roster_positions into "1 QB, 2 RB, …, 6 BN" */
 export function summariseRosterPositions(positions: string[]): string {
     const counts = new Map<string, number>();
-    for (const pos of positions) {
-        counts.set(pos, (counts.get(pos) ?? 0) + 1);
-    }
-    // Preferred display order
-    const order = ['QB', 'RB', 'WR', 'TE', 'FLEX', 'SUPER_FLEX', 'K', 'DEF', 'IDP_FLEX', 'BN', 'IR'];
+    for (const pos of positions) counts.set(pos, (counts.get(pos) ?? 0) + 1);
+    const order = ['QB', 'RB', 'WR', 'TE', 'FLEX', 'SUPER_FLEX', 'K', 'DEF', 'BN', 'IR'];
     const parts: string[] = [];
     for (const pos of order) {
         const n = counts.get(pos);
         if (n) {
-            const label = pos === 'SUPER_FLEX' ? 'SF' : pos === 'IDP_FLEX' ? 'IDP' : pos;
-            parts.push(`${n} ${label}`);
+            parts.push(`${n} ${pos === 'SUPER_FLEX' ? 'SF' : pos}`);
             counts.delete(pos);
         }
     }
-    // Remaining unknown positions
-    for (const [pos, n] of counts) {
-        parts.push(`${n} ${pos}`);
-    }
+    for (const [pos, n] of counts) parts.push(`${n} ${pos}`);
     return parts.join(', ');
+}
+
+/** Returns total fantasy points as a float */
+export function rosterFpts(settings: SleeperRoster['settings']): number {
+    return (settings?.fpts ?? 0) + (settings?.fpts_decimal ?? 0) / 100;
+}
+
+/** True if we should be polling live matchup scores right now (ET game windows) */
+export function isGameWindow(): boolean {
+    const etString = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });
+    const et = new Date(etString);
+    const day = et.getDay(); // 0=Sun 1=Mon 4=Thu
+    const hour = et.getHours();
+    const windows: Record<number, [number, number]> = {
+        0: [12, 24], // Sunday noon–midnight
+        1: [17, 24], // Monday 5pm–midnight
+        4: [17, 24], // Thursday 5pm–midnight
+    };
+    const w = windows[day];
+    return w ? hour >= w[0] && hour < w[1] : false;
 }
