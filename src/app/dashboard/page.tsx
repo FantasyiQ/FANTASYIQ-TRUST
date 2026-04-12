@@ -290,38 +290,39 @@ export default async function DashboardPage() {
                             {leagues.map((league) => {
                                 const standing = (league.standings as { wins: number; losses: number; fpts: number }[] | null)?.[0];
                                 return (
-                                    <li key={league.id} className="relative flex items-center gap-4 px-6 py-4 hover:bg-gray-800/30 transition group">
-                                        <Link href={`/dashboard/league/${league.id}`} className="absolute inset-0" aria-label={league.leagueName} />
-                                        {league.avatar ? (
-                                            <Image src={`https://sleepercdn.com/avatars/thumbs/${league.avatar}`}
-                                                alt={league.leagueName} width={40} height={40} className="rounded-lg shrink-0" />
-                                        ) : (
-                                            <div className="w-10 h-10 rounded-lg bg-gray-800 shrink-0 flex items-center justify-center text-gray-600 text-xs font-bold">FF</div>
-                                        )}
-                                        <div className="flex-1 min-w-0">
-                                            <p className="font-medium text-white truncate">{league.leagueName}</p>
-                                            <p className="text-gray-500 text-xs mt-0.5 capitalize">
-                                                {league.season} · {league.totalRosters} teams
-                                                {league.scoringType ? ` · ${league.scoringType.replace('_', ' ').toUpperCase()}` : ''}
-                                                {standing ? ` · ${standing.wins}-${standing.losses}` : ''}
-                                            </p>
-                                        </div>
-                                        <div className="text-right shrink-0">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
-                                                league.status === 'in_season'  ? 'bg-green-900/40 text-green-400 border-green-800' :
-                                                league.status === 'drafting'   ? 'bg-blue-900/40 text-blue-400 border-blue-800' :
-                                                league.status === 'pre_draft'  ? 'bg-yellow-900/40 text-yellow-400 border-yellow-800' :
-                                                'bg-gray-800 text-gray-500 border-gray-700'
-                                            }`}>
-                                                {league.status === 'in_season' ? 'In Season' :
-                                                 league.status === 'pre_draft' ? 'Pre-Draft' :
-                                                 league.status === 'drafting'  ? 'Drafting' : 'Complete'}
-                                            </span>
-                                            <p className="text-gray-700 text-xs mt-1">
-                                                {league.lastSyncedAt ? new Date(league.lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Never'}
-                                            </p>
-                                        </div>
-                                        <form action={unsyncLeague.bind(null, league.leagueId)} className="relative z-10">
+                                    <li key={league.id} className="flex items-center gap-4 px-6 py-4 hover:bg-gray-800/30 transition">
+                                        <Link href={`/dashboard/league/${league.id}`} className="flex items-center gap-4 flex-1 min-w-0">
+                                            {league.avatar ? (
+                                                <Image src={`https://sleepercdn.com/avatars/thumbs/${league.avatar}`}
+                                                    alt={league.leagueName} width={40} height={40} className="rounded-lg shrink-0" />
+                                            ) : (
+                                                <div className="w-10 h-10 rounded-lg bg-gray-800 shrink-0 flex items-center justify-center text-gray-600 text-xs font-bold">FF</div>
+                                            )}
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-medium text-white truncate">{league.leagueName}</p>
+                                                <p className="text-gray-500 text-xs mt-0.5 capitalize">
+                                                    {league.season} · {league.totalRosters} teams
+                                                    {league.scoringType ? ` · ${league.scoringType.replace('_', ' ').toUpperCase()}` : ''}
+                                                    {standing ? ` · ${standing.wins}-${standing.losses}` : ''}
+                                                </p>
+                                            </div>
+                                            <div className="text-right shrink-0">
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                                                    league.status === 'in_season'  ? 'bg-green-900/40 text-green-400 border-green-800' :
+                                                    league.status === 'drafting'   ? 'bg-blue-900/40 text-blue-400 border-blue-800' :
+                                                    league.status === 'pre_draft'  ? 'bg-yellow-900/40 text-yellow-400 border-yellow-800' :
+                                                    'bg-gray-800 text-gray-500 border-gray-700'
+                                                }`}>
+                                                    {league.status === 'in_season' ? 'In Season' :
+                                                     league.status === 'pre_draft' ? 'Pre-Draft' :
+                                                     league.status === 'drafting'  ? 'Drafting' : 'Complete'}
+                                                </span>
+                                                <p className="text-gray-700 text-xs mt-1">
+                                                    {league.lastSyncedAt ? new Date(league.lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Never'}
+                                                </p>
+                                            </div>
+                                        </Link>
+                                        <form action={unsyncLeague.bind(null, league.leagueId)}>
                                             <button type="submit" title="Unsync"
                                                 className="text-gray-600 hover:text-red-400 transition text-sm px-2 py-1 rounded">
                                                 ✕
