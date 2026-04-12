@@ -2,8 +2,9 @@
 
 import { useMemo } from 'react';
 import TradeEvaluator from '@/app/dashboard/trade/TradeEvaluator';
-import { PLAYERS } from '@/lib/trade-engine';
+import { PLAYERS, getDraftPicks } from '@/lib/trade-engine';
 import type { PprFormat, LeagueType, Player } from '@/lib/trade-engine';
+import type { TradeTeam } from '@/app/dashboard/trade/TradeEvaluator';
 
 const LEAGUE_SIZES = [8, 10, 12, 14, 16, 32] as const;
 type LeagueSize = typeof LEAGUE_SIZES[number];
@@ -26,34 +27,62 @@ function scoringLabel(scoringType: string | null): string {
     return 'Standard';
 }
 
-interface RosterPlayer {
-    name: string;
-    position: string;
-    team: string;
+interface RawOwnedPick {
+    season: string;
+    round:  number;
+    slot:   number;
+}
+
+export interface RawTeamData {
+    rosterId:   number;
+    teamName:   string;
+    players:    { name: string; position: string; team: string }[];
+    ownedPicks: RawOwnedPick[];
 }
 
 interface Props {
-    leagueName:       string;
-    scoringType:      string | null;
-    totalRosters:     number;
-    leagueType:       LeagueType;
-    myRosterPlayers?: RosterPlayer[];
+    leagueName:      string;
+    scoringType:     string | null;
+    totalRosters:    number;
+    leagueType:      LeagueType;
+    myTeamData?:     RawTeamData;
+    otherTeamsData?: RawTeamData[];
 }
 
 export default function LeagueTradeEvaluator({
-    leagueName, scoringType, totalRosters, leagueType, myRosterPlayers = [],
+    leagueName, scoringType, totalRosters, leagueType, myTeamData, otherTeamsData = [],
 }: Props) {
     const ppr        = scoringTypeToPpr(scoringType);
     const leagueSize = nearestLeagueSize(totalRosters);
     const label      = `${leagueName} — ${scoringLabel(scoringType)} · ${totalRosters} Teams · ${leagueType}`;
 
-    // Match roster players to trade-engine PLAYERS by name (case-insensitive)
-    const myRoster = useMemo<Player[]>(() => {
-        const byName = new Map(PLAYERS.map(p => [p.name.toLowerCase(), p]));
-        return myRosterPlayers
-            .map(p => byName.get(p.name.toLowerCase()))
+    const allPicks     = useMemo(() => getDraftPicks(leagueSize), [leagueSize]);
+    const pickByName   = useMemo(() => new Map(allPicks.map(p => [p.name, p])), [allPicks]);
+    const playerByName = useMemo(() => new Map(PLAYERS.map(p => [p.name.toLowerCase(), p])), []);
+
+    function convertRaw(raw: RawTeamData): TradeTeam {
+        const players: Player[] = raw.players
+            .map(p => playerByName.get(p.name.toLowerCase()))
             .filter((p): p is Player => p !== undefined);
-    }, [myRosterPlayers]);
+
+        const picks: Player[] = raw.ownedPicks
+            .map(op => pickByName.get(`${op.season} ${op.round}.${op.slot.toString().padStart(2, '0')}`))
+            .filter((p): p is Player => p !== undefined);
+
+        return { rosterId: raw.rosterId, teamName: raw.teamName, players, picks };
+    }
+
+    const myTeam = useMemo<TradeTeam | undefined>(
+        () => (myTeamData ? convertRaw(myTeamData) : undefined),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [myTeamData, playerByName, pickByName]
+    );
+
+    const otherTeams = useMemo<TradeTeam[]>(
+        () => otherTeamsData.map(convertRaw),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [otherTeamsData, playerByName, pickByName]
+    );
 
     return (
         <TradeEvaluator
@@ -61,7 +90,8 @@ export default function LeagueTradeEvaluator({
             initialLeagueSize={leagueSize}
             initialLeagueType={leagueType}
             leagueLabel={label}
-            myRoster={myRoster}
+            myTeam={myTeam}
+            otherTeams={otherTeams}
         />
     );
 }

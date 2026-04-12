@@ -62,15 +62,16 @@ function PlayerPill({ result, onRemove }: { result: DtvResult; onRemove: () => v
 
 const POS_ORDER: Record<string, number> = { QB: 0, RB: 1, WR: 2, TE: 3, K: 4, DEF: 5 };
 
-function RosterQuickPick({ players, picks, excluded, ppr, leagueType, onAdd }: {
-    players:    Player[];
-    picks:      Player[];
-    excluded:   string[];
-    ppr:        PprFormat;
-    leagueType: LeagueType;
-    onAdd:      (p: Player) => void;
+function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, onAdd, rosterLabel = 'My Roster' }: {
+    players:      Player[];
+    picks?:       Player[];
+    excluded:     string[];
+    ppr:          PprFormat;
+    leagueType:   LeagueType;
+    onAdd:        (p: Player) => void;
+    rosterLabel?: string;
 }) {
-    const [tab, setTab]         = useState<'roster' | 'picks'>('roster');
+    const [tab, setTab]           = useState<'roster' | 'picks'>('roster');
     const [pickYear, setPickYear] = useState(2026);
 
     const sorted = useMemo(() =>
@@ -108,7 +109,7 @@ function RosterQuickPick({ players, picks, excluded, ppr, leagueType, onAdd }: {
     return (
         <div className="space-y-2">
             <div className="flex items-center gap-2">
-                {tabBtn('roster', 'My Roster')}
+                {tabBtn('roster', rosterLabel)}
                 {picks.length > 0 && tabBtn('picks', 'Draft Picks')}
             </div>
 
@@ -243,12 +244,21 @@ function PlayerSearch({ onAdd, excluded, ppr, leagueType, players }: {
     );
 }
 
+export interface TradeTeam {
+    rosterId: number;
+    teamName: string;
+    players:  Player[];
+    picks:    Player[];
+}
+
 interface TradeEvaluatorProps {
     initialPpr?:        PprFormat;
     initialLeagueSize?: LeagueSize;
     initialLeagueType?: LeagueType;
     leagueLabel?:       string;
     myRoster?:          Player[];
+    myTeam?:            TradeTeam;
+    otherTeams?:        TradeTeam[];
 }
 
 export default function TradeEvaluator({
@@ -257,6 +267,8 @@ export default function TradeEvaluator({
     initialLeagueType = 'Redraft',
     leagueLabel,
     myRoster          = [],
+    myTeam,
+    otherTeams        = [],
 }: TradeEvaluatorProps = {}) {
     const [ppr, setPpr]               = useState<PprFormat>(initialPpr);
     const [leagueType, setLeagueType] = useState<LeagueType>(initialLeagueType);
@@ -265,11 +277,22 @@ export default function TradeEvaluator({
     const [pickYear, setPickYear]     = useState(2026);
     const [sideA, setSideA]           = useState<Player[]>([]);
     const [sideB, setSideB]           = useState<Player[]>([]);
+    const [selectedTeamId, setSelectedTeamId] = useState<number | null>(otherTeams[0]?.rosterId ?? null);
 
     const allExcluded = [...sideA.map(p => p.name), ...sideB.map(p => p.name)];
 
     const draftPicks = useMemo(() => getDraftPicks(leagueSize), [leagueSize]);
     const allPlayers = useMemo(() => [...PLAYERS, ...draftPicks], [draftPicks]);
+
+    // Per-team quick-pick sources
+    const giveRoster   = myTeam?.players ?? myRoster;
+    const givePicks    = myTeam?.picks   ?? draftPicks;
+    const selectedTeam = useMemo(
+        () => otherTeams.find(t => t.rosterId === selectedTeamId) ?? null,
+        [otherTeams, selectedTeamId]
+    );
+    const receiveRoster = selectedTeam?.players ?? (myTeam ? [] : myRoster);
+    const receivePicks  = selectedTeam?.picks   ?? [];
 
     const result = useMemo(() => {
         if (sideA.length === 0 && sideB.length === 0) return null;
@@ -337,10 +360,10 @@ export default function TradeEvaluator({
                         <h2 className="font-bold text-white">You Give</h2>
                         {result && <span className="text-2xl font-extrabold text-white">{result.totalA}</span>}
                     </div>
-                    {(myRoster.length > 0 || draftPicks.length > 0) && (
+                    {(giveRoster.length > 0 || givePicks.length > 0) && (
                         <RosterQuickPick
-                            players={myRoster}
-                            picks={draftPicks}
+                            players={giveRoster}
+                            picks={givePicks}
                             excluded={allExcluded}
                             ppr={ppr}
                             leagueType={leagueType}
@@ -362,12 +385,27 @@ export default function TradeEvaluator({
                         <h2 className="font-bold text-white">You Receive</h2>
                         {result && <span className="text-2xl font-extrabold text-white">{result.totalB}</span>}
                     </div>
-                    {myRoster.length > 0 && (
+                    {otherTeams.length > 0 && (
+                        <div>
+                            <label className="text-gray-500 text-xs font-medium block mb-1">Trading with</label>
+                            <select
+                                value={selectedTeamId ?? ''}
+                                onChange={e => setSelectedTeamId(Number(e.target.value))}
+                                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C8A951]/60">
+                                {otherTeams.map(t => (
+                                    <option key={t.rosterId} value={t.rosterId}>{t.teamName}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                    {(receiveRoster.length > 0 || receivePicks.length > 0) && (
                         <RosterQuickPick
-                            players={myRoster}
+                            players={receiveRoster}
+                            picks={receivePicks}
                             excluded={allExcluded}
                             ppr={ppr}
                             leagueType={leagueType}
+                            rosterLabel={selectedTeam ? `${selectedTeam.teamName.split(' ')[0]}'s Roster` : 'Roster'}
                             onAdd={p => setSideB(prev => prev.length < 5 ? [...prev, p] : prev)}
                         />
                     )}

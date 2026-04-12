@@ -6,7 +6,7 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import {
-    getLeague, getLeagueUsers, getLeagueRosters, getPlayers,
+    getLeague, getLeagueUsers, getLeagueRosters, getPlayers, getTradedPicks,
     scoringLabel, summariseRosterPositions,
     type SleeperLeagueMember, type SleeperRoster,
 } from '@/lib/sleeper';
@@ -54,11 +54,12 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
 
     if (!league || league.userId !== session.user.id) notFound();
 
-    const [sleeperLeague, members, rosters, allPlayers, dbUser] = await Promise.all([
+    const [sleeperLeague, members, rosters, allPlayers, tradedPicks, dbUser] = await Promise.all([
         getLeague(league.leagueId),
         getLeagueUsers(league.leagueId),
         getLeagueRosters(league.leagueId),
         getPlayers(),
+        getTradedPicks(league.leagueId),
         prisma.user.findUnique({ where: { id: session.user.id }, select: { sleeperUserId: true } }),
     ]);
 
@@ -86,15 +87,51 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
     const players: Record<string, typeof allPlayers[string]> = {};
     for (const pid of neededIds) { if (allPlayers[pid]) players[pid] = allPlayers[pid]; }
 
-    // Find the current user's roster for the trade evaluator quick-pick
-    const mySleeperRoster = rosters.find(r => r.owner_id === dbUser?.sleeperUserId);
-    const myRosterPlayers = (mySleeperRoster?.players ?? [])
-        .filter(pid => pid !== '0' && allPlayers[pid])
-        .map(pid => ({
-            name:     allPlayers[pid].full_name,
-            position: allPlayers[pid].position,
-            team:     allPlayers[pid].team,
-        }));
+    // Build pick ownership per roster
+    // Slot = reverse standings rank (worst record → slot 1, best record → slot n)
+    const rosterIdToSlot = new Map(
+        rows.map(row => [row.roster.roster_id, league.totalRosters - row.rank + 1])
+    );
+    const FUTURE_SEASONS = ['2026', '2027', '2028'];
+    const ROUNDS = [1, 2, 3, 4, 5];
+    const rosterIds = rosters.map(r => r.roster_id);
+
+    function computeOwnedPicks(rosterId: number) {
+        const owned: { season: string; round: number; slot: number }[] = [];
+        for (const season of FUTURE_SEASONS) {
+            for (const round of ROUNDS) {
+                for (const origId of rosterIds) {
+                    const traded = tradedPicks.find(
+                        tp => tp.season === season && tp.round === round && tp.roster_id === origId
+                    );
+                    const currentOwner = traded ? traded.owner_id : origId;
+                    if (currentOwner === rosterId) {
+                        owned.push({ season, round, slot: rosterIdToSlot.get(origId) ?? 1 });
+                    }
+                }
+            }
+        }
+        return owned;
+    }
+
+    // Build team data for the trade evaluator
+    const teamTradeData = rows.map(row => ({
+        rosterId:  row.roster.roster_id,
+        teamName:  row.teamName,
+        players:   (row.roster.players ?? [])
+            .filter(pid => pid !== '0' && allPlayers[pid])
+            .map(pid => ({
+                name:     allPlayers[pid].full_name,
+                position: allPlayers[pid].position,
+                team:     allPlayers[pid].team,
+            })),
+        ownedPicks: computeOwnedPicks(row.roster.roster_id),
+    }));
+
+    const myTeamData  = teamTradeData.find(
+        t => rosters.find(r => r.roster_id === t.rosterId)?.owner_id === dbUser?.sleeperUserId
+    );
+    const otherTeamsData = teamTradeData.filter(t => t.rosterId !== myTeamData?.rosterId);
 
     const teamRosters: TeamRosterData[] = rows.map(row => {
         const starterSet = new Set((row.roster.starters ?? []).filter(pid => pid !== '0'));
@@ -268,7 +305,8 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                         scoringType={league.scoringType ?? null}
                         totalRosters={league.totalRosters}
                         leagueType={sleeperLeague.settings?.type === 2 ? 'Dynasty' : 'Redraft'}
-                        myRosterPlayers={myRosterPlayers}
+                        myTeamData={myTeamData}
+                        otherTeamsData={otherTeamsData}
                     />
                 </div>
 
