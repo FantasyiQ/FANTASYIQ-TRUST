@@ -60,46 +60,125 @@ function PlayerPill({ result, onRemove }: { result: DtvResult; onRemove: () => v
     );
 }
 
-function RosterQuickPick({ players, excluded, ppr, leagueType, onAdd }: {
+const POS_ORDER: Record<string, number> = { QB: 0, RB: 1, WR: 2, TE: 3, K: 4, DEF: 5 };
+
+function RosterQuickPick({ players, picks, excluded, ppr, leagueType, onAdd }: {
     players:    Player[];
+    picks:      Player[];
     excluded:   string[];
     ppr:        PprFormat;
     leagueType: LeagueType;
     onAdd:      (p: Player) => void;
 }) {
-    const POS_ORDER: Record<string, number> = { QB: 0, RB: 1, WR: 2, TE: 3, K: 4, DEF: 5 };
-    const sorted = [...players].sort((a, b) =>
-        (POS_ORDER[a.position] ?? 9) - (POS_ORDER[b.position] ?? 9)
+    const [tab, setTab]         = useState<'roster' | 'picks'>('roster');
+    const [pickYear, setPickYear] = useState(2026);
+
+    const sorted = useMemo(() =>
+        [...players].sort((a, b) => (POS_ORDER[a.position] ?? 9) - (POS_ORDER[b.position] ?? 9)),
+        [players]
     );
+
+    const yearPicks = useMemo(() =>
+        picks.filter(p => p.team === String(pickYear)),
+        [picks, pickYear]
+    );
+
+    // group by round number (pick name starts with "YYYY R.")
+    const rounds = useMemo(() => {
+        const map = new Map<number, Player[]>();
+        for (const p of yearPicks) {
+            const round = parseInt(p.name.split(' ')[1]?.split('.')[0] ?? '1', 10);
+            if (!map.has(round)) map.set(round, []);
+            map.get(round)!.push(p);
+        }
+        return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
+    }, [yearPicks]);
+
+    const tabBtn = (id: 'roster' | 'picks', label: string) => (
+        <button type="button" onClick={() => setTab(id)}
+            className={`px-3 py-1 rounded-lg text-xs font-semibold transition border ${
+                tab === id
+                    ? 'bg-[#C8A951] text-black border-[#C8A951]'
+                    : 'bg-gray-800 text-gray-500 border-gray-700 hover:border-gray-500'
+            }`}>
+            {label}
+        </button>
+    );
+
     return (
-        <div>
-            <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-2">My Roster</p>
-            <div className="flex flex-wrap gap-1.5">
-                {sorted.map(p => {
-                    const used = excluded.includes(p.name);
-                    const dtv  = calcDtv(p, ppr, leagueType);
-                    return (
-                        <button
-                            key={p.name}
-                            type="button"
-                            disabled={used}
-                            onClick={() => onAdd(p)}
-                            title={`${p.name} — DTV ${dtv.finalDtv}`}
-                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium transition ${
-                                used
-                                    ? 'border-gray-800 text-gray-700 cursor-not-allowed'
-                                    : 'border-gray-700 text-gray-300 hover:border-[#C8A951]/60 hover:text-white'
-                            }`}
-                        >
-                            <span className={`font-bold ${POS_COLORS[p.position] ?? ''} px-1 rounded text-[10px]`}>
-                                {p.position}
-                            </span>
-                            {p.name.split(' ').pop()}
-                            <span className="text-gray-600">{dtv.finalDtv}</span>
-                        </button>
-                    );
-                })}
+        <div className="space-y-2">
+            <div className="flex items-center gap-2">
+                {tabBtn('roster', 'My Roster')}
+                {picks.length > 0 && tabBtn('picks', 'Draft Picks')}
             </div>
+
+            {tab === 'roster' && (
+                <div className="flex flex-wrap gap-1.5">
+                    {sorted.map(p => {
+                        const used = excluded.includes(p.name);
+                        const dtv  = calcDtv(p, ppr, leagueType);
+                        return (
+                            <button key={p.name} type="button" disabled={used} onClick={() => onAdd(p)}
+                                title={`${p.name} — DTV ${dtv.finalDtv}`}
+                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium transition ${
+                                    used
+                                        ? 'border-gray-800 text-gray-700 cursor-not-allowed'
+                                        : 'border-gray-700 text-gray-300 hover:border-[#C8A951]/60 hover:text-white'
+                                }`}>
+                                <span className={`font-bold ${POS_COLORS[p.position] ?? ''} px-1 rounded text-[10px]`}>
+                                    {p.position}
+                                </span>
+                                {p.name.split(' ').pop()}
+                                <span className="text-gray-600">{dtv.finalDtv}</span>
+                            </button>
+                        );
+                    })}
+                    {sorted.length === 0 && <p className="text-gray-700 text-xs italic">No roster players found in trade engine</p>}
+                </div>
+            )}
+
+            {tab === 'picks' && picks.length > 0 && (
+                <div className="space-y-2">
+                    {/* Year tabs */}
+                    <div className="flex gap-1.5">
+                        {[2026, 2027, 2028].map(y => (
+                            <button key={y} type="button" onClick={() => setPickYear(y)}
+                                className={`px-2.5 py-0.5 rounded text-xs font-semibold border transition ${
+                                    pickYear === y
+                                        ? 'bg-indigo-900/60 text-indigo-300 border-indigo-700'
+                                        : 'bg-gray-800 text-gray-500 border-gray-700 hover:border-gray-500'
+                                }`}>
+                                {y}
+                            </button>
+                        ))}
+                    </div>
+                    {/* Picks by round */}
+                    <div className="space-y-1.5">
+                        {rounds.map(([round, roundPicks]) => (
+                            <div key={round} className="flex items-center gap-2 flex-wrap">
+                                <span className="text-gray-600 text-[10px] font-semibold w-8 shrink-0">Rd {round}</span>
+                                {roundPicks.map(p => {
+                                    const used = excluded.includes(p.name);
+                                    const dtv  = calcDtv(p, ppr, leagueType);
+                                    const slot = p.name.split(' ')[1]; // e.g. "1.03"
+                                    return (
+                                        <button key={p.name} type="button" disabled={used} onClick={() => onAdd(p)}
+                                            title={`${p.name} — DTV ${dtv.finalDtv}`}
+                                            className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] font-medium transition ${
+                                                used
+                                                    ? 'border-gray-800 text-gray-700 cursor-not-allowed'
+                                                    : 'border-indigo-800/60 text-indigo-300 hover:border-indigo-500 hover:text-white'
+                                            }`}>
+                                            {slot}
+                                            <span className="text-gray-600">{dtv.finalDtv}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -258,9 +337,10 @@ export default function TradeEvaluator({
                         <h2 className="font-bold text-white">You Give</h2>
                         {result && <span className="text-2xl font-extrabold text-white">{result.totalA}</span>}
                     </div>
-                    {myRoster.length > 0 && (
+                    {(myRoster.length > 0 || draftPicks.length > 0) && (
                         <RosterQuickPick
                             players={myRoster}
+                            picks={draftPicks}
                             excluded={allExcluded}
                             ppr={ppr}
                             leagueType={leagueType}
