@@ -10,11 +10,19 @@ interface ConnectedLeague {
     createdAt: string | Date;
 }
 
+interface SyncedLeague {
+    id: string;
+    leagueName: string;
+    season: string;
+    totalRosters: number;
+}
+
 interface Props {
     leagues: ConnectedLeague[];
-    limit: number;  // Infinity for elite
-    nextTier: string | null;  // e.g. "All-Pro", or null if already elite/no sub
-    tierLabel: string;  // e.g. "Player Pro"
+    syncedLeagues?: SyncedLeague[];   // Sleeper-synced leagues to pick from
+    limit: number;
+    nextTier: string | null;
+    tierLabel: string;
 }
 
 const PLATFORMS = ['ESPN', 'Yahoo', 'Sleeper', 'NFL', 'CBS', 'Other'];
@@ -31,7 +39,7 @@ function lockLabel(createdAt: string | Date): string {
     return lockedUntil.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export default function ConnectedLeagues({ leagues: initial, limit, nextTier, tierLabel }: Props) {
+export default function ConnectedLeagues({ leagues: initial, syncedLeagues = [], limit, nextTier, tierLabel }: Props) {
     const [leagues, setLeagues] = useState<ConnectedLeague[]>(initial);
     const [showForm, setShowForm] = useState(false);
     const [leagueName, setLeagueName] = useState('');
@@ -42,9 +50,20 @@ export default function ConnectedLeagues({ leagues: initial, limit, nextTier, ti
     const count = leagues.length;
     const atLimit = limit !== Infinity && count >= limit;
 
+    // Sleeper leagues not already connected
+    const connectedNames = new Set(leagues.map(l => l.leagueName.toLowerCase()));
+    const availableSynced = syncedLeagues.filter(
+        sl => !connectedNames.has(sl.leagueName.toLowerCase())
+    );
+
     function countLabel() {
         if (limit === Infinity) return `${count} League${count !== 1 ? 's' : ''} Connected`;
         return `${count} / ${limit} Leagues Connected`;
+    }
+
+    function selectSynced(sl: SyncedLeague) {
+        setLeagueName(sl.leagueName);
+        setPlatform('Sleeper');
     }
 
     async function handleAdd() {
@@ -121,10 +140,40 @@ export default function ConnectedLeagues({ leagues: initial, limit, nextTier, ti
 
             {/* Inline add form */}
             {showForm && (
-                <div className="mb-4 bg-gray-800/50 border border-gray-700 rounded-xl p-4">
-                    <p className="text-xs text-amber-400/80 mb-3 font-medium">
+                <div className="mb-4 bg-gray-800/50 border border-gray-700 rounded-xl p-4 space-y-3">
+                    <p className="text-xs text-amber-400/80 font-medium">
                         ⚠ League slots are locked for 1 year once connected. Choose carefully.
                     </p>
+
+                    {/* Pick from synced Sleeper leagues */}
+                    {availableSynced.length > 0 && (
+                        <div>
+                            <p className="text-xs text-gray-500 mb-2">Select a synced league:</p>
+                            <div className="flex flex-wrap gap-2">
+                                {availableSynced.map(sl => (
+                                    <button
+                                        key={sl.id}
+                                        type="button"
+                                        onClick={() => selectSynced(sl)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
+                                            leagueName === sl.leagueName && platform === 'Sleeper'
+                                                ? 'border-[#C8A951] bg-[#C8A951]/10 text-[#C8A951]'
+                                                : 'border-gray-700 text-gray-300 hover:border-[#C8A951]/50'
+                                        }`}
+                                    >
+                                        {sl.leagueName}
+                                        <span className="text-gray-500 ml-1">{sl.season} · {sl.totalRosters}T</span>
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="flex items-center gap-2 mt-3 mb-1">
+                                <div className="h-px flex-1 bg-gray-700" />
+                                <span className="text-gray-600 text-xs">or enter manually</span>
+                                <div className="h-px flex-1 bg-gray-700" />
+                            </div>
+                        </div>
+                    )}
+
                     <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-end">
                         <div className="flex-1">
                             <input

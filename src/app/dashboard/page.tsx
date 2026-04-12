@@ -182,6 +182,12 @@ export default async function DashboardPage() {
                             </div>
                             <ConnectedLeagues
                                 leagues={connectedLeagues}
+                                syncedLeagues={leagues.map(l => ({
+                                    id: l.id,
+                                    leagueName: l.leagueName,
+                                    season: l.season,
+                                    totalRosters: l.totalRosters,
+                                }))}
                                 limit={leagueLimit}
                                 nextTier={nextTier}
                                 tierLabel={formatTier(subscriptionTier)}
