@@ -100,6 +100,10 @@ export default async function DashboardPage() {
         .filter(s => s.type === 'commissioner')
         .sort((a, b) => (a.leagueName ?? '').localeCompare(b.leagueName ?? ''));
 
+    const syncedLeagueIdByName = new Map(
+        leagues.map(l => [l.leagueName.toLowerCase(), l.id])
+    );
+
     const hasAnyActiveSub = activeSubs.length > 0;
     const isElite = subscriptionTier === 'PLAYER_ELITE' || subscriptionTier === 'COMMISSIONER_ELITE';
 
@@ -234,9 +238,17 @@ export default async function DashboardPage() {
                                     className="flex flex-col p-4 bg-gray-800/40 rounded-xl border border-gray-800">
                                     <div className="flex items-start justify-between gap-4">
                                         <div>
-                                            {sub.leagueName && (
-                                                <p className="text-[#C8A951] font-semibold text-sm">{sub.leagueName}</p>
-                                            )}
+                                            {sub.leagueName && (() => {
+                                                const leagueId = syncedLeagueIdByName.get(sub.leagueName.toLowerCase());
+                                                return leagueId ? (
+                                                    <Link href={`/dashboard/league/${leagueId}`}
+                                                        className="text-[#C8A951] font-semibold text-sm hover:underline">
+                                                        {sub.leagueName} →
+                                                    </Link>
+                                                ) : (
+                                                    <p className="text-[#C8A951] font-semibold text-sm">{sub.leagueName}</p>
+                                                );
+                                            })()}
                                             <p className="font-medium text-gray-300 text-xs mt-0.5">{commLabel(sub.tier, sub.leagueSize)}</p>
                                             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${STATUS_STYLES[sub.status] ?? STATUS_STYLES.inactive}`}>
