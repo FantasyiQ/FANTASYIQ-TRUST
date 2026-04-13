@@ -355,13 +355,41 @@ model FutureDuesObligation {
 
 // Downloaded once per day via /api/cron/sleeper-players.
 // Sleeper player IDs are used throughout league/roster/matchup data.
+// Enriched daily via /api/cron/espn-rosters with injury and physical data.
 model SleeperPlayer {
-    playerId  String   @id   // Sleeper's player_id string
-    fullName  String
-    position  String
-    team      String
-    active    Boolean  @default(true)
-    updatedAt DateTime @updatedAt
+    playerId        String   @id   // Sleeper's player_id string
+    fullName        String
+    position        String
+    team            String
+    active          Boolean  @default(true)
+    // ESPN enrichment fields (updated daily by espn-rosters cron)
+    espnId          String?
+    injuryStatus    String?  // Active | Questionable | Doubtful | Out | IR | PUP
+    injuryBodyPart  String?
+    jerseyNumber    Int?
+    height          String?  // e.g. "6' 2\""
+    weight          Int?     // lbs
+    age             Int?
+    updatedAt       DateTime @updatedAt
+
+    projections     PlayerProjection[]
+}
+
+// Weekly fantasy point projections — populated by /api/cron/sleeper-projections.
+model PlayerProjection {
+    id        String   @id @default(cuid())
+    playerId  String
+    season    String
+    week      Int
+    pointsPpr Float
+    pointsStd Float
+    pointsHalfPpr Float
+    updatedAt DateTime @updatedAt @default(now())
+
+    player    SleeperPlayer @relation(fields: [playerId], references: [playerId], onDelete: Cascade)
+
+    @@unique([playerId, season, week])
+    @@index([season, week])
 }
 
 // One entry per user per contest. Lineup is a JSON array of picked players.
