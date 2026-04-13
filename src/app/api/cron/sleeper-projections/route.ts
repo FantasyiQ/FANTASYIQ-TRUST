@@ -34,16 +34,21 @@ export async function GET(request: NextRequest): Promise<Response> {
 
     const { season, week } = currentNflWeek();
 
-    const res = await fetch(
-        `https://api.sleeper.app/v1/projections/nfl/${season}/${week}?season_type=regular&position[]=QB&position[]=RB&position[]=WR&position[]=TE&position[]=K&position[]=DEF`,
-        { cache: 'no-store' }
-    );
-    if (!res.ok) return Response.json({ error: `Sleeper ${res.status}` }, { status: 502 });
-
-    const data = await res.json() as Record<string, SleeperProjection>;
+    // Try the current week; fall back to week 1 if no projection data found
+    let data: Record<string, SleeperProjection> = {};
+    for (const tryWeek of [week, 1]) {
+        const res = await fetch(
+            `https://api.sleeper.app/v1/projections/nfl/regular/${season}/${tryWeek}`,
+            { cache: 'no-store' }
+        );
+        if (!res.ok) continue;
+        const raw = await res.json() as Record<string, SleeperProjection>;
+        const hasData = Object.values(raw).some(p => p?.pts_ppr != null || p?.pts_std != null);
+        if (hasData) { data = raw; break; }
+    }
 
     const rows = Object.entries(data)
-        .filter(([, p]) => p.pts_ppr != null || p.pts_std != null)
+        .filter(([, p]) => p?.pts_ppr != null || p?.pts_std != null)
         .map(([playerId, p]) => ({
             playerId,
             season,

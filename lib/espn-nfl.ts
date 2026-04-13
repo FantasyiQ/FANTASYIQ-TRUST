@@ -1,6 +1,15 @@
 // ESPN hidden NFL API helpers
 // All endpoints are unauthenticated and publicly accessible.
 
+// Browser-like headers required — Vercel IPs get blocked without them
+const ESPN_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'application/json, text/plain, */*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Referer': 'https://www.espn.com/',
+    'Origin': 'https://www.espn.com',
+};
+
 export interface EspnPlayer {
     espnId:         string;
     fullName:       string;
@@ -42,7 +51,7 @@ interface EspnRosterGroup {
 export async function getEspnTeams(): Promise<EspnTeam[]> {
     const res = await fetch(
         'https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams?limit=32',
-        { next: { revalidate: 3600 } }
+        { headers: ESPN_HEADERS, cache: 'no-store' }
     );
     if (!res.ok) throw new Error(`ESPN teams ${res.status}`);
     const data = await res.json() as {
@@ -56,7 +65,7 @@ export async function getEspnTeams(): Promise<EspnTeam[]> {
 export async function getEspnTeamRoster(teamSlug: string, teamAbbr: string): Promise<EspnPlayer[]> {
     const res = await fetch(
         `https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${teamSlug}/roster`,
-        { cache: 'no-store' }
+        { headers: ESPN_HEADERS, cache: 'no-store' }
     );
     if (!res.ok) return [];
 
