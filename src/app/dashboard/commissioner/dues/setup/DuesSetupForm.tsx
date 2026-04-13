@@ -18,9 +18,10 @@ interface Props {
 export default function DuesSetupForm({ syncedLeagues }: Props) {
     const router = useRouter();
     const params = useSearchParams();
-    const subId        = params.get('subId') ?? '';
-    const paramName    = params.get('leagueName') ?? '';
-    const paramSize    = params.get('leagueSize') ?? '';
+    const subId     = params.get('subId') ?? '';
+    const paramName = params.get('leagueName') ?? '';
+    const paramSize = params.get('leagueSize') ?? '';
+    const isPreFilled = !!paramName;
 
     // Auto-match a synced league by name (case-insensitive)
     const autoMatch = paramName
@@ -29,13 +30,23 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
 
     const [selectedLeagueId, setSelectedLeagueId] = useState(autoMatch?.id ?? '');
     const [leagueName, setLeagueName] = useState(autoMatch?.leagueName ?? paramName);
-    const [season, setSeason] = useState(autoMatch?.season ?? new Date().getFullYear().toString());
     const [buyIn, setBuyIn] = useState('');
     const [teamCount, setTeamCount] = useState(
         autoMatch ? String(autoMatch.totalRosters) : (paramSize || '12')
     );
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+
+    // Season checkboxes — default to the auto-matched season, else current year
+    const baseYear = parseInt(autoMatch?.season ?? new Date().getFullYear().toString());
+    const seasonOptions = [baseYear, baseYear + 1, baseYear + 2].map(String);
+    const [selectedSeasons, setSelectedSeasons] = useState<string[]>([String(baseYear)]);
+
+    function toggleSeason(s: string) {
+        setSelectedSeasons(prev =>
+            prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s].sort()
+        );
+    }
 
     function handleLeagueSelect(id: string) {
         setSelectedLeagueId(id);
@@ -44,7 +55,6 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
         if (league) {
             setLeagueName(league.leagueName);
             setTeamCount(String(league.totalRosters));
-            setSeason(league.season);
         }
     }
 
@@ -53,6 +63,7 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
         setError('');
         if (!leagueName.trim()) { setError('League name is required.'); return; }
         if (!buyIn || parseFloat(buyIn) <= 0) { setError('Buy-in must be greater than $0.'); return; }
+        if (!selectedSeasons.length) { setError('Select at least one season.'); return; }
 
         setLoading(true);
         try {
@@ -62,12 +73,12 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
                 body: JSON.stringify({
                     subscriptionId: subId,
                     leagueName: leagueName.trim(),
-                    season,
+                    seasons: selectedSeasons,
                     buyInAmount: parseFloat(buyIn),
                     teamCount: parseInt(teamCount),
                 }),
             });
-            const data = await res.json();
+            const data = await res.json() as { id?: string; error?: string };
             if (!res.ok) { setError(data.error ?? 'Failed to create tracker.'); return; }
             router.push(`/dashboard/commissioner/dues/${data.id}`);
         } catch {
@@ -77,6 +88,10 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
         }
     }
 
+    const perMemberTotal = buyIn && parseFloat(buyIn) > 0
+        ? parseFloat(buyIn) * selectedSeasons.length
+        : null;
+
     return (
         <form onSubmit={handleSubmit} className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-5">
             {error && (
@@ -85,8 +100,8 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
                 </div>
             )}
 
-            {/* Synced league picker */}
-            {syncedLeagues.length > 0 && (
+            {/* Synced league picker — hidden when pre-filled from commissioner plan */}
+            {!isPreFilled && syncedLeagues.length > 0 && (
                 <div>
                     <label className="block text-sm font-medium text-gray-300 mb-1.5">
                         Pick a Synced League <span className="text-gray-500 font-normal">(optional)</span>
@@ -117,21 +132,31 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
                 />
             </div>
 
+            {/* Season selection — up to 3 years */}
             <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Season</label>
-                <input
-                    type="text"
-                    value={season}
-                    onChange={e => setSeason(e.target.value)}
-                    placeholder="2025"
-                    maxLength={4}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#C8A951]/60"
-                />
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Seasons <span className="text-gray-500 font-normal text-xs">(select up to 3 for multi-year pre-pay)</span>
+                </label>
+                <div className="flex gap-3">
+                    {seasonOptions.map(s => (
+                        <button
+                            key={s}
+                            type="button"
+                            onClick={() => toggleSeason(s)}
+                            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition ${
+                                selectedSeasons.includes(s)
+                                    ? 'bg-[#C8A951] text-black border-[#C8A951]'
+                                    : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'
+                            }`}>
+                            {s}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1.5">Buy-In Per Team</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-1.5">Buy-In Per Team / Season</label>
                     <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
                         <input
@@ -159,18 +184,26 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
             </div>
 
             {buyIn && parseFloat(buyIn) > 0 && (
-                <div className="bg-[#C8A951]/10 border border-[#C8A951]/30 rounded-xl px-4 py-3 text-sm">
-                    <span className="text-[#C8A951] font-bold">Total Pot: </span>
-                    <span className="text-white">${(parseFloat(buyIn) * parseInt(teamCount)).toFixed(2)}</span>
-                    <span className="text-gray-400 ml-2">({teamCount} teams × ${parseFloat(buyIn).toFixed(2)})</span>
+                <div className="bg-[#C8A951]/10 border border-[#C8A951]/30 rounded-xl px-4 py-3 space-y-1 text-sm">
+                    <div>
+                        <span className="text-[#C8A951] font-bold">Pot Per Season: </span>
+                        <span className="text-white">${(parseFloat(buyIn) * parseInt(teamCount)).toFixed(2)}</span>
+                        <span className="text-gray-400 ml-2">({teamCount} teams × ${parseFloat(buyIn).toFixed(2)})</span>
+                    </div>
+                    {selectedSeasons.length > 1 && perMemberTotal && (
+                        <div>
+                            <span className="text-[#C8A951] font-bold">Per Member ({selectedSeasons.length} seasons): </span>
+                            <span className="text-white">${perMemberTotal.toFixed(2)}</span>
+                        </div>
+                    )}
                 </div>
             )}
 
             <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !selectedSeasons.length}
                 className="w-full bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-50 text-black font-bold py-3 rounded-xl transition text-sm">
-                {loading ? 'Creating...' : 'Create Tracker'}
+                {loading ? 'Creating...' : selectedSeasons.length > 1 ? `Create ${selectedSeasons.length} Trackers` : 'Create Tracker'}
             </button>
         </form>
     );

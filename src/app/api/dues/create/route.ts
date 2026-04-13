@@ -11,14 +11,14 @@ export async function POST(request: NextRequest): Promise<Response> {
     const body = await request.json() as {
         subscriptionId?: string;
         leagueName?: string;
-        season?: string;
+        seasons?: string[];   // multi-year: e.g. ["2025","2026","2027"]
         buyInAmount?: number;
         teamCount?: number;
     };
 
-    const { subscriptionId, leagueName, season, buyInAmount, teamCount } = body;
+    const { subscriptionId, leagueName, seasons, buyInAmount, teamCount } = body;
 
-    if (!subscriptionId || !leagueName || !season || !buyInAmount || !teamCount) {
+    if (!subscriptionId || !leagueName || !seasons?.length || !buyInAmount || !teamCount) {
         return Response.json({ error: 'All fields are required.' }, { status: 400 });
     }
     if (buyInAmount <= 0 || teamCount < 2) {
@@ -31,7 +31,6 @@ export async function POST(request: NextRequest): Promise<Response> {
     });
     if (!user) return Response.json({ error: 'User not found.' }, { status: 404 });
 
-    // Verify the subscription belongs to this user and is a commissioner plan
     const sub = await prisma.subscription.findUnique({
         where: { id: subscriptionId },
         select: { id: true, userId: true, type: true, status: true, leagueDues: { select: { id: true } } },
@@ -43,12 +42,16 @@ export async function POST(request: NextRequest): Promise<Response> {
     if (sub.status !== 'active' && sub.status !== 'trialing') return Response.json({ error: 'Subscription is not active.' }, { status: 400 });
     if (sub.leagueDues) return Response.json({ error: 'A tracker already exists for this league.' }, { status: 400 });
 
-    const dues = await prisma.leagueDues.create({
+    // Create one tracker per season. First season links to the subscription;
+    // additional seasons are standalone (commissionerId only).
+    const [primarySeason, ...extraSeasons] = seasons;
+
+    const primary = await prisma.leagueDues.create({
         data: {
             subscriptionId,
             commissionerId: user.id,
             leagueName,
-            season,
+            season: primarySeason,
             buyInAmount,
             teamCount,
             potTotal: 0,
@@ -56,5 +59,19 @@ export async function POST(request: NextRequest): Promise<Response> {
         },
     });
 
-    return Response.json({ id: dues.id });
+    if (extraSeasons.length > 0) {
+        await prisma.leagueDues.createMany({
+            data: extraSeasons.map(season => ({
+                commissionerId: user.id,
+                leagueName,
+                season,
+                buyInAmount,
+                teamCount,
+                potTotal: 0,
+                status: 'setup',
+            })),
+        });
+    }
+
+    return Response.json({ id: primary.id });
 }

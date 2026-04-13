@@ -144,7 +144,7 @@ model ConnectedLeague {
 // One tracker per commissioner subscription. Holds the buy-in, pot, and status.
 model LeagueDues {
     id                   String    @id @default(cuid())
-    subscriptionId       String    @unique  // one tracker per commissioner sub
+    subscriptionId       String?   @unique  // linked to commissioner sub (null for extra-season trackers)
     commissionerId       String              // userId of the commissioner
     leagueName           String
     season               String             // e.g. "2025"
@@ -159,7 +159,7 @@ model LeagueDues {
     updatedAt            DateTime           @updatedAt
 
     commissioner         User               @relation("CommissionerDues", fields: [commissionerId], references: [id], onDelete: Cascade)
-    subscription         Subscription       @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+    subscription         Subscription?      @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
     members              DuesMember[]
     payoutSpots          PayoutSpot[]
     proposals            PayoutProposal[]
