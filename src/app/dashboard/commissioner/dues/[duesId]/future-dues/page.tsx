@@ -49,6 +49,23 @@ export default async function FutureDuesPage({ params }: { params: Promise<{ due
     });
     const futureTrackers = followOnTrackers.map(t => ({ id: t.id, season: t.season }));
 
+    // Also fetch obligations logged on sibling trackers for the current season
+    // (e.g. pre-pays created on the 2025 tracker for season 2027 should show on the 2027 tracker)
+    const siblingTrackerIds = (await prisma.leagueDues.findMany({
+        where: { commissionerId: user.id, leagueName: dues.leagueName, id: { not: duesId } },
+        select: { id: true },
+    })).map(t => t.id);
+
+    const siblingObligations = siblingTrackerIds.length > 0
+        ? await prisma.futureDuesObligation.findMany({
+            where: { leagueDuesId: { in: siblingTrackerIds }, season: dues.season },
+            orderBy: { createdAt: 'asc' },
+            include: { member: { select: { displayName: true, teamName: true } } },
+        })
+        : [];
+
+    const allObligations = [...dues.futureDues, ...siblingObligations];
+
     return (
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
             <div className="max-w-4xl mx-auto space-y-6">
@@ -69,7 +86,7 @@ export default async function FutureDuesPage({ params }: { params: Promise<{ due
                     currentSeason={dues.season}
                     buyInAmount={dues.buyInAmount}
                     members={dues.members}
-                    obligations={dues.futureDues}
+                    obligations={allObligations}
                     futureTrackers={futureTrackers}
                 />
 

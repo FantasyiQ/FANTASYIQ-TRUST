@@ -41,16 +41,16 @@ export default function FutureDuesClient({ duesId, currentSeason, buyInAmount, m
     const [isPending, startTransition]  = useTransition();
     const [error, setError]             = useState('');
 
-    // Dynamic seasons: next 3 years after the tracker's current season
+    // Seasons: current season + next 2 (so obligations pre-logged on a parent tracker are visible)
     const baseYear = parseInt(currentSeason) || new Date().getFullYear();
-    const SEASONS = [String(baseYear + 1), String(baseYear + 2), String(baseYear + 3)];
-    const preSEASONS = [String(baseYear + 1), String(baseYear + 2)]; // seasons available for pre-pay
+    const SEASONS = [String(baseYear), String(baseYear + 1), String(baseYear + 2)];
+    const preSEASONS = [String(baseYear + 1), String(baseYear + 2)]; // seasons available for tracker creation
 
-    const [tab, setTab] = useState(SEASONS[0]);
+    const [tab, setTab] = useState(SEASONS[1]); // default to next season
 
     // Add form state
     const [memberId, setMemberId] = useState('');
-    const [season, setSeason]     = useState(SEASONS[0]);
+    const [season, setSeason]     = useState(SEASONS[1]);
     const [amount, setAmount]     = useState(String(buyInAmount));
     const [notes, setNotes]       = useState('');
     const [showForm, setShowForm] = useState(false);
@@ -62,7 +62,7 @@ export default function FutureDuesClient({ duesId, currentSeason, buyInAmount, m
     const pendingCount   = obligations.filter(o => o.status === 'pending').length;
 
     function reset() {
-        setMemberId(''); setSeason(SEASONS[1]);
+        setMemberId(''); setSeason(SEASONS[1]); // default add form to next season
         setAmount(String(buyInAmount)); setNotes('');
         setShowForm(false); setError('');
     }
