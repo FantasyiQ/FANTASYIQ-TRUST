@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getLockedTeams } from '@/lib/nfl-schedule';
 import LineupPicker from './LineupPicker';
 
 export default async function ProBowlEntryPage({ params }: { params: Promise<{ contestId: string }> }) {
@@ -33,7 +34,13 @@ export default async function ProBowlEntryPage({ params }: { params: Promise<{ c
 
     if (!contest) notFound();
 
-    const existingEntry = contest.entries[0] ?? null;
+    const existingEntry   = contest.entries[0] ?? null;
+    // Fetch locked teams for slot-level locking (non-fatal — empty set = nothing locked yet)
+    const lockedTeamSet   = contest.status === 'open'
+        ? await getLockedTeams(contest.season, contest.week)
+        : new Set<string>();
+    const lockedTeams     = Array.from(lockedTeamSet) as string[];
+
     const settings = contest.scoringSettings as {
         rosterPositions?: string[];
         scoringType?: string;
@@ -75,6 +82,7 @@ export default async function ProBowlEntryPage({ params }: { params: Promise<{ c
                     <LineupPicker
                         contestId={contestId}
                         rosterPositions={rosterPositions}
+                        lockedTeams={lockedTeams}
                         existingLineup={existingEntry ? (existingEntry.lineup as unknown as LineupSlot[]) : null}
                     />
                 )}
