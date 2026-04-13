@@ -9,13 +9,13 @@ export const dynamic = 'force-dynamic';
 export default async function PricingPage({
     searchParams,
 }: {
-    searchParams: Promise<{ tab?: string; error?: string }>;
+    searchParams: Promise<{ tab?: string; error?: string; detail?: string }>;
 }) {
-    const { tab, error } = await searchParams;
+    const { tab, error, detail } = await searchParams;
     const defaultTab = tab === 'commissioner' ? 'commissioner' : 'player';
     const alreadySubscribed = error === 'already-subscribed';
     const checkoutError =
-        error === 'checkout-failed'       ? 'Something went wrong starting checkout. Please try again.' :
+        error === 'checkout-failed'       ? `Something went wrong starting checkout.${detail ? ` ${decodeURIComponent(detail)}` : ' Please try again.'}` :
         error === 'invalid-plan'          ? 'Invalid plan selected. Please try again.' :
         error === 'league-name-required'  ? 'Enter your league name before selecting a commissioner plan.' :
         null;

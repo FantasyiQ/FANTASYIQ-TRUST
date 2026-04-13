@@ -45,14 +45,14 @@ function tierGroupRank(tier: string): number {
 /* ── Catalog helpers ──────────────────────────────────────────────── */
 const TEAM_SIZES: TeamSize[] = [8, 10, 12, 14, 16, 32];
 
-// [Pro, All-Pro, Elite] — null means Pro is not offered at that size
-const COMM_PRICES: Record<TeamSize, [string | null, string, string]> = {
-    8:  [null,    '49.99',  '59.99'],
+// [Pro, All-Pro, Elite]
+const COMM_PRICES: Record<TeamSize, [string, string, string]> = {
+    8:  ['39.99', '49.99',  '59.99'],
     10: ['49.99', '59.99',  '69.99'],
     12: ['59.99', '69.99',  '79.99'],
     14: ['69.99', '79.99',  '89.99'],
     16: ['79.99', '89.99',  '99.99'],
-    32: [null,    '169.99', '179.99'],
+    32: ['159.99', '169.99', '179.99'],
 };
 
 // Index 0=Pro, 1=All-Pro, 2=Elite
@@ -65,8 +65,8 @@ function subPrice(tier: string, leagueSize: number): number {
     return parseFloat(COMM_PRICES[leagueSize as TeamSize]?.[idx] ?? '0');
 }
 
-function proAvailable(size: TeamSize): boolean {
-    return COMM_PRICES[size][0] !== null;
+function proAvailable(_size: TeamSize): boolean {
+    return true;
 }
 
 function findPriceId(name: string): string {
@@ -651,7 +651,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                         ) : (
                             <>
                                 <CommPlanCard
-                                    name="Commissioner Pro" price={proPx ?? '—'} period="/year"
+                                    name="Commissioner Pro" price={proPx} period="/year"
                                     features={COMM_PRO_FEATURES}
                                     priceId={commPriceId('Pro', size)} tier="COMMISSIONER_PRO"
                                     leagueName={leagueName}

@@ -346,6 +346,19 @@ model FutureDuesObligation {
     @@index([memberId])
 }
 
+// ── Sleeper Player Database ──────────────────────────────────────────────────
+
+// Downloaded once per day via /api/cron/sleeper-players.
+// Sleeper player IDs are used throughout league/roster/matchup data.
+model SleeperPlayer {
+    playerId  String   @id   // Sleeper's player_id string
+    fullName  String
+    position  String
+    team      String
+    active    Boolean  @default(true)
+    updatedAt DateTime @updatedAt
+}
+
 // One entry per user per contest. Lineup is a JSON array of picked players.
 model ProBowlEntry {
     id        String   @id @default(cuid())

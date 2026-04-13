@@ -12,9 +12,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     const ids = raw.split(',').map((s) => s.trim()).filter(Boolean);
 
     try {
-        const all = await getPlayers();
-        const result: Record<string, typeof all[string]> = {};
-        for (const id of ids) { if (all[id]) result[id] = all[id]; }
+        const result = await getPlayers(ids);
         return Response.json(result);
     } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to fetch players';

@@ -122,8 +122,17 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
         redirect('/pricing?error=already-subscribed');
     }
 
-    // Get or create Stripe customer
+    // Get or create Stripe customer — verify the stored ID is valid in the current Stripe mode
     let customerId = user.stripeCustomerId;
+    if (customerId) {
+        try {
+            const existing = await stripe.customers.retrieve(customerId);
+            if ((existing as { deleted?: boolean }).deleted) customerId = null;
+        } catch {
+            // Customer doesn't exist in this mode (e.g. test ID used against live keys)
+            customerId = null;
+        }
+    }
     if (!customerId) {
         try {
             const customer = await stripe.customers.create({

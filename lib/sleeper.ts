@@ -121,41 +121,20 @@ export interface SlimPlayer {
     team: string;
 }
 
-type RawPlayer = {
-    active?: boolean;
-    position?: string;
-    full_name?: string;
-    first_name?: string;
-    last_name?: string;
-    team?: string;
-};
-
-let playersCache: Record<string, SlimPlayer> | null = null;
-let playersCacheTime = 0;
-
-export async function getPlayers(): Promise<Record<string, SlimPlayer>> {
-    const ONE_DAY = 24 * 60 * 60 * 1000;
-    if (playersCache && Date.now() - playersCacheTime < ONE_DAY) return playersCache;
-
-    const res = await fetch('https://api.sleeper.app/v1/players/nfl', { next: { revalidate: 86400 } });
-    if (!res.ok) throw new Error(`Sleeper players fetch failed: ${res.status}`);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const data: Record<string, RawPlayer> = await res.json();
-
-    const slim: Record<string, SlimPlayer> = {};
-    for (const [id, player] of Object.entries(data)) {
-        if (player.active && player.position) {
-            slim[id] = {
-                full_name: player.full_name || `${player.first_name ?? ''} ${player.last_name ?? ''}`.trim(),
-                position: player.position,
-                team: player.team ?? 'FA',
-            };
-        }
+/**
+ * Look up players by ID from the local DB (populated daily by /api/cron/sleeper-players).
+ * Pass an array of IDs to fetch only what you need, or omit to get everything.
+ */
+export async function getPlayers(ids?: string[]): Promise<Record<string, SlimPlayer>> {
+    const { prisma } = await import('./prisma');
+    const rows = await prisma.sleeperPlayer.findMany(
+        ids?.length ? { where: { playerId: { in: ids } } } : undefined
+    );
+    const result: Record<string, SlimPlayer> = {};
+    for (const r of rows) {
+        result[r.playerId] = { full_name: r.fullName, position: r.position, team: r.team };
     }
-
-    playersCache = slim;
-    playersCacheTime = Date.now();
-    return slim;
+    return result;
 }
 
 // ─── Derived helpers ───────────────────────────────────────────────────────────
