@@ -89,7 +89,14 @@ export default async function DashboardPage() {
 
     if (!user) redirect('/sign-in');
 
-    const { name, image, subscriptionTier, subscriptions, connectedLeagues, leagues } = user;
+    const { name, image, subscriptionTier, subscriptions, leagues } = user;
+
+    // Enrich connected leagues with the matching League.id so links always work
+    const syncedIdByNameServer = new Map(leagues.map(l => [l.leagueName.toLowerCase().trim(), l.id]));
+    const connectedLeagues = user.connectedLeagues.map(cl => ({
+        ...cl,
+        syncedLeagueId: syncedIdByNameServer.get(cl.leagueName.toLowerCase().trim()),
+    }));
     const displayName = (name ?? session.user.email ?? '').split(' ')[0];
 
     const activeSubs = subscriptions.filter(
