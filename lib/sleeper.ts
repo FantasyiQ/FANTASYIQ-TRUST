@@ -126,15 +126,19 @@ export interface SlimPlayer {
  * Pass an array of IDs to fetch only what you need, or omit to get everything.
  */
 export async function getPlayers(ids?: string[]): Promise<Record<string, SlimPlayer>> {
-    const { prisma } = await import('./prisma');
-    const rows = await prisma.sleeperPlayer.findMany(
-        ids?.length ? { where: { playerId: { in: ids } } } : undefined
-    );
-    const result: Record<string, SlimPlayer> = {};
-    for (const r of rows) {
-        result[r.playerId] = { full_name: r.fullName, position: r.position, team: r.team };
+    try {
+        const { prisma } = await import('./prisma');
+        const rows = await prisma.sleeperPlayer.findMany(
+            ids?.length ? { where: { playerId: { in: ids } } } : undefined
+        );
+        const result: Record<string, SlimPlayer> = {};
+        for (const r of rows) {
+            result[r.playerId] = { full_name: r.fullName, position: r.position, team: r.team };
+        }
+        return result;
+    } catch {
+        return {};
     }
-    return result;
 }
 
 // ─── Derived helpers ───────────────────────────────────────────────────────────
