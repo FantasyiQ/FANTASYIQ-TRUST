@@ -94,6 +94,11 @@ export async function POST(request: NextRequest): Promise<Response> {
         const updated = await stripe.subscriptions.update(stripeSubscriptionId, {
             items: [{ id: stripeSub.items.data[0].id, price: priceId }],
             proration_behavior: 'always_invoice',
+            metadata: {
+                tier: newInfo.tier,
+                planType: newInfo.type,
+                leagueSize: newInfo.leagueSize != null ? String(newInfo.leagueSize) : '',
+            },
         });
 
         // Sync DB

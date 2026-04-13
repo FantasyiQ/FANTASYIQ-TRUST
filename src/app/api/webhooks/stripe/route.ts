@@ -107,11 +107,11 @@ export async function POST(request: NextRequest): Promise<Response> {
 
                 if (!customerId) break;
 
-                // Derive from PLAN_CATALOG
+                // Derive from PLAN_CATALOG — price ID is authoritative over metadata
                 const info     = priceId ? planInfo(priceId) : null;
-                const tier     = metaTier ?? info?.tier ?? null;
+                const tier     = info?.tier ?? metaTier ?? null;
                 const subType  = resolveSubType(tier, metaPlanType, info?.type);
-                const leagueSize = metaSize ?? info?.leagueSize ?? null;
+                const leagueSize = info?.leagueSize ?? metaSize ?? null;
 
                 if (!tier) break;
 
