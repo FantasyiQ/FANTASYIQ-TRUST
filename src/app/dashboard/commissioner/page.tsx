@@ -27,6 +27,12 @@ const FEATURES = [
         title:       'Commissioner Announcements',
         description: 'Store your rulebook, bylaws, and league documents. Draft and send announcements to keep your managers in the loop.',
     },
+    {
+        href:        '/dashboard/commissioner/pro-bowl',
+        icon:        '🏆',
+        title:       'Pro Bowl Contest',
+        description: 'Week 18 free contest — DraftKings-style lineup picks, no salary cap. One contest per league.',
+    },
 ] as const;
 
 export default async function CommissionerHubPage() {
