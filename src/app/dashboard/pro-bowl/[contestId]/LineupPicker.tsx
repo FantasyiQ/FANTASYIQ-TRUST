@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 
 interface LineupSlot {
     position: string;
@@ -8,7 +8,13 @@ interface LineupSlot {
     nflTeam: string;
 }
 
-// Client-side team normalization (mirrors server-side logic)
+interface PlayerResult {
+    fullName: string;
+    position: string;
+    team: string;
+}
+
+// ── Team normalization (mirrors server) ────────────────────────────────────────
 const ALIASES: Record<string, string> = {
     ari:'ARI',arizona:'ARI',cardinals:'ARI',
     atl:'ATL',atlanta:'ATL',falcons:'ATL',
@@ -27,8 +33,8 @@ const ALIASES: Record<string, string> = {
     jax:'JAX',jac:'JAX',jacksonville:'JAX',jaguars:'JAX',
     kc:'KC','kansas city':'KC',chiefs:'KC',
     lv:'LV','las vegas':'LV',raiders:'LV',
-    lac:'LAC',chargers:'LAC','la chargers':'LAC',
-    lar:'LAR',rams:'LAR','la rams':'LAR',
+    lac:'LAC',chargers:'LAC',
+    lar:'LAR',rams:'LAR',
     mia:'MIA',miami:'MIA',dolphins:'MIA',
     min:'MIN',minnesota:'MIN',vikings:'MIN',
     ne:'NE','new england':'NE',patriots:'NE',
@@ -43,19 +49,17 @@ const ALIASES: Record<string, string> = {
     ten:'TEN',tennessee:'TEN',titans:'TEN',
     was:'WAS',wsh:'WAS',washington:'WAS',commanders:'WAS',
 };
-
 function normalizeTeam(input: string): string | null {
     if (!input) return null;
     const clean = input.toLowerCase().replace(/\s*d\/?s[t]?\s*$/, '').trim();
     return ALIASES[clean] ?? null;
 }
-
 function isSlotLocked(nflTeam: string, lockedTeams: string[]): boolean {
-    if (lockedTeams.length === 0) return false;
     const abbrev = normalizeTeam(nflTeam);
     return abbrev ? lockedTeams.includes(abbrev) : false;
 }
 
+// ── Position colours ───────────────────────────────────────────────────────────
 function positionColor(pos: string) {
     switch (pos) {
         case 'QB':         return 'text-red-400';
@@ -74,10 +78,123 @@ function flexNote(positions: string[]): string {
     const notes: string[] = [];
     if (positions.includes('FLEX'))       notes.push('FLEX can be RB, WR, or TE.');
     if (positions.includes('SUPER_FLEX')) notes.push('SUPER_FLEX can be QB, RB, WR, or TE.');
-    if (positions.includes('DEF'))        notes.push('DEF: enter team name (e.g. Cowboys D/ST).');
     return notes.join('  ');
 }
 
+// ── Player autocomplete for a single slot ─────────────────────────────────────
+function PlayerSearch({
+    slot,
+    slotIndex,
+    locked,
+    onChange,
+}: {
+    slot:       LineupSlot;
+    slotIndex:  number;
+    locked:     boolean;
+    onChange:   (index: number, player: PlayerResult) => void;
+}) {
+    const [query, setQuery]       = useState(slot.playerName);
+    const [results, setResults]   = useState<PlayerResult[]>([]);
+    const [open, setOpen]         = useState(false);
+    const [loading, setLoading]   = useState(false);
+    const debounceRef             = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const containerRef            = useRef<HTMLDivElement>(null);
+
+    // Keep query in sync if parent resets
+    useEffect(() => { setQuery(slot.playerName); }, [slot.playerName]);
+
+    // Close dropdown on outside click
+    useEffect(() => {
+        function onClickOutside(e: MouseEvent) {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setOpen(false);
+            }
+        }
+        document.addEventListener('mousedown', onClickOutside);
+        return () => document.removeEventListener('mousedown', onClickOutside);
+    }, []);
+
+    const search = useCallback((q: string) => {
+        if (q.length < 2) { setResults([]); setOpen(false); return; }
+        setLoading(true);
+        const url = `/api/pro-bowl/players?q=${encodeURIComponent(q)}&position=${encodeURIComponent(slot.position)}`;
+        fetch(url)
+            .then(r => r.json() as Promise<PlayerResult[]>)
+            .then(data => { setResults(data); setOpen(data.length > 0); })
+            .catch(() => { /* ignore */ })
+            .finally(() => setLoading(false));
+    }, [slot.position]);
+
+    function handleInput(e: React.ChangeEvent<HTMLInputElement>) {
+        const val = e.target.value;
+        setQuery(val);
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => search(val), 250);
+    }
+
+    function selectPlayer(p: PlayerResult) {
+        setQuery(p.fullName);
+        setOpen(false);
+        setResults([]);
+        onChange(slotIndex, p);
+    }
+
+    if (locked) {
+        return (
+            <div className="flex-1 flex items-center gap-2 bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 opacity-60">
+                <span className="text-white text-sm flex-1 truncate">{slot.playerName || '—'}</span>
+                {slot.nflTeam && <span className="text-gray-500 text-xs shrink-0">{slot.nflTeam}</span>}
+            </div>
+        );
+    }
+
+    return (
+        <div ref={containerRef} className="flex-1 relative">
+            <div className="flex gap-2">
+                <div className="relative flex-1">
+                    <input
+                        type="text"
+                        placeholder="Search player…"
+                        value={query}
+                        onChange={handleInput}
+                        onFocus={() => results.length > 0 && setOpen(true)}
+                        autoComplete="off"
+                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/60"
+                    />
+                    {loading && (
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 text-xs">…</span>
+                    )}
+                </div>
+                {slot.nflTeam && (
+                    <span className="shrink-0 self-center text-xs font-bold text-gray-400 bg-gray-800 border border-gray-700 rounded-lg px-2.5 py-2">
+                        {slot.nflTeam}
+                    </span>
+                )}
+            </div>
+
+            {open && results.length > 0 && (
+                <ul className="absolute z-50 left-0 right-0 top-full mt-1 bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
+                    {results.map((p, i) => (
+                        <li key={i}>
+                            <button
+                                type="button"
+                                onMouseDown={() => selectPlayer(p)}
+                                className="w-full text-left px-4 py-2.5 hover:bg-gray-700 flex items-center justify-between gap-3 transition">
+                                <span className="text-white text-sm font-medium">{p.fullName}</span>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <span className={`text-xs font-bold ${positionColor(p.position)}`}>{p.position}</span>
+                                    <span className="text-gray-500 text-xs">{p.team}</span>
+                                </div>
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+}
+
+// ── Main LineupPicker ──────────────────────────────────────────────────────────
 export default function LineupPicker({
     contestId,
     rosterPositions,
@@ -89,15 +206,17 @@ export default function LineupPicker({
     lockedTeams:     string[];
     existingLineup:  LineupSlot[] | null;
 }) {
-    const blankRoster: LineupSlot[] = rosterPositions.map(p => ({ position: p, playerName: '', nflTeam: '' }));
+    const blankRoster = rosterPositions.map(p => ({ position: p, playerName: '', nflTeam: '' }));
     const [lineup, setLineup] = useState<LineupSlot[]>(existingLineup ?? blankRoster);
     const [loading, setLoading] = useState(false);
     const [error, setError]    = useState('');
     const [saved, setSaved]    = useState(false);
 
-    function update(index: number, field: 'playerName' | 'nflTeam', value: string) {
+    function selectPlayer(index: number, player: PlayerResult) {
         setSaved(false);
-        setLineup(prev => prev.map((slot, i) => i === index ? { ...slot, [field]: value } : slot));
+        setLineup(prev => prev.map((slot, i) =>
+            i === index ? { ...slot, playerName: player.fullName, nflTeam: player.team } : slot
+        ));
     }
 
     async function handleSubmit(e: React.FormEvent) {
@@ -105,18 +224,11 @@ export default function LineupPicker({
         setError('');
         setSaved(false);
 
-        // Only validate unlocked slots
         for (const slot of lineup) {
-            const locked = isSlotLocked(slot.nflTeam, lockedTeams);
-            if (!locked) {
-                if (!slot.playerName.trim()) {
-                    setError(`Fill in the player name for the ${slot.position} slot.`);
-                    return;
-                }
-                if (!slot.nflTeam.trim()) {
-                    setError(`Fill in the NFL team for the ${slot.position} slot.`);
-                    return;
-                }
+            if (isSlotLocked(slot.nflTeam, lockedTeams)) continue;
+            if (!slot.playerName.trim()) {
+                setError(`Select a player for the ${slot.position} slot.`);
+                return;
             }
         }
 
@@ -132,55 +244,39 @@ export default function LineupPicker({
         setSaved(true);
     }
 
-    const unlockedSlots = lineup.filter(s => !isSlotLocked(s.nflTeam, lockedTeams));
-    const allUnlockedFilled = unlockedSlots.every(s => s.playerName.trim() && s.nflTeam.trim());
-    const lockedCount = lineup.filter(s => isSlotLocked(s.nflTeam, lockedTeams)).length;
-    // Count slots locked by team even when nflTeam is blank (new entries during active games)
-    const note = flexNote(rosterPositions);
+    const lockedCount      = lineup.filter(s => isSlotLocked(s.nflTeam, lockedTeams)).length;
+    const unlockedUnfilled = lineup.filter(s => !isSlotLocked(s.nflTeam, lockedTeams) && !s.playerName.trim()).length;
+    const note             = flexNote(rosterPositions);
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
             {lockedCount > 0 && (
                 <div className="bg-yellow-900/20 border border-yellow-800/50 rounded-xl px-4 py-3 text-yellow-400 text-sm">
-                    🔒 {lockedCount} slot{lockedCount !== 1 ? 's' : ''} locked — game{lockedCount !== 1 ? 's' : ''} in progress. Remaining picks can still be saved.
+                    🔒 {lockedCount} slot{lockedCount !== 1 ? 's' : ''} locked — game{lockedCount !== 1 ? 's' : ''} in progress.
                 </div>
             )}
 
             <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-800">
                     <h2 className="font-bold">Pick Your Lineup</h2>
-                    <p className="text-gray-500 text-xs mt-1">No salary cap — pick any NFL player. Slots lock automatically when that team&apos;s game kicks off.</p>
+                    <p className="text-gray-500 text-xs mt-1">Search any active NFL player. Slots lock automatically when that team&apos;s game kicks off.</p>
                 </div>
 
                 <div className="divide-y divide-gray-800/50">
                     {lineup.map((slot, i) => {
                         const locked = isSlotLocked(slot.nflTeam, lockedTeams);
                         return (
-                            <div key={i} className={`px-6 py-4 flex items-center gap-4 ${locked ? 'opacity-60' : ''}`}>
-                                <div className="flex items-center gap-1.5 w-16 shrink-0">
-                                    <span className={`text-xs font-bold ${positionColor(slot.position)}`}>
-                                        {slot.position}
-                                    </span>
-                                    {locked && <span className="text-xs text-gray-500">🔒</span>}
+                            <div key={i} className={`px-6 py-3.5 flex items-center gap-3 ${locked ? 'opacity-60' : ''}`}>
+                                <div className="flex items-center gap-1 w-16 shrink-0">
+                                    <span className={`text-xs font-bold ${positionColor(slot.position)}`}>{slot.position}</span>
+                                    {locked && <span className="text-xs">🔒</span>}
                                 </div>
-                                <div className="flex-1 grid sm:grid-cols-2 gap-2">
-                                    <input
-                                        type="text"
-                                        placeholder={locked ? '—' : 'Player name'}
-                                        value={slot.playerName}
-                                        onChange={e => update(i, 'playerName', e.target.value)}
-                                        disabled={locked}
-                                        className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/60 w-full disabled:cursor-not-allowed disabled:opacity-50"
-                                    />
-                                    <input
-                                        type="text"
-                                        placeholder={locked ? '—' : slot.position === 'DEF' ? 'Team (e.g. Cowboys)' : 'NFL team (e.g. DAL)'}
-                                        value={slot.nflTeam}
-                                        onChange={e => update(i, 'nflTeam', e.target.value)}
-                                        disabled={locked}
-                                        className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/60 w-full disabled:cursor-not-allowed disabled:opacity-50"
-                                    />
-                                </div>
+                                <PlayerSearch
+                                    slot={slot}
+                                    slotIndex={i}
+                                    locked={locked}
+                                    onChange={selectPlayer}
+                                />
                             </div>
                         );
                     })}
@@ -191,13 +287,13 @@ export default function LineupPicker({
             {error && <p className="text-red-400 text-sm">{error}</p>}
             {saved && (
                 <p className="text-green-400 text-sm font-medium">
-                    Lineup saved! {lockedCount > 0 ? 'Locked slots are final.' : 'You can edit until games begin.'}
+                    Lineup saved! {lockedCount > 0 ? 'Locked slots are final.' : 'Slots lock when games begin.'}
                 </p>
             )}
 
             <button
                 type="submit"
-                disabled={loading || !allUnlockedFilled}
+                disabled={loading || unlockedUnfilled > 0}
                 className="w-full bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-50 text-black font-bold py-3 rounded-xl text-sm transition">
                 {loading ? 'Saving…' : existingLineup ? 'Update Lineup' : 'Submit Lineup'}
             </button>
