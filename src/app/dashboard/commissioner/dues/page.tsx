@@ -104,7 +104,7 @@ export default async function DuesPage() {
                                             <Link
                                                 href={dues
                                                     ? `/dashboard/commissioner/dues/${dues.id}`
-                                                    : `/dashboard/commissioner/dues/setup?subId=${sub.id}`}
+                                                    : `/dashboard/commissioner/dues/setup?subId=${sub.id}&leagueName=${encodeURIComponent(sub.leagueName ?? '')}&leagueSize=${sub.leagueSize ?? ''}`}
                                                 className="bg-[#C8A951] hover:bg-[#b8992f] text-black font-bold px-4 py-2 rounded-lg text-sm transition">
                                                 {dues ? 'Open Tracker' : 'Set Up Tracker'}
                                             </Link>

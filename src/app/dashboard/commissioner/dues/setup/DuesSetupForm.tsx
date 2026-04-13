@@ -18,13 +18,22 @@ interface Props {
 export default function DuesSetupForm({ syncedLeagues }: Props) {
     const router = useRouter();
     const params = useSearchParams();
-    const subId = params.get('subId') ?? '';
+    const subId        = params.get('subId') ?? '';
+    const paramName    = params.get('leagueName') ?? '';
+    const paramSize    = params.get('leagueSize') ?? '';
 
-    const [selectedLeagueId, setSelectedLeagueId] = useState('');
-    const [leagueName, setLeagueName] = useState('');
-    const [season, setSeason] = useState(new Date().getFullYear().toString());
+    // Auto-match a synced league by name (case-insensitive)
+    const autoMatch = paramName
+        ? syncedLeagues.find(l => l.leagueName.toLowerCase() === paramName.toLowerCase())
+        : null;
+
+    const [selectedLeagueId, setSelectedLeagueId] = useState(autoMatch?.id ?? '');
+    const [leagueName, setLeagueName] = useState(autoMatch?.leagueName ?? paramName);
+    const [season, setSeason] = useState(autoMatch?.season ?? new Date().getFullYear().toString());
     const [buyIn, setBuyIn] = useState('');
-    const [teamCount, setTeamCount] = useState('12');
+    const [teamCount, setTeamCount] = useState(
+        autoMatch ? String(autoMatch.totalRosters) : (paramSize || '12')
+    );
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
