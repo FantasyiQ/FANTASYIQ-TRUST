@@ -71,6 +71,8 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                     orderBy: { createdAt: 'desc' },
                     select: { type: true, tier: true, leagueName: true },
                 },
+                // Fetch the user's synced leagues so we can match by ID, not just name
+                leagues: { select: { id: true, leagueName: true } },
             },
         }),
         // Any active commissioner plan for this league (not just the current user's)
@@ -92,9 +94,18 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
     // - If no player plan slot used, the member gets at most the commissioner tier.
     const activePlayerSub = dbUser?.subscriptions.find(s => s.type === 'player') ?? null;
     const playerTier = activePlayerSub?.tier ?? 'FREE';
-    const leagueConnected = dbUser?.connectedLeagues.some(
-        cl => cl.leagueName.toLowerCase() === league.leagueName.toLowerCase()
-    ) ?? false;
+
+    // Build a map: connectedLeague name → League.id (via the user's synced leagues)
+    // This lets us match by ID so minor name differences don't break access.
+    const syncedNameToId = new Map(
+        (dbUser?.leagues ?? []).map(l => [l.leagueName.toLowerCase().trim(), l.id])
+    );
+    const leagueConnected = (dbUser?.connectedLeagues ?? []).some(cl => {
+        // Direct name match
+        if (cl.leagueName.toLowerCase().trim() === league.leagueName.toLowerCase().trim()) return true;
+        // Match via League.id — catches slight name discrepancies
+        return syncedNameToId.get(cl.leagueName.toLowerCase().trim()) === league.id;
+    });
     const effectiveTier = effectiveTierForLeague(
         playerTier,
         commSubForLeague?.tier ?? null,
