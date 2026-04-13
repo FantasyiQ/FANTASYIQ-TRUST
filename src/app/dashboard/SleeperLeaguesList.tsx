@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { unsyncLeague } from '@/app/actions/leagues';
@@ -46,7 +45,6 @@ function formatSyncTime(date: Date | null): string {
 }
 
 export default function SleeperLeaguesList({ leagues }: Props) {
-    const router = useRouter();
 
     if (leagues.length === 0) {
         return (
@@ -67,9 +65,8 @@ export default function SleeperLeaguesList({ leagues }: Props) {
                 const standing = (league.standings as { wins: number; losses: number }[] | null)?.[0];
                 return (
                     <li key={league.id} className="flex items-center gap-4 px-6 py-4 hover:bg-gray-800/30 transition-colors">
-                        <button
-                            type="button"
-                            onClick={() => router.push(`/dashboard/league/${league.id}`)}
+                        <Link
+                            href={`/dashboard/league/${league.id}`}
                             className="flex items-center gap-4 flex-1 min-w-0 text-left"
                         >
                             {league.avatar ? (
@@ -81,22 +78,25 @@ export default function SleeperLeaguesList({ leagues }: Props) {
                                 <div className="w-10 h-10 rounded-lg bg-gray-800 shrink-0 flex items-center justify-center text-gray-600 text-xs font-bold">FF</div>
                             )}
                             <div className="flex-1 min-w-0">
-                                <p className="font-medium text-white truncate">{league.leagueName}</p>
+                                <p className="font-medium text-white truncate group-hover:text-[#C8A951]">{league.leagueName}</p>
                                 <p className="text-gray-500 text-xs mt-0.5">
                                     {league.season} · {league.totalRosters} teams
                                     {league.scoringType ? ` · ${league.scoringType.replace('_', ' ').toUpperCase()}` : ''}
                                     {standing ? ` · ${standing.wins}-${standing.losses}` : ''}
                                 </p>
                             </div>
-                            <div className="text-right shrink-0">
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusBadgeClass(league.status)}`}>
-                                    {statusLabel(league.status)}
-                                </span>
-                                <p className="text-gray-700 text-xs mt-1 tabular-nums">
-                                    {formatSyncTime(league.lastSyncedAt)}
-                                </p>
+                            <div className="flex items-center gap-3 shrink-0">
+                                <div className="text-right">
+                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusBadgeClass(league.status)}`}>
+                                        {statusLabel(league.status)}
+                                    </span>
+                                    <p className="text-gray-700 text-xs mt-1 tabular-nums">
+                                        {formatSyncTime(league.lastSyncedAt)}
+                                    </p>
+                                </div>
+                                <span className="text-[#C8A951] text-sm font-semibold whitespace-nowrap">View →</span>
                             </div>
-                        </button>
+                        </Link>
                         <form action={unsyncLeague.bind(null, league.leagueId)}>
                             <button type="submit" title="Unsync"
                                 className="text-gray-600 hover:text-red-400 transition text-sm px-2 py-1 rounded">
