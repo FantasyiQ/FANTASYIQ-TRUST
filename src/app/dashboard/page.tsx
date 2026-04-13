@@ -101,7 +101,7 @@ export default async function DashboardPage() {
         .sort((a, b) => (a.leagueName ?? '').localeCompare(b.leagueName ?? ''));
 
     const syncedLeagueIdByName = new Map(
-        leagues.map(l => [l.leagueName.toLowerCase(), l.id])
+        leagues.map(l => [l.leagueName.toLowerCase().trim(), l.id])
     );
 
     const hasAnyActiveSub = activeSubs.length > 0;
@@ -239,9 +239,14 @@ export default async function DashboardPage() {
                                     <div className="flex items-start justify-between gap-4">
                                         <div>
                                             {sub.leagueName && (() => {
-                                                const leagueId = syncedLeagueIdByName.get(sub.leagueName.toLowerCase());
-                                                return leagueId ? (
-                                                    <Link href={`/dashboard/league/${leagueId}`}
+                                                const leagueId = syncedLeagueIdByName.get(sub.leagueName.toLowerCase().trim());
+                                                // Partial match fallback — handles minor name differences
+                                                const partialMatch = !leagueId
+                                                    ? leagues.find(l => l.leagueName.toLowerCase().includes(sub.leagueName!.toLowerCase().trim()) || sub.leagueName!.toLowerCase().trim().includes(l.leagueName.toLowerCase()))
+                                                    : null;
+                                                const resolvedId = leagueId ?? partialMatch?.id;
+                                                return resolvedId ? (
+                                                    <Link href={`/dashboard/league/${resolvedId}`}
                                                         className="text-[#C8A951] font-semibold text-sm hover:underline">
                                                         {sub.leagueName} →
                                                     </Link>
