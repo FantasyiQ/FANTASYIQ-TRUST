@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { createPortalSession } from '@/app/actions/stripe';
 import ConnectedLeagues from '@/components/ConnectedLeagues';
 import SleeperLeaguesList from './SleeperLeaguesList';
+import SyncedLeaguePicker from './SyncedLeaguePicker';
 import { getLeagueLimit, tierToLimitKey, nextTierName } from '@/lib/league-limits';
 import type { SubscriptionTier } from '@prisma/client';
 
@@ -207,10 +208,19 @@ export default async function DashboardPage() {
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
                     <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
                         <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Commissioner Plans</p>
-                        <Link href="/pricing?tab=commissioner"
-                            className="text-sm border border-gray-700 hover:border-[#C8A951]/50 text-gray-300 font-semibold px-4 py-1.5 rounded-lg transition">
-                            + Add League
-                        </Link>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <SyncedLeaguePicker leagues={leagues.map(l => ({
+                                id: l.id,
+                                leagueName: l.leagueName,
+                                totalRosters: l.totalRosters,
+                                season: l.season,
+                                scoringType: l.scoringType ?? null,
+                            }))} />
+                            <Link href="/pricing?tab=commissioner"
+                                className="text-sm border border-gray-700 hover:border-[#C8A951]/50 text-gray-300 font-semibold px-4 py-1.5 rounded-lg transition">
+                                + Add League
+                            </Link>
+                        </div>
                     </div>
 
                     {commSubs.length === 0 ? (
