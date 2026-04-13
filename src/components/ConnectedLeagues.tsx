@@ -42,6 +42,7 @@ function lockLabel(createdAt: string | Date): string {
 export default function ConnectedLeagues({ leagues: initial, syncedLeagues = [], limit, nextTier, tierLabel }: Props) {
     const [leagues, setLeagues] = useState<ConnectedLeague[]>(initial);
     const [showForm, setShowForm] = useState(false);
+    const [showSyncedPicker, setShowSyncedPicker] = useState(false);
     const [leagueName, setLeagueName] = useState('');
     const [platform, setPlatform] = useState('');
     const [error, setError] = useState<string | null>(null);
@@ -96,6 +97,28 @@ export default function ConnectedLeagues({ leagues: initial, syncedLeagues = [],
         });
     }
 
+    async function handleAddSynced(sl: SyncedLeague) {
+        setError(null);
+        setShowSyncedPicker(false);
+        startTransition(async () => {
+            try {
+                const res = await fetch('/api/leagues', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ leagueName: sl.leagueName, platform: 'Sleeper' }),
+                });
+                const data = await res.json() as ConnectedLeague & { error?: string };
+                if (!res.ok) {
+                    setError((data as { error?: string }).error ?? 'Failed to add league.');
+                    return;
+                }
+                setLeagues(prev => [...prev, data]);
+            } catch {
+                setError('Network error. Please try again.');
+            }
+        });
+    }
+
     async function handleRemove(id: string) {
         setError(null);
         startTransition(async () => {
@@ -114,6 +137,33 @@ export default function ConnectedLeagues({ leagues: initial, syncedLeagues = [],
     }
 
     return (
+        <>
+        {showSyncedPicker && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+                <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowSyncedPicker(false)} />
+                <div className="relative bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+                    <h2 className="text-lg font-bold text-white mb-1">Add Synced League</h2>
+                    <p className="text-gray-400 text-sm mb-4">Select a Sleeper league to connect to your player plan.</p>
+                    <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                        {availableSynced.map((sl) => (
+                            <button
+                                key={sl.id}
+                                onClick={() => { void handleAddSynced(sl); }}
+                                disabled={isPending}
+                                className="w-full text-left px-4 py-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-[#C8A951]/50 rounded-xl transition group disabled:opacity-50">
+                                <p className="text-white font-semibold text-sm group-hover:text-[#C8A951] transition">{sl.leagueName}</p>
+                                <p className="text-gray-500 text-xs mt-0.5">{sl.totalRosters} teams · {sl.season}</p>
+                            </button>
+                        ))}
+                    </div>
+                    <button
+                        onClick={() => setShowSyncedPicker(false)}
+                        className="mt-4 w-full py-2.5 rounded-xl border border-gray-700 text-gray-400 hover:text-white text-sm font-semibold transition">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        )}
         <div className="mt-5 pt-5 border-t border-gray-800">
             <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
                 <div>
@@ -135,11 +185,20 @@ export default function ConnectedLeagues({ leagues: initial, syncedLeagues = [],
                         )}
                     </div>
                 ) : (
-                    <button
-                        onClick={() => { setShowForm(v => !v); setError(null); }}
-                        className="text-sm border border-gray-700 hover:border-[#C8A951]/50 text-gray-300 font-semibold px-3 py-1.5 rounded-lg transition">
-                        {showForm ? 'Cancel' : '+ Connect League'}
-                    </button>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {availableSynced.length > 0 && (
+                            <button
+                                onClick={() => { setShowSyncedPicker(true); setError(null); }}
+                                className="text-sm border border-[#C8A951]/40 hover:border-[#C8A951] text-[#C8A951] font-semibold px-3 py-1.5 rounded-lg transition">
+                                + Synced League
+                            </button>
+                        )}
+                        <button
+                            onClick={() => { setShowForm(v => !v); setError(null); }}
+                            className="text-sm border border-gray-700 hover:border-[#C8A951]/50 text-gray-300 font-semibold px-3 py-1.5 rounded-lg transition">
+                            {showForm ? 'Cancel' : '+ Connect League'}
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -259,5 +318,6 @@ export default function ConnectedLeagues({ leagues: initial, syncedLeagues = [],
                 </ul>
             )}
         </div>
+        </>
     );
 }
