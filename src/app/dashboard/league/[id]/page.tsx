@@ -55,7 +55,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
 
     if (!league || league.userId !== session.user.id) notFound();
 
-    const [sleeperLeague, members, rosters, allPlayers, tradedPicks, dbUser] = await Promise.all([
+    const [sleeperLeague, members, rosters, allPlayers, tradedPicks, dbUser, commSubForLeague] = await Promise.all([
         getLeague(league.leagueId),
         getLeagueUsers(league.leagueId),
         getLeagueRosters(league.leagueId),
@@ -73,16 +73,25 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                 },
             },
         }),
+        // Any active commissioner plan for this league (not just the current user's)
+        // so all league members benefit from the commissioner's tier.
+        prisma.subscription.findFirst({
+            where: {
+                type: 'commissioner',
+                leagueName: { equals: league.leagueName, mode: 'insensitive' },
+                status: { in: ['active', 'trialing'] },
+            },
+            select: { tier: true },
+        }),
     ]);
 
-    // Determine effective tier for this league.
-    // Derive player tier from the active player subscription row — more reliable
-    // than user.subscriptionTier which can be stale from test-mode resets.
+    // Effective tier rules:
+    // - Commissioner plan for this league applies to ALL members regardless of player plan.
+    // - Player plan only applies (and can override commissioner) if the user has
+    //   connected this league to their player plan (used a slot).
+    // - If no player plan slot used, the member gets at most the commissioner tier.
     const activePlayerSub = dbUser?.subscriptions.find(s => s.type === 'player') ?? null;
     const playerTier = activePlayerSub?.tier ?? 'FREE';
-    const commSubForLeague = dbUser?.subscriptions.find(
-        s => s.type === 'commissioner' && s.leagueName?.toLowerCase() === league.leagueName.toLowerCase()
-    ) ?? null;
     const leagueConnected = dbUser?.connectedLeagues.some(
         cl => cl.leagueName.toLowerCase() === league.leagueName.toLowerCase()
     ) ?? false;
