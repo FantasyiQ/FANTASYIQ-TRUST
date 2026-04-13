@@ -10,6 +10,7 @@ import {
     scoringLabel, summariseRosterPositions,
     type SleeperLeagueMember, type SleeperRoster,
 } from '@/lib/sleeper';
+import { effectiveTierForLeague, tierLevel } from '@/lib/league-limits';
 import RosterCards, { type TeamRosterData } from './RosterCards';
 import LeagueTradeEvaluator from './LeagueTradeEvaluator';
 
@@ -60,8 +61,38 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
         getLeagueRosters(league.leagueId),
         getPlayers(),
         getTradedPicks(league.leagueId),
-        prisma.user.findUnique({ where: { id: session.user.id }, select: { sleeperUserId: true } }),
+        prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: {
+                sleeperUserId: true,
+                subscriptionTier: true,
+                connectedLeagues: { select: { leagueName: true } },
+                subscriptions: {
+                    where: { type: 'commissioner', status: { in: ['active', 'trialing'] } },
+                    orderBy: { createdAt: 'desc' },
+                    select: { tier: true, leagueName: true },
+                },
+            },
+        }),
     ]);
+
+    // Determine effective tier for this league:
+    // Player tier is uplifted by the matching commissioner plan tier IF this
+    // league is also connected to the user's player plan.
+    const playerTier = dbUser?.subscriptionTier ?? 'FREE';
+    const commSubForLeague = dbUser?.subscriptions.find(
+        s => s.leagueName?.toLowerCase() === league.leagueName.toLowerCase()
+    ) ?? null;
+    const leagueConnected = dbUser?.connectedLeagues.some(
+        cl => cl.leagueName.toLowerCase() === league.leagueName.toLowerCase()
+    ) ?? false;
+    const effectiveTier = effectiveTierForLeague(
+        playerTier,
+        commSubForLeague?.tier ?? null,
+        leagueConnected,
+    );
+    const effectiveLevel = tierLevel(effectiveTier); // 0=FREE 1=Pro 2=All-Pro 3=Elite
+    const canUseTradeEvaluator = effectiveLevel >= 2; // All-Pro+
 
     const memberMap = new Map<string, SleeperLeagueMember>(members.map(m => [m.user_id, m]));
 
@@ -300,14 +331,27 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                 {/* Trade Evaluator */}
                 <div>
                     <h2 className="font-semibold text-lg mb-4">Trade Evaluator</h2>
-                    <LeagueTradeEvaluator
-                        leagueName={league.leagueName}
-                        scoringType={league.scoringType ?? null}
-                        totalRosters={league.totalRosters}
-                        leagueType={sleeperLeague.settings?.type === 2 ? 'Dynasty' : 'Redraft'}
-                        myTeamData={myTeamData}
-                        otherTeamsData={otherTeamsData}
-                    />
+                    {canUseTradeEvaluator ? (
+                        <LeagueTradeEvaluator
+                            leagueName={league.leagueName}
+                            scoringType={league.scoringType ?? null}
+                            totalRosters={league.totalRosters}
+                            leagueType={sleeperLeague.settings?.type === 2 ? 'Dynasty' : 'Redraft'}
+                            myTeamData={myTeamData}
+                            otherTeamsData={otherTeamsData}
+                        />
+                    ) : (
+                        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center">
+                            <p className="text-gray-400 text-sm mb-1">Trade Evaluator requires All-Pro or higher.</p>
+                            <p className="text-gray-600 text-xs mb-4">
+                                Upgrade your player plan, or the commissioner can upgrade their league plan —{' '}
+                                and connect this league to your player plan to unlock it.
+                            </p>
+                            <a href="/pricing" className="inline-block bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-5 py-2.5 rounded-lg transition text-sm">
+                                View Plans
+                            </a>
+                        </div>
+                    )}
                 </div>
 
             </div>
