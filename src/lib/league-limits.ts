@@ -55,12 +55,22 @@ export function effectiveTierForLeague(
     commSubTierForLeague: string | null,
     leagueConnectedToPlayerPlan: boolean,
 ): string {
-    const playerLvl = tierLevel(playerTier);
-    const commLvl   = leagueConnectedToPlayerPlan && commSubTierForLeague
-        ? tierLevel(commSubTierForLeague)
-        : 0;
-    const level = Math.max(playerLvl, commLvl);
-    switch (level) {
+    const commLvl = commSubTierForLeague ? tierLevel(commSubTierForLeague) : 0;
+
+    if (leagueConnectedToPlayerPlan) {
+        // Both plans apply — player plan can uplift above the commissioner plan
+        const level = Math.max(tierLevel(playerTier), commLvl);
+        switch (level) {
+            case 3: return 'PLAYER_ELITE';
+            case 2: return 'PLAYER_ALL_PRO';
+            case 1: return 'PLAYER_PRO';
+            default: return 'FREE';
+        }
+    }
+
+    // Not connected to player plan — only the commissioner plan tier applies,
+    // no matter how high the player plan is.
+    switch (commLvl) {
         case 3: return 'PLAYER_ELITE';
         case 2: return 'PLAYER_ALL_PRO';
         case 1: return 'PLAYER_PRO';
