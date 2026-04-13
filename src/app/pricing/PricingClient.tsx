@@ -28,6 +28,7 @@ interface Props {
     defaultTab: Tab;
     defaultSize?: number | null;
     defaultLeagueName?: string;
+    newLeague?: boolean;
     alreadySubscribed?: boolean;
     checkoutError?: string | null;
 }
@@ -438,9 +439,10 @@ function resolvePlayerCardStatus(cardTier: string, playerSub: PlayerSub | null):
     return 'unavailable';
 }
 
-function resolveCommCardStatus(cardTier: string, size: TeamSize, commSubs: CommSub[]): CardStatus {
+function resolveCommCardStatus(cardTier: string, size: TeamSize, commSubs: CommSub[], forceCheckout = false): CardStatus {
+    if (forceCheckout) return 'checkout';
     const existing = commSubs.find(s => s.leagueSize === size);
-    if (!existing) return 'checkout'; // no plan for this size yet — new purchase
+    if (!existing) return 'checkout';
     const currentRank = tierGroupRank(existing.tier);
     const cardRank    = tierGroupRank(cardTier);
     if (cardRank > currentRank)  return 'upgrade';
@@ -449,7 +451,7 @@ function resolveCommCardStatus(cardTier: string, size: TeamSize, commSubs: CommS
 }
 
 /* ── Main component ───────────────────────────────────────────────── */
-export default function PricingClient({ playerSub, commSubs, activeCommCount, activePlayerLeagueCount, defaultTab, defaultSize, defaultLeagueName, alreadySubscribed, checkoutError }: Props) {
+export default function PricingClient({ playerSub, commSubs, activeCommCount, activePlayerLeagueCount, defaultTab, defaultSize, defaultLeagueName, newLeague, alreadySubscribed, checkoutError }: Props) {
     const { update: updateSession } = useSession();
     const [tab, setTab]       = useState<Tab>(defaultTab);
     const [size, setSize]     = useState<TeamSize>((TEAM_SIZES.includes(defaultSize as TeamSize) ? defaultSize : 12) as TeamSize);
@@ -639,7 +641,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     features={COMM_PRO_FEATURES}
                                     priceId={commPriceId('Pro', size)} tier="COMMISSIONER_PRO"
                                     leagueName={leagueName}
-                                    cardStatus={proAvailable(size) ? resolveCommCardStatus('COMMISSIONER_PRO', size, commSubs) : 'unavailable'}
+                                    cardStatus={proAvailable(size) ? resolveCommCardStatus('COMMISSIONER_PRO', size, commSubs, newLeague) : 'unavailable'}
                                     sourceStripeSubId={commSubs.find(s => s.leagueSize === size)?.stripeSubscriptionId}
                                     onUpgrade={handleUpgradeClick}
                                 />
@@ -649,7 +651,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     features={COMM_ALL_PRO_FEATURES}
                                     priceId={commPriceId('All-Pro', size)} tier="COMMISSIONER_ALL_PRO"
                                     leagueName={leagueName}
-                                    cardStatus={resolveCommCardStatus('COMMISSIONER_ALL_PRO', size, commSubs)}
+                                    cardStatus={resolveCommCardStatus('COMMISSIONER_ALL_PRO', size, commSubs, newLeague)}
                                     sourceStripeSubId={commSubs.find(s => s.leagueSize === size)?.stripeSubscriptionId}
                                     onUpgrade={handleUpgradeClick}
                                 />
@@ -659,7 +661,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     features={COMM_ELITE_FEATURES}
                                     priceId={commPriceId('Elite', size)} tier="COMMISSIONER_ELITE"
                                     leagueName={leagueName}
-                                    cardStatus={resolveCommCardStatus('COMMISSIONER_ELITE', size, commSubs)}
+                                    cardStatus={resolveCommCardStatus('COMMISSIONER_ELITE', size, commSubs, newLeague)}
                                     sourceStripeSubId={commSubs.find(s => s.leagueSize === size)?.stripeSubscriptionId}
                                     onUpgrade={handleUpgradeClick}
                                 />

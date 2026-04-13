@@ -9,9 +9,9 @@ export const dynamic = 'force-dynamic';
 export default async function PricingPage({
     searchParams,
 }: {
-    searchParams: Promise<{ tab?: string; error?: string; detail?: string; size?: string; leagueName?: string }>;
+    searchParams: Promise<{ tab?: string; error?: string; detail?: string; size?: string; leagueName?: string; mode?: string }>;
 }) {
-    const { tab, error, detail, size, leagueName: leagueNameParam } = await searchParams;
+    const { tab, error, detail, size, leagueName: leagueNameParam, mode } = await searchParams;
     const defaultTab = tab === 'commissioner' ? 'commissioner' : 'player';
     const defaultSize = size ? parseInt(size) : null;
     const defaultLeagueName = leagueNameParam ? decodeURIComponent(leagueNameParam) : '';
@@ -89,6 +89,7 @@ export default async function PricingPage({
             defaultTab={defaultTab as 'player' | 'commissioner'}
             defaultSize={defaultSize}
             defaultLeagueName={defaultLeagueName}
+            newLeague={mode === 'new'}
             alreadySubscribed={alreadySubscribed}
             checkoutError={checkoutError}
         />

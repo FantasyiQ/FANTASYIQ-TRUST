@@ -20,7 +20,7 @@ export default function SyncedLeaguePicker({ leagues }: { leagues: SyncedLeague[
     function handlePick(league: SyncedLeague) {
         setOpen(false);
         router.push(
-            `/pricing?tab=commissioner&size=${league.totalRosters}&leagueName=${encodeURIComponent(league.leagueName)}`
+            `/pricing?tab=commissioner&mode=new&size=${league.totalRosters}&leagueName=${encodeURIComponent(league.leagueName)}`
         );
     }
 
