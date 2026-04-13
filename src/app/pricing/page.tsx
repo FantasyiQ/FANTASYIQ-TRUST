@@ -35,6 +35,7 @@ export default async function PricingPage({
                 subscriptionTier: true,
                 subscriptions: {
                     where: { status: { in: ['active', 'trialing'] } },
+                    orderBy: { createdAt: 'desc' },
                     select: { type: true, tier: true, leagueSize: true, leagueName: true, stripeSubscriptionId: true },
                 },
                 _count: { select: { connectedLeagues: true } },
@@ -68,9 +69,17 @@ export default async function PricingPage({
                 playerSub = { tier, stripeSubscriptionId: rawPlayerSub.stripeSubscriptionId };
             }
 
-            // Commissioner subs — read from DB (webhook keeps these accurate)
+            // Commissioner subs — read from DB (webhook keeps these accurate).
+            // Ordered by createdAt DESC so the most recent sub per size wins when deduplicating.
+            // (Stale duplicate rows from prior test sessions can exist for the same leagueSize.)
+            const seenSizes = new Set<number>();
             commSubs = user.subscriptions
                 .filter(s => s.type === 'commissioner' && s.stripeSubscriptionId && s.leagueSize)
+                .filter(s => {
+                    if (seenSizes.has(s.leagueSize!)) return false;
+                    seenSizes.add(s.leagueSize!);
+                    return true;
+                })
                 .map(s => ({
                     tier: s.tier,
                     leagueSize: s.leagueSize!,
