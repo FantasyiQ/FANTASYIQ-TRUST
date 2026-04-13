@@ -27,7 +27,11 @@ export async function GET(request: NextRequest): Promise<Response> {
 
     const players = await prisma.sleeperPlayer.findMany({
         where: {
-            active: true,
+            // Include active players OR any player currently on a roster (team != FA)
+            OR: [
+                { active: true },
+                { team: { not: 'FA' } },
+            ],
             fullName: { contains: q, mode: 'insensitive' },
             ...(positions ? { position: { in: positions } } : {}),
         },
