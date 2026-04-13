@@ -208,7 +208,7 @@ export default function FutureDuesClient({ duesId, currentSeason, buyInAmount, m
                 {showForm && (
                     <div className="px-6 py-4 border-b border-gray-800 bg-gray-800/30 space-y-3">
                         <p className="text-xs text-amber-400/80 font-medium">
-                            Log a team that acquired a future pick and will owe dues in that season.
+                            Log a team that traded away a future pick and will owe dues in that season.
                         </p>
                         <div className="grid sm:grid-cols-4 gap-3">
                             <div className="sm:col-span-2">
@@ -261,7 +261,7 @@ export default function FutureDuesClient({ duesId, currentSeason, buyInAmount, m
                 {tabObligations.length === 0 ? (
                     <div className="px-6 py-10 text-center text-gray-500 text-sm">
                         No future dues obligations logged for {tab}.<br />
-                        <span className="text-gray-700 text-xs">Use the Add Obligation button to track teams that acquired future picks.</span>
+                        <span className="text-gray-700 text-xs">Use the Add Obligation button to track teams that traded away future picks.</span>
                     </div>
                 ) : (
                     <ul className="divide-y divide-gray-800/50">

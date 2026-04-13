@@ -60,7 +60,7 @@ export default async function FutureDuesPage({ params }: { params: Promise<{ due
                     </Link>
                     <h1 className="text-2xl font-bold mt-3">Future Dues</h1>
                     <p className="text-gray-400 text-sm mt-1">
-                        Track teams that acquired future draft picks and owe dues in upcoming seasons.
+                        Track teams who traded away future draft picks and owe dues in upcoming seasons.
                     </p>
                 </div>
 
