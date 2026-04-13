@@ -516,7 +516,7 @@ export const PLAYERS: Player[] = [
 
 ];
 
-// Round value ranges: [pickOneValue, lastPickValue] for 2026 (anchor year)
+// Round value ranges: [pickOneValue, lastPickValue] for the nearest draft year (anchor)
 const ROUND_ANCHORS: [number, number][] = [
     [82, 52], // Round 1
     [46, 32], // Round 2
@@ -525,22 +525,30 @@ const ROUND_ANCHORS: [number, number][] = [
     [10,  6], // Round 5
 ];
 
-const YEAR_DISCOUNT: Record<number, number> = {
-    2026: 1.00,
-    2027: 0.83,
-    2028: 0.69,
-};
+const YEAR_DISCOUNTS = [1.00, 0.83, 0.69]; // nearest, +1, +2 year multipliers
 
-// Generates individual draft picks (1.01 … 5.{leagueSize}) for 2026–2028.
+// NFL draft is typically ~April 24. Before that date 2026 picks still trade freely;
+// after that they've been used so futures start at 2027.
+function futurePickYears(): [number, number, number] {
+    const now   = new Date();
+    const year  = now.getFullYear();
+    const month = now.getMonth() + 1; // 1-based
+    const day   = now.getDate();
+    const pastDraft = month > 4 || (month === 4 && day >= 25);
+    const base  = pastDraft ? year + 1 : year;
+    return [base, base + 1, base + 2];
+}
+
+// Generates individual draft picks (1.01 … 5.{leagueSize}) for the next 3 draft years.
 // Age is kept at 22 for dynasty age-curve logic; it is not shown in the UI.
 export function getDraftPicks(leagueSize: number): Player[] {
     const picks: Player[] = [];
     let rank = 500;
 
-    for (const year of [2026, 2027, 2028]) {
-        const discount = YEAR_DISCOUNT[year];
+    for (const [i, year] of futurePickYears().entries()) {
+        const discount = YEAR_DISCOUNTS[i] ?? 0.60;
         for (let round = 1; round <= 5; round++) {
-            const [hi, lo] = ROUND_ANCHORS[round - 1];
+            const [hi, lo] = ROUND_ANCHORS[round - 1]!;
             for (let pick = 1; pick <= leagueSize; pick++) {
                 const t = leagueSize === 1 ? 0 : (pick - 1) / (leagueSize - 1);
                 const value = Math.round((hi + t * (lo - hi)) * discount * 10) / 10;

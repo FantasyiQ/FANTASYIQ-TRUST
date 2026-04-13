@@ -7,6 +7,17 @@ import type { Player, PprFormat, LeagueType, DtvResult } from '@/lib/trade-engin
 const LEAGUE_SIZES = [8, 10, 12, 14, 16, 32] as const;
 type LeagueSize = typeof LEAGUE_SIZES[number];
 
+// Dynamic pick years: before ~April 25 current year is still tradeable; after, shift forward
+function pickYears(): [number, number, number] {
+    const now = new Date();
+    const m = now.getMonth() + 1;
+    const d = now.getDate();
+    const pastDraft = m > 4 || (m === 4 && d >= 25);
+    const base = pastDraft ? now.getFullYear() + 1 : now.getFullYear();
+    return [base, base + 1, base + 2];
+}
+const PICK_YEARS = pickYears();
+
 const TIER_COLORS: Record<string, string> = {
     Elite:   'text-[#C8A951]',
     Star:    'text-green-400',
@@ -148,7 +159,7 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, onAdd
     rosterLabel?: string;
 }) {
     const [tab, setTab]           = useState<'roster' | 'picks'>('roster');
-    const [pickYear, setPickYear] = useState(2026);
+    const [pickYear, setPickYear] = useState(PICK_YEARS[0]);
 
     const sorted = useMemo(() =>
         [...players].sort((a, b) => (POS_ORDER[a.position] ?? 9) - (POS_ORDER[b.position] ?? 9)),
@@ -218,7 +229,7 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, onAdd
                 <div className="space-y-2">
                     {/* Year tabs */}
                     <div className="flex gap-1.5">
-                        {[2026, 2027, 2028].map(y => (
+                        {PICK_YEARS.map(y => (
                             <button key={y} type="button" onClick={() => setPickYear(y)}
                                 className={`px-2.5 py-0.5 rounded text-xs font-semibold border transition ${
                                     pickYear === y
@@ -380,7 +391,7 @@ export default function TradeEvaluator({
     const [leagueType, setLeagueType] = useState<LeagueType>(initialLeagueType);
     const [leagueSize, setLeagueSize] = useState<LeagueSize>(initialLeagueSize);
     const [posFilter, setPosFilter]   = useState('ALL');
-    const [pickYear, setPickYear]     = useState(2026);
+    const [pickYear, setPickYear]     = useState(PICK_YEARS[0]);
     const [sideA, setSideA]           = useState<Player[]>([]);
     const [sideB, setSideB]           = useState<Player[]>([]);
     const [selectedTeamId, setSelectedTeamId] = useState<number | null>(otherTeams[0]?.rosterId ?? null);
@@ -604,7 +615,7 @@ export default function TradeEvaluator({
                     <div className="p-6 space-y-6">
                         {/* Year tabs */}
                         <div className="flex gap-2">
-                            {[2026, 2027, 2028].map(y => (
+                            {PICK_YEARS.map(y => (
                                 <button key={y} onClick={() => setPickYear(y)}
                                     className={`px-4 py-2 rounded-lg text-sm font-semibold transition border ${pickYear === y ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
                                     {y}

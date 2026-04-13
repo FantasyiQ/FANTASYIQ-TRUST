@@ -143,7 +143,11 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
     const rosterIdToSlot = new Map(
         rows.map(row => [row.roster.roster_id, league.totalRosters - row.rank + 1])
     );
-    const FUTURE_SEASONS = ['2026', '2027', '2028'];
+    // NFL draft is typically ~April 24; before that date current-year picks still trade.
+    const _now = new Date();
+    const _pastDraft = _now.getMonth() + 1 > 4 || (_now.getMonth() + 1 === 4 && _now.getDate() >= 25);
+    const _base = _pastDraft ? _now.getFullYear() + 1 : _now.getFullYear();
+    const FUTURE_SEASONS = [String(_base), String(_base + 1), String(_base + 2)];
     const ROUNDS = [1, 2, 3, 4, 5];
     const rosterIds = rosters.map(r => r.roster_id);
 
