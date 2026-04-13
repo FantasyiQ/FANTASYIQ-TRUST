@@ -54,7 +54,7 @@ export default async function FutureDuesPage({ params }: { params: Promise<{ due
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
                     <p className="text-gray-400 text-sm leading-relaxed">
                         When a manager trades away a future year pick (e.g. their 2027 1st round), the team that
-                        <span className="text-white font-medium"> acquires</span> that pick will participate in your
+                        <span className="text-white font-medium"> traded away</span> that pick still participates in your
                         league in that future season — and will owe dues. Log those obligations here so you know
                         who to collect from when the season arrives. Use <span className="text-[#C8A951]">Pay on Behalf</span> to
                         run payment through FantasyIQ Trust, or <span className="text-[#C8A951]">Mark Paid</span> once
