@@ -39,23 +39,99 @@ function verdictColor(v: string) {
     }
 }
 
-function PlayerPill({ result, onRemove }: { result: DtvResult; onRemove: () => void }) {
+const INSIGHT_COLORS: Record<string, string> = {
+    'Rookie Deal':          'bg-emerald-900/50 text-emerald-300 border-emerald-800',
+    '5th-Year Option':      'bg-emerald-900/40 text-emerald-400 border-emerald-800',
+    'Walk Year':            'bg-orange-900/50 text-orange-300 border-orange-800',
+    'Free Agent':           'bg-red-900/50 text-red-300 border-red-800',
+    'Prime RB Age':         'bg-[#C8A951]/10 text-[#C8A951] border-[#C8A951]/30',
+    'RB Decline Risk':      'bg-red-900/40 text-red-400 border-red-800',
+    'WR Prime':             'bg-[#C8A951]/10 text-[#C8A951] border-[#C8A951]/30',
+    'Aging WR':             'bg-orange-900/40 text-orange-400 border-orange-800',
+    'QB Prime':             'bg-[#C8A951]/10 text-[#C8A951] border-[#C8A951]/30',
+    'TE Prime':             'bg-[#C8A951]/10 text-[#C8A951] border-[#C8A951]/30',
+    'Aging TE':             'bg-orange-900/40 text-orange-400 border-orange-800',
+    'TE Target Hog':        'bg-yellow-900/40 text-yellow-300 border-yellow-800',
+    'Pass-Heavy Offense':   'bg-blue-900/40 text-blue-300 border-blue-800',
+    'High-Powered Offense': 'bg-blue-900/40 text-blue-300 border-blue-800',
+    'Run-First Scheme':     'bg-green-900/40 text-green-300 border-green-800',
+    'Heavy Workload':       'bg-green-900/40 text-green-300 border-green-800',
+    'Top-10 Pedigree':      'bg-purple-900/40 text-purple-300 border-purple-800',
+    'High Draft Capital':   'bg-purple-900/30 text-purple-400 border-purple-800',
+    'UDFA Ascent':          'bg-indigo-900/40 text-indigo-300 border-indigo-800',
+};
+
+function InsightBadge({ label }: { label: string }) {
     return (
-        <div className="flex items-center justify-between bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-md border shrink-0 ${POS_COLORS[result.position] ?? 'bg-gray-800 text-gray-400 border-gray-700'}`}>
-                    {result.position}
-                </span>
-                <div className="min-w-0">
-                    <p className="text-white text-sm font-semibold truncate">{result.name}</p>
-                    <p className="text-gray-500 text-xs">{result.position === 'PICK' ? `${result.team} Draft` : `${result.team}${result.age ? ` · Age ${result.age}` : ''}`}</p>
+        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${INSIGHT_COLORS[label] ?? 'bg-gray-800 text-gray-400 border-gray-700'}`}>
+            {label}
+        </span>
+    );
+}
+
+function FactorBar({ label, value, max = 1.30 }: { label: string; value: number; max?: number }) {
+    const pct = Math.min(100, Math.round((value / max) * 100));
+    const color = value >= 1.10 ? 'bg-[#C8A951]' : value >= 0.98 ? 'bg-green-500' : value >= 0.88 ? 'bg-orange-500' : 'bg-red-500';
+    return (
+        <div className="flex items-center gap-2">
+            <span className="text-gray-600 text-[10px] w-16 shrink-0">{label}</span>
+            <div className="flex-1 bg-gray-700 rounded-full h-1.5">
+                <div className={`${color} h-1.5 rounded-full transition-all`} style={{ width: `${pct}%` }} />
+            </div>
+            <span className="text-gray-500 text-[10px] w-8 text-right">{value.toFixed(2)}×</span>
+        </div>
+    );
+}
+
+function PlayerPill({ result, onRemove, leagueType }: { result: DtvResult; onRemove: () => void; leagueType: LeagueType }) {
+    const [expanded, setExpanded] = useState(false);
+
+    return (
+        <div className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-md border shrink-0 ${POS_COLORS[result.position] ?? 'bg-gray-800 text-gray-400 border-gray-700'}`}>
+                        {result.position}
+                    </span>
+                    <div className="min-w-0">
+                        <p className="text-white text-sm font-semibold truncate">{result.name}</p>
+                        <p className="text-gray-500 text-xs">{result.position === 'PICK' ? `${result.team} Draft` : `${result.team}${result.age ? ` · Age ${result.age}` : ''}`}</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                    <div className="text-right">
+                        <p className={`font-bold text-sm ${TIER_COLORS[result.tier]}`}>{result.finalDtv}</p>
+                        <p className="text-gray-600 text-xs">{result.tier}</p>
+                    </div>
+                    {result.position !== 'PICK' && (
+                        <button
+                            onClick={() => setExpanded(v => !v)}
+                            className="text-gray-600 hover:text-gray-300 transition text-xs px-1"
+                            title="Show factors">
+                            {expanded ? '▲' : '▼'}
+                        </button>
+                    )}
+                    <button onClick={onRemove} className="text-gray-700 hover:text-red-400 transition text-lg leading-none">×</button>
                 </div>
             </div>
-            <div className="text-right shrink-0">
-                <p className={`font-bold text-sm ${TIER_COLORS[result.tier]}`}>{result.finalDtv}</p>
-                <p className="text-gray-600 text-xs">{result.tier}</p>
-            </div>
-            <button onClick={onRemove} className="text-gray-700 hover:text-red-400 transition text-lg leading-none shrink-0">×</button>
+
+            {/* Insight badges */}
+            {result.insights && result.insights.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                    {result.insights.map(i => <InsightBadge key={i} label={i} />)}
+                </div>
+            )}
+
+            {/* Expanded factor breakdown */}
+            {expanded && result.position !== 'PICK' && (
+                <div className="space-y-1 pt-1 border-t border-gray-700">
+                    <FactorBar label="Position"  value={result.posMultiplier} />
+                    <FactorBar label="Age Curve"  value={result.ageMultiplier} />
+                    <FactorBar label="Scheme"     value={result.schedFactor} />
+                    <FactorBar label="Contract"   value={result.situFactor} />
+                    {leagueType === 'Dynasty' && <FactorBar label="Draft Cap"  value={result.draftCapFactor} />}
+                </div>
+            )}
         </div>
     );
 }
@@ -243,13 +319,22 @@ function PlayerSearch({ onAdd, excluded, ppr, leagueType, players }: {
                             <li key={p.name}>
                                 <button
                                     onMouseDown={() => { onAdd(p); setQuery(''); setResults([]); }}
-                                    className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-700 transition text-left gap-3">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded border shrink-0 ${POS_COLORS[p.position] ?? ''}`}>
+                                    className="w-full flex items-start justify-between px-4 py-2.5 hover:bg-gray-700 transition text-left gap-3">
+                                    <div className="flex items-start gap-2 min-w-0">
+                                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${POS_COLORS[p.position] ?? ''}`}>
                                             {p.position}
                                         </span>
-                                        <span className="text-white text-sm truncate">{p.name}</span>
-                                        <span className="text-gray-500 text-xs">{p.team}</span>
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-white text-sm truncate">{p.name}</span>
+                                                <span className="text-gray-500 text-xs">{p.team}</span>
+                                            </div>
+                                            {dtv.insights && dtv.insights.length > 0 && (
+                                                <div className="flex flex-wrap gap-1 mt-0.5">
+                                                    {dtv.insights.map(i => <InsightBadge key={i} label={i} />)}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="text-right shrink-0">
                                         <span className={`text-sm font-bold ${TIER_COLORS[dtv.tier]}`}>{dtv.finalDtv}</span>
@@ -394,7 +479,7 @@ export default function TradeEvaluator({
                     <PlayerSearch onAdd={p => setSideA(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} players={allPlayers} />
                     <div className="space-y-2">
                         {result?.sideA.map(r => (
-                            <PlayerPill key={r.name} result={r} onRemove={() => setSideA(prev => prev.filter(p => p.name !== r.name))} />
+                            <PlayerPill key={r.name} result={r} leagueType={leagueType} onRemove={() => setSideA(prev => prev.filter(p => p.name !== r.name))} />
                         ))}
                         {sideA.length === 0 && <p className="text-gray-600 text-sm text-center py-4">Search and add up to 5 players</p>}
                     </div>
@@ -433,7 +518,7 @@ export default function TradeEvaluator({
                     <PlayerSearch onAdd={p => setSideB(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} players={allPlayers} />
                     <div className="space-y-2">
                         {result?.sideB.map(r => (
-                            <PlayerPill key={r.name} result={r} onRemove={() => setSideB(prev => prev.filter(p => p.name !== r.name))} />
+                            <PlayerPill key={r.name} result={r} leagueType={leagueType} onRemove={() => setSideB(prev => prev.filter(p => p.name !== r.name))} />
                         ))}
                         {sideB.length === 0 && <p className="text-gray-600 text-sm text-center py-4">Search and add up to 5 players</p>}
                     </div>
@@ -565,6 +650,7 @@ export default function TradeEvaluator({
                                     <th className="text-left px-3 py-3 text-gray-500 font-medium">Player</th>
                                     <th className="text-left px-3 py-3 text-gray-500 font-medium">Pos</th>
                                     <th className="text-left px-3 py-3 text-gray-500 font-medium">Team</th>
+                                    <th className="text-left px-3 py-3 text-gray-500 font-medium hidden sm:table-cell">Intel</th>
                                     <th className="text-right px-3 py-3 text-gray-500 font-medium">DTV</th>
                                     <th className="text-right px-4 py-3 text-gray-500 font-medium">Tier</th>
                                 </tr>
@@ -582,6 +668,11 @@ export default function TradeEvaluator({
                                                 </span>
                                             </td>
                                             <td className="px-3 py-3 text-gray-400">{p.team}</td>
+                                            <td className="px-3 py-3 hidden sm:table-cell">
+                                                <div className="flex flex-wrap gap-1">
+                                                    {dtv.insights?.map(i => <InsightBadge key={i} label={i} />)}
+                                                </div>
+                                            </td>
                                             <td className="px-3 py-3 text-right font-bold text-white">{dtv.finalDtv}</td>
                                             <td className={`px-4 py-3 text-right font-semibold text-xs ${TIER_COLORS[dtv.tier]}`}>{dtv.tier}</td>
                                         </tr>

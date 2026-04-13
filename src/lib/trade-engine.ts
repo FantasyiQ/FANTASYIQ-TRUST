@@ -1,6 +1,10 @@
 // FantasyIQ Trust — Dynamic Trade Value Engine
-// Formula: BaseValue × WeightedFactors (6 factors summing to 1.0)
+// Formula: BaseValue × WeightedFactors (7 factors summing to 1.0)
 // Trade Score: 0–100 scale based on DTV differential
+// Dynasty vs Redraft use distinct weight sets
+
+import { getPlayerIntel } from './player-intelligence';
+export type { ContractTier } from './player-intelligence';
 
 export interface Player {
     rank:      number;
@@ -15,26 +19,40 @@ export interface DtvResult extends Player {
     posMultiplier:  number;
     ageMultiplier:  number;
     perfFactor:     number;
-    schedFactor:    number;
+    schedFactor:    number;   // = schemeFit
     injuryFactor:   number;
-    situFactor:     number;
+    situFactor:     number;   // = contractFactor
+    draftCapFactor: number;   // NEW: draft pedigree weight
     rawDtv:         number;
     pprBoost:       number;
     finalDtv:       number;
     tier:           string;
+    insights:       string[]; // NEW: badge labels
 }
 
 export type PprFormat = 0 | 0.5 | 1 | 'te_prem';
 export type LeagueType = 'Redraft' | 'Dynasty';
 
-// Factor weights — sum to 1.0
-const WEIGHTS = {
-    posScarcity:   0.25,
-    ageCurve:      0.20,
-    recentPerf:    0.20,
-    schedStrength: 0.15,
-    injuryRisk:    0.10,
-    teamSituation: 0.10,
+// Dynasty weights: age & contract matter far more
+const DYNASTY_WEIGHTS = {
+    posScarcity:    0.20,
+    ageCurve:       0.22,
+    recentPerf:     0.15,
+    schemeFit:      0.15,
+    contractFactor: 0.12,
+    draftCapital:   0.08,
+    injuryRisk:     0.08,
+};
+
+// Redraft weights: current production & scheme usage dominate
+const REDRAFT_WEIGHTS = {
+    posScarcity:    0.28,
+    ageCurve:       0.06,
+    recentPerf:     0.25,
+    schemeFit:      0.18,
+    contractFactor: 0.04,
+    draftCapital:   0.03,
+    injuryRisk:     0.16,
 };
 
 const SCARCITY: Record<string, number> = {
@@ -57,14 +75,7 @@ const CATCH_RATE: Record<string, number> = {
     PICK: 0,
 };
 
-function ageMultiplier(position: string, age: number, leagueType: LeagueType): number {
-    if (leagueType === 'Redraft') return 1.0;
-    if (position === 'K' || position === 'DEF' || position === 'PICK') return 1.0;
-    if (age <= 24) return 1.15;
-    if (age <= 27) return 1.05;
-    if (age <= 30) return 0.95;
-    return 0.85;
-}
+// Age multiplier is now handled by getPlayerIntel's ageFactor (per-position curves)
 
 function tier(finalDtv: number): string {
     if (finalDtv >= 85) return 'Elite';
@@ -95,19 +106,28 @@ export function calcDtv(
     leagueType: LeagueType = 'Redraft',
     factors: PlayerFactors = DEFAULT_FACTORS,
 ): DtvResult {
+    const W = leagueType === 'Dynasty' ? DYNASTY_WEIGHTS : REDRAFT_WEIGHTS;
+
     const posM  = SCARCITY[player.position] ?? 1;
-    const ageM  = ageMultiplier(player.position, player.age, leagueType);
-    const { perfFactor, schedFactor, injuryFactor, situFactor } = factors;
+    const intel = getPlayerIntel(player.name, player.position, player.team, player.age, leagueType);
+    const ageM  = intel.ageFactor;
+
+    const { perfFactor, injuryFactor } = factors;
+    // schedFactor override (from caller) or use scheme intelligence
+    const schemeM   = factors.schedFactor  !== 1.0 ? factors.schedFactor  : intel.schemeFit;
+    const contractM = factors.situFactor   !== 1.0 ? factors.situFactor   : intel.contractFactor;
+    const draftCapM = intel.draftCapFactor;
 
     const composite =
-        posM         * WEIGHTS.posScarcity   +
-        ageM         * WEIGHTS.ageCurve      +
-        perfFactor   * WEIGHTS.recentPerf    +
-        schedFactor  * WEIGHTS.schedStrength +
-        injuryFactor * WEIGHTS.injuryRisk    +
-        situFactor   * WEIGHTS.teamSituation;
+        posM       * W.posScarcity    +
+        ageM       * W.ageCurve       +
+        perfFactor * W.recentPerf     +
+        schemeM    * W.schemeFit      +
+        contractM  * W.contractFactor +
+        draftCapM  * W.draftCapital   +
+        injuryFactor * W.injuryRisk;
 
-    // TE Premium: TEs score 1.5× per catch (full PPR + 0.5 bonus), everyone else full PPR
+    // TE Premium: TEs score 1.5× per catch, everyone else full PPR
     const effectivePpr = ppr === 'te_prem'
         ? (player.position === 'TE' ? 1.5 : 1.0)
         : ppr;
@@ -118,16 +138,18 @@ export function calcDtv(
 
     return {
         ...player,
-        posMultiplier: posM,
-        ageMultiplier: ageM,
+        posMultiplier:  posM,
+        ageMultiplier:  ageM,
         perfFactor,
-        schedFactor,
+        schedFactor:    schemeM,
         injuryFactor,
-        situFactor,
+        situFactor:     contractM,
+        draftCapFactor: draftCapM,
         rawDtv,
         pprBoost,
         finalDtv,
-        tier: tier(finalDtv),
+        tier:           tier(finalDtv),
+        insights:       intel.insights,
     };
 }
 
