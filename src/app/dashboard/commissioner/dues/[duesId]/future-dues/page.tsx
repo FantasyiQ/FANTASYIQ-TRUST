@@ -64,6 +64,7 @@ export default async function FutureDuesPage({ params }: { params: Promise<{ due
 
                 <FutureDuesClient
                     duesId={duesId}
+                    currentSeason={dues.season}
                     buyInAmount={dues.buyInAmount}
                     members={dues.members}
                     obligations={dues.futureDues}
