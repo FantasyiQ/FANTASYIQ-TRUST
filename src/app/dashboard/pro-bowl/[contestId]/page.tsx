@@ -21,6 +21,7 @@ export default async function ProBowlEntryPage({ params }: { params: Promise<{ c
             season: true,
             week: true,
             status: true,
+            leagueName: true,
             leagueDues: { select: { leagueName: true } },
             entries: {
                 where: { userId: user.id },
@@ -39,7 +40,7 @@ export default async function ProBowlEntryPage({ params }: { params: Promise<{ c
                 <div>
                     <h1 className="text-2xl font-bold">Pro Bowl Lineup</h1>
                     <p className="text-gray-400 text-sm mt-1">
-                        {contest.leagueDues.leagueName} · {contest.season} Season · Week {contest.week}
+                        {contest.leagueName ?? contest.leagueDues?.leagueName} · {contest.season} Season · Week {contest.week}
                     </p>
                 </div>
 

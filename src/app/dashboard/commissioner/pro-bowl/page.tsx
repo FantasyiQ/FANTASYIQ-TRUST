@@ -21,31 +21,29 @@ export default async function ProBowlPage() {
 
     if (!user) redirect('/sign-in');
 
-    // Fetch all dues trackers for this commissioner with their pro bowl contests
-    const duesTrackers = await prisma.leagueDues.findMany({
-        where: { commissionerId: user.id },
-        select: {
-            id:         true,
-            leagueName: true,
-            proBowl: {
-                select: {
-                    id:     true,
-                    season: true,
-                    status: true,
-                    _count: { select: { entries: true } },
-                },
+    // Fetch all dues trackers and contests for this commissioner
+    const [duesTrackers, contests] = await Promise.all([
+        prisma.leagueDues.findMany({
+            where: { commissionerId: user.id },
+            select: { id: true, leagueName: true },
+        }),
+        prisma.proBowlContest.findMany({
+            where: { commissionerId: user.id },
+            select: {
+                id: true, leagueName: true, season: true, status: true,
+                _count: { select: { entries: true } },
             },
-        },
-    });
+        }),
+    ]);
 
-    // Build a map: leagueName (lowercase) → dues tracker
-    const duesMap = new Map(duesTrackers.map(d => [d.leagueName.toLowerCase().trim(), d]));
+    const duesMap    = new Map(duesTrackers.map(d => [d.leagueName.toLowerCase().trim(), d]));
+    const contestMap = new Map(contests.map(c => [c.leagueName?.toLowerCase().trim() ?? '', c]));
 
     // Build league cards from connected leagues
     const leagues: LeagueCard[] = user.connectedLeagues.map(cl => {
-        const key   = cl.leagueName.toLowerCase().trim();
-        const dues  = duesMap.get(key) ?? null;
-        const contest = dues?.proBowl ?? null;
+        const key     = cl.leagueName.toLowerCase().trim();
+        const dues    = duesMap.get(key) ?? null;
+        const contest = contestMap.get(key) ?? null;
         return {
             leagueName:     cl.leagueName,
             platform:       cl.platform,

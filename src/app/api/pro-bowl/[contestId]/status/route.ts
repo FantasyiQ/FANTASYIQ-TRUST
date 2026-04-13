@@ -22,10 +22,10 @@ export async function POST(
 
     const contest = await prisma.proBowlContest.findUnique({
         where: { id: contestId },
-        select: { id: true, status: true, leagueDues: { select: { commissionerId: true } } },
+        select: { id: true, status: true, commissionerId: true },
     });
     if (!contest) return Response.json({ error: 'Contest not found.' }, { status: 404 });
-    if (contest.leagueDues.commissionerId !== user.id) return Response.json({ error: 'Forbidden.' }, { status: 403 });
+    if (contest.commissionerId !== user.id) return Response.json({ error: 'Forbidden.' }, { status: 403 });
 
     const body = await request.json() as { status?: string };
     const nextStatus = body.status;

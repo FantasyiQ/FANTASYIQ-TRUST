@@ -33,14 +33,17 @@ function CreateCard({ card }: { card: LeagueCard }) {
     const [error, setError] = useState('');
 
     async function handleCreate() {
-        if (!card.duesId) return;
         setLoading(true);
         setError('');
         const season = new Date().getFullYear().toString();
         const res = await fetch('/api/pro-bowl/create', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ leagueDuesId: card.duesId, season }),
+            body: JSON.stringify({
+                leagueName: card.leagueName,
+                season,
+                ...(card.duesId ? { leagueDuesId: card.duesId } : {}),
+            }),
         });
         const data = await res.json() as { id?: string; error?: string };
         if (!res.ok || !data.id) { setError(data.error ?? 'Failed to create.'); setLoading(false); return; }
@@ -106,26 +109,8 @@ export default function ProBowlLeagueGrid({ leagues }: { leagues: LeagueCard[] }
                     );
                 }
 
-                // Has dues tracker but no contest → create inline
-                if (card.duesId) {
-                    return <CreateCard key={card.leagueName} card={card} />;
-                }
-
-                // No dues tracker → link to dues setup
-                return (
-                    <Link key={card.leagueName}
-                        href="/dashboard/commissioner/dues"
-                        className="group block bg-gray-900 border border-gray-800 hover:border-gray-600 rounded-2xl p-6 transition opacity-60 hover:opacity-80">
-                        <div className="flex items-start justify-between gap-2 mb-3">
-                            <p className="font-bold text-white leading-snug">{card.leagueName}</p>
-                            {card.platform && <span className="text-xs text-gray-600 shrink-0 mt-0.5">{card.platform}</span>}
-                        </div>
-                        <p className="text-gray-600 text-sm">Set up a dues tracker first</p>
-                        <div className="mt-4 text-gray-500 text-sm font-semibold opacity-0 group-hover:opacity-100 transition">
-                            Set Up Dues →
-                        </div>
-                    </Link>
-                );
+                // No contest yet → create inline (works with or without dues tracker)
+                return <CreateCard key={card.leagueName} card={card} />;
             })}
         </div>
     );

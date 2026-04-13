@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-export default function CreateProBowlButton({ duesId }: { duesId: string }) {
+export default function CreateProBowlButton({ duesId, leagueName }: { duesId: string; leagueName: string }) {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -14,7 +14,7 @@ export default function CreateProBowlButton({ duesId }: { duesId: string }) {
         const res = await fetch('/api/pro-bowl/create', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ leagueDuesId: duesId, season: new Date().getFullYear().toString() }),
+            body: JSON.stringify({ leagueName, leagueDuesId: duesId, season: new Date().getFullYear().toString() }),
         });
         const data = await res.json();
         setLoading(false);

@@ -166,7 +166,7 @@ export default async function DuesTrackerPage({ params }: { params: Promise<{ du
                             </Link>
                         </div>
                     ) : (
-                        <CreateProBowlButton duesId={duesId} />
+                        <CreateProBowlButton duesId={duesId} leagueName={dues.leagueName} />
                     )}
                 </div>
 

@@ -39,6 +39,7 @@ model User {
     commissionerDues LeagueDues[]      @relation("CommissionerDues")
     duesMemberships  DuesMember[]      @relation("MemberDues")
     proBowlEntries   ProBowlEntry[]    @relation("ProBowlEntries")
+    proBowlContests  ProBowlContest[]  @relation("CommissionerProBowl")
     announcements    Announcement[]    @relation("AuthorAnnouncements")
 }
 
@@ -277,17 +278,22 @@ model PollVote {
 
 // Week 18 free contest — DK-style, no salary, uses league scoring settings.
 model ProBowlContest {
-    id           String    @id @default(cuid())
-    leagueDuesId String    @unique
-    season       String
-    week         Int       @default(18)
+    id              String    @id @default(cuid())
+    leagueDuesId    String?   @unique  // optional link to dues tracker
+    commissionerId  String?
+    leagueName      String?
+    season          String
+    week            Int       @default(18)
     // setup | open | locked | scoring | complete
-    status       String    @default("setup")
-    scoringSettings Json?  // copied from league scoring settings
-    createdAt    DateTime  @default(now())
+    status          String    @default("setup")
+    scoringSettings Json?
+    createdAt       DateTime  @default(now())
 
-    leagueDues   LeagueDues       @relation(fields: [leagueDuesId], references: [id], onDelete: Cascade)
+    leagueDues   LeagueDues?      @relation(fields: [leagueDuesId], references: [id], onDelete: SetNull)
+    commissioner User?            @relation("CommissionerProBowl", fields: [commissionerId], references: [id], onDelete: Cascade)
     entries      ProBowlEntry[]
+
+    @@index([commissionerId])
 }
 
 // ── League Documents (bylaws, rulebooks, etc.) ────────────────────────────────

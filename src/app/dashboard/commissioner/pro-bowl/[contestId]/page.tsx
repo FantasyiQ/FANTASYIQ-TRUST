@@ -20,7 +20,7 @@ export default async function ManageProBowlPage({ params }: { params: Promise<{ 
     const contest = await prisma.proBowlContest.findUnique({
         where: { id: contestId },
         include: {
-            leagueDues: { select: { id: true, commissionerId: true, leagueName: true } },
+            leagueDues: { select: { id: true } },
             entries: {
                 include: { user: { select: { name: true, email: true } } },
                 orderBy: [{ totalPoints: 'desc' }, { createdAt: 'asc' }],
@@ -29,18 +29,19 @@ export default async function ManageProBowlPage({ params }: { params: Promise<{ 
     });
 
     if (!contest) notFound();
-    if (contest.leagueDues.commissionerId !== user.id) redirect('/dashboard/commissioner/dues');
+    if (contest.commissionerId !== user.id) redirect('/dashboard/commissioner/pro-bowl');
 
-    const entryUrl = `/dashboard/pro-bowl/${contestId}`;
+    const leagueName = contest.leagueName ?? contest.leagueDues?.id ?? 'League';
+    const entryUrl   = `/dashboard/pro-bowl/${contestId}`;
 
     return (
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
             <div className="max-w-4xl mx-auto space-y-6">
                 <div>
-                    <Link href={`/dashboard/commissioner/dues/${contest.leagueDues.id}`} className="text-gray-500 hover:text-gray-300 text-sm transition">
-                        ← Back to League Tracker
+                    <Link href="/dashboard/commissioner/pro-bowl" className="text-gray-500 hover:text-gray-300 text-sm transition">
+                        ← Back to Pro Bowl
                     </Link>
-                    <h1 className="text-2xl font-bold mt-3">Pro Bowl — {contest.leagueDues.leagueName}</h1>
+                    <h1 className="text-2xl font-bold mt-3">Pro Bowl — {leagueName}</h1>
                     <p className="text-gray-400 text-sm mt-1">{contest.season} Season · Week {contest.week} · {POSITIONS.length} roster spots · Free contest</p>
                 </div>
 
