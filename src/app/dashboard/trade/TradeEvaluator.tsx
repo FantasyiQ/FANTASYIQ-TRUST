@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { PLAYERS, getDraftPicks, evaluateTrade, calcDtv } from '@/lib/trade-engine';
 import type { Player, PprFormat, LeagueType, DtvResult } from '@/lib/trade-engine';
 
@@ -191,37 +191,58 @@ function PlayerSearch({ onAdd, excluded, ppr, leagueType, players }: {
     leagueType: LeagueType;
     players: Player[];
 }) {
-    const [query, setQuery] = useState('');
+    const [query, setQuery]     = useState('');
+    const [results, setResults] = useState<Player[]>([]);
+    const [loading, setLoading] = useState(false);
+    const debounceRef           = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const results = useMemo(() => {
-        if (!query.trim()) return [];
-        const q = query.toLowerCase();
-        return players
-            .filter(p => !excluded.includes(p.name) && (
-                p.name.toLowerCase().includes(q) ||
-                p.position.toLowerCase().includes(q) ||
-                p.team.toLowerCase().includes(q)
-            ))
-            .slice(0, 8);
-    }, [query, excluded, players]);
+    const search = useCallback(async (q: string) => {
+        if (q.length < 2) { setResults([]); return; }
+        setLoading(true);
+        try {
+            const res = await fetch(`/api/players/trade-search?q=${encodeURIComponent(q)}`);
+            const data = await res.json() as Player[];
+            setResults(data.filter(p => !excluded.includes(p.name)));
+        } catch { /* ignore */ }
+        finally { setLoading(false); }
+    }, [excluded]);
+
+    function handleInput(e: React.ChangeEvent<HTMLInputElement>) {
+        const val = e.target.value;
+        setQuery(val);
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => { void search(val); }, 250);
+    }
+
+    // Keep roster quick-pick working (still searches local players array)
+    const localResults = useMemo(() => {
+        if (query.length >= 2) return [];
+        return players;
+    }, [query, players]);
+    void localResults; // unused — roster picks handled by RosterQuickPick
 
     return (
         <div className="relative">
-            <input
-                type="text"
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                placeholder="Search player, position, or team…"
-                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/60"
-            />
+            <div className="relative">
+                <input
+                    type="text"
+                    value={query}
+                    onChange={handleInput}
+                    placeholder="Search any NFL player…"
+                    className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/60"
+                />
+                {loading && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 text-xs">…</span>
+                )}
+            </div>
             {results.length > 0 && (
-                <ul className="absolute z-10 left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-xl overflow-hidden shadow-xl">
+                <ul className="absolute z-10 left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-xl overflow-hidden shadow-xl max-h-64 overflow-y-auto">
                     {results.map(p => {
                         const dtv = calcDtv(p, ppr, leagueType);
                         return (
                             <li key={p.name}>
                                 <button
-                                    onClick={() => { onAdd(p); setQuery(''); }}
+                                    onMouseDown={() => { onAdd(p); setQuery(''); setResults([]); }}
                                     className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-700 transition text-left gap-3">
                                     <div className="flex items-center gap-2 min-w-0">
                                         <span className={`text-xs font-bold px-1.5 py-0.5 rounded border shrink-0 ${POS_COLORS[p.position] ?? ''}`}>
