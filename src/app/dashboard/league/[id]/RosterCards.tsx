@@ -85,7 +85,7 @@ function TeamCard({ team, players, defaultOpen }: {
     });
 
     return (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+        <div id={`team-${team.rosterId}`} className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden scroll-mt-28">
             <button type="button" onClick={() => setOpen(v => !v)}
                 className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-800/40 transition text-left">
                 <span className="text-gray-500 font-semibold text-sm w-5 shrink-0">{team.rank}</span>

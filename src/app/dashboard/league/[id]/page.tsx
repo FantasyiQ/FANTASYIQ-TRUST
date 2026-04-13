@@ -241,7 +241,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                                     <tr key={row.roster.roster_id} className="border-b border-gray-800/50 last:border-0 hover:bg-gray-800/20 transition-colors">
                                         <td className="px-6 py-4 text-gray-500 font-medium">{row.rank}</td>
                                         <td className="px-4 py-4">
-                                            <div className="flex items-center gap-3">
+                                            <a href={`#team-${row.roster.roster_id}`} className="flex items-center gap-3 group">
                                                 {row.member?.avatar ? (
                                                     <Image src={`https://sleepercdn.com/avatars/thumbs/${row.member.avatar}`}
                                                         alt={row.teamName} width={28} height={28} className="rounded-full shrink-0" />
@@ -251,10 +251,10 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                                                     </div>
                                                 )}
                                                 <div>
-                                                    <p className="font-medium text-white">{row.teamName}</p>
+                                                    <p className="font-medium text-white group-hover:text-[#C8A951] transition">{row.teamName}</p>
                                                     {row.member && <p className="text-gray-600 text-xs">@{row.member.username}</p>}
                                                 </div>
-                                            </div>
+                                            </a>
                                         </td>
                                         <td className="px-4 py-4 text-center font-semibold text-white">{row.wins}</td>
                                         <td className="px-4 py-4 text-center text-gray-400">{row.losses}</td>
