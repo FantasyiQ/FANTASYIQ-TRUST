@@ -8,6 +8,7 @@ interface ConnectedLeague {
     leagueName: string;
     platform: string | null;
     createdAt: string | Date;
+    syncedLeagueId?: string; // League.id — set immediately on add, so link appears without name-matching
 }
 
 interface SyncedLeague {
@@ -87,7 +88,9 @@ export default function ConnectedLeagues({ leagues: initial, syncedLeagues = [],
                     setError((data as { error?: string }).error ?? 'Failed to add league.');
                     return;
                 }
-                setLeagues(prev => [...prev, data]);
+                // Attach League.id if name matches a synced league so link appears immediately
+                const syncedLeagueId = syncedIdByName.get(leagueName.trim().toLowerCase());
+                setLeagues(prev => [...prev, { ...data, syncedLeagueId }]);
                 setLeagueName('');
                 setPlatform('');
                 setShowForm(false);
@@ -112,7 +115,8 @@ export default function ConnectedLeagues({ leagues: initial, syncedLeagues = [],
                     setError((data as { error?: string }).error ?? 'Failed to add league.');
                     return;
                 }
-                setLeagues(prev => [...prev, data]);
+                // Store the League.id directly so the link appears immediately without name-matching
+                setLeagues(prev => [...prev, { ...data, syncedLeagueId: sl.id }]);
             } catch {
                 setError('Network error. Please try again.');
             }
@@ -276,7 +280,7 @@ export default function ConnectedLeagues({ leagues: initial, syncedLeagues = [],
                 <ul className="space-y-1.5">
                     {leagues.map(l => {
                         const locked = isLocked(l.createdAt);
-                        const syncedId = syncedIdByName.get(l.leagueName.toLowerCase());
+                        const syncedId = l.syncedLeagueId ?? syncedIdByName.get(l.leagueName.toLowerCase());
                         return (
                             <li key={l.id} className="flex items-center justify-between gap-3 px-3 py-2 bg-gray-800/50 rounded-lg">
                                 <div className="min-w-0 flex-1">
