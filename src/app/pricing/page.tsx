@@ -9,10 +9,12 @@ export const dynamic = 'force-dynamic';
 export default async function PricingPage({
     searchParams,
 }: {
-    searchParams: Promise<{ tab?: string; error?: string; detail?: string }>;
+    searchParams: Promise<{ tab?: string; error?: string; detail?: string; size?: string; leagueName?: string }>;
 }) {
-    const { tab, error, detail } = await searchParams;
+    const { tab, error, detail, size, leagueName: leagueNameParam } = await searchParams;
     const defaultTab = tab === 'commissioner' ? 'commissioner' : 'player';
+    const defaultSize = size ? parseInt(size) : null;
+    const defaultLeagueName = leagueNameParam ? decodeURIComponent(leagueNameParam) : '';
     const alreadySubscribed = error === 'already-subscribed';
     const checkoutError =
         error === 'checkout-failed'       ? `Something went wrong starting checkout.${detail ? ` ${decodeURIComponent(detail)}` : ' Please try again.'}` :
@@ -85,6 +87,8 @@ export default async function PricingPage({
             activeCommCount={commSubs.length}
             activePlayerLeagueCount={activePlayerLeagueCount}
             defaultTab={defaultTab as 'player' | 'commissioner'}
+            defaultSize={defaultSize}
+            defaultLeagueName={defaultLeagueName}
             alreadySubscribed={alreadySubscribed}
             checkoutError={checkoutError}
         />

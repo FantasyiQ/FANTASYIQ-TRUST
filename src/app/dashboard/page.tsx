@@ -243,7 +243,9 @@ export default async function DashboardPage() {
                                                     {COMM_TIER_BADGE[sub.tier].label}
                                                 </span>
                                             ) : (
-                                                <Link href="/pricing?tab=commissioner" className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border shrink-0 transition hover:opacity-80 ${COMM_TIER_BADGE[sub.tier].className}`}>
+                                                <Link
+                                                    href={`/pricing?tab=commissioner&size=${sub.leagueSize ?? 12}&leagueName=${encodeURIComponent(sub.leagueName ?? '')}`}
+                                                    className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border shrink-0 transition hover:opacity-80 ${COMM_TIER_BADGE[sub.tier].className}`}>
                                                     {COMM_TIER_BADGE[sub.tier].label} ↑
                                                 </Link>
                                             )

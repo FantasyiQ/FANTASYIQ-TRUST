@@ -26,6 +26,8 @@ interface Props {
     activeCommCount: number;
     activePlayerLeagueCount: number;
     defaultTab: Tab;
+    defaultSize?: number | null;
+    defaultLeagueName?: string;
     alreadySubscribed?: boolean;
     checkoutError?: string | null;
 }
@@ -447,11 +449,12 @@ function resolveCommCardStatus(cardTier: string, size: TeamSize, commSubs: CommS
 }
 
 /* ── Main component ───────────────────────────────────────────────── */
-export default function PricingClient({ playerSub, commSubs, activeCommCount, activePlayerLeagueCount, defaultTab, alreadySubscribed, checkoutError }: Props) {
+export default function PricingClient({ playerSub, commSubs, activeCommCount, activePlayerLeagueCount, defaultTab, defaultSize, defaultLeagueName, alreadySubscribed, checkoutError }: Props) {
     const { update: updateSession } = useSession();
     const [tab, setTab]       = useState<Tab>(defaultTab);
-    const [size, setSize]     = useState<TeamSize>(12);
-    const [leagueName, setLeagueName] = useState('');
+    const [size, setSize]     = useState<TeamSize>((TEAM_SIZES.includes(defaultSize as TeamSize) ? defaultSize : 12) as TeamSize);
+    const [leagueName, setLeagueName] = useState(defaultLeagueName ?? '');
+    const leagueNameLocked = !!defaultLeagueName;
     const [pending, setPending]       = useState<PendingUpgrade | null>(null);
     const [upgrading, setUpgrading]   = useState(false);
     const [upgradeError, setUpgradeError] = useState<string | null>(null);
@@ -553,17 +556,21 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                             {/* League name input */}
                             <div>
                                 <label htmlFor="leagueName" className="block text-center text-gray-400 text-sm font-medium mb-2">
-                                    League Name <span className="text-red-400">*</span>
+                                    League Name {!leagueNameLocked && <span className="text-red-400">*</span>}
                                 </label>
-                                <input
-                                    id="leagueName"
-                                    type="text"
-                                    value={leagueName}
-                                    onChange={e => setLeagueName(e.target.value)}
-                                    placeholder="e.g. Monday Night Mayhem"
-                                    maxLength={80}
-                                    className="block mx-auto w-full max-w-sm bg-gray-900 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#C9A227]/60"
-                                />
+                                {leagueNameLocked ? (
+                                    <p className="text-center text-white font-semibold text-sm">{leagueName}</p>
+                                ) : (
+                                    <input
+                                        id="leagueName"
+                                        type="text"
+                                        value={leagueName}
+                                        onChange={e => setLeagueName(e.target.value)}
+                                        placeholder="e.g. Monday Night Mayhem"
+                                        maxLength={80}
+                                        className="block mx-auto w-full max-w-sm bg-gray-900 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#C9A227]/60"
+                                    />
+                                )}
                             </div>
 
                             {/* Size picker */}
