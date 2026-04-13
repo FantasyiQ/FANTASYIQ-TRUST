@@ -100,7 +100,7 @@ export const PLAYER_CONTRACTS: Record<string, ContractTier> = {
     // ── Veteran / market-rate ─────────────────────────────────────────────
     "Josh Jacobs":        'veteran',
     "Saquon Barkley":     'veteran',
-    "Tyreek Hill":        'veteran',
+    "Tyreek Hill":        'ufa',
     "Derrick Henry":      'veteran',
     "Keenan Allen":       'veteran',
     "Davante Adams":      'ufa',

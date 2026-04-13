@@ -206,7 +206,7 @@ export const PLAYERS: Player[] = [
     { rank:  5, name: 'Breece Hall',           position: 'RB',  team: 'NYJ', age: 24, baseValue: 93 },
     { rank:  6, name: 'Lamar Jackson',         position: 'QB',  team: 'BAL', age: 29, baseValue: 93 },
     { rank:  7, name: 'Jahmyr Gibbs',          position: 'RB',  team: 'DET', age: 23, baseValue: 92 },
-    { rank:  8, name: 'Tyreek Hill',           position: 'WR',  team: 'MIA', age: 32, baseValue: 91 },
+    { rank:  8, name: 'Tyreek Hill',           position: 'WR',  team: 'FA',  age: 32, baseValue: 83 },
     { rank:  9, name: 'Amon-Ra St. Brown',     position: 'WR',  team: 'DET', age: 25, baseValue: 91 },
     { rank: 10, name: 'Saquon Barkley',        position: 'RB',  team: 'PHI', age: 28, baseValue: 90 },
     { rank: 11, name: 'Patrick Mahomes',       position: 'QB',  team: 'KC',  age: 30, baseValue: 90 },
