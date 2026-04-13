@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
 
 interface Member {
     id:          string;
@@ -21,18 +20,24 @@ interface Obligation {
     member:      { displayName: string; teamName: string | null };
 }
 
+interface FutureTracker {
+    id:     string;
+    season: string;
+}
+
 interface Props {
-    duesId:        string;
-    currentSeason: string;   // season of this tracker, e.g. "2025"
-    buyInAmount:   number;
-    members:       Member[];
-    obligations:   Obligation[];
+    duesId:         string;
+    currentSeason:  string;   // season of this tracker, e.g. "2025"
+    buyInAmount:    number;
+    members:        Member[];
+    obligations:    Obligation[];
+    futureTrackers: FutureTracker[];
 }
 
 
-export default function FutureDuesClient({ duesId, currentSeason, buyInAmount, members, obligations: initial }: Props) {
-    const router                        = useRouter();
+export default function FutureDuesClient({ duesId, currentSeason, buyInAmount, members, obligations: initial, futureTrackers: initialTrackers }: Props) {
     const [obligations, setObligations] = useState<Obligation[]>(initial);
+    const [trackers, setTrackers]       = useState<FutureTracker[]>(initialTrackers);
     const [isPending, startTransition]  = useTransition();
     const [error, setError]             = useState('');
 
@@ -50,9 +55,8 @@ export default function FutureDuesClient({ duesId, currentSeason, buyInAmount, m
     const [notes, setNotes]       = useState('');
     const [showForm, setShowForm] = useState(false);
 
-    // Pre-pay bulk setup state
-    const [bulkAdding, setBulkAdding] = useState<string | null>(null);
-    const [bulkMsg, setBulkMsg]       = useState<string | null>(null);
+    // Follow-on tracker setup state
+    const [trackerCreating, setTrackerCreating] = useState<string | null>(null);
 
     const tabObligations = obligations.filter(o => o.season === tab);
     const pendingCount   = obligations.filter(o => o.status === 'pending').length;
@@ -114,27 +118,24 @@ export default function FutureDuesClient({ duesId, currentSeason, buyInAmount, m
         });
     }
 
-    async function handleBulkAdd(s: string) {
-        setBulkAdding(s);
-        setBulkMsg(null);
+    async function handleCreateTracker(s: string) {
+        setTrackerCreating(s);
         setError('');
         try {
-            const res = await fetch('/api/dues/future-dues/bulk', {
+            const res = await fetch('/api/dues/follow-on', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ duesId, season: s }),
+                body: JSON.stringify({ sourceDuesId: duesId, season: s }),
             });
-            const data = await res.json() as { added?: number; message?: string; error?: string };
-            if (!res.ok) { setError(data.error ?? 'Failed to set up pre-pay.'); return; }
-            setBulkMsg(data.added === 0
-                ? (data.message ?? 'All members already set up.')
-                : `Added ${data.added} member${data.added !== 1 ? 's' : ''} for ${s} pre-pay.`
-            );
-            router.refresh();
+            const data = await res.json() as { id?: string; alreadyExists?: boolean; error?: string };
+            if (!res.ok || !data.id) { setError(data.error ?? 'Failed to create tracker.'); return; }
+            if (!trackers.find(t => t.season === s)) {
+                setTrackers(prev => [...prev, { id: data.id!, season: s }]);
+            }
         } catch {
             setError('Something went wrong.');
         } finally {
-            setBulkAdding(null);
+            setTrackerCreating(null);
         }
     }
 
@@ -145,27 +146,27 @@ export default function FutureDuesClient({ duesId, currentSeason, buyInAmount, m
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
                 <h2 className="font-bold text-white mb-1">Season Pre-Pay</h2>
                 <p className="text-gray-400 text-sm mb-4">
-                    Allow all current members to pay dues for the following seasons upfront. Sets up obligations for every member at the current buy-in (${buyInAmount.toFixed(2)}/team).
+                    Create a full dues tracker for a future season so members can pre-pay. Once created, open the tracker to collect dues or manage individual obligations.
                 </p>
-                {bulkMsg && (
-                    <p className="text-green-400 text-sm mb-3">{bulkMsg}</p>
-                )}
                 <div className="flex gap-3 flex-wrap">
                     {preSEASONS.map(s => {
-                        const count = obligations.filter(o => o.season === s).length;
-                        const allSet = count >= members.length && members.length > 0;
+                        const existing = trackers.find(t => t.season === s);
                         return (
-                            <button key={s}
-                                onClick={() => { void handleBulkAdd(s); }}
-                                disabled={isPending || bulkAdding === s || allSet}
-                                className={`px-5 py-2.5 rounded-xl text-sm font-semibold border transition ${
-                                    allSet
-                                        ? 'bg-green-900/20 border-green-800 text-green-400 cursor-default'
-                                        : 'bg-gray-800 border-gray-700 hover:border-[#C8A951]/50 text-gray-300 disabled:opacity-50'
-                                }`}>
-                                {allSet ? `✓ ${s} Set Up` : bulkAdding === s ? 'Adding…' : `+ Set Up ${s} Pre-Pay`}
-                                {!allSet && count > 0 && <span className="text-gray-500 ml-1.5 text-xs">({count}/{members.length} added)</span>}
-                            </button>
+                            <div key={s} className="flex items-center gap-2">
+                                {existing ? (
+                                    <a href={`/dashboard/commissioner/dues/${existing.id}`}
+                                        className="px-5 py-2.5 rounded-xl text-sm font-semibold border bg-green-900/20 border-green-800 text-green-400 transition hover:border-green-600">
+                                        ✓ Open {s} Tracker →
+                                    </a>
+                                ) : (
+                                    <button
+                                        onClick={() => { void handleCreateTracker(s); }}
+                                        disabled={isPending || trackerCreating === s}
+                                        className="px-5 py-2.5 rounded-xl text-sm font-semibold border bg-gray-800 border-gray-700 hover:border-[#C8A951]/50 text-gray-300 disabled:opacity-50 transition">
+                                        {trackerCreating === s ? 'Creating…' : `+ Create ${s} Tracker`}
+                                    </button>
+                                )}
+                            </div>
                         );
                     })}
                 </div>

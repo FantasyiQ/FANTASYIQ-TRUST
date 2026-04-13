@@ -36,6 +36,19 @@ export default async function FutureDuesPage({ params }: { params: Promise<{ due
     if (!dues) notFound();
     if (dues.commissionerId !== user.id) redirect('/dashboard/commissioner/dues');
 
+    // Fetch any follow-on trackers for the same league+commissioner (future seasons)
+    const baseYear = parseInt(dues.season) || new Date().getFullYear();
+    const futureSeasonsToCheck = [String(baseYear + 1), String(baseYear + 2), String(baseYear + 3)];
+    const followOnTrackers = await prisma.leagueDues.findMany({
+        where: {
+            commissionerId: user.id,
+            leagueName: dues.leagueName,
+            season: { in: futureSeasonsToCheck },
+        },
+        select: { id: true, season: true },
+    });
+    const futureTrackers = followOnTrackers.map(t => ({ id: t.id, season: t.season }));
+
     return (
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
             <div className="max-w-4xl mx-auto space-y-6">
@@ -68,6 +81,7 @@ export default async function FutureDuesPage({ params }: { params: Promise<{ due
                     buyInAmount={dues.buyInAmount}
                     members={dues.members}
                     obligations={dues.futureDues}
+                    futureTrackers={futureTrackers}
                 />
 
             </div>
