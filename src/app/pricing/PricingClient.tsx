@@ -482,16 +482,17 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                     stripeSubscriptionId: pending.sourceStripeSubId,
                 }),
             });
-            const data = await res.json() as { success?: boolean; error?: string };
+            let data: { success?: boolean; error?: string } = {};
+            try { data = await res.json() as typeof data; } catch { /* non-JSON response */ }
             if (!res.ok) {
-                setUpgradeError(data.error ?? 'Upgrade failed. Please try again.');
+                setUpgradeError(data.error ?? `Upgrade failed (${res.status}). Please try again.`);
                 return;
             }
             setPending(null);
             await updateSession();
             window.location.href = '/dashboard?upgraded=1';
         } catch {
-            setUpgradeError('Network error. Please try again.');
+            setUpgradeError('Could not reach the server. Check your connection and try again.');
         } finally {
             setUpgrading(false);
         }

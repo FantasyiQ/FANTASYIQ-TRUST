@@ -45,7 +45,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     const subRecord = await prisma.subscription.findUnique({
         where: { stripeSubscriptionId },
-        select: { id: true, userId: true, type: true, status: true },
+        select: { id: true, userId: true, type: true, status: true, tier: true, leagueSize: true },
     });
 
     if (!subRecord) {
@@ -61,65 +61,75 @@ export async function POST(request: NextRequest): Promise<Response> {
         return Response.json({ error: 'Cannot switch between player and commissioner plans via upgrade' }, { status: 400 });
     }
 
-    // Get current price from Stripe (authoritative)
-    const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
-    const currentPriceId = stripeSub.items.data[0]?.price.id;
-    if (!currentPriceId) {
-        return Response.json({ error: 'Could not determine current plan' }, { status: 500 });
+    try {
+        // Get current price from Stripe (authoritative)
+        const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+        const currentPriceId = stripeSub.items.data[0]?.price.id;
+        if (!currentPriceId) {
+            return Response.json({ error: 'Could not determine current plan' }, { status: 500 });
+        }
+
+        // Fall back to DB tier/leagueSize when the current price is no longer in PLAN_CATALOG
+        // (e.g. after a Stripe product reset in test mode)
+        const currentInfo = planInfo(currentPriceId);
+        const currentLeagueSize = currentInfo?.leagueSize ?? subRecord.leagueSize;
+        const currentTier       = currentInfo?.tier       ?? subRecord.tier;
+
+        // Commissioner upgrades must stay within the same league size
+        if (newInfo.type === 'commissioner' && newInfo.leagueSize !== currentLeagueSize) {
+            return Response.json({
+                error: 'Commissioner plan upgrades must keep the same league size. Purchase a new plan for a different size.',
+            }, { status: 400 });
+        }
+
+        // Block downgrades
+        const currentRank = tierRank({ tier: currentTier, type: subRecord.type as 'player' | 'commissioner', leagueSize: currentLeagueSize });
+        const newRank     = tierRank(newInfo);
+        if (newRank <= currentRank) {
+            return Response.json({
+                error: 'Downgrades are not allowed. Cancel and resubscribe if you need a lower tier.',
+            }, { status: 400 });
+        }
+
+        const updated = await stripe.subscriptions.update(stripeSubscriptionId, {
+            items: [{ id: stripeSub.items.data[0].id, price: priceId }],
+            proration_behavior: 'always_invoice',
+        });
+
+        // Sync DB
+        const updatedItem = updated.items.data[0];
+        const periodStart = updatedItem?.current_period_start
+            ? new Date(updatedItem.current_period_start * 1000) : null;
+        const periodEnd = updatedItem?.current_period_end
+            ? new Date(updatedItem.current_period_end * 1000) : null;
+
+        const subUpdate = prisma.subscription.update({
+            where: { stripeSubscriptionId },
+            data: {
+                tier: newInfo.tier,
+                status: updated.status,
+                currentPeriodStart: periodStart,
+                currentPeriodEnd: periodEnd,
+                cancelAtPeriodEnd: updated.cancel_at_period_end,
+            },
+        });
+
+        if (newInfo.type === 'player') {
+            await prisma.$transaction([
+                subUpdate,
+                prisma.user.update({
+                    where: { id: dbUser.id },
+                    data: { subscriptionTier: newInfo.tier },
+                }),
+            ]);
+        } else {
+            await subUpdate;
+        }
+
+        return Response.json({ success: true, tier: newInfo.tier });
+    } catch (err) {
+        const message = err instanceof Error ? err.message : 'Upgrade failed';
+        console.error('[upgrade]', err);
+        return Response.json({ error: message }, { status: 500 });
     }
-
-    const currentInfo = planInfo(currentPriceId);
-
-    // Commissioner upgrades must stay within the same league size
-    if (newInfo.type === 'commissioner' && newInfo.leagueSize !== currentInfo?.leagueSize) {
-        return Response.json({
-            error: 'Commissioner plan upgrades must keep the same league size. Purchase a new plan for a different size.',
-        }, { status: 400 });
-    }
-
-    // Block downgrades
-    const currentRank = currentInfo ? tierRank(currentInfo) : 0;
-    const newRank     = tierRank(newInfo);
-    if (newRank <= currentRank) {
-        return Response.json({
-            error: 'Downgrades are not allowed. Cancel and resubscribe if you need a lower tier.',
-        }, { status: 400 });
-    }
-
-    const updated = await stripe.subscriptions.update(stripeSubscriptionId, {
-        items: [{ id: stripeSub.items.data[0].id, price: priceId }],
-        proration_behavior: 'always_invoice',
-    });
-
-    // Sync DB
-    const updatedItem = updated.items.data[0];
-    const periodStart = updatedItem?.current_period_start
-        ? new Date(updatedItem.current_period_start * 1000) : null;
-    const periodEnd = updatedItem?.current_period_end
-        ? new Date(updatedItem.current_period_end * 1000) : null;
-
-    const subUpdate = prisma.subscription.update({
-        where: { stripeSubscriptionId },
-        data: {
-            tier: newInfo.tier,
-            status: updated.status,
-            currentPeriodStart: periodStart,
-            currentPeriodEnd: periodEnd,
-            cancelAtPeriodEnd: updated.cancel_at_period_end,
-        },
-    });
-
-    if (newInfo.type === 'player') {
-        await prisma.$transaction([
-            subUpdate,
-            prisma.user.update({
-                where: { id: dbUser.id },
-                data: { subscriptionTier: newInfo.tier },
-            }),
-        ]);
-    } else {
-        await subUpdate;
-    }
-
-    return Response.json({ success: true, tier: newInfo.tier });
 }
