@@ -91,7 +91,12 @@ export async function PATCH(request: NextRequest): Promise<Response> {
 
     const obligation = await prisma.futureDuesObligation.findUnique({
         where: { id },
-        select: { leagueDues: { select: { commissionerId: true } }, status: true },
+        select: {
+            status: true,
+            season: true,
+            amount: true,
+            leagueDues: { select: { commissionerId: true, leagueName: true } },
+        },
     });
     if (!obligation || obligation.leagueDues.commissionerId !== user.id) {
         return Response.json({ error: 'Not found' }, { status: 404 });
@@ -102,5 +107,24 @@ export async function PATCH(request: NextRequest): Promise<Response> {
         data: { status: 'paid', paidAt: new Date(), paymentMethod: 'manual' },
         include: { member: { select: { displayName: true, teamName: true } } },
     });
+
+    // Credit the future season's tracker pot if it exists
+    if (obligation.status !== 'paid') {
+        const futureTracker = await prisma.leagueDues.findFirst({
+            where: {
+                commissionerId: obligation.leagueDues.commissionerId,
+                leagueName:     obligation.leagueDues.leagueName,
+                season:         obligation.season,
+            },
+            select: { id: true, potTotal: true },
+        });
+        if (futureTracker) {
+            await prisma.leagueDues.update({
+                where: { id: futureTracker.id },
+                data: { potTotal: futureTracker.potTotal + obligation.amount, status: 'active' },
+            });
+        }
+    }
+
     return Response.json(updated);
 }
