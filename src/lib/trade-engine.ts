@@ -247,7 +247,7 @@ export const PLAYERS: Player[] = [
     { rank: 46, name: 'Chase Brown',           position: 'RB',  team: 'CIN', age: 24, baseValue: 68 },
     { rank: 47, name: 'Rachaad White',         position: 'RB',  team: 'TB',  age: 26, baseValue: 66 },
     { rank: 48, name: 'Joe Mixon',             position: 'RB',  team: 'HOU', age: 29, baseValue: 65 },
-    { rank: 48, name: 'Travis Kelce',          position: 'TE',  team: 'KC',  age: 36, baseValue: 64 },
+    { rank: 48, name: 'Travis Kelce',          position: 'TE',  team: 'KC',  age: 37, baseValue: 58 },
     { rank: 49, name: 'Aaron Jones',           position: 'RB',  team: 'MIN', age: 31, baseValue: 63 },
     { rank: 50, name: 'Dalton Kincaid',        position: 'TE',  team: 'BUF', age: 25, baseValue: 62 },
     { rank: 51, name: 'TreVeyon Henderson',     position: 'RB',  team: 'NE',  age: 23, baseValue: 67 },

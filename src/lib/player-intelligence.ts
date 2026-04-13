@@ -80,6 +80,7 @@ export const PLAYER_CONTRACTS: Record<string, ContractTier> = {
     "Tee Higgins":        'extension',
     "Jaylen Waddle":      'extension',
     "Isiah Pacheco":      'extension',
+    "Travis Kelce":       'extension',  // 3-year deal KC
     "George Kittle":      'extension',
     "Sam Darnold":        'extension',
     "Jordan Love":        'extension',
@@ -218,7 +219,7 @@ export const PLAYER_DRAFT_CAPITAL: Record<string, number> = {
     "Tyler Higbee":       38,
     "Hunter Henry":       50,
     "Zach Ertz":          40,
-    "Travis Kelce":       52,
+    "Travis Kelce":       55,
 
     // Established vets (draft capital less relevant, set to moderate)
     "Tyreek Hill":        41,
