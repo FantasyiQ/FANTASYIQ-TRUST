@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { stripe, planInfo, COMMISSIONER_PRICING } from '@/lib/stripe';
+import { stripe, planInfo } from '@/lib/stripe';
 import type { PlanInfo } from '@/lib/stripe';
 
 // Derive a comparable rank from PlanInfo so this never goes stale with price ID changes.
@@ -15,80 +15,6 @@ function tierRank(info: PlanInfo): number {
         COMMISSIONER_ELITE:   60,
     };
     return (tierBase[info.tier] ?? 0);
-}
-
-function commPrice(tier: string, leagueSize: number | null): number {
-    if (!leagueSize) return 0;
-    const key =
-        tier === 'COMMISSIONER_PRO'     ? 'pro'
-      : tier === 'COMMISSIONER_ALL_PRO' ? 'all_pro'
-      : tier === 'COMMISSIONER_ELITE'   ? 'elite'
-      : null;
-    if (!key) return 0;
-    return (COMMISSIONER_PRICING[key].sizes as Record<number, number>)[leagueSize] ?? 0;
-}
-
-// After any commissioner plan change, ensure the multi-league discount sits
-// on the cheapest active plan. Removes it from more expensive plans.
-async function rebalanceCommDiscounts(userId: string): Promise<void> {
-    const allSubs = await prisma.subscription.findMany({
-        where: { userId, type: 'commissioner', status: { in: ['active', 'trialing'] } },
-        select: { stripeSubscriptionId: true, tier: true, leagueSize: true, discountPct: true },
-    });
-
-    if (allSubs.length < 2) {  // Only 1 plan — no multi-league discount
-        // Only 1 plan — no multi-league discount applies; remove any stale discount
-        for (const sub of allSubs) {
-            if ((sub.discountPct ?? 0) > 0 && sub.stripeSubscriptionId) {
-                try {
-                    await stripe.subscriptions.update(sub.stripeSubscriptionId, { discounts: [] });
-                    await prisma.subscription.update({
-                        where: { stripeSubscriptionId: sub.stripeSubscriptionId },
-                        data: { discountPct: 0 },
-                    });
-                } catch { /* non-fatal */ }
-            }
-        }
-        return;
-    }
-
-    const targetPct = allSubs.length >= 3 ? 15 : 10;
-    const couponId  = allSubs.length >= 3 ? 'MULTI_LEAGUE_15' : 'MULTI_LEAGUE_10';
-
-    // Sort cheapest first
-    const sorted = [...allSubs]
-        .map(s => ({ ...s, price: commPrice(s.tier as string, s.leagueSize) }))
-        .sort((a, b) => a.price - b.price);
-
-    const cheapest = sorted[0];
-
-    for (const sub of sorted) {
-        if (!sub.stripeSubscriptionId) continue;
-        const isCheapest = sub.stripeSubscriptionId === cheapest.stripeSubscriptionId;
-        const currentPct = sub.discountPct ?? 0;
-
-        if (isCheapest && currentPct !== targetPct) {
-            // Apply or upgrade discount on the cheapest plan
-            try {
-                await stripe.subscriptions.update(sub.stripeSubscriptionId, {
-                    discounts: [{ coupon: couponId }],
-                });
-                await prisma.subscription.update({
-                    where: { stripeSubscriptionId: sub.stripeSubscriptionId },
-                    data: { discountPct: targetPct },
-                });
-            } catch { /* non-fatal */ }
-        } else if (!isCheapest && currentPct > 0) {
-            // Remove discount from plans that aren't cheapest
-            try {
-                await stripe.subscriptions.update(sub.stripeSubscriptionId, { discounts: [] });
-                await prisma.subscription.update({
-                    where: { stripeSubscriptionId: sub.stripeSubscriptionId },
-                    data: { discountPct: 0 },
-                });
-            } catch { /* non-fatal */ }
-        }
-    }
 }
 
 export async function POST(request: NextRequest): Promise<Response> {
@@ -160,11 +86,9 @@ export async function POST(request: NextRequest): Promise<Response> {
         }, { status: 400 });
     }
 
-    // Execute the upgrade (strip existing discounts — rebalance handles reassignment)
     const updated = await stripe.subscriptions.update(stripeSubscriptionId, {
         items: [{ id: stripeSub.items.data[0].id, price: priceId }],
         proration_behavior: 'always_invoice',
-        discounts: [],  // clear discount; rebalance will re-apply to cheapest plan
     });
 
     // Sync DB
@@ -178,7 +102,6 @@ export async function POST(request: NextRequest): Promise<Response> {
         where: { stripeSubscriptionId },
         data: {
             tier: newInfo.tier,
-            discountPct: 0,  // cleared; rebalance sets correct value
             status: updated.status,
             currentPeriodStart: periodStart,
             currentPeriodEnd: periodEnd,
@@ -196,11 +119,6 @@ export async function POST(request: NextRequest): Promise<Response> {
         ]);
     } else {
         await subUpdate;
-    }
-
-    // Rebalance discounts across all commissioner plans now that prices have changed
-    if (newInfo.type === 'commissioner') {
-        await rebalanceCommDiscounts(dbUser.id);
     }
 
     return Response.json({ success: true, tier: newInfo.tier });

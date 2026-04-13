@@ -114,7 +114,6 @@ model Subscription {
     type                 String           @default("player")
     leagueName           String?          // human-readable league name, set at commissioner checkout
     leagueSize           Int?             // null for player plans; 8/10/12/14/16/32 for commissioner
-    discountPct          Int?             // 0, 15, or 25 — stored for display/receipts
     tier                 SubscriptionTier @default(FREE)
     status               String           @default("inactive")
     currentPeriodStart   DateTime?

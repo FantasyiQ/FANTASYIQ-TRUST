@@ -33,49 +33,6 @@ export async function createPortalSession(): Promise<never> {
     redirect(portalSession.url);
 }
 
-export async function syncCommDiscounts(): Promise<void> {
-    const session = await auth();
-    if (!session?.user?.email) return;
-
-    const dbUser = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        select: {
-            subscriptions: {
-                where: { type: 'commissioner', status: { in: ['active', 'trialing'] } },
-                select: { stripeSubscriptionId: true },
-            },
-        },
-    });
-    const subs = (dbUser?.subscriptions ?? []).filter(s => !!s.stripeSubscriptionId);
-    if (subs.length === 0) return;
-
-    // Fetch Stripe subs (expand discounts) to get creation timestamps, sort oldest → newest
-    const stripeData = await Promise.all(
-        subs.map(s => stripe.subscriptions.retrieve(s.stripeSubscriptionId!, { expand: ['discounts'] }))
-    );
-    const sorted = stripeData.sort((a, b) => a.created - b.created);
-
-    for (let i = 0; i < sorted.length; i++) {
-        const stripeSub = sorted[i];
-        const targetPct = i === 0 ? 0 : i === 1 ? 10 : 15;
-        const couponId  = targetPct === 10 ? 'MULTI_LEAGUE_10' : targetPct === 15 ? 'MULTI_LEAGUE_15' : null;
-        const firstDiscount = Array.isArray(stripeSub.discounts) ? stripeSub.discounts[0] : null;
-        const currentPct = typeof firstDiscount === 'object' && firstDiscount !== null
-            ? Math.round((firstDiscount as { coupon?: { percent_off?: number } }).coupon?.percent_off ?? 0)
-            : 0;
-        if (currentPct === targetPct) continue;
-        try {
-            await stripe.subscriptions.update(stripeSub.id, {
-                discounts: couponId ? [{ coupon: couponId }] : [],
-            });
-            await prisma.subscription.update({
-                where: { stripeSubscriptionId: stripeSub.id },
-                data: { discountPct: targetPct },
-            });
-        } catch { /* non-fatal */ }
-    }
-}
-
 export async function createCheckoutSession(formData: FormData): Promise<never> {
     const session = await auth();
     if (!session?.user?.email) redirect('/sign-in');

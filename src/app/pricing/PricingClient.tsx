@@ -18,7 +18,6 @@ interface PendingUpgrade {
     price: string;
     period: string;
     sourceStripeSubId: string;
-    discountNote?: string; // Explains what happens to the discount after upgrade
 }
 
 interface Props {
@@ -238,11 +237,6 @@ function UpgradeModal({
                 <p className="text-gray-500 text-xs mb-4">
                     You&apos;ll be charged the prorated difference immediately. Your new plan takes effect right away.
                 </p>
-                {pending.discountNote && (
-                    <div className="mb-4 px-4 py-3 bg-[#C9A227]/10 border border-[#C9A227]/30 rounded-lg text-[#C9A227] text-xs leading-relaxed">
-                        {pending.discountNote}
-                    </div>
-                )}
                 {error && (
                     <div className="mb-4 px-4 py-3 bg-red-900/30 border border-red-800 rounded-lg text-red-400 text-sm">
                         {error}
@@ -364,20 +358,13 @@ interface CommCardProps {
     priceId: string;
     tier: string;
     leagueName: string;
-    discountPct: number;
     cardStatus: CardStatus;
     sourceStripeSubId?: string;
     onUpgrade: (upgrade: PendingUpgrade) => void;
 }
 
-function CommPlanCard({ name, price, period, badge, badgeGold, ring, features, priceId, tier, leagueName, discountPct, cardStatus, sourceStripeSubId, onUpgrade }: CommCardProps) {
+function CommPlanCard({ name, price, period, badge, badgeGold, ring, features, priceId, tier, leagueName, cardStatus, sourceStripeSubId, onUpgrade }: CommCardProps) {
     const canCheckout = leagueName.trim().length > 0 && !!priceId;
-
-    let displayPrice = price;
-    if (discountPct > 0) {
-        const numeric = parseFloat(price);
-        displayPrice = (numeric * (1 - discountPct / 100)).toFixed(2);
-    }
 
     return (
         <div className={`relative flex flex-col bg-gray-900 rounded-2xl p-6 border transition-shadow hover:shadow-lg hover:shadow-[#C9A227]/5 ${
@@ -391,23 +378,8 @@ function CommPlanCard({ name, price, period, badge, badgeGold, ring, features, p
 
             <h3 className="text-xl font-bold text-white mt-1">{name}</h3>
             <div className="mt-4 mb-1">
-                {discountPct > 0 ? (
-                    <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-extrabold text-white">${displayPrice}</span>
-                        <span className="text-gray-500 text-sm line-through">${price}</span>
-                        <span className="text-gray-400 text-sm ml-0.5">{period}</span>
-                    </div>
-                ) : (
-                    <div>
-                        <span className="text-4xl font-extrabold text-white">${price}</span>
-                        <span className="text-gray-400 text-sm ml-1.5">{period}</span>
-                    </div>
-                )}
-                {discountPct > 0 && (
-                    <span className="inline-block mt-1.5 text-xs font-semibold bg-green-900/40 text-green-400 border border-green-800 px-2 py-0.5 rounded-full">
-                        {discountPct}% multi-league discount
-                    </span>
-                )}
+                <span className="text-4xl font-extrabold text-white">${price}</span>
+                <span className="text-gray-400 text-sm ml-1.5">{period}</span>
             </div>
 
             <ul className="space-y-0.5 flex-1 mt-4">
@@ -655,7 +627,6 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     features={COMM_PRO_FEATURES}
                                     priceId={commPriceId('Pro', size)} tier="COMMISSIONER_PRO"
                                     leagueName={leagueName}
-                                    discountPct={0}
                                     cardStatus={proAvailable(size) ? resolveCommCardStatus('COMMISSIONER_PRO', size, commSubs) : 'unavailable'}
                                     sourceStripeSubId={commSubs.find(s => s.leagueSize === size)?.stripeSubscriptionId}
                                     onUpgrade={handleUpgradeClick}
@@ -666,7 +637,6 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     features={COMM_ALL_PRO_FEATURES}
                                     priceId={commPriceId('All-Pro', size)} tier="COMMISSIONER_ALL_PRO"
                                     leagueName={leagueName}
-                                    discountPct={0}
                                     cardStatus={resolveCommCardStatus('COMMISSIONER_ALL_PRO', size, commSubs)}
                                     sourceStripeSubId={commSubs.find(s => s.leagueSize === size)?.stripeSubscriptionId}
                                     onUpgrade={handleUpgradeClick}
@@ -677,7 +647,6 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     features={COMM_ELITE_FEATURES}
                                     priceId={commPriceId('Elite', size)} tier="COMMISSIONER_ELITE"
                                     leagueName={leagueName}
-                                    discountPct={0}
                                     cardStatus={resolveCommCardStatus('COMMISSIONER_ELITE', size, commSubs)}
                                     sourceStripeSubId={commSubs.find(s => s.leagueSize === size)?.stripeSubscriptionId}
                                     onUpgrade={handleUpgradeClick}

@@ -50,8 +50,6 @@ export default async function CheckoutSuccessPage({
             const metaPlanType   = (cs.metadata?.planType ?? 'player') as 'player' | 'commissioner';
             const metaSize       = cs.metadata?.leagueSize ? parseInt(cs.metadata.leagueSize) : null;
             const metaLeagueName = cs.metadata?.leagueName ?? null;
-            const metaDiscountPct = cs.metadata?.discountPct ? parseInt(cs.metadata.discountPct) : null;
-
             // Fall back to PLAN_CATALOG if metadata is somehow missing
             const priceId = sub.items.data[0]?.price.id ?? null;
             const catalogInfo = priceId ? planInfo(priceId) : null;
@@ -83,7 +81,6 @@ export default async function CheckoutSuccessPage({
                         type: subType,
                         leagueSize,
                         leagueName: metaLeagueName,
-                        discountPct: metaDiscountPct,
                         tier,
                         status: 'active',
                         currentPeriodStart: periodStart,
@@ -93,7 +90,6 @@ export default async function CheckoutSuccessPage({
                         type: subType,
                         leagueSize,
                         leagueName: metaLeagueName,
-                        discountPct: metaDiscountPct,
                         tier,
                         status: 'active',
                         currentPeriodStart: periodStart,

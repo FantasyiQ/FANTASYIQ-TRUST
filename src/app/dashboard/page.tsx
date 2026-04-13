@@ -65,7 +65,6 @@ export default async function DashboardPage() {
                     tier: true,
                     leagueSize: true,
                     leagueName: true,
-                    discountPct: true,
                     status: true,
                     stripeSubscriptionId: true,
                     currentPeriodEnd: true,
@@ -233,11 +232,6 @@ export default async function DashboardPage() {
                                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${STATUS_STYLES[sub.status] ?? STATUS_STYLES.inactive}`}>
                                                     {sub.status.replace('_', ' ')}
                                                 </span>
-                                                {sub.discountPct != null && sub.discountPct > 0 && (
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border bg-green-900/40 text-green-400 border-green-800">
-                                                        {sub.discountPct}% discount
-                                                    </span>
-                                                )}
                                                 {periodLabel(sub) && (
                                                     <span className="text-gray-500 text-xs">{periodLabel(sub)}</span>
                                                 )}

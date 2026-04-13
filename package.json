@@ -10,8 +10,7 @@
     "db:generate": "dotenv -e .env.local -- prisma generate",
     "db:push": "dotenv -e .env.local -- prisma db push",
     "db:migrate": "dotenv -e .env.local -- prisma migrate dev",
-    "db:studio": "dotenv -e .env.local -- prisma studio",
-    "create-coupons": "dotenv -e .env.local -- npx tsx scripts/create-stripe-coupons.ts"
+    "db:studio": "dotenv -e .env.local -- prisma studio"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
