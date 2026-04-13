@@ -23,15 +23,19 @@ export async function POST(
 
     const contest = await prisma.proBowlContest.findUnique({
         where: { id: contestId },
-        select: { id: true, status: true, leagueDuesId: true },
+        select: { id: true, status: true, scoringSettings: true },
     });
     if (!contest) return Response.json({ error: 'Contest not found.' }, { status: 404 });
     if (contest.status !== 'open') return Response.json({ error: 'Contest is not open for entries.' }, { status: 400 });
 
+    // Use league-specific roster positions if available, fall back to default
+    const settings = contest.scoringSettings as { rosterPositions?: string[] } | null;
+    const requiredPositions = settings?.rosterPositions ?? REQUIRED_POSITIONS;
+
     const body = await request.json() as { lineup?: LineupSlot[] };
     const { lineup } = body;
-    if (!lineup || !Array.isArray(lineup) || lineup.length !== REQUIRED_POSITIONS.length) {
-        return Response.json({ error: `Lineup must have exactly ${REQUIRED_POSITIONS.length} players.` }, { status: 400 });
+    if (!lineup || !Array.isArray(lineup) || lineup.length !== requiredPositions.length) {
+        return Response.json({ error: `Lineup must have exactly ${requiredPositions.length} players.` }, { status: 400 });
     }
 
     // Validate each slot has required fields and is not blank

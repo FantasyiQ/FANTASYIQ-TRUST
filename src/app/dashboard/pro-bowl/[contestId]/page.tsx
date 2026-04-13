@@ -22,6 +22,7 @@ export default async function ProBowlEntryPage({ params }: { params: Promise<{ c
             week: true,
             status: true,
             leagueName: true,
+            scoringSettings: true,
             leagueDues: { select: { leagueName: true } },
             entries: {
                 where: { userId: user.id },
@@ -33,6 +34,13 @@ export default async function ProBowlEntryPage({ params }: { params: Promise<{ c
     if (!contest) notFound();
 
     const existingEntry = contest.entries[0] ?? null;
+    const settings = contest.scoringSettings as {
+        rosterPositions?: string[];
+        scoringType?: string;
+        scoring?: Record<string, number>;
+    } | null;
+    const rosterPositions = settings?.rosterPositions ?? ['QB', 'RB', 'RB', 'WR', 'WR', 'WR', 'TE', 'FLEX', 'K', 'DEF'];
+    const scoringType     = settings?.scoringType ?? 'std';
 
     return (
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
@@ -43,6 +51,9 @@ export default async function ProBowlEntryPage({ params }: { params: Promise<{ c
                         {contest.leagueName ?? contest.leagueDues?.leagueName} · {contest.season} Season · Week {contest.week}
                     </p>
                 </div>
+
+                {/* Scoring summary */}
+                <ScoringCard scoringType={scoringType} scoring={settings?.scoring ?? {}} rosterPositions={rosterPositions} />
 
                 {contest.status === 'setup' && (
                     <div className="bg-gray-900 border border-gray-800 rounded-2xl p-10 text-center text-gray-500 text-sm">
@@ -63,6 +74,7 @@ export default async function ProBowlEntryPage({ params }: { params: Promise<{ c
                 {contest.status === 'open' && (
                     <LineupPicker
                         contestId={contestId}
+                        rosterPositions={rosterPositions}
                         existingLineup={existingEntry ? (existingEntry.lineup as unknown as LineupSlot[]) : null}
                     />
                 )}
@@ -76,6 +88,65 @@ interface LineupSlot {
     playerName: string;
     nflTeam: string;
     projectedPoints?: number;
+}
+
+function ScoringCard({ scoringType, scoring, rosterPositions }: {
+    scoringType: string;
+    scoring: Record<string, number>;
+    rosterPositions: string[];
+}) {
+    const scoringLabel = scoringType === 'ppr' ? 'PPR' : scoringType === 'half_ppr' ? 'Half PPR' : 'Standard';
+
+    const KEY_RULES: { key: string; label: string }[] = [
+        { key: 'pass_td',  label: 'Pass TD' },
+        { key: 'pass_yd',  label: 'Pass Yd' },
+        { key: 'rush_td',  label: 'Rush TD' },
+        { key: 'rush_yd',  label: 'Rush Yd' },
+        { key: 'rec_td',   label: 'Rec TD' },
+        { key: 'rec_yd',   label: 'Rec Yd' },
+        { key: 'rec',      label: 'Reception' },
+        { key: 'fum_lost', label: 'Fumble Lost' },
+        { key: 'int',      label: 'INT (thrown)' },
+    ];
+
+    const hasScoring = Object.keys(scoring).length > 0;
+    const starters   = rosterPositions.filter(p => !['BN','IR','TAXI'].includes(p));
+
+    return (
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-4">
+            <div className="flex items-center gap-3 flex-wrap">
+                <h2 className="font-bold text-white">League Scoring</h2>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#C8A951]/20 text-[#C8A951] border border-[#C8A951]/30">
+                    {scoringLabel}
+                </span>
+            </div>
+
+            <div>
+                <p className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-2">Lineup Format</p>
+                <div className="flex flex-wrap gap-1.5">
+                    {starters.map((pos, i) => (
+                        <span key={i} className="px-2.5 py-1 rounded-lg bg-gray-800 border border-gray-700 text-xs font-bold text-gray-300">
+                            {pos}
+                        </span>
+                    ))}
+                </div>
+            </div>
+
+            {hasScoring && (
+                <div>
+                    <p className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-2">Key Scoring Rules</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-1.5">
+                        {KEY_RULES.filter(r => scoring[r.key] != null).map(r => (
+                            <div key={r.key} className="flex items-center justify-between gap-2">
+                                <span className="text-gray-500 text-xs">{r.label}</span>
+                                <span className="text-white text-xs font-semibold">{scoring[r.key] > 0 ? `+${scoring[r.key]}` : scoring[r.key]}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 }
 
 function LockedEntry({ lineup, status }: { lineup: LineupSlot[]; status: string }) {

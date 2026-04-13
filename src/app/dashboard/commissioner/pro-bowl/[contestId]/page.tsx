@@ -4,7 +4,6 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import ContestControls from './ContestControls';
 
-const POSITIONS = ['QB', 'RB', 'RB', 'WR', 'WR', 'WR', 'TE', 'FLEX', 'K', 'DEF'];
 
 export default async function ManageProBowlPage({ params }: { params: Promise<{ contestId: string }> }) {
     const { contestId } = await params;
@@ -27,12 +26,18 @@ export default async function ManageProBowlPage({ params }: { params: Promise<{ 
             },
         },
     });
+    type ScoringSettings = { rosterPositions?: string[]; scoringType?: string; scoring?: Record<string, number> };
 
     if (!contest) notFound();
     if (contest.commissionerId !== user.id) redirect('/dashboard/commissioner/pro-bowl');
 
-    const leagueName = contest.leagueName ?? contest.leagueDues?.id ?? 'League';
-    const entryUrl   = `/dashboard/pro-bowl/${contestId}`;
+    const leagueName      = contest.leagueName ?? contest.leagueDues?.id ?? 'League';
+    const entryUrl        = `/dashboard/pro-bowl/${contestId}`;
+    const settings        = contest.scoringSettings as ScoringSettings | null;
+    const rosterPositions = settings?.rosterPositions ?? ['QB','RB','RB','WR','WR','WR','TE','FLEX','K','DEF'];
+    const scoringType     = settings?.scoringType ?? 'std';
+    const scoringLabel    = scoringType === 'ppr' ? 'PPR' : scoringType === 'half_ppr' ? 'Half PPR' : 'Standard';
+    const scoring         = settings?.scoring ?? {};
 
     return (
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
@@ -42,23 +47,56 @@ export default async function ManageProBowlPage({ params }: { params: Promise<{ 
                         ← Back to Pro Bowl
                     </Link>
                     <h1 className="text-2xl font-bold mt-3">Pro Bowl — {leagueName}</h1>
-                    <p className="text-gray-400 text-sm mt-1">{contest.season} Season · Week {contest.week} · {POSITIONS.length} roster spots · Free contest</p>
+                    <p className="text-gray-400 text-sm mt-1">{contest.season} Season · Week {contest.week} · {rosterPositions.length} roster spots · Free contest</p>
                 </div>
 
                 {/* Controls */}
                 <ContestControls contestId={contestId} status={contest.status} entryUrl={entryUrl} />
 
-                {/* Lineup requirements */}
-                <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-                    <h2 className="font-bold mb-4">Lineup Format</h2>
-                    <div className="flex flex-wrap gap-2">
-                        {POSITIONS.map((pos, i) => (
-                            <span key={i} className="px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-700 text-sm font-semibold text-gray-300">
-                                {pos}
-                            </span>
-                        ))}
+                {/* Lineup & scoring */}
+                <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-5">
+                    <div className="flex items-center gap-3 flex-wrap">
+                        <h2 className="font-bold">Lineup &amp; Scoring</h2>
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#C8A951]/20 text-[#C8A951] border border-[#C8A951]/30">
+                            {scoringLabel}
+                        </span>
                     </div>
-                    <p className="text-gray-500 text-xs mt-3">No salary cap — pick any NFL player. FLEX can be RB/WR/TE.</p>
+                    <div>
+                        <p className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-2">Roster Slots ({rosterPositions.length})</p>
+                        <div className="flex flex-wrap gap-2">
+                            {rosterPositions.map((pos, i) => (
+                                <span key={i} className="px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-700 text-sm font-semibold text-gray-300">
+                                    {pos}
+                                </span>
+                            ))}
+                        </div>
+                        <p className="text-gray-600 text-xs mt-2">No salary cap — pick any NFL player for each slot.</p>
+                    </div>
+                    {Object.keys(scoring).length > 0 && (
+                        <div>
+                            <p className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-2">Key Scoring Rules</p>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-1.5">
+                                {[
+                                    { key: 'pass_td', label: 'Pass TD' },
+                                    { key: 'pass_yd', label: 'Pass Yd' },
+                                    { key: 'rush_td', label: 'Rush TD' },
+                                    { key: 'rush_yd', label: 'Rush Yd' },
+                                    { key: 'rec_td',  label: 'Rec TD' },
+                                    { key: 'rec_yd',  label: 'Rec Yd' },
+                                    { key: 'rec',     label: 'Reception' },
+                                    { key: 'fum_lost',label: 'Fumble Lost' },
+                                    { key: 'int',     label: 'INT (thrown)' },
+                                ].filter(r => scoring[r.key] != null).map(r => (
+                                    <div key={r.key} className="flex items-center justify-between gap-2">
+                                        <span className="text-gray-500 text-xs">{r.label}</span>
+                                        <span className="text-white text-xs font-semibold">
+                                            {scoring[r.key] > 0 ? `+${scoring[r.key]}` : scoring[r.key]}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Entries */}

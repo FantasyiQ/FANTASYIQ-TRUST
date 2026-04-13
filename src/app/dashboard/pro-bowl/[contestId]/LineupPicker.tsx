@@ -8,48 +8,43 @@ interface LineupSlot {
     nflTeam: string;
 }
 
-const ROSTER: LineupSlot[] = [
-    { position: 'QB',   playerName: '', nflTeam: '' },
-    { position: 'RB',   playerName: '', nflTeam: '' },
-    { position: 'RB',   playerName: '', nflTeam: '' },
-    { position: 'WR',   playerName: '', nflTeam: '' },
-    { position: 'WR',   playerName: '', nflTeam: '' },
-    { position: 'WR',   playerName: '', nflTeam: '' },
-    { position: 'TE',   playerName: '', nflTeam: '' },
-    { position: 'FLEX', playerName: '', nflTeam: '' },
-    { position: 'K',    playerName: '', nflTeam: '' },
-    { position: 'DEF',  playerName: '', nflTeam: '' },
-];
-
-const FLEX_NOTE = 'FLEX can be RB, WR, or TE.';
-const DEF_NOTE  = 'DEF: enter team name (e.g. Cowboys D/ST).';
-
 function positionColor(pos: string) {
     switch (pos) {
-        case 'QB':   return 'text-red-400';
-        case 'RB':   return 'text-green-400';
-        case 'WR':   return 'text-blue-400';
-        case 'TE':   return 'text-yellow-400';
-        case 'FLEX': return 'text-purple-400';
-        case 'K':    return 'text-gray-400';
-        case 'DEF':  return 'text-orange-400';
-        default:     return 'text-gray-400';
+        case 'QB':         return 'text-red-400';
+        case 'RB':         return 'text-green-400';
+        case 'WR':         return 'text-blue-400';
+        case 'TE':         return 'text-yellow-400';
+        case 'FLEX':       return 'text-purple-400';
+        case 'SUPER_FLEX': return 'text-pink-400';
+        case 'K':          return 'text-gray-400';
+        case 'DEF':        return 'text-orange-400';
+        default:           return 'text-gray-400';
     }
+}
+
+function flexNote(positions: string[]): string {
+    const notes: string[] = [];
+    if (positions.includes('FLEX'))       notes.push('FLEX can be RB, WR, or TE.');
+    if (positions.includes('SUPER_FLEX')) notes.push('SUPER_FLEX can be QB, RB, WR, or TE.');
+    if (positions.includes('DEF'))        notes.push('DEF: enter team name (e.g. Cowboys D/ST).');
+    return notes.join('  ');
 }
 
 export default function LineupPicker({
     contestId,
+    rosterPositions,
     existingLineup,
 }: {
-    contestId: string;
-    existingLineup: LineupSlot[] | null;
+    contestId:       string;
+    rosterPositions: string[];
+    existingLineup:  LineupSlot[] | null;
 }) {
-    const [lineup, setLineup] = useState<LineupSlot[]>(
-        existingLineup ?? ROSTER.map(r => ({ ...r }))
-    );
+    const blankRoster: LineupSlot[] = rosterPositions.map(p => ({ position: p, playerName: '', nflTeam: '' }));
+
+    const [lineup, setLineup] = useState<LineupSlot[]>(existingLineup ?? blankRoster);
     const [loading, setLoading] = useState(false);
-    const [error, setError]   = useState('');
-    const [saved, setSaved]   = useState(false);
+    const [error, setError]    = useState('');
+    const [saved, setSaved]    = useState(false);
 
     function update(index: number, field: 'playerName' | 'nflTeam', value: string) {
         setSaved(false);
@@ -85,6 +80,7 @@ export default function LineupPicker({
     }
 
     const allFilled = lineup.every(s => s.playerName.trim() && s.nflTeam.trim());
+    const note = flexNote(rosterPositions);
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -97,7 +93,7 @@ export default function LineupPicker({
                 <div className="divide-y divide-gray-800/50">
                     {lineup.map((slot, i) => (
                         <div key={i} className="px-6 py-4 flex items-center gap-4">
-                            <span className={`text-xs font-bold w-10 shrink-0 ${positionColor(slot.position)}`}>
+                            <span className={`text-xs font-bold w-14 shrink-0 ${positionColor(slot.position)}`}>
                                 {slot.position}
                             </span>
                             <div className="flex-1 grid sm:grid-cols-2 gap-2">
@@ -121,10 +117,7 @@ export default function LineupPicker({
                 </div>
             </div>
 
-            <div className="text-xs text-gray-600 space-y-1 px-1">
-                <p>{FLEX_NOTE}</p>
-                <p>{DEF_NOTE}</p>
-            </div>
+            {note && <p className="text-xs text-gray-600 px-1">{note}</p>}
 
             {error && <p className="text-red-400 text-sm">{error}</p>}
 
