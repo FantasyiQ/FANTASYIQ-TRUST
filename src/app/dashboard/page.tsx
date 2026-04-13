@@ -220,7 +220,7 @@ export default async function DashboardPage() {
                                 season: l.season,
                                 scoringType: l.scoringType ?? null,
                             }))} />
-                            <Link href="/pricing?tab=commissioner"
+                            <Link href="/pricing?tab=commissioner&mode=new"
                                 className="text-sm border border-gray-700 hover:border-[#C8A951]/50 text-gray-300 font-semibold px-4 py-1.5 rounded-lg transition">
                                 + Add League
                             </Link>
