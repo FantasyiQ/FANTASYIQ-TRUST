@@ -65,23 +65,23 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
             where: { id: session.user.id },
             select: {
                 sleeperUserId: true,
-                subscriptionTier: true,
                 connectedLeagues: { select: { leagueName: true } },
                 subscriptions: {
-                    where: { type: 'commissioner', status: { in: ['active', 'trialing'] } },
+                    where: { status: { in: ['active', 'trialing'] } },
                     orderBy: { createdAt: 'desc' },
-                    select: { tier: true, leagueName: true },
+                    select: { type: true, tier: true, leagueName: true },
                 },
             },
         }),
     ]);
 
-    // Determine effective tier for this league:
-    // Player tier is uplifted by the matching commissioner plan tier IF this
-    // league is also connected to the user's player plan.
-    const playerTier = dbUser?.subscriptionTier ?? 'FREE';
+    // Determine effective tier for this league.
+    // Derive player tier from the active player subscription row — more reliable
+    // than user.subscriptionTier which can be stale from test-mode resets.
+    const activePlayerSub = dbUser?.subscriptions.find(s => s.type === 'player') ?? null;
+    const playerTier = activePlayerSub?.tier ?? 'FREE';
     const commSubForLeague = dbUser?.subscriptions.find(
-        s => s.leagueName?.toLowerCase() === league.leagueName.toLowerCase()
+        s => s.type === 'commissioner' && s.leagueName?.toLowerCase() === league.leagueName.toLowerCase()
     ) ?? null;
     const leagueConnected = dbUser?.connectedLeagues.some(
         cl => cl.leagueName.toLowerCase() === league.leagueName.toLowerCase()
