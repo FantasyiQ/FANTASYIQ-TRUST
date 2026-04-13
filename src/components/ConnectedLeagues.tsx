@@ -196,7 +196,7 @@ export default function ConnectedLeagues({ leagues: initial, syncedLeagues = [],
                         <button
                             onClick={() => { setShowForm(v => !v); setError(null); }}
                             className="text-sm border border-gray-700 hover:border-[#C8A951]/50 text-gray-300 font-semibold px-3 py-1.5 rounded-lg transition">
-                            {showForm ? 'Cancel' : '+ Connect League'}
+                            {showForm ? 'Cancel' : '+ Add League'}
                         </button>
                     </div>
                 )}

@@ -29,7 +29,7 @@ export default function SyncedLeaguePicker({ leagues }: { leagues: SyncedLeague[
             <button
                 onClick={() => setOpen(true)}
                 className="text-sm border border-[#C8A951]/40 hover:border-[#C8A951] text-[#C8A951] font-semibold px-4 py-1.5 rounded-lg transition">
-                + Add Synced League
+                + Synced League
             </button>
 
             {open && (
