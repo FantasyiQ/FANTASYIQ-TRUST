@@ -210,6 +210,17 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
     const myTeamData  = teamTradeData.find(
         t => rosters.find(r => r.roster_id === t.rosterId)?.owner_id === dbUser?.sleeperUserId
     );
+
+    // TEMP DEBUG
+    if (myTeamData) {
+        console.log('[league/picks] league:', league.leagueId, league.leagueName);
+        console.log('[league/picks] myRosterId:', myTeamData.rosterId, typeof myTeamData.rosterId);
+        console.log('[league/picks] tradedPicks sample:', tradedPicks.slice(0, 5).map(tp => ({
+            season: tp.season, round: tp.round, roster_id: tp.roster_id, owner_id: tp.owner_id,
+            types: `roster_id:${typeof tp.roster_id} owner_id:${typeof tp.owner_id}`,
+        })));
+        console.log('[league/picks] myOwnedPicks:', myTeamData.ownedPicks.map(p => `${p.season} ${p.round}.${p.slot}`));
+    }
     const otherTeamsData = teamTradeData.filter(t => t.rosterId !== myTeamData?.rosterId);
 
     const teamRosters: TeamRosterData[] = rows.map(row => {
