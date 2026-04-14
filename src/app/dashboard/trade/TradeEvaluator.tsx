@@ -272,13 +272,14 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, setti
     );
 }
 
-function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEAGUE_SETTINGS, players }: {
+function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEAGUE_SETTINGS, players, allPicks = [] }: {
     onAdd: (p: Player) => void;
     excluded: string[];
     ppr: PprFormat;
     leagueType: LeagueType;
     settings?: LeagueSettings;
     players: Player[];
+    allPicks?: Player[];
 }) {
     const [query, setQuery]     = useState('');
     const [results, setResults] = useState<Player[]>([]);
@@ -289,12 +290,25 @@ function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEA
         if (q.length < 2) { setResults([]); return; }
         setLoading(true);
         try {
+            const ql = q.toLowerCase();
+            // Match picks: any pick whose name contains the query (e.g. "1.04", "2026", "round 1")
+            const pickMatches = allPicks
+                .filter(p => p.name.toLowerCase().includes(ql) && !excluded.includes(p.name))
+                .slice(0, 8);
+
             const res = await fetch(`/api/players/trade-search?q=${encodeURIComponent(q)}`);
-            const data = await res.json() as Player[];
-            setResults(data.filter(p => !excluded.includes(p.name)));
+            const playerData = await res.json() as Player[];
+            const playerMatches = playerData.filter(p => !excluded.includes(p.name));
+
+            // Picks first if query looks like a pick (contains digit+dot or 4-digit year), players otherwise
+            const looksLikePick = /\d\.\d|\b20\d{2}\b/.test(q);
+            setResults(looksLikePick
+                ? [...pickMatches, ...playerMatches].slice(0, 12)
+                : [...playerMatches, ...pickMatches].slice(0, 12)
+            );
         } catch { /* ignore */ }
         finally { setLoading(false); }
-    }, [excluded]);
+    }, [excluded, allPicks]);
 
     function handleInput(e: React.ChangeEvent<HTMLInputElement>) {
         const val = e.target.value;
@@ -303,13 +317,6 @@ function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEA
         debounceRef.current = setTimeout(() => { void search(val); }, 250);
     }
 
-    // Keep roster quick-pick working (still searches local players array)
-    const localResults = useMemo(() => {
-        if (query.length >= 2) return [];
-        return players;
-    }, [query, players]);
-    void localResults; // unused — roster picks handled by RosterQuickPick
-
     return (
         <div className="relative">
             <div className="relative">
@@ -317,7 +324,7 @@ function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEA
                     type="text"
                     value={query}
                     onChange={handleInput}
-                    placeholder="Search any NFL player…"
+                    placeholder="Search any player or pick (e.g. 1.04, 2026)…"
                     className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/60"
                 />
                 {loading && (
@@ -377,7 +384,8 @@ interface TradeEvaluatorProps {
     initialLeagueSettings?: LeagueSettings;
     leagueLabel?:           string;
     myRoster?:              Player[];
-    myPicks?:               Player[];   // pre-fetched picks from all synced leagues
+    myPicks?:               Player[];       // user's owned picks from all synced leagues
+    allLeaguePicks?:        Player[];       // all picks from all teams in all synced leagues
     myTeam?:                TradeTeam;
     otherTeams?:            TradeTeam[];
 }
@@ -390,6 +398,7 @@ export default function TradeEvaluator({
     leagueLabel,
     myRoster              = [],
     myPicks               = [],
+    allLeaguePicks        = [],
     myTeam,
     otherTeams            = [],
 }: TradeEvaluatorProps = {}) {
@@ -432,6 +441,17 @@ export default function TradeEvaluator({
         () => [...PLAYERS.map(patchPlayer), ...draftPicks],
         [draftPicks, patchPlayer],
     );
+
+    // All picks available for search: league-synced picks + full draft pick grid
+    // Deduplicated: league picks first (have correct values), fill in missing slots from draftPicks
+    const searchablePicks = useMemo(() => {
+        const seen = new Set<string>();
+        const picks: Player[] = [];
+        for (const p of [...allLeaguePicks, ...draftPicks]) {
+            if (!seen.has(p.name)) { seen.add(p.name); picks.push(p); }
+        }
+        return picks;
+    }, [allLeaguePicks, draftPicks]);
 
     // Per-team quick-pick sources (patch FC values onto roster players too)
     const giveRoster   = useMemo(
@@ -530,7 +550,7 @@ export default function TradeEvaluator({
                             onAdd={p => setSideA(prev => prev.length < 5 ? [...prev, p] : prev)}
                         />
                     )}
-                    <PlayerSearch onAdd={p => setSideA(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} settings={leagueSettings} players={allPlayers} />
+                    <PlayerSearch onAdd={p => setSideA(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} settings={leagueSettings} players={allPlayers} allPicks={searchablePicks} />
                     <div className="space-y-2">
                         {result?.sideA.map(r => (
                             <PlayerPill key={r.name} result={r} leagueType={leagueType} onRemove={() => setSideA(prev => prev.filter(p => p.name !== r.name))} />
@@ -570,7 +590,7 @@ export default function TradeEvaluator({
                             onAdd={p => setSideB(prev => prev.length < 5 ? [...prev, p] : prev)}
                         />
                     )}
-                    <PlayerSearch onAdd={p => setSideB(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} settings={leagueSettings} players={allPlayers} />
+                    <PlayerSearch onAdd={p => setSideB(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} settings={leagueSettings} players={allPlayers} allPicks={searchablePicks} />
                     <div className="space-y-2">
                         {result?.sideB.map(r => (
                             <PlayerPill key={r.name} result={r} leagueType={leagueType} onRemove={() => setSideB(prev => prev.filter(p => p.name !== r.name))} />
