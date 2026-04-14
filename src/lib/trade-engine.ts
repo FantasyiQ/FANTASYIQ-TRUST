@@ -241,7 +241,7 @@ export const PLAYERS: Player[] = [
     { rank: 40, name: 'George Kittle',         position: 'TE',  team: 'SF',  age: 32, baseValue: 71 },
     { rank: 41, name: 'Zay Flowers',           position: 'WR',  team: 'BAL', age: 24, baseValue: 70 },
     { rank: 42, name: 'David Montgomery',      position: 'RB',  team: 'DET', age: 28, baseValue: 69 },
-    { rank: 43, name: 'Anthony Richardson',    position: 'QB',  team: 'IND', age: 23, baseValue: 58 },
+    { rank: 43, name: 'Anthony Richardson',    position: 'QB',  team: 'IND', age: 23, baseValue: 36 },
     { rank: 44, name: 'Ladd McConkey',         position: 'WR',  team: 'LAC', age: 23, baseValue: 68 },
     { rank: 45, name: 'Mark Andrews',          position: 'TE',  team: 'BAL', age: 30, baseValue: 67 },
     { rank: 46, name: 'Chase Brown',           position: 'RB',  team: 'CIN', age: 24, baseValue: 68 },
