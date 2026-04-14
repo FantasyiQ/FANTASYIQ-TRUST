@@ -377,6 +377,7 @@ interface TradeEvaluatorProps {
     initialLeagueSettings?: LeagueSettings;
     leagueLabel?:           string;
     myRoster?:              Player[];
+    myPicks?:               Player[];   // pre-fetched picks from all synced leagues
     myTeam?:                TradeTeam;
     otherTeams?:            TradeTeam[];
 }
@@ -388,6 +389,7 @@ export default function TradeEvaluator({
     initialLeagueSettings = DEFAULT_LEAGUE_SETTINGS,
     leagueLabel,
     myRoster              = [],
+    myPicks               = [],
     myTeam,
     otherTeams            = [],
 }: TradeEvaluatorProps = {}) {
@@ -436,7 +438,7 @@ export default function TradeEvaluator({
         () => (myTeam?.players ?? myRoster).map(patchPlayer),
         [myTeam, myRoster, patchPlayer],
     );
-    const givePicks    = myTeam?.picks   ?? draftPicks;
+    const givePicks    = myTeam?.picks ?? (myPicks.length > 0 ? myPicks : draftPicks);
     const selectedTeam = useMemo(
         () => otherTeams.find(t => t.rosterId === selectedTeamId) ?? null,
         [otherTeams, selectedTeamId]
