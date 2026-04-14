@@ -57,19 +57,17 @@ export async function GET(request: Request): Promise<Response> {
         return Response.json({ error: String(err) }, { status: 502 });
     }
 
-    // Build redraft value map by playerID
-    const redraftMap = new Map<number, number>();
+    // KTC uses different playerIDs for the same player on dynasty vs redraft pages.
+    // Match by name (lowercased) to correctly link redraft values.
+    const redraftMap = new Map<string, number>();
+    const redraftSfMap = new Map<string, number>();
     for (const p of redraftPlayers) {
-        redraftMap.set(p.playerID, p.oneQBValues?.value ?? 0);
+        const key = p.playerName.toLowerCase();
+        redraftMap.set(key, p.oneQBValues?.value ?? 0);
+        redraftSfMap.set(key, p.superflexValues?.value ?? 0);
     }
 
     const entries = dynastyPlayers.filter(p => p.playerName && p.playerID);
-
-    // Build redraft superflex map (from fantasy-rankings superflexValues)
-    const redraftSfMap = new Map<number, number>();
-    for (const p of redraftPlayers) {
-        redraftSfMap.set(p.playerID, p.superflexValues?.value ?? 0);
-    }
 
     const BATCH = 50;
     let upserted = 0;
@@ -84,24 +82,24 @@ export async function GET(request: Request): Promise<Response> {
                     playerName:     p.playerName,
                     nameLower:      p.playerName.toLowerCase(),
                     position:       p.position,
-                    team:           p.team                           ?? null,
-                    age:            p.age                            ?? null,
-                    dynastyValue:   p.oneQBValues?.value             ?? 0,
-                    dynastyValueSf: p.superflexValues?.value         ?? 0,
-                    redraftValue:   redraftMap.get(p.playerID)       ?? 0,
-                    redraftValueSf: redraftSfMap.get(p.playerID)     ?? 0,
+                    team:           p.team                                          ?? null,
+                    age:            p.age                                           ?? null,
+                    dynastyValue:   p.oneQBValues?.value                            ?? 0,
+                    dynastyValueSf: p.superflexValues?.value                        ?? 0,
+                    redraftValue:   redraftMap.get(p.playerName.toLowerCase())      ?? 0,
+                    redraftValueSf: redraftSfMap.get(p.playerName.toLowerCase())    ?? 0,
                     trend30Day:     null,
                 },
                 update: {
                     playerName:     p.playerName,
                     nameLower:      p.playerName.toLowerCase(),
                     position:       p.position,
-                    team:           p.team                           ?? null,
-                    age:            p.age                            ?? null,
-                    dynastyValue:   p.oneQBValues?.value             ?? 0,
-                    dynastyValueSf: p.superflexValues?.value         ?? 0,
-                    redraftValue:   redraftMap.get(p.playerID)       ?? 0,
-                    redraftValueSf: redraftSfMap.get(p.playerID)     ?? 0,
+                    team:           p.team                                          ?? null,
+                    age:            p.age                                           ?? null,
+                    dynastyValue:   p.oneQBValues?.value                            ?? 0,
+                    dynastyValueSf: p.superflexValues?.value                        ?? 0,
+                    redraftValue:   redraftMap.get(p.playerName.toLowerCase())      ?? 0,
+                    redraftValueSf: redraftSfMap.get(p.playerName.toLowerCase())    ?? 0,
                     trend30Day:     null,
                 },
             }).catch(() => null)
