@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 
 export const maxDuration = 60;
 
@@ -24,7 +25,7 @@ export async function GET(request: Request): Promise<Response> {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Fetch 1QB dynasty values (PPR) — this is the most common format
+    // Fetch 1QB dynasty values (PPR) — most common format
     const res = await fetch(
         'https://api.fantasycalc.com/values/current?isDynasty=true&numQbs=1&ppr=1&numTeams=12',
         { cache: 'no-store' },
@@ -39,40 +40,37 @@ export async function GET(request: Request): Promise<Response> {
         return Response.json({ error: 'Empty response from FantasyCalc' }, { status: 502 });
     }
 
-    // Upsert in batches of 200
-    const BATCH = 200;
-    let upserted = 0;
+    // Single bulk upsert via raw SQL — vastly faster than N individual upserts
+    const values = players.map(p =>
+        Prisma.sql`(
+            ${p.id},
+            ${p.name},
+            ${p.name.toLowerCase()},
+            ${p.position},
+            ${p.maybeTeam ?? null},
+            ${p.maybeAge ?? null},
+            ${p.value},
+            ${p.redraftValue},
+            ${p.trend30Day ?? null},
+            NOW()
+        )`
+    );
 
-    for (let i = 0; i < players.length; i += BATCH) {
-        const batch = players.slice(i, i + BATCH);
-        await Promise.all(batch.map(p =>
-            prisma.fantasyCalcValue.upsert({
-                where:  { fcId: p.id },
-                create: {
-                    fcId:         p.id,
-                    playerName:   p.name,
-                    nameLower:    p.name.toLowerCase(),
-                    position:     p.position,
-                    team:         p.maybeTeam  ?? null,
-                    age:          p.maybeAge   ?? null,
-                    dynastyValue: p.value,
-                    redraftValue: p.redraftValue,
-                    trend30Day:   p.trend30Day  ?? null,
-                },
-                update: {
-                    playerName:   p.name,
-                    nameLower:    p.name.toLowerCase(),
-                    position:     p.position,
-                    team:         p.maybeTeam  ?? null,
-                    age:          p.maybeAge   ?? null,
-                    dynastyValue: p.value,
-                    redraftValue: p.redraftValue,
-                    trend30Day:   p.trend30Day  ?? null,
-                },
-            }).catch(() => null)
-        ));
-        upserted += batch.length;
-    }
+    await prisma.$executeRaw`
+        INSERT INTO "FantasyCalcValue"
+            ("fcId","playerName","nameLower","position","team","age","dynastyValue","redraftValue","trend30Day","updatedAt")
+        VALUES ${Prisma.join(values)}
+        ON CONFLICT ("fcId") DO UPDATE SET
+            "playerName"   = EXCLUDED."playerName",
+            "nameLower"    = EXCLUDED."nameLower",
+            "position"     = EXCLUDED."position",
+            "team"         = EXCLUDED."team",
+            "age"          = EXCLUDED."age",
+            "dynastyValue" = EXCLUDED."dynastyValue",
+            "redraftValue" = EXCLUDED."redraftValue",
+            "trend30Day"   = EXCLUDED."trend30Day",
+            "updatedAt"    = NOW()
+    `;
 
-    return Response.json({ ok: true, upserted });
+    return Response.json({ ok: true, upserted: players.length });
 }
