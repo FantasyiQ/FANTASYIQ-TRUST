@@ -104,6 +104,7 @@ export const PLAYER_CONTRACTS: Record<string, ContractTier> = {
     "Tyreek Hill":        'ufa',
     "Derrick Henry":      'veteran',
     "Keenan Allen":       'veteran',
+    "Daniel Jones":       'expiring',  // 1-year deal IND
     "Davante Adams":      'ufa',
     "Cooper Kupp":        'expiring',
     "Stefon Diggs":       'veteran',

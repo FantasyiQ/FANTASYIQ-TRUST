@@ -510,7 +510,7 @@ export const PLAYERS: Player[] = [
     { rank: 300, name: 'Trace McSorley',      position: 'QB',  team: 'ARI', age: 29, baseValue: 45 },
 
     // ── Low-value veterans / backup-only ────────────────────────────────────
-    { rank: 301, name: 'Daniel Jones',         position: 'QB',  team: 'FA',  age: 29, baseValue: 6  },
+    { rank: 301, name: 'Daniel Jones',         position: 'QB',  team: 'IND', age: 29, baseValue: 62 },
 
     // ── 2025 NOTABLE ROOKIES ─────────────────────────────────────────────────
     { rank: 302, name: 'Cam Ward',             position: 'QB',  team: 'TEN', age: 23, baseValue: 72 },
