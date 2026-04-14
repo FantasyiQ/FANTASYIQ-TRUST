@@ -26,10 +26,12 @@ export async function GET(request: Request): Promise<Response> {
         return Response.json({ error: `FantasyCalc responded ${res.status}` }, { status: 502 });
     }
 
-    const players = await res.json() as FcPlayer[];
-    if (!Array.isArray(players) || players.length === 0) {
+    const raw = await res.json() as FcPlayer[];
+    if (!Array.isArray(raw) || raw.length === 0) {
         return Response.json({ error: 'Empty response from FantasyCalc' }, { status: 502 });
     }
+    // Some entries may lack a name (picks, etc.) — skip them
+    const players = raw.filter(p => typeof p.name === 'string' && p.name.length > 0);
 
     // Upsert in batches of 50 using Promise.all within each batch
     const BATCH = 50;
