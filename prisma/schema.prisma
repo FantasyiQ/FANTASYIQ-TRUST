@@ -418,9 +418,11 @@ model FantasyCalcValue {
     position     String
     team         String?
     age          Float?
-    dynastyValue Int      // raw FantasyCalc scale (~0-11000)
-    redraftValue Int
-    trend30Day   Int?
+    dynastyValue   Int      // KTC 1QB dynasty (0–9999)
+    dynastyValueSf Int      @default(0)  // KTC superflex dynasty
+    redraftValue   Int      // KTC 1QB redraft (0–9999)
+    redraftValueSf Int      @default(0)  // KTC superflex redraft
+    trend30Day     Int?
     updatedAt    DateTime @updatedAt @default(now())
 
     @@index([nameLower])

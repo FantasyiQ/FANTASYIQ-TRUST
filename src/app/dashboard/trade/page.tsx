@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getLeagueRosters, getTradedPicks } from '@/lib/sleeper';
+import type { SleeperRoster, SleeperTradedPick } from '@/lib/sleeper';
 import { getDraftPicks } from '@/lib/trade-engine';
 import type { Player } from '@/lib/trade-engine';
 import TradeEvaluator from './TradeEvaluator';
@@ -20,47 +21,40 @@ function futureSeasons(): string[] {
 
 const ROUNDS = [1, 2, 3, 4, 5];
 
-type TradedPick = { season: string; round: number; roster_id: number; owner_id: number; previous_owner_id: number };
-
-function resolveOwnedPicks(
-    rosterId:    number,
-    rosterIds:   number[],
-    standings:   Map<number, number>,
-    tradedPicks: TradedPick[],
-): { season: string; round: number; slot: number }[] {
-    const FUTURE = futureSeasons();
-
-    const groups = new Map<string, TradedPick[]>();
-    for (const tp of tradedPicks) {
-        const key = `${tp.season}-${Number(tp.round)}-${Number(tp.roster_id)}`;
-        const g = groups.get(key) ?? [];
-        g.push(tp);
-        groups.set(key, g);
-    }
-    const pickOwnerMap = new Map<string, number>();
-    for (const [key, trades] of groups) {
-        if (trades.length === 1) {
-            pickOwnerMap.set(key, Number(trades[0].owner_id));
-        } else {
-            const prevOwnerIds = new Set(trades.map(t => Number(t.previous_owner_id)));
-            const terminal = trades.find(t => !prevOwnerIds.has(Number(t.owner_id)));
-            pickOwnerMap.set(key, Number(terminal?.owner_id ?? trades[trades.length - 1].owner_id));
+function buildPickOwnerMap(
+    rosters: SleeperRoster[],
+    tradedPicks: SleeperTradedPick[],
+    futureSeason: string[],
+): Map<string, number> {
+    const map = new Map<string, number>();
+    // Prefer roster.draft_picks (authoritative across seasons) over traded_picks events
+    const anyHasDraftPicks = rosters.some(r => r.draft_picks && r.draft_picks.length > 0);
+    if (anyHasDraftPicks) {
+        for (const roster of rosters) {
+            for (const dp of roster.draft_picks ?? []) {
+                if (!futureSeason.includes(dp.season)) continue;
+                map.set(`${dp.season}-${Number(dp.round)}-${Number(dp.roster_id)}`, Number(roster.roster_id));
+            }
         }
-    }
-
-    const owned: { season: string; round: number; slot: number }[] = [];
-    for (const season of FUTURE) {
-        for (const round of ROUNDS) {
-            for (const origId of rosterIds) {
-                const key = `${season}-${round}-${origId}`;
-                const owner = pickOwnerMap.get(key) ?? origId;
-                if (Number(owner) === Number(rosterId)) {
-                    owned.push({ season, round, slot: standings.get(origId) ?? 1 });
-                }
+    } else {
+        const groups = new Map<string, SleeperTradedPick[]>();
+        for (const tp of tradedPicks) {
+            const key = `${tp.season}-${Number(tp.round)}-${Number(tp.roster_id)}`;
+            const g = groups.get(key) ?? [];
+            g.push(tp);
+            groups.set(key, g);
+        }
+        for (const [key, trades] of groups) {
+            if (trades.length === 1) {
+                map.set(key, Number(trades[0].owner_id));
+            } else {
+                const prevOwnerIds = new Set(trades.map(t => Number(t.previous_owner_id)));
+                const terminal = trades.find(t => !prevOwnerIds.has(Number(t.owner_id)));
+                map.set(key, Number(terminal?.owner_id ?? trades[trades.length - 1].owner_id));
             }
         }
     }
-    return owned;
+    return map;
 }
 
 export default async function TradePage() {
@@ -78,6 +72,7 @@ export default async function TradePage() {
     let allLeaguePicks: Player[] = [];
 
     if (dbUser?.sleeperUserId && dbUser.leagues.length > 0) {
+        const FUTURE = futureSeasons();
         const results = await Promise.allSettled(
             dbUser.leagues.map(async league => {
                 const [rosters, tradedPicks] = await Promise.all([
@@ -96,13 +91,22 @@ export default async function TradePage() {
                 const rosterIds = rosters.map(r => r.roster_id);
                 const pickGrid  = getDraftPicks(league.totalRosters);
                 const pickByName = new Map(pickGrid.map(p => [p.name, p]));
+                const pickOwnerMap = buildPickOwnerMap(rosters, tradedPicks, FUTURE);
 
                 const picks: Player[] = [];
                 for (const roster of rosters) {
-                    const owned = resolveOwnedPicks(roster.roster_id, rosterIds, standings, tradedPicks as TradedPick[]);
-                    for (const op of owned) {
-                        const pick = pickByName.get(`${op.season} ${op.round}.${op.slot.toString().padStart(2, '0')}`);
-                        if (pick) picks.push(pick);
+                    for (const season of FUTURE) {
+                        for (const round of ROUNDS) {
+                            for (const origId of rosterIds) {
+                                const key = `${season}-${round}-${origId}`;
+                                const owner = pickOwnerMap.get(key) ?? origId;
+                                if (Number(owner) === Number(roster.roster_id)) {
+                                    const slot = standings.get(origId) ?? 1;
+                                    const pick = pickByName.get(`${season} ${round}.${slot.toString().padStart(2, '0')}`);
+                                    if (pick) picks.push(pick);
+                                }
+                            }
+                        }
                     }
                 }
                 return picks;
@@ -130,7 +134,7 @@ export default async function TradePage() {
                         Values adjust for position scarcity, age curve, and your PPR format. Search players to evaluate any trade.
                     </p>
                 </div>
-                <TradeEvaluator hideQuickPick allLeaguePicks={allLeaguePicks} />
+                <TradeEvaluator allLeaguePicks={allLeaguePicks} />
             </div>
         </main>
     );

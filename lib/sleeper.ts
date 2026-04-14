@@ -48,6 +48,8 @@ export interface SleeperRoster {
     owner_id: string | null;
     players: string[] | null;
     starters: string[] | null;
+    // Dynasty: picks this roster currently owns (authoritative — includes cross-season trades)
+    draft_picks?: SleeperTradedPick[];
     settings: {
         wins: number;
         losses: number;

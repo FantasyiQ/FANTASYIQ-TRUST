@@ -3,9 +3,9 @@ import { prisma } from '@/lib/prisma';
 import { PLAYERS } from '@/lib/trade-engine';
 import type { Player } from '@/lib/trade-engine';
 
-const FC_CAP = 10000;
+const KTC_CAP = 9999;
 function normaliseFc(raw: number): number {
-    return Math.min(100, Math.max(1, Math.round((raw / FC_CAP) * 100)));
+    return Math.min(100, Math.max(1, Math.round((raw / KTC_CAP) * 100)));
 }
 
 // Default baseValues for depth players not in the top-300 list
@@ -61,13 +61,14 @@ export async function GET(request: NextRequest): Promise<Response> {
             ? normaliseFc(Math.max(fcRow.dynastyValue, fcRow.redraftValue))
             : undefined;
         if (curated) {
-            // Only override if FC value is within reason (>40% of hardcoded)
-            const useFC = fcValue !== undefined && fcValue > curated.baseValue * 0.4;
+            // FC can boost freely; can only lower curated value by up to 15%
+            const floor = curated.baseValue * 0.85;
+            const adjusted = fcValue !== undefined ? Math.max(fcValue, floor) : curated.baseValue;
             return {
                 ...curated,
                 team:      p.team ?? curated.team,
                 age:       p.age  ?? curated.age,
-                baseValue: useFC ? fcValue : curated.baseValue,
+                baseValue: adjusted,
             };
         }
         return {

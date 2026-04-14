@@ -151,13 +151,23 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
     const ROUNDS = [1, 2, 3, 4, 5];
     const rosterIds = rosters.map(r => r.roster_id);
 
-    // Resolve current pick ownership correctly, even when a pick was traded multiple times.
-    // Sleeper returns one entry per trade event; we need the terminal (most recent) owner.
-    // A trade is terminal when its owner_id doesn't appear as any other trade's
-    // previous_owner_id for the same pick.
+    // Build pick ownership map.
+    // Prefer roster.draft_picks (authoritative — reflects all cross-season trades).
+    // Fall back to traded_picks reconstruction only if draft_picks isn't populated.
     const pickOwnerMap = new Map<string, number>(); // `${season}-${round}-${roster_id}` → current owner
-    {
-        // Group all traded-pick events by pick identity
+    const anyHasDraftPicks = rosters.some(r => r.draft_picks && r.draft_picks.length > 0);
+    if (anyHasDraftPicks) {
+        // Each roster's draft_picks lists picks they received via trades (not their own untouched picks).
+        // Picks not in any roster's draft_picks are still with the original owner (roster_id).
+        for (const roster of rosters) {
+            for (const dp of roster.draft_picks ?? []) {
+                if (!FUTURE_SEASONS.includes(dp.season)) continue;
+                const key = `${dp.season}-${Number(dp.round)}-${Number(dp.roster_id)}`;
+                pickOwnerMap.set(key, Number(roster.roster_id));
+            }
+        }
+    } else {
+        // Fallback: reconstruct from traded_picks trade events
         const groups = new Map<string, typeof tradedPicks>();
         for (const tp of tradedPicks) {
             const key = `${tp.season}-${Number(tp.round)}-${Number(tp.roster_id)}`;
@@ -169,7 +179,6 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
             if (trades.length === 1) {
                 pickOwnerMap.set(key, Number(trades[0].owner_id));
             } else {
-                // The terminal owner is the one whose owner_id is never a previous_owner_id
                 const prevOwnerIds = new Set(trades.map(t => Number(t.previous_owner_id)));
                 const terminal = trades.find(t => !prevOwnerIds.has(Number(t.owner_id)));
                 pickOwnerMap.set(key, Number(terminal?.owner_id ?? trades[trades.length - 1].owner_id));
@@ -211,20 +220,6 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
         t => rosters.find(r => r.roster_id === t.rosterId)?.owner_id === dbUser?.sleeperUserId
     );
 
-    // TEMP DEBUG — visible in browser
-    const myRid = myTeamData?.rosterId;
-    const picksInvolvingMe = tradedPicks.filter(tp =>
-        tp.roster_id === myRid || tp.owner_id === myRid || tp.previous_owner_id === myRid
-    );
-    const pickDebug = {
-        myRosterId: myRid ?? null,
-        totalTradedPicks: tradedPicks.length,
-        picksInvolvingMyRoster: picksInvolvingMe.map(tp => ({
-            s: tp.season, r: tp.round, roster_id: tp.roster_id,
-            prev_owner: tp.previous_owner_id, owner: tp.owner_id,
-        })),
-        myOwnedPicks: (myTeamData?.ownedPicks ?? []).map(p => `${p.season} ${p.round}.${String(p.slot).padStart(2,'0')}`),
-    };
     const otherTeamsData = teamTradeData.filter(t => t.rosterId !== myTeamData?.rosterId);
 
     const teamRosters: TeamRosterData[] = rows.map(row => {
@@ -390,12 +385,6 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                         </dl>
                     </div>
                 </div>
-
-                {/* TEMP DEBUG PANEL */}
-                <details className="bg-gray-900 border border-yellow-800 rounded-lg p-4 text-xs font-mono">
-                    <summary className="text-yellow-400 cursor-pointer font-bold">🔍 Pick Debug</summary>
-                    <pre className="mt-2 text-gray-300 whitespace-pre-wrap text-[11px]">{JSON.stringify(pickDebug, null, 2)}</pre>
-                </details>
 
                 {/* Trade Evaluator */}
                 <div>

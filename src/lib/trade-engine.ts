@@ -143,55 +143,27 @@ const DEFAULT_FACTORS: PlayerFactors = {
 
 export function calcDtv(
     player: Player,
-    ppr: PprFormat = 1,
+    _ppr: PprFormat = 1,
     leagueType: LeagueType = 'Redraft',
-    factors: PlayerFactors = DEFAULT_FACTORS,
-    settings: LeagueSettings = DEFAULT_LEAGUE_SETTINGS,
+    _factors?: PlayerFactors,
+    _settings?: LeagueSettings,
 ): DtvResult {
-    const W = leagueType === 'Dynasty' ? DYNASTY_WEIGHTS : REDRAFT_WEIGHTS;
-
-    const posM  = computeScarcity(player.position, settings);
-    const intel = getPlayerIntel(player.name, player.position, player.team, player.age, leagueType);
-    const ageM  = intel.ageFactor;
-
-    const { perfFactor, injuryFactor } = factors;
-    // schedFactor override (from caller) or use scheme intelligence
-    const schemeM   = factors.schedFactor  !== 1.0 ? factors.schedFactor  : intel.schemeFit;
-    const contractM = factors.situFactor   !== 1.0 ? factors.situFactor   : intel.contractFactor;
-    const draftCapM = intel.draftCapFactor;
-
-    const composite =
-        posM       * W.posScarcity    +
-        ageM       * W.ageCurve       +
-        perfFactor * W.recentPerf     +
-        schemeM    * W.schemeFit      +
-        contractM  * W.contractFactor +
-        draftCapM  * W.draftCapital   +
-        injuryFactor * W.injuryRisk;
-
-    // TE Premium: TEs score 1.5× per catch, everyone else full PPR
-    const effectivePpr = ppr === 'te_prem'
-        ? (player.position === 'TE' ? 1.5 : 1.0)
-        : ppr;
-
-    const rawDtv   = Math.round(player.baseValue * composite * 10) / 10;
-    // bonusRecTe adds to TE ppr value (e.g. 0.5 bonus/rec in a TE-premium league)
-    const catchRate = CATCH_RATE[player.position] ?? 0;
-    const teBonus   = player.position === 'TE' ? settings.bonusRecTe : 0;
-    const pprBoost  = catchRate * (effectivePpr + teBonus);
-    const finalDtv  = Math.round((rawDtv + pprBoost) * 10) / 10;
+    // Values are sourced directly from KTC — no multipliers applied.
+    // Insight badges are still generated for informational display.
+    const intel    = getPlayerIntel(player.name, player.position, player.team, player.age, leagueType);
+    const finalDtv = Math.round(player.baseValue * 10) / 10;
 
     return {
         ...player,
-        posMultiplier:  posM,
-        ageMultiplier:  ageM,
-        perfFactor,
-        schedFactor:    schemeM,
-        injuryFactor,
-        situFactor:     contractM,
-        draftCapFactor: draftCapM,
-        rawDtv,
-        pprBoost,
+        posMultiplier:  1,
+        ageMultiplier:  1,
+        perfFactor:     1,
+        schedFactor:    1,
+        injuryFactor:   1,
+        situFactor:     1,
+        draftCapFactor: 1,
+        rawDtv:         finalDtv,
+        pprBoost:       0,
         finalDtv,
         tier:           tier(finalDtv),
         insights:       intel.insights,

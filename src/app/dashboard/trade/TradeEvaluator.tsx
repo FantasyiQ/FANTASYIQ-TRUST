@@ -94,9 +94,7 @@ function FactorBar({ label, value, max = 1.30 }: { label: string; value: number;
     );
 }
 
-function PlayerPill({ result, onRemove, leagueType }: { result: DtvResult; onRemove: () => void; leagueType: LeagueType }) {
-    const [expanded, setExpanded] = useState(false);
-
+function PlayerPill({ result, onRemove, leagueSize }: { result: DtvResult; onRemove: () => void; leagueType: LeagueType; leagueSize: number }) {
     return (
         <div className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 space-y-2">
             <div className="flex items-center justify-between gap-3">
@@ -105,7 +103,9 @@ function PlayerPill({ result, onRemove, leagueType }: { result: DtvResult; onRem
                         {result.position}
                     </span>
                     <div className="min-w-0">
-                        <p className="text-white text-sm font-semibold truncate">{result.name}</p>
+                        <p className="text-white text-sm font-semibold truncate">
+                            {result.position === 'PICK' ? pickLabel(result.name, leagueSize) : result.name}
+                        </p>
                         <p className="text-gray-500 text-xs">{result.position === 'PICK' ? `${result.team} Draft` : `${result.team}${result.age ? ` · Age ${result.age}` : ''}`}</p>
                     </div>
                 </div>
@@ -114,14 +114,6 @@ function PlayerPill({ result, onRemove, leagueType }: { result: DtvResult; onRem
                         <p className={`font-bold text-sm ${TIER_COLORS[result.tier]}`}>{result.finalDtv}</p>
                         <p className="text-gray-600 text-xs">{result.tier}</p>
                     </div>
-                    {result.position !== 'PICK' && (
-                        <button
-                            onClick={() => setExpanded(v => !v)}
-                            className="text-gray-600 hover:text-gray-300 transition text-xs px-1"
-                            title="Show factors">
-                            {expanded ? '▲' : '▼'}
-                        </button>
-                    )}
                     <button onClick={onRemove} className="text-gray-700 hover:text-red-400 transition text-lg leading-none">×</button>
                 </div>
             </div>
@@ -132,29 +124,33 @@ function PlayerPill({ result, onRemove, leagueType }: { result: DtvResult; onRem
                     {result.insights.map(i => <InsightBadge key={i} label={i} />)}
                 </div>
             )}
-
-            {/* Expanded factor breakdown */}
-            {expanded && result.position !== 'PICK' && (
-                <div className="space-y-1 pt-1 border-t border-gray-700">
-                    <FactorBar label="Position"  value={result.posMultiplier} />
-                    <FactorBar label="Age Curve"  value={result.ageMultiplier} />
-                    <FactorBar label="Scheme"     value={result.schedFactor} />
-                    <FactorBar label="Contract"   value={result.situFactor} />
-                    {leagueType === 'Dynasty' && <FactorBar label="Draft Cap"  value={result.draftCapFactor} />}
-                </div>
-            )}
         </div>
     );
 }
 
 const POS_ORDER: Record<string, number> = { QB: 0, RB: 1, WR: 2, TE: 3, K: 4, DEF: 5 };
 
-function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, settings = DEFAULT_LEAGUE_SETTINGS, onAdd, rosterLabel = 'My Roster' }: {
+// Future picks (year > current draft year) show as "Early/Mid/Late Nth" — exact slot unknown until standings lock
+function pickLabel(name: string, leagueSize: number): string {
+    const m = name.match(/^(\d{4}) (\d+)\.(\d+)$/);
+    if (!m) return name;
+    const year  = parseInt(m[1]);
+    if (year <= PICK_YEARS[0]) return name; // current year: draft order is known
+    const round = parseInt(m[2]);
+    const slot  = parseInt(m[3]);
+    const third = Math.ceil(leagueSize / 3);
+    const tier  = slot <= third ? 'Early' : slot <= third * 2 ? 'Mid' : 'Late';
+    const ord   = ['1st','2nd','3rd','4th','5th'][round - 1] ?? `${round}th`;
+    return `${year} ${tier} ${ord}`;
+}
+
+function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, leagueSize = 12, settings = DEFAULT_LEAGUE_SETTINGS, onAdd, rosterLabel = 'My Roster' }: {
     players:      Player[];
     picks?:       Player[];
     excluded:     string[];
     ppr:          PprFormat;
     leagueType:   LeagueType;
+    leagueSize?:  number;
     settings?:    LeagueSettings;
     onAdd:        (p: Player) => void;
     rosterLabel?: string;
@@ -167,10 +163,21 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, setti
         [players]
     );
 
-    const yearPicks = useMemo(() =>
-        picks.filter(p => p.team === String(pickYear)),
-        [picks, pickYear]
-    );
+    const yearPicks = useMemo(() => {
+        const seen = new Set<string>();
+        return picks
+            .filter(p => {
+                if (p.team !== String(pickYear)) return false;
+                if (seen.has(p.name)) return false;
+                seen.add(p.name);
+                return true;
+            })
+            .sort((a, b) => {
+                const [ar, as_] = (a.name.split(' ')[1] ?? '0.0').split('.').map(Number);
+                const [br, bs_] = (b.name.split(' ')[1] ?? '0.0').split('.').map(Number);
+                return ar !== br ? ar - br : as_ - bs_;
+            });
+    }, [picks, pickYear]);
 
     // group by round number (pick name starts with "YYYY R.")
     const rounds = useMemo(() => {
@@ -243,28 +250,59 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, setti
                     </div>
                     {/* Picks by round */}
                     <div className="space-y-1.5">
-                        {rounds.map(([round, roundPicks]) => (
-                            <div key={round} className="flex items-center gap-2 flex-wrap">
-                                <span className="text-gray-600 text-[10px] font-semibold w-8 shrink-0">Rd {round}</span>
-                                {roundPicks.map(p => {
-                                    const used = excluded.includes(p.name);
-                                    const dtv  = calcDtv(p, ppr, leagueType, undefined, settings);
-                                    const slot = p.name.split(' ')[1]; // e.g. "1.03"
-                                    return (
-                                        <button key={p.name} type="button" disabled={used} onClick={() => onAdd(p)}
-                                            title={`${p.name} — DTV ${dtv.finalDtv}`}
-                                            className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] font-medium transition ${
-                                                used
-                                                    ? 'border-gray-800 text-gray-700 cursor-not-allowed'
-                                                    : 'border-indigo-800/60 text-indigo-300 hover:border-indigo-500 hover:text-white'
-                                            }`}>
-                                            {slot}
-                                            <span className="text-gray-600">{dtv.finalDtv}</span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        ))}
+                        {rounds.map(([round, roundPicks]) => {
+                            const isFuture = pickYear > PICK_YEARS[0];
+                            const ord = ['1st','2nd','3rd','4th','5th'][round - 1] ?? `${round}th`;
+                            const third = Math.ceil(leagueSize / 3);
+                            const tierOf = (slot: number) => slot <= third ? 'Early' : slot <= third * 2 ? 'Mid' : 'Late';
+                            return (
+                                <div key={round} className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-gray-600 text-[10px] font-semibold w-8 shrink-0">Rd {round}</span>
+                                    {isFuture
+                                        ? (['Early','Mid','Late'] as const).map(tierName => {
+                                            const tierPicks = roundPicks.filter(p => tierOf(parseInt(p.name.split('.')[1] ?? '1')) === tierName);
+                                            if (tierPicks.length === 0) return null;
+                                            const available = tierPicks.filter(p => !excluded.includes(p.name));
+                                            const allUsed = available.length === 0;
+                                            const avgDtv = Math.round(tierPicks.reduce((sum, p) => sum + calcDtv(p, ppr, leagueType, undefined, settings).finalDtv, 0) / tierPicks.length);
+                                            const remaining = available.length;
+                                            return (
+                                                <button key={tierName} type="button" disabled={allUsed}
+                                                    onClick={() => available[0] && onAdd(available[0])}
+                                                    title={`${tierName} ${ord} — avg DTV ${avgDtv}`}
+                                                    className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] font-medium transition ${
+                                                        allUsed
+                                                            ? 'border-gray-800 text-gray-700 cursor-not-allowed'
+                                                            : 'border-indigo-800/60 text-indigo-300 hover:border-indigo-500 hover:text-white'
+                                                    }`}>
+                                                    {tierName} {ord}
+                                                    {tierPicks.length > 1 && remaining > 0 && (
+                                                        <span className="text-indigo-500 text-[10px]">×{remaining}</span>
+                                                    )}
+                                                    <span className="text-gray-600">{avgDtv}</span>
+                                                </button>
+                                            );
+                                        })
+                                        : roundPicks.map(p => {
+                                            const used = excluded.includes(p.name);
+                                            const dtv  = calcDtv(p, ppr, leagueType, undefined, settings);
+                                            return (
+                                                <button key={p.name} type="button" disabled={used} onClick={() => onAdd(p)}
+                                                    title={`${p.name} — DTV ${dtv.finalDtv}`}
+                                                    className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] font-medium transition ${
+                                                        used
+                                                            ? 'border-gray-800 text-gray-700 cursor-not-allowed'
+                                                            : 'border-indigo-800/60 text-indigo-300 hover:border-indigo-500 hover:text-white'
+                                                    }`}>
+                                                    {p.name.split(' ')[1]}
+                                                    <span className="text-gray-600">{dtv.finalDtv}</span>
+                                                </button>
+                                            );
+                                        })
+                                    }
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             )}
@@ -272,7 +310,7 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, setti
     );
 }
 
-function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEAGUE_SETTINGS, players, allPicks = [] }: {
+function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEAGUE_SETTINGS, players, allPicks = [], leagueSize = 12 }: {
     onAdd: (p: Player) => void;
     excluded: string[];
     ppr: PprFormat;
@@ -280,6 +318,7 @@ function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEA
     settings?: LeagueSettings;
     players: Player[];
     allPicks?: Player[];
+    leagueSize?: number;
 }) {
     const [query, setQuery]     = useState('');
     const [results, setResults] = useState<Player[]>([]);
@@ -291,17 +330,21 @@ function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEA
         setLoading(true);
         try {
             const ql = q.toLowerCase();
-            // Match picks: any pick whose name contains the query (e.g. "1.04", "2026", "round 1")
+            // Match picks: raw name or label (e.g. "early first", "mid 2nd", "2027", "1.04")
             const pickMatches = allPicks
-                .filter(p => p.name.toLowerCase().includes(ql) && !excluded.includes(p.name))
+                .filter(p => {
+                    const label = pickLabel(p.name, leagueSize).toLowerCase();
+                    return (p.name.toLowerCase().includes(ql) || label.includes(ql)) && !excluded.includes(p.name);
+                })
                 .slice(0, 8);
 
             const res = await fetch(`/api/players/trade-search?q=${encodeURIComponent(q)}`);
             const playerData = await res.json() as Player[];
             const playerMatches = playerData.filter(p => !excluded.includes(p.name));
 
-            // Picks first if query looks like a pick (contains digit+dot or 4-digit year), players otherwise
-            const looksLikePick = /\d\.\d|\b20\d{2}\b/.test(q);
+            // Picks first if query looks like a pick
+            const looksLikePick = /\d\.\d|\b20\d{2}\b|\b(early|mid|late)\b/i.test(q) ||
+                (pickMatches.length > 0 && playerMatches.length === 0);
             setResults(looksLikePick
                 ? [...pickMatches, ...playerMatches].slice(0, 12)
                 : [...playerMatches, ...pickMatches].slice(0, 12)
@@ -346,8 +389,12 @@ function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEA
                                         </span>
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-1.5">
-                                                <span className="text-white text-sm truncate">{p.name}</span>
-                                                <span className="text-gray-500 text-xs">{p.team}</span>
+                                                <span className="text-white text-sm truncate">
+                                                    {p.position === 'PICK' ? pickLabel(p.name, leagueSize) : p.name}
+                                                </span>
+                                                <span className="text-gray-500 text-xs">
+                                                    {p.position === 'PICK' ? `${p.team} Draft` : p.team}
+                                                </span>
                                             </div>
                                             {dtv.insights && dtv.insights.length > 0 && (
                                                 <div className="flex flex-wrap gap-1 mt-0.5">
@@ -413,30 +460,70 @@ export default function TradeEvaluator({
     const [pickYear, setPickYear]     = useState(PICK_YEARS[0]);
     const [sideA, setSideA]           = useState<Player[]>([]);
     const [sideB, setSideB]           = useState<Player[]>([]);
+    const [sideC, setSideC]           = useState<Player[]>([]);
+    const [threeWay, setThreeWay]     = useState(false);
     const [selectedTeamId, setSelectedTeamId] = useState<number | null>(otherTeams[0]?.rosterId ?? null);
-    const [fcMap, setFcMap] = useState<Record<string, { dynasty: number; redraft: number }>>({});
+    const [fcMap, setFcMap] = useState<Record<string, { dynasty: number; dynastySf: number; redraft: number; redraftSf: number }>>({});
 
-    // Load live FantasyCalc values (cached 1hr on CDN)
+    // Load live KTC values (cached 1hr on CDN)
     useEffect(() => {
         fetch('/api/players/fc-values')
             .then(r => r.json())
-            .then((data: Record<string, { dynasty: number; redraft: number }>) => {
+            .then((data: Record<string, { dynasty: number; dynastySf: number; redraft: number; redraftSf: number }>) => {
                 setFcMap(data);
             })
-            .catch(() => {/* ignore — fall back to hardcoded baseValues */});
+            .catch(() => {});
     }, []);
 
-    // Patch baseValue with live FC data — use dynasty or redraft value to match league type
+    // Apply KTC base value + league format adjustments
     const patchPlayer = useCallback((p: Player): Player => {
         const fc = fcMap[p.name.toLowerCase()];
-        if (!fc) return p;
-        const fcVal = leagueType === 'Dynasty' ? fc.dynasty : fc.redraft;
-        // Use FC value only if it's higher than half the hardcoded value,
-        // preventing stale/low community data from tanking elite players
-        return fcVal > p.baseValue * 0.4 ? { ...p, baseValue: fcVal } : p;
-    }, [fcMap, leagueType]);
+        const superflex = leagueSettings.sfSlots > 0;
 
-    const allExcluded = [...sideA.map(p => p.name), ...sideB.map(p => p.name)];
+        // Pick KTC value for this league format
+        let ktcVal: number | undefined;
+        if (fc) {
+            if (leagueType === 'Dynasty') {
+                ktcVal = superflex ? fc.dynastySf : fc.dynasty;
+            } else {
+                ktcVal = superflex ? fc.redraftSf : fc.redraft;
+            }
+        }
+
+        // Use KTC directly; fall back to hardcoded baseValue only when KTC has no data
+        let baseValue: number;
+        if (ktcVal !== undefined && ktcVal > 0) {
+            baseValue = ktcVal;
+        } else {
+            baseValue = p.baseValue;
+        }
+
+        // League format adjustments (on top of KTC base)
+        // PPR: KTC is full PPR — reduce catching positions for non-PPR
+        if (p.position !== 'PICK') {
+            const catchWeight: Record<string, number> = { WR: 0.55, RB: 0.35, TE: 0.65 };
+            const cw = catchWeight[p.position] ?? 0;
+            if (ppr === 0 && cw > 0)        baseValue = Math.max(1, baseValue - cw * 10);
+            else if (ppr === 0.5 && cw > 0) baseValue = Math.max(1, baseValue - cw * 5);
+            else if (ppr === 'te_prem' && p.position === 'TE') baseValue = baseValue * 1.12;
+
+            // 6pt passing TDs boost QB value
+            if (p.position === 'QB' && leagueSettings.passTd >= 6) baseValue = baseValue * 1.08;
+
+            // TE bonus reception scoring
+            if (p.position === 'TE' && leagueSettings.bonusRecTe > 0) baseValue = baseValue * (1 + leagueSettings.bonusRecTe * 0.06);
+
+            // League size: KTC baseline is 12-team — adjust scarcity for other sizes
+            const sizeFactor = 1 + (leagueSize - 12) * 0.012;
+            baseValue = baseValue * sizeFactor;
+
+            baseValue = Math.round(Math.max(1, baseValue) * 10) / 10;
+        }
+
+        return { ...p, baseValue };
+    }, [fcMap, leagueType, leagueSettings, ppr, leagueSize]);
+
+    const allExcluded = [...sideA.map(p => p.name), ...sideB.map(p => p.name), ...sideC.map(p => p.name)];
 
     const draftPicks = useMemo(() => getDraftPicks(leagueSize), [leagueSize]);
     const allPlayers = useMemo(
@@ -469,12 +556,17 @@ export default function TradeEvaluator({
         () => (selectedTeam?.players ?? (myTeam ? [] : myRoster)).map(patchPlayer),
         [selectedTeam, myTeam, myRoster, patchPlayer],
     );
-    const receivePicks  = selectedTeam?.picks   ?? [];
+    const receivePicks  = selectedTeam?.picks ?? (myTeam ? [] : draftPicks);
 
     const result = useMemo(() => {
         if (sideA.length === 0 && sideB.length === 0) return null;
         return evaluateTrade(sideA, sideB, ppr, leagueType, [], [], leagueSettings);
     }, [sideA, sideB, ppr, leagueType, leagueSettings]);
+
+    const totalC = useMemo(() =>
+        Math.round(sideC.reduce((s, p) => s + calcDtv(p, ppr, leagueType, undefined, leagueSettings).finalDtv, 0) * 10) / 10,
+        [sideC, ppr, leagueType, leagueSettings]
+    );
 
     const positions = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'PICK'];
 
@@ -533,38 +625,48 @@ export default function TradeEvaluator({
                 </div>
             </div>
 
+            {/* 3-way toggle */}
+            <div className="flex items-center gap-3">
+                <button
+                    onClick={() => { setThreeWay(v => !v); if (threeWay) setSideC([]); }}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${threeWay ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
+                    {threeWay ? '✕ Remove 3rd Team' : '+ 3-Way Trade'}
+                </button>
+            </div>
+
             {/* Trade sides */}
-            <div className="grid md:grid-cols-2 gap-4">
-                {/* Side A */}
+            <div className={`grid gap-4 ${threeWay ? 'lg:grid-cols-3 md:grid-cols-2' : 'md:grid-cols-2'}`}>
+                {/* Team 1 */}
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-4">
                     <div className="flex items-center justify-between">
-                        <h2 className="font-bold text-white">You Give</h2>
+                        <h2 className="font-bold text-white">Team 1</h2>
                         {result && <span className="text-2xl font-extrabold text-white">{result.totalA}</span>}
                     </div>
-                    {!hideQuickPick && (giveRoster.length > 0 || givePicks.length > 0) && (
+                    {(giveRoster.length > 0 || givePicks.length > 0) && (
                         <RosterQuickPick
                             players={giveRoster}
                             picks={givePicks}
                             excluded={allExcluded}
                             ppr={ppr}
                             leagueType={leagueType}
+                            leagueSize={leagueSize}
                             settings={leagueSettings}
                             onAdd={p => setSideA(prev => prev.length < 5 ? [...prev, p] : prev)}
                         />
                     )}
-                    <PlayerSearch onAdd={p => setSideA(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} settings={leagueSettings} players={allPlayers} allPicks={searchablePicks} />
+                    <PlayerSearch onAdd={p => setSideA(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} settings={leagueSettings} players={allPlayers} allPicks={searchablePicks} leagueSize={leagueSize} />
                     <div className="space-y-2">
                         {result?.sideA.map(r => (
-                            <PlayerPill key={r.name} result={r} leagueType={leagueType} onRemove={() => setSideA(prev => prev.filter(p => p.name !== r.name))} />
+                            <PlayerPill key={r.name} result={r} leagueType={leagueType} leagueSize={leagueSize} onRemove={() => setSideA(prev => prev.filter(p => p.name !== r.name))} />
                         ))}
                         {sideA.length === 0 && <p className="text-gray-600 text-sm text-center py-4">Search and add up to 5 players</p>}
                     </div>
                 </div>
 
-                {/* Side B */}
+                {/* Team 2 */}
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-4">
                     <div className="flex items-center justify-between">
-                        <h2 className="font-bold text-white">You Receive</h2>
+                        <h2 className="font-bold text-white">Team 2</h2>
                         {result && <span className="text-2xl font-extrabold text-white">{result.totalB}</span>}
                     </div>
                     {otherTeams.length > 0 && (
@@ -580,82 +682,143 @@ export default function TradeEvaluator({
                             </select>
                         </div>
                     )}
-                    {!hideQuickPick && (receiveRoster.length > 0 || receivePicks.length > 0) && (
+                    {(receiveRoster.length > 0 || receivePicks.length > 0) && (
                         <RosterQuickPick
                             players={receiveRoster}
                             picks={receivePicks}
                             excluded={allExcluded}
                             ppr={ppr}
                             leagueType={leagueType}
+                            leagueSize={leagueSize}
                             settings={leagueSettings}
                             rosterLabel={selectedTeam ? `${selectedTeam.teamName.split(' ')[0]}'s Roster` : 'Roster'}
                             onAdd={p => setSideB(prev => prev.length < 5 ? [...prev, p] : prev)}
                         />
                     )}
-                    <PlayerSearch onAdd={p => setSideB(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} settings={leagueSettings} players={allPlayers} allPicks={searchablePicks} />
+                    <PlayerSearch onAdd={p => setSideB(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} settings={leagueSettings} players={allPlayers} allPicks={searchablePicks} leagueSize={leagueSize} />
                     <div className="space-y-2">
                         {result?.sideB.map(r => (
-                            <PlayerPill key={r.name} result={r} leagueType={leagueType} onRemove={() => setSideB(prev => prev.filter(p => p.name !== r.name))} />
+                            <PlayerPill key={r.name} result={r} leagueType={leagueType} leagueSize={leagueSize} onRemove={() => setSideB(prev => prev.filter(p => p.name !== r.name))} />
                         ))}
                         {sideB.length === 0 && <p className="text-gray-600 text-sm text-center py-4">Search and add up to 5 players</p>}
                     </div>
                 </div>
+
+                {/* Team 3 (3-way) */}
+                {threeWay && (
+                    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h2 className="font-bold text-white">Team 3</h2>
+                            {sideC.length > 0 && <span className="text-2xl font-extrabold text-white">{totalC}</span>}
+                        </div>
+                        <RosterQuickPick
+                            players={[]}
+                            picks={draftPicks}
+                            excluded={allExcluded}
+                            ppr={ppr}
+                            leagueType={leagueType}
+                            leagueSize={leagueSize}
+                            settings={leagueSettings}
+                            rosterLabel="Team 3"
+                            onAdd={p => setSideC(prev => prev.length < 5 ? [...prev, p] : prev)}
+                        />
+                        <PlayerSearch onAdd={p => setSideC(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} settings={leagueSettings} players={allPlayers} allPicks={searchablePicks} leagueSize={leagueSize} />
+                        <div className="space-y-2">
+                            {sideC.map(p => {
+                                const r = calcDtv(p, ppr, leagueType, undefined, leagueSettings);
+                                return <PlayerPill key={p.name} result={r} leagueType={leagueType} leagueSize={leagueSize} onRemove={() => setSideC(prev => prev.filter(x => x.name !== p.name))} />;
+                            })}
+                            {sideC.length === 0 && <p className="text-gray-600 text-sm text-center py-4">Search and add up to 5 players</p>}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Verdict */}
             {result && (sideA.length > 0 || sideB.length > 0) && (
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-5">
                     <h2 className="font-bold">Trade Verdict</h2>
-                    <div className="grid sm:grid-cols-3 gap-4 text-center">
-                        <div>
-                            <p className="text-gray-500 text-xs mb-1">You Give</p>
-                            <p className="text-3xl font-extrabold text-white">{result.totalA}</p>
-                            <p className="text-gray-500 text-xs mt-1">DTV</p>
-                        </div>
-                        <div className="flex flex-col items-center justify-center gap-1">
-                            <p className={`text-xl font-extrabold ${verdictColor(result.verdict)}`}>{result.verdict}</p>
-                            <div className="flex items-center gap-2">
-                                <span className="text-gray-600 text-xs">Trade Score:</span>
-                                <span className={`text-lg font-bold ${verdictColor(result.verdict)}`}>{result.score}</span>
-                                <span className="text-gray-600 text-xs">/ 100</span>
-                            </div>
-                            <p className="text-gray-600 text-xs">
-                                {result.winner === 'Even' ? 'Essentially even' :
-                                 result.winner === 'A' ? `You overpay by ${result.diff}` :
-                                 `You win by ${result.diff}`}
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-gray-500 text-xs mb-1">You Receive</p>
-                            <p className="text-3xl font-extrabold text-white">{result.totalB}</p>
-                            <p className="text-gray-500 text-xs mt-1">DTV</p>
-                        </div>
-                    </div>
 
-                    {/* Bar comparison */}
-                    <div className="space-y-2">
-                        <div className="flex items-center gap-3">
-                            <span className="text-gray-500 text-xs w-20 text-right shrink-0">You Give</span>
-                            <div className="flex-1 bg-gray-800 rounded-full h-3">
-                                <div className="bg-red-500 h-3 rounded-full transition-all"
-                                    style={{ width: `${Math.min(100, result.totalA / Math.max(result.totalA, result.totalB, 1) * 100)}%` }} />
+                    {threeWay ? (
+                        /* 3-way: show all 3 totals + bar */
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-3 gap-4 text-center">
+                                {([['Team 1', result.totalA], ['Team 2', result.totalB], ['Team 3', totalC]] as [string, number][]).map(([label, total]) => {
+                                    const maxTotal = Math.max(result.totalA, result.totalB, totalC, 1);
+                                    const isWinner = total === maxTotal;
+                                    return (
+                                        <div key={label}>
+                                            <p className="text-gray-500 text-xs mb-1">{label}</p>
+                                            <p className={`text-3xl font-extrabold ${isWinner ? 'text-[#C8A951]' : 'text-white'}`}>{total}</p>
+                                            <p className="text-gray-500 text-xs mt-1">DTV{isWinner ? ' 🏆' : ''}</p>
+                                        </div>
+                                    );
+                                })}
                             </div>
-                            <span className="text-white text-xs font-bold w-10">{result.totalA}</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <span className="text-gray-500 text-xs w-20 text-right shrink-0">You Get</span>
-                            <div className="flex-1 bg-gray-800 rounded-full h-3">
-                                <div className="bg-green-500 h-3 rounded-full transition-all"
-                                    style={{ width: `${Math.min(100, result.totalB / Math.max(result.totalA, result.totalB, 1) * 100)}%` }} />
+                            <div className="space-y-2">
+                                {([['Team 1', result.totalA, 'bg-blue-500'], ['Team 2', result.totalB, 'bg-green-500'], ['Team 3', totalC, 'bg-purple-500']] as [string, number, string][]).map(([label, total, color]) => (
+                                    <div key={label} className="flex items-center gap-3">
+                                        <span className="text-gray-500 text-xs w-14 text-right shrink-0">{label}</span>
+                                        <div className="flex-1 bg-gray-800 rounded-full h-3">
+                                            <div className={`${color} h-3 rounded-full transition-all`}
+                                                style={{ width: `${Math.min(100, total / Math.max(result.totalA, result.totalB, totalC, 1) * 100)}%` }} />
+                                        </div>
+                                        <span className="text-white text-xs font-bold w-10">{total}</span>
+                                    </div>
+                                ))}
                             </div>
-                            <span className="text-white text-xs font-bold w-10">{result.totalB}</span>
                         </div>
-                    </div>
-
-                    {/* Score scale */}
-                    <div className="text-xs text-gray-600 text-center">
-                        0–14 Robbery · 15–29 Bad Deal · 30–44 Slight Loss · 45–59 Fair Trade · 60–74 Slight Edge · 75–89 Strong Win · 90–100 Slam Dunk
-                    </div>
+                    ) : (
+                        /* 2-way: existing verdict */
+                        <>
+                            <div className="grid sm:grid-cols-3 gap-4 text-center">
+                                <div>
+                                    <p className="text-gray-500 text-xs mb-1">Team 1</p>
+                                    <p className="text-3xl font-extrabold text-white">{result.totalA}</p>
+                                    <p className="text-gray-500 text-xs mt-1">DTV</p>
+                                </div>
+                                <div className="flex flex-col items-center justify-center gap-1">
+                                    <p className={`text-xl font-extrabold ${verdictColor(result.verdict)}`}>{result.verdict}</p>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-gray-600 text-xs">Trade Score:</span>
+                                        <span className={`text-lg font-bold ${verdictColor(result.verdict)}`}>{result.score}</span>
+                                        <span className="text-gray-600 text-xs">/ 100</span>
+                                    </div>
+                                    <p className="text-gray-600 text-xs">
+                                        {result.winner === 'Even' ? 'Essentially even' :
+                                         result.winner === 'A' ? `Team 1 overpays by ${result.diff}` :
+                                         `Team 1 wins by ${result.diff}`}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-gray-500 text-xs mb-1">Team 2</p>
+                                    <p className="text-3xl font-extrabold text-white">{result.totalB}</p>
+                                    <p className="text-gray-500 text-xs mt-1">DTV</p>
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-3">
+                                    <span className="text-gray-500 text-xs w-14 text-right shrink-0">Team 1</span>
+                                    <div className="flex-1 bg-gray-800 rounded-full h-3">
+                                        <div className="bg-blue-500 h-3 rounded-full transition-all"
+                                            style={{ width: `${Math.min(100, result.totalA / Math.max(result.totalA, result.totalB, 1) * 100)}%` }} />
+                                    </div>
+                                    <span className="text-white text-xs font-bold w-10">{result.totalA}</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <span className="text-gray-500 text-xs w-14 text-right shrink-0">Team 2</span>
+                                    <div className="flex-1 bg-gray-800 rounded-full h-3">
+                                        <div className="bg-green-500 h-3 rounded-full transition-all"
+                                            style={{ width: `${Math.min(100, result.totalB / Math.max(result.totalA, result.totalB, 1) * 100)}%` }} />
+                                    </div>
+                                    <span className="text-white text-xs font-bold w-10">{result.totalB}</span>
+                                </div>
+                            </div>
+                            <div className="text-xs text-gray-600 text-center">
+                                0–14 Robbery · 15–29 Bad Deal · 30–44 Slight Loss · 45–59 Fair Trade · 60–74 Slight Edge · 75–89 Strong Win · 90–100 Slam Dunk
+                            </div>
+                        </>
+                    )}
                 </div>
             )}
 
@@ -691,28 +854,52 @@ export default function TradeEvaluator({
 
                         {/* Rounds */}
                         {[1, 2, 3, 4, 5].map(round => {
+                            const isFutureChart = pickYear > PICK_YEARS[0];
+                            const ord = ['1st','2nd','3rd','4th','5th'][round - 1] ?? `${round}th`;
                             const roundPicks = draftPicks.filter(p =>
                                 p.team === String(pickYear) && p.name.startsWith(`${pickYear} ${round}.`)
-                            );
+                            ).sort((a, b) => {
+                                const as_ = parseInt(a.name.split('.')[1] ?? '0');
+                                const bs_ = parseInt(b.name.split('.')[1] ?? '0');
+                                return as_ - bs_;
+                            });
+                            if (roundPicks.length === 0) return null;
+                            const third = Math.ceil(leagueSize / 3);
+                            const tierOf = (slot: number) => slot <= third ? 'Early' : slot <= third * 2 ? 'Mid' : 'Late';
                             return (
                                 <div key={round}>
-                                    <h3 className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-3">
-                                        Round {round}
-                                    </h3>
-                                    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
-                                        {roundPicks.map(p => {
-                                            const dtv = calcDtv(p, ppr, leagueType, undefined, leagueSettings);
-                                            const pickLabel = p.name.split(' ')[1]; // e.g. "1.03"
-                                            return (
-                                                <div key={p.name}
-                                                    className="bg-gray-800 border border-gray-700 rounded-xl p-2.5 text-center hover:border-indigo-500/50 transition cursor-default">
-                                                    <p className="text-indigo-300 font-bold text-sm">{pickLabel}</p>
-                                                    <p className={`font-extrabold text-base ${TIER_COLORS[dtv.tier]}`}>{dtv.finalDtv}</p>
-                                                    <p className="text-gray-600 text-xs">{dtv.tier}</p>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
+                                    <h3 className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-3">Round {round}</h3>
+                                    {isFutureChart ? (
+                                        <div className="grid grid-cols-3 gap-3">
+                                            {(['Early','Mid','Late'] as const).map(tierName => {
+                                                const tierPicks = roundPicks.filter(p => tierOf(parseInt(p.name.split('.')[1] ?? '1')) === tierName);
+                                                if (tierPicks.length === 0) return null;
+                                                const avgDtv = Math.round(tierPicks.reduce((s, p) => s + calcDtv(p, ppr, leagueType, undefined, leagueSettings).finalDtv, 0) / tierPicks.length * 10) / 10;
+                                                const repDtv = calcDtv(tierPicks[Math.floor(tierPicks.length / 2)], ppr, leagueType, undefined, leagueSettings);
+                                                return (
+                                                    <div key={tierName} className="bg-gray-800 border border-gray-700 rounded-xl p-3 text-center hover:border-indigo-500/50 transition cursor-default">
+                                                        <p className="text-indigo-300 font-bold text-sm">{tierName} {ord}</p>
+                                                        <p className={`font-extrabold text-base ${TIER_COLORS[repDtv.tier]}`}>{avgDtv}</p>
+                                                        <p className="text-gray-600 text-xs">{repDtv.tier}</p>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
+                                            {roundPicks.map(p => {
+                                                const dtv = calcDtv(p, ppr, leagueType, undefined, leagueSettings);
+                                                const slot = p.name.split(' ')[1];
+                                                return (
+                                                    <div key={p.name} className="bg-gray-800 border border-gray-700 rounded-xl p-2.5 text-center hover:border-indigo-500/50 transition cursor-default">
+                                                        <p className="text-indigo-300 font-bold text-sm">{slot}</p>
+                                                        <p className={`font-extrabold text-base ${TIER_COLORS[dtv.tier]}`}>{dtv.finalDtv}</p>
+                                                        <p className="text-gray-600 text-xs">{dtv.tier}</p>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}
@@ -761,16 +948,21 @@ export default function TradeEvaluator({
                                                     <div className="flex items-center justify-end gap-1">
                                                         <button
                                                             onClick={() => setSideA(prev => prev.length < 5 ? [...prev, p] : prev)}
-                                                            title="Add to Give"
-                                                            className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-red-800/60 text-red-400 hover:bg-red-900/40 transition">
-                                                            Give
+                                                            className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-blue-800/60 text-blue-400 hover:bg-blue-900/40 transition">
+                                                            T1
                                                         </button>
                                                         <button
                                                             onClick={() => setSideB(prev => prev.length < 5 ? [...prev, p] : prev)}
-                                                            title="Add to Receive"
                                                             className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-green-800/60 text-green-400 hover:bg-green-900/40 transition">
-                                                            Get
+                                                            T2
                                                         </button>
+                                                        {threeWay && (
+                                                            <button
+                                                                onClick={() => setSideC(prev => prev.length < 5 ? [...prev, p] : prev)}
+                                                                className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-purple-800/60 text-purple-400 hover:bg-purple-900/40 transition">
+                                                                T3
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 )}
                                             </td>
