@@ -62,7 +62,17 @@ export default function LeagueTradeEvaluator({
 
     function convertRaw(raw: RawTeamData): TradeTeam {
         const players: Player[] = raw.players
-            .map(p => playerByName.get(p.name.toLowerCase()))
+            .map(p => {
+                const curated = playerByName.get(p.name.toLowerCase());
+                if (!curated) return undefined;
+                // Override team and position from live Sleeper data so scheme
+                // fit and badges reflect current roster assignments
+                return {
+                    ...curated,
+                    team:     p.team     || curated.team,
+                    position: p.position || curated.position,
+                };
+            })
             .filter((p): p is Player => p !== undefined);
 
         const picks: Player[] = raw.ownedPicks

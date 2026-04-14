@@ -38,10 +38,17 @@ export async function GET(request: NextRequest): Promise<Response> {
     // 2. Build a lookup of curated static values by name
     const staticByName = new Map(PLAYERS.map(p => [p.name.toLowerCase(), p]));
 
-    // 3. Merge: use curated value if available, otherwise assign depth value
+    // 3. Merge: use curated value if available, override team from live DB data.
+    //    This ensures scheme fit / badges always reflect current roster assignments.
     const merged: Player[] = dbMatches.map((p, i) => {
         const curated = staticByName.get(p.fullName.toLowerCase());
-        if (curated) return curated;
+        if (curated) {
+            return {
+                ...curated,
+                team: p.team ?? curated.team,  // live team overrides hardcoded
+                age:  p.age  ?? curated.age,   // live age overrides hardcoded
+            };
+        }
         return {
             rank:      300 + i + 1,
             name:      p.fullName,
