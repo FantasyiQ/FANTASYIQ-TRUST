@@ -114,16 +114,34 @@ export default function LeagueTradeEvaluator({
     const pickByName   = useMemo(() => new Map(allPicks.map(p => [p.name, p])), [allPicks]);
     const playerByName = useMemo(() => new Map(PLAYERS.map(p => [p.name.toLowerCase(), p])), []);
 
+    // Depth base values for players not in the curated top-300 list
+    const DEPTH_BASE: Record<string, number> = {
+        QB: 22, RB: 18, WR: 18, TE: 14, K: 8, DEF: 8,
+    };
+
+    let depthRank = 400;
+
     function convertRaw(raw: RawTeamData): TradeTeam {
         const players: Player[] = raw.players
             .map(p => {
                 const curated = playerByName.get(p.name.toLowerCase());
-                if (!curated) return undefined;
+                if (curated) {
+                    return {
+                        ...curated,
+                        team:     p.team     || curated.team,
+                        position: p.position || curated.position,
+                    };
+                }
+                // Include depth/unranked players with a basic profile
+                if (!p.name || !p.position) return undefined;
                 return {
-                    ...curated,
-                    team:     p.team     || curated.team,
-                    position: p.position || curated.position,
-                };
+                    rank:      depthRank++,
+                    name:      p.name,
+                    position:  p.position,
+                    team:      p.team ?? '',
+                    age:       26,
+                    baseValue: DEPTH_BASE[p.position] ?? 10,
+                } satisfies Player;
             })
             .filter((p): p is Player => p !== undefined);
 
