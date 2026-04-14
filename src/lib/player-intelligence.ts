@@ -273,7 +273,7 @@ export const TEAM_SCHEMES: Record<string, TeamScheme> = {
     WSH: { passRate: 0.59, rbCarryShare: 0.96, teTargetShare: 0.12, wr1TargetShare: 0.26 },
     CHI: { passRate: 0.59, rbCarryShare: 0.96, teTargetShare: 0.12, wr1TargetShare: 0.26 },
     DET: { passRate: 0.62, rbCarryShare: 0.92, teTargetShare: 0.21, wr1TargetShare: 0.25 },
-    GB:  { passRate: 0.62, rbCarryShare: 0.92, teTargetShare: 0.12, wr1TargetShare: 0.26 },
+    GB:  { passRate: 0.62, rbCarryShare: 0.92, teTargetShare: 0.17, wr1TargetShare: 0.26 },
     MIN: { passRate: 0.62, rbCarryShare: 0.90, teTargetShare: 0.10, wr1TargetShare: 0.29 },
     ATL: { passRate: 0.58, rbCarryShare: 1.10, teTargetShare: 0.12, wr1TargetShare: 0.28 },
     CAR: { passRate: 0.56, rbCarryShare: 1.16, teTargetShare: 0.12, wr1TargetShare: 0.26 },

@@ -311,7 +311,7 @@ export const PLAYERS: Player[] = [
     { rank: 107, name: 'Tyler Conklin',       position: 'TE',  team: 'NYJ', age: 30, baseValue: 46 },
     { rank: 108, name: 'Chigoziem Okonkwo',   position: 'TE',  team: 'TEN', age: 26, baseValue: 52 },
     { rank: 109, name: 'Isaiah Likely',       position: 'TE',  team: 'BAL', age: 25, baseValue: 55 },
-    { rank: 110, name: 'Tucker Kraft',        position: 'TE',  team: 'GB',  age: 24, baseValue: 53 },
+    { rank: 110, name: 'Tucker Kraft',        position: 'TE',  team: 'GB',  age: 24, baseValue: 68 },
     { rank: 111, name: 'Michael Mayer',       position: 'TE',  team: 'LV',  age: 23, baseValue: 51 },
     { rank: 112, name: 'Luke Musgrave',       position: 'TE',  team: 'GB',  age: 25, baseValue: 50 },
     { rank: 113, name: 'Brenton Strange',     position: 'TE',  team: 'JAX', age: 25, baseValue: 48 },
