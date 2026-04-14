@@ -20,7 +20,16 @@ export interface SleeperLeague {
         trade_deadline?: number;
     };
     scoring_settings: {
-        rec?: number;           // 0 = std, 0.5 = half_ppr, 1 = ppr
+        rec?:              number;   // PPR value (0 / 0.5 / 1)
+        pass_td?:          number;   // passing TD pts (4 or 6)
+        bonus_rec_te?:     number;   // TE bonus per reception
+        fum_lost?:         number;   // fumble penalty
+        int?:              number;   // interception penalty
+        rush_td?:          number;   // rushing TD pts
+        rec_td?:           number;   // receiving TD pts
+        bonus_pass_yd_300?: number;  // 300-yd passing bonus
+        bonus_rush_yd_100?: number;  // 100-yd rushing bonus
+        bonus_rec_yd_100?:  number;  // 100-yd receiving bonus
     };
     roster_positions: string[];
 }

@@ -55,21 +55,56 @@ const REDRAFT_WEIGHTS = {
     injuryRisk:     0.16,
 };
 
-const SCARCITY_1QB: Record<string, number> = {
-    QB:   0.95,
-    RB:   1.25,
-    WR:   1.20,
-    TE:   1.10,
-    K:    0.85,
-    DEF:  0.85,
-    PICK: 1.00,
+// Encapsulates all league-specific settings that affect player values.
+// Built from Sleeper roster_positions + scoring_settings on the league page;
+// defaults match a standard 12-team, 1QB, 2RB/2WR/1TE/1FLEX, 4pt-TD setup.
+export interface LeagueSettings {
+    // Scoring
+    passTd:     number;   // passing TD value (4 or 6) — boosts QB scarcity
+    bonusRecTe: number;   // bonus pts per TE reception — boosts TE ppr value
+    // Roster starter slot counts (from roster_positions)
+    qbSlots:   number;
+    rbSlots:   number;
+    wrSlots:   number;
+    teSlots:   number;
+    flexSlots: number;    // FLEX = RB/WR/TE eligible
+    sfSlots:   number;    // SUPER_FLEX = QB/RB/WR/TE eligible
+}
+
+export const DEFAULT_LEAGUE_SETTINGS: LeagueSettings = {
+    passTd: 4, bonusRecTe: 0,
+    qbSlots: 1, rbSlots: 2, wrSlots: 2, teSlots: 1, flexSlots: 1, sfSlots: 0,
 };
 
-// Superflex / 2QB: QBs fill two roster slots so top-24 QBs all carry starter value
-const SCARCITY_SF: Record<string, number> = {
-    ...SCARCITY_1QB,
-    QB: 1.42,
-};
+// Derive per-position scarcity from actual starter counts.
+// Formulas calibrated so standard settings reproduce the original hardcoded values:
+//   QB=0.95, RB=1.25, WR=1.20, TE=1.10 (1QB, 2RB, 2WR, 1TE, 1FLEX, 0SF)
+// and superflex (sfSlots=1) gives QB=1.42.
+function computeScarcity(pos: string, s: LeagueSettings): number {
+    switch (pos) {
+        case 'QB': {
+            const eff = s.qbSlots + s.sfSlots * 0.65;
+            const base = 0.23 + 0.72 * eff;
+            // 6pt TDs meaningfully increase QB demand — boost scarcity ~8%
+            return s.passTd >= 6 ? base * 1.08 : base;
+        }
+        case 'RB': {
+            const eff = s.rbSlots + s.flexSlots * 0.40 + s.sfSlots * 0.15;
+            return 0.89 + 0.15 * eff;
+        }
+        case 'WR': {
+            const eff = s.wrSlots + s.flexSlots * 0.40 + s.sfSlots * 0.15;
+            return 0.91 + 0.12 * eff;
+        }
+        case 'TE': {
+            const eff = s.teSlots + s.flexSlots * 0.20 + s.sfSlots * 0.05;
+            return 0.88 + 0.18 * eff;
+        }
+        case 'K':
+        case 'DEF':  return 0.85;
+        default:     return 1.00;
+    }
+}
 
 const CATCH_RATE: Record<string, number> = {
     RB:   0.5,
@@ -111,12 +146,11 @@ export function calcDtv(
     ppr: PprFormat = 1,
     leagueType: LeagueType = 'Redraft',
     factors: PlayerFactors = DEFAULT_FACTORS,
-    superflex = false,
+    settings: LeagueSettings = DEFAULT_LEAGUE_SETTINGS,
 ): DtvResult {
     const W = leagueType === 'Dynasty' ? DYNASTY_WEIGHTS : REDRAFT_WEIGHTS;
-    const SCARCITY = superflex ? SCARCITY_SF : SCARCITY_1QB;
 
-    const posM  = SCARCITY[player.position] ?? 1;
+    const posM  = computeScarcity(player.position, settings);
     const intel = getPlayerIntel(player.name, player.position, player.team, player.age, leagueType);
     const ageM  = intel.ageFactor;
 
@@ -141,8 +175,11 @@ export function calcDtv(
         : ppr;
 
     const rawDtv   = Math.round(player.baseValue * composite * 10) / 10;
-    const pprBoost = (CATCH_RATE[player.position] ?? 0) * effectivePpr;
-    const finalDtv = Math.round((rawDtv + pprBoost) * 10) / 10;
+    // bonusRecTe adds to TE ppr value (e.g. 0.5 bonus/rec in a TE-premium league)
+    const catchRate = CATCH_RATE[player.position] ?? 0;
+    const teBonus   = player.position === 'TE' ? settings.bonusRecTe : 0;
+    const pprBoost  = catchRate * (effectivePpr + teBonus);
+    const finalDtv  = Math.round((rawDtv + pprBoost) * 10) / 10;
 
     return {
         ...player,
@@ -184,7 +221,7 @@ export function evaluateTrade(
     leagueType: LeagueType = 'Redraft',
     factorsA: PlayerFactors[] = [],
     factorsB: PlayerFactors[] = [],
-    superflex = false,
+    settings: LeagueSettings = DEFAULT_LEAGUE_SETTINGS,
 ): {
     sideA:   DtvResult[];
     sideB:   DtvResult[];
@@ -195,8 +232,8 @@ export function evaluateTrade(
     verdict: string;
     winner:  'A' | 'B' | 'Even';
 } {
-    const a = sideA.map((p, i) => calcDtv(p, ppr, leagueType, factorsA[i] ?? DEFAULT_FACTORS, superflex));
-    const b = sideB.map((p, i) => calcDtv(p, ppr, leagueType, factorsB[i] ?? DEFAULT_FACTORS, superflex));
+    const a = sideA.map((p, i) => calcDtv(p, ppr, leagueType, factorsA[i] ?? DEFAULT_FACTORS, settings));
+    const b = sideB.map((p, i) => calcDtv(p, ppr, leagueType, factorsB[i] ?? DEFAULT_FACTORS, settings));
     const totalA = Math.round(a.reduce((s, p) => s + p.finalDtv, 0) * 10) / 10;
     const totalB = Math.round(b.reduce((s, p) => s + p.finalDtv, 0) * 10) / 10;
     const diff   = Math.round(Math.abs(totalA - totalB) * 10) / 10;
