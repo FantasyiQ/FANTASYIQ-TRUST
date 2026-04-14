@@ -2,15 +2,17 @@ import { prisma } from '@/lib/prisma';
 
 export const maxDuration = 60;
 
-type FcPlayer = {
-    id:            number;
-    name:          string;
-    position:      string;
-    value:         number;
-    redraftValue:  number;
-    maybeTeam?:    string | null;
-    maybeAge?:     number | null;
-    trend30Day?:   number | null;
+type FcEntry = {
+    player: {
+        id:          number;
+        name:        string;
+        position:    string;
+        maybeTeam?:  string | null;
+        maybeAge?:   number | null;
+    };
+    value:        number;   // dynasty value
+    redraftValue: number;
+    trend30Day?:  number | null;
 };
 
 export async function GET(request: Request): Promise<Response> {
@@ -26,42 +28,42 @@ export async function GET(request: Request): Promise<Response> {
         return Response.json({ error: `FantasyCalc responded ${res.status}` }, { status: 502 });
     }
 
-    const raw = await res.json() as FcPlayer[];
+    const raw = await res.json() as FcEntry[];
     if (!Array.isArray(raw) || raw.length === 0) {
         return Response.json({ error: 'Empty response from FantasyCalc' }, { status: 502 });
     }
-    // Some entries may lack a name (picks, etc.) — skip them
-    const players = raw.filter(p => typeof p.name === 'string' && p.name.length > 0);
 
-    // Upsert in batches of 50 using Promise.all within each batch
+    // Filter out entries without a valid player name
+    const entries = raw.filter(e => typeof e.player?.name === 'string' && e.player.name.length > 0);
+
     const BATCH = 50;
     let upserted = 0;
 
-    for (let i = 0; i < players.length; i += BATCH) {
-        const batch = players.slice(i, i + BATCH);
-        await Promise.all(batch.map(p =>
+    for (let i = 0; i < entries.length; i += BATCH) {
+        const batch = entries.slice(i, i + BATCH);
+        await Promise.all(batch.map(e =>
             prisma.fantasyCalcValue.upsert({
-                where:  { fcId: p.id },
+                where:  { fcId: e.player.id },
                 create: {
-                    fcId:         p.id,
-                    playerName:   p.name,
-                    nameLower:    p.name.toLowerCase(),
-                    position:     p.position,
-                    team:         p.maybeTeam  ?? null,
-                    age:          p.maybeAge   ?? null,
-                    dynastyValue: p.value,
-                    redraftValue: p.redraftValue,
-                    trend30Day:   p.trend30Day  ?? null,
+                    fcId:         e.player.id,
+                    playerName:   e.player.name,
+                    nameLower:    e.player.name.toLowerCase(),
+                    position:     e.player.position,
+                    team:         e.player.maybeTeam  ?? null,
+                    age:          e.player.maybeAge   ?? null,
+                    dynastyValue: e.value,
+                    redraftValue: e.redraftValue,
+                    trend30Day:   e.trend30Day         ?? null,
                 },
                 update: {
-                    playerName:   p.name,
-                    nameLower:    p.name.toLowerCase(),
-                    position:     p.position,
-                    team:         p.maybeTeam  ?? null,
-                    age:          p.maybeAge   ?? null,
-                    dynastyValue: p.value,
-                    redraftValue: p.redraftValue,
-                    trend30Day:   p.trend30Day  ?? null,
+                    playerName:   e.player.name,
+                    nameLower:    e.player.name.toLowerCase(),
+                    position:     e.player.position,
+                    team:         e.player.maybeTeam  ?? null,
+                    age:          e.player.maybeAge   ?? null,
+                    dynastyValue: e.value,
+                    redraftValue: e.redraftValue,
+                    trend30Day:   e.trend30Day         ?? null,
                 },
             }).catch(() => null)
         ));
