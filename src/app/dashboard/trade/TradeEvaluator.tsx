@@ -481,6 +481,10 @@ export default function TradeEvaluator({
                             {label}
                         </button>
                     ))}
+                    <button onClick={() => setSuperflex(v => !v)}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${superflex ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
+                        SFLX
+                    </button>
                 </div>
                 <div className="flex items-center gap-2">
                     <span className="text-gray-400 text-sm font-medium">Type:</span>
@@ -499,17 +503,6 @@ export default function TradeEvaluator({
                             {s}
                         </button>
                     ))}
-                </div>
-                <div className="flex items-center gap-2">
-                    <span className="text-gray-400 text-sm font-medium">QB:</span>
-                    <button onClick={() => setSuperflex(false)}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${!superflex ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
-                        1QB
-                    </button>
-                    <button onClick={() => setSuperflex(true)}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${superflex ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
-                        Superflex
-                    </button>
                 </div>
             </div>
 
