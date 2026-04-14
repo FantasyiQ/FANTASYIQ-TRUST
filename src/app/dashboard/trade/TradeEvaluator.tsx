@@ -159,7 +159,7 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, setti
     onAdd:        (p: Player) => void;
     rosterLabel?: string;
 }) {
-    const [tab, setTab]           = useState<'roster' | 'picks'>('roster');
+    const [tab, setTab]           = useState<'roster' | 'picks'>(players.length === 0 && picks.length > 0 ? 'picks' : 'roster');
     const [pickYear, setPickYear] = useState(PICK_YEARS[0]);
 
     const sorted = useMemo(() =>
