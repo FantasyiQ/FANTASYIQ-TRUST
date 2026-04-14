@@ -211,16 +211,18 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
         t => rosters.find(r => r.roster_id === t.rosterId)?.owner_id === dbUser?.sleeperUserId
     );
 
-    // TEMP DEBUG
-    if (myTeamData) {
-        console.log('[league/picks] league:', league.leagueId, league.leagueName);
-        console.log('[league/picks] myRosterId:', myTeamData.rosterId, typeof myTeamData.rosterId);
-        console.log('[league/picks] tradedPicks sample:', tradedPicks.slice(0, 5).map(tp => ({
-            season: tp.season, round: tp.round, roster_id: tp.roster_id, owner_id: tp.owner_id,
-            types: `roster_id:${typeof tp.roster_id} owner_id:${typeof tp.owner_id}`,
-        })));
-        console.log('[league/picks] myOwnedPicks:', myTeamData.ownedPicks.map(p => `${p.season} ${p.round}.${p.slot}`));
-    }
+    // TEMP DEBUG — visible in browser
+    const pickDebug = {
+        myRosterId:    myTeamData?.rosterId ?? null,
+        myRosterType:  typeof myTeamData?.rosterId,
+        sleeperUserId: dbUser?.sleeperUserId ?? null,
+        totalTradedPicks: tradedPicks.length,
+        tradedPickSample: tradedPicks.slice(0, 6).map(tp => ({
+            s: tp.season, r: tp.round, roster_id: tp.roster_id, owner_id: tp.owner_id,
+            types: `${typeof tp.roster_id}/${typeof tp.owner_id}`,
+        })),
+        myOwnedPicks: (myTeamData?.ownedPicks ?? []).map(p => `${p.season} ${p.round}.${String(p.slot).padStart(2,'0')}`),
+    };
     const otherTeamsData = teamTradeData.filter(t => t.rosterId !== myTeamData?.rosterId);
 
     const teamRosters: TeamRosterData[] = rows.map(row => {
@@ -386,6 +388,12 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                         </dl>
                     </div>
                 </div>
+
+                {/* TEMP DEBUG PANEL */}
+                <details className="bg-gray-900 border border-yellow-800 rounded-lg p-4 text-xs font-mono">
+                    <summary className="text-yellow-400 cursor-pointer font-bold">🔍 Pick Debug</summary>
+                    <pre className="mt-2 text-gray-300 whitespace-pre-wrap text-[11px]">{JSON.stringify(pickDebug, null, 2)}</pre>
+                </details>
 
                 {/* Trade Evaluator */}
                 <div>
