@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef, useCallback } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { PLAYERS, getDraftPicks, evaluateTrade, calcDtv } from '@/lib/trade-engine';
 import type { Player, PprFormat, LeagueType, DtvResult } from '@/lib/trade-engine';
 
@@ -395,20 +395,48 @@ export default function TradeEvaluator({
     const [sideA, setSideA]           = useState<Player[]>([]);
     const [sideB, setSideB]           = useState<Player[]>([]);
     const [selectedTeamId, setSelectedTeamId] = useState<number | null>(otherTeams[0]?.rosterId ?? null);
+    const [fcMap, setFcMap]           = useState<Record<string, number>>({});
+
+    // Load live FantasyCalc dynasty values (cached 1hr on CDN, no flicker on re-renders)
+    useEffect(() => {
+        fetch('/api/players/fc-values')
+            .then(r => r.json())
+            .then((data: Record<string, { dynasty: number }>) => {
+                const flat: Record<string, number> = {};
+                for (const [k, v] of Object.entries(data)) flat[k] = v.dynasty;
+                setFcMap(flat);
+            })
+            .catch(() => {/* ignore — fall back to hardcoded baseValues */});
+    }, []);
+
+    // Patch baseValue with live FC data where available
+    const patchPlayer = useCallback((p: Player): Player => {
+        const fc = fcMap[p.name.toLowerCase()];
+        return fc !== undefined ? { ...p, baseValue: fc } : p;
+    }, [fcMap]);
 
     const allExcluded = [...sideA.map(p => p.name), ...sideB.map(p => p.name)];
 
     const draftPicks = useMemo(() => getDraftPicks(leagueSize), [leagueSize]);
-    const allPlayers = useMemo(() => [...PLAYERS, ...draftPicks], [draftPicks]);
+    const allPlayers = useMemo(
+        () => [...PLAYERS.map(patchPlayer), ...draftPicks],
+        [draftPicks, patchPlayer],
+    );
 
-    // Per-team quick-pick sources
-    const giveRoster   = myTeam?.players ?? myRoster;
+    // Per-team quick-pick sources (patch FC values onto roster players too)
+    const giveRoster   = useMemo(
+        () => (myTeam?.players ?? myRoster).map(patchPlayer),
+        [myTeam, myRoster, patchPlayer],
+    );
     const givePicks    = myTeam?.picks   ?? draftPicks;
     const selectedTeam = useMemo(
         () => otherTeams.find(t => t.rosterId === selectedTeamId) ?? null,
         [otherTeams, selectedTeamId]
     );
-    const receiveRoster = selectedTeam?.players ?? (myTeam ? [] : myRoster);
+    const receiveRoster = useMemo(
+        () => (selectedTeam?.players ?? (myTeam ? [] : myRoster)).map(patchPlayer),
+        [selectedTeam, myTeam, myRoster, patchPlayer],
+    );
     const receivePicks  = selectedTeam?.picks   ?? [];
 
     const result = useMemo(() => {

@@ -3,6 +3,11 @@ import { prisma } from '@/lib/prisma';
 import { PLAYERS } from '@/lib/trade-engine';
 import type { Player } from '@/lib/trade-engine';
 
+const FC_CAP = 10000;
+function normaliseFc(raw: number): number {
+    return Math.min(100, Math.max(1, Math.round((raw / FC_CAP) * 100)));
+}
+
 // Default baseValues for depth players not in the top-300 list
 const DEPTH_BASE: Record<string, number> = {
     QB:  22, RB:  18, WR:  18, TE:  14,
@@ -26,27 +31,37 @@ export async function GET(request: NextRequest): Promise<Response> {
     const ql = q.toLowerCase();
 
     // 1. Pull all DB matches (cast wide net, sort by relevance after)
-    const dbMatches = await prisma.sleeperPlayer.findMany({
-        where: {
-            OR: [{ active: true }, { team: { not: 'FA' } }],
-            fullName: { contains: q, mode: 'insensitive' },
-        },
-        select: { fullName: true, position: true, team: true, age: true },
-        take: 50,
-    });
+    const [dbMatches, fcRows] = await Promise.all([
+        prisma.sleeperPlayer.findMany({
+            where: {
+                OR: [{ active: true }, { team: { not: 'FA' } }],
+                fullName: { contains: q, mode: 'insensitive' },
+            },
+            select: { fullName: true, position: true, team: true, age: true },
+            take: 50,
+        }),
+        prisma.fantasyCalcValue.findMany({
+            where: { nameLower: { contains: ql } },
+            select: { nameLower: true, dynastyValue: true },
+        }),
+    ]);
 
-    // 2. Build a lookup of curated static values by name
+    // 2. Build lookups
     const staticByName = new Map(PLAYERS.map(p => [p.name.toLowerCase(), p]));
+    const fcByName = new Map(fcRows.map(r => [r.nameLower, r.dynastyValue]));
 
-    // 3. Merge: use curated value if available, override team from live DB data.
-    //    This ensures scheme fit / badges always reflect current roster assignments.
+    // 3. Merge: FC baseValue > curated > depth default
     const merged: Player[] = dbMatches.map((p, i) => {
-        const curated = staticByName.get(p.fullName.toLowerCase());
+        const nameLower = p.fullName.toLowerCase();
+        const fcRaw = fcByName.get(nameLower);
+        const fcValue = fcRaw !== undefined ? normaliseFc(fcRaw) : undefined;
+        const curated = staticByName.get(nameLower);
         if (curated) {
             return {
                 ...curated,
-                team: p.team ?? curated.team,  // live team overrides hardcoded
-                age:  p.age  ?? curated.age,   // live age overrides hardcoded
+                team:      p.team ?? curated.team,
+                age:       p.age  ?? curated.age,
+                baseValue: fcValue ?? curated.baseValue,
             };
         }
         return {
@@ -55,7 +70,7 @@ export async function GET(request: NextRequest): Promise<Response> {
             position:  p.position,
             team:      p.team,
             age:       p.age ?? 26,
-            baseValue: DEPTH_BASE[p.position] ?? 10,
+            baseValue: fcValue ?? (DEPTH_BASE[p.position] ?? 10),
         };
     });
 

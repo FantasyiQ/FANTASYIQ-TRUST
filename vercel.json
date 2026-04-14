@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/sleeper-matchups",
       "schedule": "*/3 * * * *"
+    },
+    {
+      "path": "/api/cron/fantasycalc-sync",
+      "schedule": "0 7 * * *"
     }
   ]
 }

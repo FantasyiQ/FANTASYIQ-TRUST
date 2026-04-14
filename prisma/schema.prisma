@@ -409,3 +409,19 @@ model ProBowlEntry {
     @@unique([contestId, userId]) // one entry per user per contest
     @@index([contestId])
 }
+
+model FantasyCalcValue {
+    id           String   @id @default(cuid())
+    fcId         Int      @unique
+    playerName   String
+    nameLower    String   @unique
+    position     String
+    team         String?
+    age          Float?
+    dynastyValue Int      // raw FantasyCalc scale (~0-11000)
+    redraftValue Int
+    trend30Day   Int?
+    updatedAt    DateTime @updatedAt @default(now())
+
+    @@index([nameLower])
+}
