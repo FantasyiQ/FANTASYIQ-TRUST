@@ -41,20 +41,23 @@ export interface RawTeamData {
 }
 
 interface Props {
-    leagueName:      string;
-    scoringType:     string | null;
-    totalRosters:    number;
-    leagueType:      LeagueType;
-    myTeamData?:     RawTeamData;
-    otherTeamsData?: RawTeamData[];
+    leagueName:       string;
+    scoringType:      string | null;
+    totalRosters:     number;
+    leagueType:       LeagueType;
+    rosterPositions?: string[];
+    myTeamData?:      RawTeamData;
+    otherTeamsData?:  RawTeamData[];
 }
 
 export default function LeagueTradeEvaluator({
-    leagueName, scoringType, totalRosters, leagueType, myTeamData, otherTeamsData = [],
+    leagueName, scoringType, totalRosters, leagueType, rosterPositions = [], myTeamData, otherTeamsData = [],
 }: Props) {
     const ppr        = scoringTypeToPpr(scoringType);
     const leagueSize = nearestLeagueSize(totalRosters);
-    const label      = `${leagueName} — ${scoringLabel(scoringType)} · ${totalRosters} Teams · ${leagueType}`;
+    const superflex  = rosterPositions.includes('SUPER_FLEX');
+    const sfLabel    = superflex ? ' · Superflex' : '';
+    const label      = `${leagueName} — ${scoringLabel(scoringType)} · ${totalRosters} Teams · ${leagueType}${sfLabel}`;
 
     const allPicks     = useMemo(() => getDraftPicks(leagueSize), [leagueSize]);
     const pickByName   = useMemo(() => new Map(allPicks.map(p => [p.name, p])), [allPicks]);
@@ -99,6 +102,7 @@ export default function LeagueTradeEvaluator({
             initialPpr={ppr}
             initialLeagueSize={leagueSize}
             initialLeagueType={leagueType}
+            initialSuperflex={superflex}
             leagueLabel={label}
             myTeam={myTeam}
             otherTeams={otherTeams}

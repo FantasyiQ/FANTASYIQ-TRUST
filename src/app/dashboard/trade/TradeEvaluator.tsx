@@ -149,12 +149,13 @@ function PlayerPill({ result, onRemove, leagueType }: { result: DtvResult; onRem
 
 const POS_ORDER: Record<string, number> = { QB: 0, RB: 1, WR: 2, TE: 3, K: 4, DEF: 5 };
 
-function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, onAdd, rosterLabel = 'My Roster' }: {
+function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, superflex = false, onAdd, rosterLabel = 'My Roster' }: {
     players:      Player[];
     picks?:       Player[];
     excluded:     string[];
     ppr:          PprFormat;
     leagueType:   LeagueType;
+    superflex?:   boolean;
     onAdd:        (p: Player) => void;
     rosterLabel?: string;
 }) {
@@ -204,7 +205,7 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, onAdd
                 <div className="flex flex-wrap gap-1.5">
                     {sorted.map(p => {
                         const used = excluded.includes(p.name);
-                        const dtv  = calcDtv(p, ppr, leagueType);
+                        const dtv  = calcDtv(p, ppr, leagueType, undefined, superflex);
                         return (
                             <button key={p.name} type="button" disabled={used} onClick={() => onAdd(p)}
                                 title={`${p.name} — DTV ${dtv.finalDtv}`}
@@ -247,7 +248,7 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, onAdd
                                 <span className="text-gray-600 text-[10px] font-semibold w-8 shrink-0">Rd {round}</span>
                                 {roundPicks.map(p => {
                                     const used = excluded.includes(p.name);
-                                    const dtv  = calcDtv(p, ppr, leagueType);
+                                    const dtv  = calcDtv(p, ppr, leagueType, undefined, superflex);
                                     const slot = p.name.split(' ')[1]; // e.g. "1.03"
                                     return (
                                         <button key={p.name} type="button" disabled={used} onClick={() => onAdd(p)}
@@ -271,11 +272,12 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, onAdd
     );
 }
 
-function PlayerSearch({ onAdd, excluded, ppr, leagueType, players }: {
+function PlayerSearch({ onAdd, excluded, ppr, leagueType, superflex = false, players }: {
     onAdd: (p: Player) => void;
     excluded: string[];
     ppr: PprFormat;
     leagueType: LeagueType;
+    superflex?: boolean;
     players: Player[];
 }) {
     const [query, setQuery]     = useState('');
@@ -325,7 +327,7 @@ function PlayerSearch({ onAdd, excluded, ppr, leagueType, players }: {
             {results.length > 0 && (
                 <ul className="absolute z-10 left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-xl overflow-hidden shadow-xl max-h-64 overflow-y-auto">
                     {results.map(p => {
-                        const dtv = calcDtv(p, ppr, leagueType);
+                        const dtv = calcDtv(p, ppr, leagueType, undefined, superflex);
                         return (
                             <li key={p.name}>
                                 <button
@@ -372,6 +374,7 @@ interface TradeEvaluatorProps {
     initialPpr?:        PprFormat;
     initialLeagueSize?: LeagueSize;
     initialLeagueType?: LeagueType;
+    initialSuperflex?:  boolean;
     leagueLabel?:       string;
     myRoster?:          Player[];
     myTeam?:            TradeTeam;
@@ -382,6 +385,7 @@ export default function TradeEvaluator({
     initialPpr        = 0.5,
     initialLeagueSize = 12,
     initialLeagueType = 'Redraft',
+    initialSuperflex  = false,
     leagueLabel,
     myRoster          = [],
     myTeam,
@@ -390,6 +394,7 @@ export default function TradeEvaluator({
     const [ppr, setPpr]               = useState<PprFormat>(initialPpr);
     const [leagueType, setLeagueType] = useState<LeagueType>(initialLeagueType);
     const [leagueSize, setLeagueSize] = useState<LeagueSize>(initialLeagueSize);
+    const [superflex, setSuperflex]   = useState<boolean>(initialSuperflex);
     const [posFilter, setPosFilter]   = useState('ALL');
     const [pickYear, setPickYear]     = useState(PICK_YEARS[0]);
     const [sideA, setSideA]           = useState<Player[]>([]);
@@ -441,8 +446,8 @@ export default function TradeEvaluator({
 
     const result = useMemo(() => {
         if (sideA.length === 0 && sideB.length === 0) return null;
-        return evaluateTrade(sideA, sideB, ppr, leagueType);
-    }, [sideA, sideB, ppr, leagueType]);
+        return evaluateTrade(sideA, sideB, ppr, leagueType, [], [], superflex);
+    }, [sideA, sideB, ppr, leagueType, superflex]);
 
     const positions = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'PICK'];
 
@@ -495,6 +500,17 @@ export default function TradeEvaluator({
                         </button>
                     ))}
                 </div>
+                <div className="flex items-center gap-2">
+                    <span className="text-gray-400 text-sm font-medium">QB:</span>
+                    <button onClick={() => setSuperflex(false)}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${!superflex ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
+                        1QB
+                    </button>
+                    <button onClick={() => setSuperflex(true)}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${superflex ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
+                        Superflex
+                    </button>
+                </div>
             </div>
 
             {/* Trade sides */}
@@ -512,10 +528,11 @@ export default function TradeEvaluator({
                             excluded={allExcluded}
                             ppr={ppr}
                             leagueType={leagueType}
+                            superflex={superflex}
                             onAdd={p => setSideA(prev => prev.length < 5 ? [...prev, p] : prev)}
                         />
                     )}
-                    <PlayerSearch onAdd={p => setSideA(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} players={allPlayers} />
+                    <PlayerSearch onAdd={p => setSideA(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} superflex={superflex} players={allPlayers} />
                     <div className="space-y-2">
                         {result?.sideA.map(r => (
                             <PlayerPill key={r.name} result={r} leagueType={leagueType} onRemove={() => setSideA(prev => prev.filter(p => p.name !== r.name))} />
@@ -550,11 +567,12 @@ export default function TradeEvaluator({
                             excluded={allExcluded}
                             ppr={ppr}
                             leagueType={leagueType}
+                            superflex={superflex}
                             rosterLabel={selectedTeam ? `${selectedTeam.teamName.split(' ')[0]}'s Roster` : 'Roster'}
                             onAdd={p => setSideB(prev => prev.length < 5 ? [...prev, p] : prev)}
                         />
                     )}
-                    <PlayerSearch onAdd={p => setSideB(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} players={allPlayers} />
+                    <PlayerSearch onAdd={p => setSideB(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} superflex={superflex} players={allPlayers} />
                     <div className="space-y-2">
                         {result?.sideB.map(r => (
                             <PlayerPill key={r.name} result={r} leagueType={leagueType} onRemove={() => setSideB(prev => prev.filter(p => p.name !== r.name))} />
@@ -663,7 +681,7 @@ export default function TradeEvaluator({
                                     </h3>
                                     <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
                                         {roundPicks.map(p => {
-                                            const dtv = calcDtv(p, ppr, leagueType);
+                                            const dtv = calcDtv(p, ppr, leagueType, undefined, superflex);
                                             const pickLabel = p.name.split(' ')[1]; // e.g. "1.03"
                                             return (
                                                 <div key={p.name}
@@ -697,7 +715,7 @@ export default function TradeEvaluator({
                             </thead>
                             <tbody className="divide-y divide-gray-800/50">
                                 {filteredPlayers.map(p => {
-                                    const dtv     = calcDtv(p, ppr, leagueType);
+                                    const dtv     = calcDtv(p, ppr, leagueType, undefined, superflex);
                                     const inTrade = allExcluded.includes(p.name);
                                     return (
                                         <tr key={p.name} className="hover:bg-gray-800/30 transition">

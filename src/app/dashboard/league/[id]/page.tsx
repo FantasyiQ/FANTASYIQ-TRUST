@@ -385,6 +385,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                             scoringType={league.scoringType ?? null}
                             totalRosters={league.totalRosters}
                             leagueType={sleeperLeague.settings?.type === 2 ? 'Dynasty' : 'Redraft'}
+                            rosterPositions={rosterPositions}
                             myTeamData={myTeamData}
                             otherTeamsData={otherTeamsData}
                         />

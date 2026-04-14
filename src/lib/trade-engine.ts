@@ -55,7 +55,7 @@ const REDRAFT_WEIGHTS = {
     injuryRisk:     0.16,
 };
 
-const SCARCITY: Record<string, number> = {
+const SCARCITY_1QB: Record<string, number> = {
     QB:   0.95,
     RB:   1.25,
     WR:   1.20,
@@ -63,6 +63,12 @@ const SCARCITY: Record<string, number> = {
     K:    0.85,
     DEF:  0.85,
     PICK: 1.00,
+};
+
+// Superflex / 2QB: QBs fill two roster slots so top-24 QBs all carry starter value
+const SCARCITY_SF: Record<string, number> = {
+    ...SCARCITY_1QB,
+    QB: 1.42,
 };
 
 const CATCH_RATE: Record<string, number> = {
@@ -105,8 +111,10 @@ export function calcDtv(
     ppr: PprFormat = 1,
     leagueType: LeagueType = 'Redraft',
     factors: PlayerFactors = DEFAULT_FACTORS,
+    superflex = false,
 ): DtvResult {
     const W = leagueType === 'Dynasty' ? DYNASTY_WEIGHTS : REDRAFT_WEIGHTS;
+    const SCARCITY = superflex ? SCARCITY_SF : SCARCITY_1QB;
 
     const posM  = SCARCITY[player.position] ?? 1;
     const intel = getPlayerIntel(player.name, player.position, player.team, player.age, leagueType);
@@ -176,6 +184,7 @@ export function evaluateTrade(
     leagueType: LeagueType = 'Redraft',
     factorsA: PlayerFactors[] = [],
     factorsB: PlayerFactors[] = [],
+    superflex = false,
 ): {
     sideA:   DtvResult[];
     sideB:   DtvResult[];
@@ -186,8 +195,8 @@ export function evaluateTrade(
     verdict: string;
     winner:  'A' | 'B' | 'Even';
 } {
-    const a = sideA.map((p, i) => calcDtv(p, ppr, leagueType, factorsA[i] ?? DEFAULT_FACTORS));
-    const b = sideB.map((p, i) => calcDtv(p, ppr, leagueType, factorsB[i] ?? DEFAULT_FACTORS));
+    const a = sideA.map((p, i) => calcDtv(p, ppr, leagueType, factorsA[i] ?? DEFAULT_FACTORS, superflex));
+    const b = sideB.map((p, i) => calcDtv(p, ppr, leagueType, factorsB[i] ?? DEFAULT_FACTORS, superflex));
     const totalA = Math.round(a.reduce((s, p) => s + p.finalDtv, 0) * 10) / 10;
     const totalB = Math.round(b.reduce((s, p) => s + p.finalDtv, 0) * 10) / 10;
     const diff   = Math.round(Math.abs(totalA - totalB) * 10) / 10;
