@@ -47,8 +47,8 @@ export async function GET(): Promise<Response> {
 
     return Response.json(map, {
         headers: {
-            // Cache for 1 hour — FC updates daily, no need to hit DB on every page load
-            'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+            // Cache for 5 min; KTC syncs daily but we want fresh values after each sync
+            'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
         },
     });
 }
