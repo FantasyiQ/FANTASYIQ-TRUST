@@ -212,14 +212,16 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
     );
 
     // TEMP DEBUG — visible in browser
+    const myRid = myTeamData?.rosterId;
+    const picksInvolvingMe = tradedPicks.filter(tp =>
+        tp.roster_id === myRid || tp.owner_id === myRid || tp.previous_owner_id === myRid
+    );
     const pickDebug = {
-        myRosterId:    myTeamData?.rosterId ?? null,
-        myRosterType:  typeof myTeamData?.rosterId,
-        sleeperUserId: dbUser?.sleeperUserId ?? null,
+        myRosterId: myRid ?? null,
         totalTradedPicks: tradedPicks.length,
-        tradedPickSample: tradedPicks.slice(0, 6).map(tp => ({
-            s: tp.season, r: tp.round, roster_id: tp.roster_id, owner_id: tp.owner_id,
-            types: `${typeof tp.roster_id}/${typeof tp.owner_id}`,
+        picksInvolvingMyRoster: picksInvolvingMe.map(tp => ({
+            s: tp.season, r: tp.round, roster_id: tp.roster_id,
+            prev_owner: tp.previous_owner_id, owner: tp.owner_id,
         })),
         myOwnedPicks: (myTeamData?.ownedPicks ?? []).map(p => `${p.season} ${p.round}.${String(p.slot).padStart(2,'0')}`),
     };
