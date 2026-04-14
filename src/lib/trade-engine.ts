@@ -241,7 +241,7 @@ export const PLAYERS: Player[] = [
     { rank: 40, name: 'George Kittle',         position: 'TE',  team: 'SF',  age: 32, baseValue: 71 },
     { rank: 41, name: 'Zay Flowers',           position: 'WR',  team: 'BAL', age: 24, baseValue: 70 },
     { rank: 42, name: 'David Montgomery',      position: 'RB',  team: 'DET', age: 28, baseValue: 69 },
-    { rank: 43, name: 'Anthony Richardson',    position: 'QB',  team: 'IND', age: 23, baseValue: 68 },
+    { rank: 43, name: 'Anthony Richardson',    position: 'QB',  team: 'IND', age: 23, baseValue: 58 },
     { rank: 44, name: 'Ladd McConkey',         position: 'WR',  team: 'LAC', age: 23, baseValue: 68 },
     { rank: 45, name: 'Mark Andrews',          position: 'TE',  team: 'BAL', age: 30, baseValue: 67 },
     { rank: 46, name: 'Chase Brown',           position: 'RB',  team: 'CIN', age: 24, baseValue: 68 },
@@ -509,10 +509,13 @@ export const PLAYERS: Player[] = [
     { rank: 299, name: 'Brandon Allen',       position: 'QB',  team: 'CIN', age: 32, baseValue: 46 },
     { rank: 300, name: 'Trace McSorley',      position: 'QB',  team: 'ARI', age: 29, baseValue: 45 },
 
+    // ── Low-value veterans / backup-only ────────────────────────────────────
+    { rank: 301, name: 'Daniel Jones',         position: 'QB',  team: 'FA',  age: 29, baseValue: 6  },
+
     // ── 2025 NOTABLE ROOKIES ─────────────────────────────────────────────────
-    { rank: 301, name: 'Cam Ward',             position: 'QB',  team: 'TEN', age: 23, baseValue: 72 },
-    { rank: 302, name: 'Shedeur Sanders',      position: 'QB',  team: 'CLE', age: 24, baseValue: 64 },
-    { rank: 303, name: 'Omarion Hampton',      position: 'RB',  team: 'LAR', age: 22, baseValue: 63 },
+    { rank: 302, name: 'Cam Ward',             position: 'QB',  team: 'TEN', age: 23, baseValue: 72 },
+    { rank: 303, name: 'Shedeur Sanders',      position: 'QB',  team: 'CLE', age: 24, baseValue: 64 },
+    { rank: 304, name: 'Omarion Hampton',      position: 'RB',  team: 'LAR', age: 22, baseValue: 63 },
 
 ];
 
