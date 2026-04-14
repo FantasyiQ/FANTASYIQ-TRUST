@@ -42,26 +42,32 @@ export async function GET(request: NextRequest): Promise<Response> {
         }),
         prisma.fantasyCalcValue.findMany({
             where: { nameLower: { contains: ql } },
-            select: { nameLower: true, dynastyValue: true },
+            select: { nameLower: true, dynastyValue: true, redraftValue: true },
         }),
     ]);
 
     // 2. Build lookups
     const staticByName = new Map(PLAYERS.map(p => [p.name.toLowerCase(), p]));
-    const fcByName = new Map(fcRows.map(r => [r.nameLower, r.dynastyValue]));
+    const fcByName = new Map(fcRows.map(r => [r.nameLower, r]));
 
     // 3. Merge: FC baseValue > curated > depth default
+    // Use redraft value by default for search (client applies dynasty/redraft via patchPlayer)
     const merged: Player[] = dbMatches.map((p, i) => {
         const nameLower = p.fullName.toLowerCase();
-        const fcRaw = fcByName.get(nameLower);
-        const fcValue = fcRaw !== undefined ? normaliseFc(fcRaw) : undefined;
+        const fcRow  = fcByName.get(nameLower);
         const curated = staticByName.get(nameLower);
+        // Use the higher of dynasty/redraft as the neutral search baseValue
+        const fcValue = fcRow !== undefined
+            ? normaliseFc(Math.max(fcRow.dynastyValue, fcRow.redraftValue))
+            : undefined;
         if (curated) {
+            // Only override if FC value is within reason (>40% of hardcoded)
+            const useFC = fcValue !== undefined && fcValue > curated.baseValue * 0.4;
             return {
                 ...curated,
                 team:      p.team ?? curated.team,
                 age:       p.age  ?? curated.age,
-                baseValue: fcValue ?? curated.baseValue,
+                baseValue: useFC ? fcValue : curated.baseValue,
             };
         }
         return {

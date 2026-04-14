@@ -401,25 +401,27 @@ export default function TradeEvaluator({
     const [sideA, setSideA]           = useState<Player[]>([]);
     const [sideB, setSideB]           = useState<Player[]>([]);
     const [selectedTeamId, setSelectedTeamId] = useState<number | null>(otherTeams[0]?.rosterId ?? null);
-    const [fcMap, setFcMap]           = useState<Record<string, number>>({});
+    const [fcMap, setFcMap] = useState<Record<string, { dynasty: number; redraft: number }>>({});
 
-    // Load live FantasyCalc dynasty values (cached 1hr on CDN, no flicker on re-renders)
+    // Load live FantasyCalc values (cached 1hr on CDN)
     useEffect(() => {
         fetch('/api/players/fc-values')
             .then(r => r.json())
-            .then((data: Record<string, { dynasty: number }>) => {
-                const flat: Record<string, number> = {};
-                for (const [k, v] of Object.entries(data)) flat[k] = v.dynasty;
-                setFcMap(flat);
+            .then((data: Record<string, { dynasty: number; redraft: number }>) => {
+                setFcMap(data);
             })
             .catch(() => {/* ignore — fall back to hardcoded baseValues */});
     }, []);
 
-    // Patch baseValue with live FC data where available
+    // Patch baseValue with live FC data — use dynasty or redraft value to match league type
     const patchPlayer = useCallback((p: Player): Player => {
         const fc = fcMap[p.name.toLowerCase()];
-        return fc !== undefined ? { ...p, baseValue: fc } : p;
-    }, [fcMap]);
+        if (!fc) return p;
+        const fcVal = leagueType === 'Dynasty' ? fc.dynasty : fc.redraft;
+        // Use FC value only if it's higher than half the hardcoded value,
+        // preventing stale/low community data from tanking elite players
+        return fcVal > p.baseValue * 0.4 ? { ...p, baseValue: fcVal } : p;
+    }, [fcMap, leagueType]);
 
     const allExcluded = [...sideA.map(p => p.name), ...sideB.map(p => p.name)];
 
