@@ -72,38 +72,44 @@ export async function GET(request: Request): Promise<Response> {
     const BATCH = 50;
     let upserted = 0;
 
+    // Upsert by nameLower (not fcId) so that rows originally created with old
+    // FantasyCalc IDs get updated correctly — KTC uses different playerIDs.
+    // Also update fcId so it reflects the current KTC ID.
     for (let i = 0; i < entries.length; i += BATCH) {
         const batch = entries.slice(i, i + BATCH);
-        await Promise.all(batch.map(p =>
-            prisma.fantasyCalcValue.upsert({
-                where:  { fcId: p.playerID },
+        await Promise.all(batch.map(p => {
+            const nameLower      = p.playerName.toLowerCase();
+            const redraftValue   = redraftMap.get(nameLower)   ?? 0;
+            const redraftValueSf = redraftSfMap.get(nameLower) ?? 0;
+            return prisma.fantasyCalcValue.upsert({
+                where:  { nameLower },
                 create: {
                     fcId:           p.playerID,
                     playerName:     p.playerName,
-                    nameLower:      p.playerName.toLowerCase(),
+                    nameLower,
                     position:       p.position,
-                    team:           p.team                                          ?? null,
-                    age:            p.age                                           ?? null,
-                    dynastyValue:   p.oneQBValues?.value                            ?? 0,
-                    dynastyValueSf: p.superflexValues?.value                        ?? 0,
-                    redraftValue:   redraftMap.get(p.playerName.toLowerCase())      ?? 0,
-                    redraftValueSf: redraftSfMap.get(p.playerName.toLowerCase())    ?? 0,
+                    team:           p.team              ?? null,
+                    age:            p.age               ?? null,
+                    dynastyValue:   p.oneQBValues?.value   ?? 0,
+                    dynastyValueSf: p.superflexValues?.value ?? 0,
+                    redraftValue,
+                    redraftValueSf,
                     trend30Day:     null,
                 },
                 update: {
+                    fcId:           p.playerID,
                     playerName:     p.playerName,
-                    nameLower:      p.playerName.toLowerCase(),
                     position:       p.position,
-                    team:           p.team                                          ?? null,
-                    age:            p.age                                           ?? null,
-                    dynastyValue:   p.oneQBValues?.value                            ?? 0,
-                    dynastyValueSf: p.superflexValues?.value                        ?? 0,
-                    redraftValue:   redraftMap.get(p.playerName.toLowerCase())      ?? 0,
-                    redraftValueSf: redraftSfMap.get(p.playerName.toLowerCase())    ?? 0,
+                    team:           p.team              ?? null,
+                    age:            p.age               ?? null,
+                    dynastyValue:   p.oneQBValues?.value   ?? 0,
+                    dynastyValueSf: p.superflexValues?.value ?? 0,
+                    redraftValue,
+                    redraftValueSf,
                     trend30Day:     null,
                 },
-            }).catch(() => null)
-        ));
+            }).catch(() => null);
+        }));
         upserted += batch.length;
     }
 
