@@ -160,19 +160,19 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
         // Group all traded-pick events by pick identity
         const groups = new Map<string, typeof tradedPicks>();
         for (const tp of tradedPicks) {
-            const key = `${tp.season}-${tp.round}-${tp.roster_id}`;
+            const key = `${tp.season}-${Number(tp.round)}-${Number(tp.roster_id)}`;
             const g = groups.get(key) ?? [];
             g.push(tp);
             groups.set(key, g);
         }
         for (const [key, trades] of groups) {
             if (trades.length === 1) {
-                pickOwnerMap.set(key, trades[0].owner_id);
+                pickOwnerMap.set(key, Number(trades[0].owner_id));
             } else {
                 // The terminal owner is the one whose owner_id is never a previous_owner_id
-                const prevOwnerIds = new Set(trades.map(t => t.previous_owner_id));
-                const terminal = trades.find(t => !prevOwnerIds.has(t.owner_id));
-                pickOwnerMap.set(key, terminal?.owner_id ?? trades[trades.length - 1].owner_id);
+                const prevOwnerIds = new Set(trades.map(t => Number(t.previous_owner_id)));
+                const terminal = trades.find(t => !prevOwnerIds.has(Number(t.owner_id)));
+                pickOwnerMap.set(key, Number(terminal?.owner_id ?? trades[trades.length - 1].owner_id));
             }
         }
     }
@@ -184,7 +184,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                 for (const origId of rosterIds) {
                     const key = `${season}-${round}-${origId}`;
                     const currentOwner = pickOwnerMap.get(key) ?? origId;
-                    if (currentOwner === rosterId) {
+                    if (Number(currentOwner) === Number(rosterId)) {
                         owned.push({ season, round, slot: rosterIdToSlot.get(origId) ?? 1 });
                     }
                 }

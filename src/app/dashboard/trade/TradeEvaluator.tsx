@@ -386,6 +386,7 @@ interface TradeEvaluatorProps {
     myRoster?:              Player[];
     myPicks?:               Player[];       // user's owned picks from all synced leagues
     allLeaguePicks?:        Player[];       // all picks from all teams in all synced leagues
+    hideQuickPick?:         boolean;        // suppress roster/pick quick-add panels (search-only mode)
     myTeam?:                TradeTeam;
     otherTeams?:            TradeTeam[];
 }
@@ -399,6 +400,7 @@ export default function TradeEvaluator({
     myRoster              = [],
     myPicks               = [],
     allLeaguePicks        = [],
+    hideQuickPick         = false,
     myTeam,
     otherTeams            = [],
 }: TradeEvaluatorProps = {}) {
@@ -539,7 +541,7 @@ export default function TradeEvaluator({
                         <h2 className="font-bold text-white">You Give</h2>
                         {result && <span className="text-2xl font-extrabold text-white">{result.totalA}</span>}
                     </div>
-                    {(giveRoster.length > 0 || givePicks.length > 0) && (
+                    {!hideQuickPick && (giveRoster.length > 0 || givePicks.length > 0) && (
                         <RosterQuickPick
                             players={giveRoster}
                             picks={givePicks}
@@ -578,7 +580,7 @@ export default function TradeEvaluator({
                             </select>
                         </div>
                     )}
-                    {(receiveRoster.length > 0 || receivePicks.length > 0) && (
+                    {!hideQuickPick && (receiveRoster.length > 0 || receivePicks.length > 0) && (
                         <RosterQuickPick
                             players={receiveRoster}
                             picks={receivePicks}
