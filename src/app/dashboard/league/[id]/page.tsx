@@ -151,15 +151,39 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
     const ROUNDS = [1, 2, 3, 4, 5];
     const rosterIds = rosters.map(r => r.roster_id);
 
+    // Resolve current pick ownership correctly, even when a pick was traded multiple times.
+    // Sleeper returns one entry per trade event; we need the terminal (most recent) owner.
+    // A trade is terminal when its owner_id doesn't appear as any other trade's
+    // previous_owner_id for the same pick.
+    const pickOwnerMap = new Map<string, number>(); // `${season}-${round}-${roster_id}` → current owner
+    {
+        // Group all traded-pick events by pick identity
+        const groups = new Map<string, typeof tradedPicks>();
+        for (const tp of tradedPicks) {
+            const key = `${tp.season}-${tp.round}-${tp.roster_id}`;
+            const g = groups.get(key) ?? [];
+            g.push(tp);
+            groups.set(key, g);
+        }
+        for (const [key, trades] of groups) {
+            if (trades.length === 1) {
+                pickOwnerMap.set(key, trades[0].owner_id);
+            } else {
+                // The terminal owner is the one whose owner_id is never a previous_owner_id
+                const prevOwnerIds = new Set(trades.map(t => t.previous_owner_id));
+                const terminal = trades.find(t => !prevOwnerIds.has(t.owner_id));
+                pickOwnerMap.set(key, terminal?.owner_id ?? trades[trades.length - 1].owner_id);
+            }
+        }
+    }
+
     function computeOwnedPicks(rosterId: number) {
         const owned: { season: string; round: number; slot: number }[] = [];
         for (const season of FUTURE_SEASONS) {
             for (const round of ROUNDS) {
                 for (const origId of rosterIds) {
-                    const traded = tradedPicks.find(
-                        tp => tp.season === season && tp.round === round && tp.roster_id === origId
-                    );
-                    const currentOwner = traded ? traded.owner_id : origId;
+                    const key = `${season}-${round}-${origId}`;
+                    const currentOwner = pickOwnerMap.get(key) ?? origId;
                     if (currentOwner === rosterId) {
                         owned.push({ season, round, slot: rosterIdToSlot.get(origId) ?? 1 });
                     }
