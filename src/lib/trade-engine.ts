@@ -267,7 +267,7 @@ export const PLAYERS: Player[] = [
     { rank: 20, name: 'Drake London',          position: 'WR',  team: 'ATL', age: 25, baseValue: 84 },
     { rank: 21, name: 'Kyren Williams',        position: 'RB',  team: 'LAR', age: 26, baseValue: 84 },
     { rank: 22, name: 'Joe Burrow',            position: 'QB',  team: 'CIN', age: 30, baseValue: 84 },
-    { rank: 23, name: 'Marvin Harrison Jr',    position: 'WR',  team: 'ARI', age: 24, baseValue: 83 },
+    { rank: 10, name: 'Marvin Harrison Jr',    position: 'WR',  team: 'ARI', age: 24, baseValue: 93 },
     { rank: 24, name: 'Kenneth Walker',        position: 'RB',  team: 'SEA', age: 26, baseValue: 82 },
     { rank: 25, name: 'Sam LaPorta',           position: 'TE',  team: 'DET', age: 25, baseValue: 82 },
     { rank: 26, name: 'Brock Bowers',          position: 'TE',  team: 'LV',  age: 23, baseValue: 81 },
