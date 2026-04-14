@@ -691,12 +691,14 @@ export default function TradeEvaluator({
                                     <th className="text-left px-3 py-3 text-gray-500 font-medium">Team</th>
                                     <th className="text-left px-3 py-3 text-gray-500 font-medium hidden sm:table-cell">Intel</th>
                                     <th className="text-right px-3 py-3 text-gray-500 font-medium">DTV</th>
-                                    <th className="text-right px-4 py-3 text-gray-500 font-medium">Tier</th>
+                                    <th className="text-right px-3 py-3 text-gray-500 font-medium">Tier</th>
+                                    <th className="text-right px-4 py-3 text-gray-500 font-medium">Add</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-800/50">
                                 {filteredPlayers.map(p => {
-                                    const dtv = calcDtv(p, ppr, leagueType);
+                                    const dtv     = calcDtv(p, ppr, leagueType);
+                                    const inTrade = allExcluded.includes(p.name);
                                     return (
                                         <tr key={p.name} className="hover:bg-gray-800/30 transition">
                                             <td className="px-4 py-3 text-gray-600 text-xs">{p.rank}</td>
@@ -713,7 +715,27 @@ export default function TradeEvaluator({
                                                 </div>
                                             </td>
                                             <td className="px-3 py-3 text-right font-bold text-white">{dtv.finalDtv}</td>
-                                            <td className={`px-4 py-3 text-right font-semibold text-xs ${TIER_COLORS[dtv.tier]}`}>{dtv.tier}</td>
+                                            <td className={`px-3 py-3 text-right font-semibold text-xs ${TIER_COLORS[dtv.tier]}`}>{dtv.tier}</td>
+                                            <td className="px-4 py-3 text-right">
+                                                {inTrade ? (
+                                                    <span className="text-gray-700 text-xs">✓</span>
+                                                ) : (
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        <button
+                                                            onClick={() => setSideA(prev => prev.length < 5 ? [...prev, p] : prev)}
+                                                            title="Add to Give"
+                                                            className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-red-800/60 text-red-400 hover:bg-red-900/40 transition">
+                                                            Give
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setSideB(prev => prev.length < 5 ? [...prev, p] : prev)}
+                                                            title="Add to Receive"
+                                                            className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-green-800/60 text-green-400 hover:bg-green-900/40 transition">
+                                                            Get
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </td>
                                         </tr>
                                     );
                                 })}
