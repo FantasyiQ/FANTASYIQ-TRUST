@@ -418,21 +418,7 @@ export default function LeagueDetailTabs({
                         )}
                     </div>
 
-                    {/* Card 3: Trade Evaluator (embedded above standings) */}
-                    <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-                        <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
-                            <h2 className="font-semibold text-lg">Trade Evaluator</h2>
-                            <button
-                                onClick={() => setActiveTab('trade')}
-                                className="text-xs text-[#C8A951]/70 hover:text-[#C8A951] font-medium transition"
-                            >
-                                Open full view →
-                            </button>
-                        </div>
-                        <div className="p-4">{tradeEvaluatorContent}</div>
-                    </div>
-
-                    {/* Card 4: Standings (collapsible) */}
+                    {/* Card 3: Standings (collapsible) */}
                     <CollapsibleCard title="Standings">
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
@@ -484,52 +470,68 @@ export default function LeagueDetailTabs({
                         </div>
                     </CollapsibleCard>
 
-                    {/* Card 6: League Settings (merged — roster slots + settings) */}
-                    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-5">
-                        <h2 className="font-semibold text-lg">League Settings</h2>
+                    {/* Card 5: League Settings (collapsible, merged — roster slots + settings) */}
+                    <CollapsibleCard title="League Settings">
+                        <div className="p-6 space-y-5">
 
-                        {/* Roster Slots section */}
-                        <div>
-                            <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-2">Roster Slots</p>
-                            {rosterPositions.length > 0 ? (
-                                <>
-                                    <p className="text-gray-300 text-sm leading-relaxed mb-3">{rosterPositionsSummary}</p>
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {rosterPositions.map((pos, i) => (
-                                            <span key={i} className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                                                pos === 'BN' ? 'bg-gray-800 text-gray-500' :
-                                                pos === 'IR' ? 'bg-red-900/30 text-red-500' :
-                                                'bg-[#C8A951]/10 text-[#C8A951]'
-                                            }`}>{pos}</span>
-                                        ))}
-                                    </div>
-                                </>
-                            ) : (
-                                <p className="text-gray-600 text-sm">No roster data available.</p>
-                            )}
+                            {/* Roster Slots section */}
+                            <div>
+                                <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-2">Roster Slots</p>
+                                {rosterPositions.length > 0 ? (
+                                    <>
+                                        <p className="text-gray-300 text-sm leading-relaxed mb-3">{rosterPositionsSummary}</p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {rosterPositions.map((pos, i) => (
+                                                <span key={i} className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                                                    pos === 'BN' ? 'bg-gray-800 text-gray-500' :
+                                                    pos === 'IR' ? 'bg-red-900/30 text-red-500' :
+                                                    'bg-[#C8A951]/10 text-[#C8A951]'
+                                                }`}>{pos}</span>
+                                            ))}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <p className="text-gray-600 text-sm">No roster data available.</p>
+                                )}
+                            </div>
+
+                            <div className="border-t border-gray-800" />
+
+                            {/* Settings key-value section */}
+                            <div>
+                                <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-3">Configuration</p>
+                                <dl className="grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+                                    {[
+                                        ['Scoring',      scoringType === 'ppr' ? 'PPR' : scoringType === 'half_ppr' ? '½ PPR' : 'Standard'],
+                                        ['Type',         sleeperSettings.type === 2 ? 'Dynasty' : 'Redraft'],
+                                        ['Platform',     'Sleeper'],
+                                        ['Roster Size',  rosterPositions.length > 0 ? String(rosterPositions.length) : '—'],
+                                        ...(sleeperSettings.playoff_teams != null ? [['Playoff Teams', String(sleeperSettings.playoff_teams)]] : []),
+                                        ...(sleeperSettings.trade_deadline != null ? [['Trade Deadline', `Week ${sleeperSettings.trade_deadline}`]] : []),
+                                    ].map(([label, value]) => (
+                                        <div key={label} className="flex justify-between border-b border-gray-800/50 pb-2 last:border-0">
+                                            <dt className="text-gray-500">{label}</dt>
+                                            <dd className="text-gray-200 font-medium">{value}</dd>
+                                        </div>
+                                    ))}
+                                </dl>
+                            </div>
+
                         </div>
+                    </CollapsibleCard>
 
-                        <div className="border-t border-gray-800" />
-
-                        {/* Settings key-value section */}
-                        <div>
-                            <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-3">Configuration</p>
-                            <dl className="grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
-                                {[
-                                    ['Scoring',      scoringType === 'ppr' ? 'PPR' : scoringType === 'half_ppr' ? '½ PPR' : 'Standard'],
-                                    ['Type',         sleeperSettings.type === 2 ? 'Dynasty' : 'Redraft'],
-                                    ['Platform',     'Sleeper'],
-                                    ['Roster Size',  rosterPositions.length > 0 ? String(rosterPositions.length) : '—'],
-                                    ...(sleeperSettings.playoff_teams != null ? [['Playoff Teams', String(sleeperSettings.playoff_teams)]] : []),
-                                    ...(sleeperSettings.trade_deadline != null ? [['Trade Deadline', `Week ${sleeperSettings.trade_deadline}`]] : []),
-                                ].map(([label, value]) => (
-                                    <div key={label} className="flex justify-between border-b border-gray-800/50 pb-2 last:border-0">
-                                        <dt className="text-gray-500">{label}</dt>
-                                        <dd className="text-gray-200 font-medium">{value}</dd>
-                                    </div>
-                                ))}
-                            </dl>
+                    {/* Card 6: Trade Evaluator (embedded) */}
+                    <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+                        <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+                            <h2 className="font-semibold text-lg">Trade Evaluator</h2>
+                            <button
+                                onClick={() => setActiveTab('trade')}
+                                className="text-xs text-[#C8A951]/70 hover:text-[#C8A951] font-medium transition"
+                            >
+                                Open full view →
+                            </button>
                         </div>
+                        <div className="p-4">{tradeEvaluatorContent}</div>
                     </div>
 
                     {/* Card 7: Player Rankings — gated behind All-Pro+ */}
