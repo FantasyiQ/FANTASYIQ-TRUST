@@ -64,8 +64,9 @@ interface Props {
     sleeperSettings:        SleeperSettings;
     duesData:               DuesData | null;
     announcements:          AnnouncementData[];
-    tradeEvaluatorContent:  React.ReactNode;
-    isCommissioner:         boolean;
+    tradeEvaluatorContent:   React.ReactNode;
+    isCommissioner:          boolean;
+    canUsePlayerRankings:    boolean;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -260,6 +261,7 @@ export default function LeagueDetailTabs({
     announcements,
     tradeEvaluatorContent,
     isCommissioner,
+    canUsePlayerRankings,
 }: Props) {
     const [activeTab, setActiveTab] = useState<Tab>('overview');
 
@@ -530,14 +532,27 @@ export default function LeagueDetailTabs({
                         </div>
                     </div>
 
-                    {/* Card 8: Player Rankings (collapsible) */}
-                    <CollapsibleCard title="Player Rankings">
-                        <PlayerRankingsCard
-                            ppr={ppr}
-                            leagueType={leagueType}
-                            leagueSettings={leagueSettings}
-                        />
-                    </CollapsibleCard>
+                    {/* Card 7: Player Rankings — gated behind All-Pro+ */}
+                    {canUsePlayerRankings ? (
+                        <CollapsibleCard title="Player Rankings">
+                            <PlayerRankingsCard
+                                ppr={ppr}
+                                leagueType={leagueType}
+                                leagueSettings={leagueSettings}
+                            />
+                        </CollapsibleCard>
+                    ) : (
+                        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center">
+                            <p className="text-gray-400 text-sm mb-1">Player Rankings requires All-Pro or higher.</p>
+                            <p className="text-gray-600 text-xs mb-4">
+                                Upgrade your player plan, or the commissioner can upgrade their league plan —{' '}
+                                and connect this league to your player plan to unlock it.
+                            </p>
+                            <a href="/pricing" className="inline-block bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-5 py-2.5 rounded-lg transition text-sm">
+                                View Plans
+                            </a>
+                        </div>
+                    )}
 
                 </div>
             )}

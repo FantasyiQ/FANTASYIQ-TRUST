@@ -393,6 +393,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                     announcements={announcements}
                     tradeEvaluatorContent={tradeEvaluatorContent}
                     isCommissioner={isCommissioner}
+                    canUsePlayerRankings={canUseTradeEvaluator}
                 />
 
             </div>
