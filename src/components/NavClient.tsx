@@ -19,27 +19,28 @@ function navLinkClass(active: boolean) {
 function TierBadge({ tier }: { tier: string | null }) {
     if (!tier || tier === 'FREE') return null;
 
-    let label = '';
-    let className = '';
-
     if (tier === 'PLAYER_ELITE' || tier === 'COMMISSIONER_ELITE') {
-        label = 'Elite';
-        className = 'bg-[#C9A227]/15 border border-[#C9A227]/50 text-[#C9A227]';
-    } else if (tier === 'PLAYER_ALL_PRO' || tier === 'COMMISSIONER_ALL_PRO') {
-        label = 'All-Pro';
-        className = 'bg-[#C9A227]/10 border border-[#C9A227]/30 text-[#C9A227]/80';
-    } else if (tier === 'PLAYER_PRO' || tier === 'COMMISSIONER_PRO') {
-        label = 'Pro';
-        className = 'bg-gray-800 border border-gray-600 text-gray-300';
-    } else {
-        return null;
+        return (
+            <span className="shrink-0 whitespace-nowrap bg-[#C9A227]/15 border border-[#C9A227]/50 text-[#C9A227] font-bold px-3 py-1 rounded-lg text-sm">
+                Elite ✦
+            </span>
+        );
     }
-
-    return (
-        <span className={`shrink-0 whitespace-nowrap font-bold px-3 py-1 rounded-lg text-sm ${className}`}>
-            {label}
-        </span>
-    );
+    if (tier === 'PLAYER_ALL_PRO' || tier === 'COMMISSIONER_ALL_PRO') {
+        return (
+            <span className="shrink-0 whitespace-nowrap bg-[#C9A227]/10 border border-[#C9A227]/30 text-[#C9A227]/80 font-bold px-3 py-1 rounded-lg text-sm">
+                All-Pro ✦
+            </span>
+        );
+    }
+    if (tier === 'PLAYER_PRO' || tier === 'COMMISSIONER_PRO') {
+        return (
+            <span className="shrink-0 whitespace-nowrap bg-gray-800 border border-gray-600 text-gray-300 font-bold px-3 py-1 rounded-lg text-sm">
+                Pro
+            </span>
+        );
+    }
+    return null;
 }
 
 export default function NavClient({ tier, signOutAction }: Props) {
