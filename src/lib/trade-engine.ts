@@ -560,16 +560,16 @@ function futurePickYears(): [number, number, number] {
     return [base, base + 1, base + 2];
 }
 
-// Generates individual draft picks (1.01 … 5.{leagueSize}) for the next 3 draft years.
+// Generates individual draft picks (1.01 … {rounds}.{leagueSize}) for the next 3 draft years.
 // Age is kept at 22 for dynasty age-curve logic; it is not shown in the UI.
-export function getDraftPicks(leagueSize: number): Player[] {
+export function getDraftPicks(leagueSize: number, draftRounds = 5): Player[] {
     const picks: Player[] = [];
     let rank = 500;
 
     for (const [i, year] of futurePickYears().entries()) {
         const discount = YEAR_DISCOUNTS[i] ?? 0.60;
-        for (let round = 1; round <= 5; round++) {
-            const [hi, lo] = ROUND_ANCHORS[round - 1]!;
+        for (let round = 1; round <= draftRounds; round++) {
+            const [hi, lo] = ROUND_ANCHORS[round - 1] ?? [6, 3]; // rounds beyond 5 get minimal value
             for (let pick = 1; pick <= leagueSize; pick++) {
                 const t = leagueSize === 1 ? 0 : (pick - 1) / (leagueSize - 1);
                 const value = Math.round((hi + t * (lo - hi)) * discount * 10) / 10;

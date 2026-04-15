@@ -85,6 +85,7 @@ interface Props {
     leagueName:       string;
     scoringType:      string | null;
     totalRosters:     number;
+    draftRounds?:     number;
     leagueType:       LeagueType;
     rosterPositions?: string[];
     scoringSettings?: ScoringSettings;
@@ -93,7 +94,7 @@ interface Props {
 }
 
 export default function LeagueTradeEvaluator({
-    leagueName, scoringType, totalRosters, leagueType,
+    leagueName, scoringType, totalRosters, draftRounds = 5, leagueType,
     rosterPositions = [], scoringSettings = {}, myTeamData, otherTeamsData = [],
 }: Props) {
     const ppr           = scoringTypeToPpr(scoringType);
@@ -110,7 +111,7 @@ export default function LeagueTradeEvaluator({
     const tePremLabel = leagueSettings.bonusRecTe > 0 ? ' · TE+' : '';
     const label     = `${leagueName} — ${scoringLabel(scoringType)} · ${totalRosters} Teams · ${leagueType}${sfLabel}${passTdLabel}${tePremLabel}`;
 
-    const allPicks     = useMemo(() => getDraftPicks(leagueSize), [leagueSize]);
+    const allPicks     = useMemo(() => getDraftPicks(leagueSize, draftRounds), [leagueSize, draftRounds]);
     const pickByName   = useMemo(() => new Map(allPicks.map(p => [p.name, p])), [allPicks]);
     const playerByName = useMemo(() => new Map(PLAYERS.map(p => [p.name.toLowerCase(), p])), []);
 

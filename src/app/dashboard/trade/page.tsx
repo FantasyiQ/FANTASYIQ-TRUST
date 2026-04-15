@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getLeagueRosters, getTradedPicks } from '@/lib/sleeper';
+import { getLeague, getLeagueRosters, getTradedPicks } from '@/lib/sleeper';
 import type { SleeperRoster, SleeperTradedPick } from '@/lib/sleeper';
 import { getDraftPicks } from '@/lib/trade-engine';
 import type { Player } from '@/lib/trade-engine';
@@ -19,7 +19,7 @@ function futureSeasons(): string[] {
     return [String(base), String(base + 1), String(base + 2)];
 }
 
-const ROUNDS = [1, 2, 3, 4, 5];
+function rounds(n: number) { return Array.from({ length: n }, (_, i) => i + 1); }
 
 function buildPickOwnerMap(
     rosters: SleeperRoster[],
@@ -75,10 +75,12 @@ export default async function TradePage() {
         const FUTURE = futureSeasons();
         const results = await Promise.allSettled(
             dbUser.leagues.map(async league => {
-                const [rosters, tradedPicks] = await Promise.all([
+                const [sleeperLeague, rosters, tradedPicks] = await Promise.all([
+                    getLeague(league.leagueId),
                     getLeagueRosters(league.leagueId),
                     getTradedPicks(league.leagueId),
                 ]);
+                const draftRounds = sleeperLeague.settings?.draft_rounds ?? 5;
 
                 const sorted = [...rosters].sort((a, b) => {
                     const wa = a.settings?.wins ?? 0, wb = b.settings?.wins ?? 0;
@@ -89,9 +91,10 @@ export default async function TradePage() {
                 });
                 const standings = new Map(sorted.map((r, i) => [r.roster_id, league.totalRosters - i]));
                 const rosterIds = rosters.map(r => r.roster_id);
-                const pickGrid  = getDraftPicks(league.totalRosters);
+                const pickGrid  = getDraftPicks(league.totalRosters, draftRounds);
                 const pickByName = new Map(pickGrid.map(p => [p.name, p]));
                 const pickOwnerMap = buildPickOwnerMap(rosters, tradedPicks, FUTURE);
+                const ROUNDS = rounds(draftRounds);
 
                 const picks: Player[] = [];
                 for (const roster of rosters) {

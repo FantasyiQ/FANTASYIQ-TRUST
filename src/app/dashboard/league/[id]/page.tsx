@@ -148,7 +148,8 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
     const _pastDraft = _now.getMonth() + 1 > 4 || (_now.getMonth() + 1 === 4 && _now.getDate() >= 25);
     const _base = _pastDraft ? _now.getFullYear() + 1 : _now.getFullYear();
     const FUTURE_SEASONS = [String(_base), String(_base + 1), String(_base + 2)];
-    const ROUNDS = [1, 2, 3, 4, 5];
+    const draftRounds = sleeperLeague.settings?.draft_rounds ?? 5;
+    const ROUNDS = Array.from({ length: draftRounds }, (_, i) => i + 1);
     const rosterIds = rosters.map(r => r.roster_id);
 
     // Build pick ownership map.
@@ -394,6 +395,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                             leagueName={league.leagueName}
                             scoringType={league.scoringType ?? null}
                             totalRosters={league.totalRosters}
+                            draftRounds={draftRounds}
                             leagueType={sleeperLeague.settings?.type === 2 ? 'Dynasty' : 'Redraft'}
                             rosterPositions={rosterPositions}
                             scoringSettings={sleeperLeague.scoring_settings}

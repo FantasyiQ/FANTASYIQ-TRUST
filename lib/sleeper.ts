@@ -16,6 +16,7 @@ export interface SleeperLeague {
     avatar: string | null;
     settings: {
         type: number;           // 0 = redraft, 2 = dynasty
+        draft_rounds?: number;  // number of rounds in the rookie/startup draft
         playoff_teams?: number;
         trade_deadline?: number;
     };
