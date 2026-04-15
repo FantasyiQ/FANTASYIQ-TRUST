@@ -7,12 +7,13 @@ import { getPlayerIntel } from './player-intelligence';
 export type { ContractTier } from './player-intelligence';
 
 export interface Player {
-    rank:      number;
-    name:      string;
-    position:  string;
-    team:      string;
-    age:       number;
-    baseValue: number;
+    rank:          number;
+    name:          string;
+    position:      string;
+    team:          string;
+    age:           number;
+    baseValue:     number;
+    injuryStatus?: string | null;
 }
 
 export interface DtvResult extends Player {
@@ -76,33 +77,40 @@ export const DEFAULT_LEAGUE_SETTINGS: LeagueSettings = {
     qbSlots: 1, rbSlots: 2, wrSlots: 2, teSlots: 1, flexSlots: 1, sfSlots: 0,
 };
 
-// Derive per-position scarcity from actual starter counts.
-// Formulas calibrated so standard settings reproduce the original hardcoded values:
-//   QB=0.95, RB=1.25, WR=1.20, TE=1.10 (1QB, 2RB, 2WR, 1TE, 1FLEX, 0SF)
-// and superflex (sfSlots=1) gives QB=1.42.
+// KTC assumes a standard 1QB PPR format — these are the baseline slot counts
+// that KTC values are calibrated against.
+const KTC_BASE_SLOTS = { QB: 1, RB: 2, WR: 2, TE: 1, FLEX: 1, SF: 0 };
+
+// Returns a scarcity multiplier relative to what KTC already prices in.
+// Each slot above/below the KTC baseline shifts value ±6% per slot.
+// FLEX and SF slots count at 40% weight toward RB/WR demand,
+// and SF adds to QB demand at 65% (a SF start often goes to a QB).
 function computeScarcity(pos: string, s: LeagueSettings): number {
+    // 0.10 per slot produces visible differentiation between league formats.
+    // FLEX is split 40/40/20 across RB/WR/TE; SF contributes 65% to QB demand.
+    const K = 0.10;
     switch (pos) {
         case 'QB': {
-            const eff = s.qbSlots + s.sfSlots * 0.65;
-            const base = 0.23 + 0.72 * eff;
-            // 6pt TDs meaningfully increase QB demand — boost scarcity ~8%
-            return s.passTd >= 6 ? base * 1.08 : base;
+            const leagueDemand = s.qbSlots + s.sfSlots * 0.65;
+            const baseDemand   = KTC_BASE_SLOTS.QB + KTC_BASE_SLOTS.SF * 0.65;
+            return 1.0 + (leagueDemand - baseDemand) * K;
         }
         case 'RB': {
-            const eff = s.rbSlots + s.flexSlots * 0.40 + s.sfSlots * 0.15;
-            return 0.89 + 0.15 * eff;
+            const leagueDemand = s.rbSlots + s.flexSlots * 0.40;
+            const baseDemand   = KTC_BASE_SLOTS.RB + KTC_BASE_SLOTS.FLEX * 0.40;
+            return 1.0 + (leagueDemand - baseDemand) * K;
         }
         case 'WR': {
-            const eff = s.wrSlots + s.flexSlots * 0.40 + s.sfSlots * 0.15;
-            return 0.91 + 0.12 * eff;
+            const leagueDemand = s.wrSlots + s.flexSlots * 0.40;
+            const baseDemand   = KTC_BASE_SLOTS.WR + KTC_BASE_SLOTS.FLEX * 0.40;
+            return 1.0 + (leagueDemand - baseDemand) * K;
         }
         case 'TE': {
-            const eff = s.teSlots + s.flexSlots * 0.20 + s.sfSlots * 0.05;
-            return 0.88 + 0.18 * eff;
+            const leagueDemand = s.teSlots + s.flexSlots * 0.20;
+            const baseDemand   = KTC_BASE_SLOTS.TE + KTC_BASE_SLOTS.FLEX * 0.20;
+            return 1.0 + (leagueDemand - baseDemand) * K;
         }
-        case 'K':
-        case 'DEF':  return 0.85;
-        default:     return 1.00;
+        default: return 1.0;
     }
 }
 
@@ -127,6 +135,25 @@ function tier(finalDtv: number): string {
     return 'Waiver';
 }
 
+// Injury risk → DTV discount. Only current status is used; historical games-missed
+// data can be wired in later when available per-season.
+// TODO: add historical component when per-season games-missed data is available.
+const INJURY_STATUS_RISK: Record<string, number> = {
+    'Questionable': 0.10,
+    'Doubtful':     0.20,
+    'Out':          0.30,
+    'IR':           0.40,
+    'PUP':          0.35,
+    'Sus':          0.15,
+};
+
+function calcInjuryFactor(status: string | null | undefined): number {
+    if (!status || status === 'Active') return 1.0;
+    const riskScore = Math.min(1.0, INJURY_STATUS_RISK[status] ?? 0.0);
+    // Higher risk = lower multiplier (max 15% discount at riskScore = 1.0)
+    return Math.round((1.0 - riskScore * 0.15) * 100) / 100;
+}
+
 export interface PlayerFactors {
     perfFactor:   number;
     schedFactor:  number;
@@ -146,23 +173,25 @@ export function calcDtv(
     _ppr: PprFormat = 1,
     leagueType: LeagueType = 'Redraft',
     _factors?: PlayerFactors,
-    _settings?: LeagueSettings,
+    settings: LeagueSettings = DEFAULT_LEAGUE_SETTINGS,
 ): DtvResult {
-    // Values are sourced directly from KTC — no multipliers applied.
-    // Insight badges are still generated for informational display.
-    const intel    = getPlayerIntel(player.name, player.position, player.team, player.age, leagueType);
-    const finalDtv = Math.round(player.baseValue * 10) / 10;
+    const intel         = getPlayerIntel(player.name, player.position, player.team, player.age, leagueType);
+    const isPick        = player.position === 'PICK';
+    const posMultiplier = isPick ? 1 : computeScarcity(player.position, settings);
+    const injuryFactor  = isPick ? 1 : calcInjuryFactor(player.injuryStatus);
+    const rawDtv        = Math.round(player.baseValue * 10) / 10;
+    const finalDtv      = Math.round(rawDtv * posMultiplier * injuryFactor * 10) / 10;
 
     return {
         ...player,
-        posMultiplier:  1,
+        posMultiplier,
         ageMultiplier:  1,
         perfFactor:     1,
         schedFactor:    1,
-        injuryFactor:   1,
+        injuryFactor,
         situFactor:     1,
         draftCapFactor: 1,
-        rawDtv:         finalDtv,
+        rawDtv,
         pprBoost:       0,
         finalDtv,
         tier:           tier(finalDtv),
@@ -171,15 +200,17 @@ export function calcDtv(
 }
 
 function tradeScore(totalA: number, totalB: number): number {
-    const total = totalA + totalB;
-    if (total === 0) return 50;
-    return Math.round((totalB / total) * 100);
+    if (totalA === 0 && totalB === 0) return 50;
+    // Net DTV differential from Team A's perspective (Team A gives totalA, receives totalB)
+    const netDiff = totalB - totalA;
+    const rawScore = 50 + (netDiff * 1.67);
+    return Math.min(100, Math.max(0, Math.round(rawScore)));
 }
 
 function verdict(score: number): string {
     if (score >= 90) return 'Slam Dunk';
     if (score >= 75) return 'Strong Win';
-    if (score >= 60) return 'Slight Edge';
+    if (score >= 56) return 'Slight Edge';
     if (score >= 45) return 'Fair Trade';
     if (score >= 30) return 'Slight Loss';
     if (score >= 15) return 'Bad Deal';
@@ -210,7 +241,7 @@ export function evaluateTrade(
     const totalB = Math.round(b.reduce((s, p) => s + p.finalDtv, 0) * 10) / 10;
     const diff   = Math.round(Math.abs(totalA - totalB) * 10) / 10;
     const score  = tradeScore(totalA, totalB);
-    const winner: 'A' | 'B' | 'Even' = diff < 2 ? 'Even' : totalB > totalA ? 'A' : 'B';
+    const winner: 'A' | 'B' | 'Even' = score >= 55 ? 'A' : score <= 45 ? 'B' : 'Even';
     return { sideA: a, sideB: b, totalA, totalB, diff, score, verdict: verdict(score), winner };
 }
 
@@ -537,6 +568,18 @@ export const PLAYERS: Player[] = [
 
 ];
 
+const ROUND_ORDINALS = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];
+export function roundOrdinal(round: number): string {
+    return ROUND_ORDINALS[round - 1] ?? `${round}th`;
+}
+
+// Tier picks: Early ≈ pick 1/6 of the way through, Mid = midpoint, Late = 5/6
+const TIER_ENTRIES: { tier: string; t: number }[] = [
+    { tier: 'Early', t: 1 / 6 },
+    { tier: 'Mid',   t: 1 / 2 },
+    { tier: 'Late',  t: 5 / 6 },
+];
+
 // Round value ranges: [pickOneValue, lastPickValue] for the nearest draft year (anchor)
 const ROUND_ANCHORS: [number, number][] = [
     [82, 52], // Round 1
@@ -577,6 +620,18 @@ export function getDraftPicks(leagueSize: number, draftRounds = 5): Player[] {
                 picks.push({
                     rank: rank++,
                     name: `${year} ${round}.${pickStr}`,
+                    position: 'PICK',
+                    team: String(year),
+                    age: 23,
+                    baseValue: value,
+                });
+            }
+            // Tier picks — used when exact draft order is not yet set
+            for (const { tier, t } of TIER_ENTRIES) {
+                const value = Math.round((hi + t * (lo - hi)) * discount * 10) / 10;
+                picks.push({
+                    rank: rank++,
+                    name: `${year} Round ${round} ${tier} ${roundOrdinal(round)}`,  // e.g. "2027 Round 1 Early 1st"
                     position: 'PICK',
                     team: String(year),
                     age: 23,

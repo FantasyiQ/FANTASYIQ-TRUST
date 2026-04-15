@@ -2,9 +2,9 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getLeague, getLeagueRosters, getTradedPicks, getLeagueDrafts, buildPickOwnerMap, buildRosterSlotMap } from '@/lib/sleeper';
+import { getLeague, getLeagueRosters, getTradedPicks, getLeagueDrafts, buildPickOwnerMap } from '@/lib/sleeper';
 import type { SleeperRoster, SleeperTradedPick } from '@/lib/sleeper';
-import { getDraftPicks } from '@/lib/trade-engine';
+import { getDraftPicks, roundOrdinal } from '@/lib/trade-engine';
 import type { Player } from '@/lib/trade-engine';
 import TradeEvaluator from './TradeEvaluator';
 
@@ -48,37 +48,38 @@ export default async function TradePage() {
                 ]);
                 const draftRounds = sleeperLeague.settings?.draft_rounds ?? 5;
 
-                // Standings fallback: worst record → rank 1 (picks first)
-                const sorted = [...rosters].sort((a, b) => {
-                    const wa = a.settings?.wins ?? 0, wb = b.settings?.wins ?? 0;
-                    if (wa !== wb) return wb - wa;
-                    const fa = (a.settings?.fpts ?? 0) + (a.settings?.fpts_decimal ?? 0) / 100;
-                    const fb = (b.settings?.fpts ?? 0) + (b.settings?.fpts_decimal ?? 0) / 100;
-                    return fb - fa;
-                });
-                const standingsRank = new Map(sorted.map((r, i) => [r.roster_id, i + 1]));
+                // Use previous season's final standings for tier computation when current
+                // season has no data yet (all 0-0 = pre_draft or season hasn't started).
+                const currentAllZero = rosters.every(
+                    r => (r.settings?.wins ?? 0) === 0 && (r.settings?.losses ?? 0) === 0
+                );
+                const prevSeasonRosters = (currentAllZero && sleeperLeague.previous_league_id)
+                    ? await getLeagueRosters(sleeperLeague.previous_league_id)
+                    : undefined;
 
-                const draft = drafts[0] ?? null;
-                const { slotMap } = buildRosterSlotMap(rosters, draft, standingsRank, league.totalRosters);
-
-                const rosterIds  = rosters.map(r => r.roster_id);
-                const pickGrid   = getDraftPicks(league.totalRosters, draftRounds);
-                const pickByName = new Map(pickGrid.map(p => [p.name, p]));
-                const pickOwnerMap = buildPickOwnerMap(rosters, tradedPicks, FUTURE);
-                const ROUNDS = rounds(draftRounds);
+                const rosterIds    = rosters.map(r => r.roster_id);
+                const pickGrid     = getDraftPicks(league.totalRosters, draftRounds);
+                const pickByName   = new Map(pickGrid.map(p => [p.name, p]));
+                const pickOwnerMap = buildPickOwnerMap(
+                    rosters, tradedPicks, FUTURE, drafts, draftRounds, prevSeasonRosters,
+                );
+                const ROUNDS       = rounds(draftRounds);
 
                 const picks: Player[] = [];
                 for (const roster of rosters) {
                     for (const season of FUTURE) {
                         for (const round of ROUNDS) {
                             for (const origId of rosterIds) {
-                                const key = `${season}-${round}-${origId}`;
-                                const owner = pickOwnerMap.get(key) ?? origId;
-                                if (Number(owner) === Number(roster.roster_id)) {
-                                    const slot = slotMap.get(origId) ?? origId;
-                                    const pick = pickByName.get(`${season} ${round}.${slot.toString().padStart(2, '0')}`);
-                                    if (pick) picks.push(pick);
+                                const key   = `${season}-${round}-${origId}`;
+                                const entry = pickOwnerMap.get(key);
+                                if (!entry || Number(entry.owner) !== Number(roster.roster_id)) continue;
+                                let pick: Player | undefined;
+                                if (entry.slot !== undefined) {
+                                    pick = pickByName.get(`${season} ${round}.${entry.slot.toString().padStart(2, '0')}`);
+                                } else if (entry.tier) {
+                                    pick = pickByName.get(`${season} Round ${round} ${entry.tier} ${roundOrdinal(round)}`);
                                 }
+                                if (pick) picks.push(pick);
                             }
                         }
                     }

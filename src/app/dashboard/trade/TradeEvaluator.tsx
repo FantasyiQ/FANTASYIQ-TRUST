@@ -50,35 +50,6 @@ function verdictColor(v: string) {
     }
 }
 
-const INSIGHT_COLORS: Record<string, string> = {
-    'Rookie Deal':          'bg-emerald-900/50 text-emerald-300 border-emerald-800',
-    '5th-Year Option':      'bg-emerald-900/40 text-emerald-400 border-emerald-800',
-    'Walk Year':            'bg-orange-900/50 text-orange-300 border-orange-800',
-    'Free Agent':           'bg-red-900/50 text-red-300 border-red-800',
-    'Prime RB Age':         'bg-[#C8A951]/10 text-[#C8A951] border-[#C8A951]/30',
-    'RB Decline Risk':      'bg-red-900/40 text-red-400 border-red-800',
-    'WR Prime':             'bg-[#C8A951]/10 text-[#C8A951] border-[#C8A951]/30',
-    'Aging WR':             'bg-orange-900/40 text-orange-400 border-orange-800',
-    'QB Prime':             'bg-[#C8A951]/10 text-[#C8A951] border-[#C8A951]/30',
-    'TE Prime':             'bg-[#C8A951]/10 text-[#C8A951] border-[#C8A951]/30',
-    'Aging TE':             'bg-orange-900/40 text-orange-400 border-orange-800',
-    'TE Target Hog':        'bg-yellow-900/40 text-yellow-300 border-yellow-800',
-    'Pass-Heavy Offense':   'bg-blue-900/40 text-blue-300 border-blue-800',
-    'High-Powered Offense': 'bg-blue-900/40 text-blue-300 border-blue-800',
-    'Run-First Scheme':     'bg-green-900/40 text-green-300 border-green-800',
-    'Heavy Workload':       'bg-green-900/40 text-green-300 border-green-800',
-    'Top-10 Pedigree':      'bg-purple-900/40 text-purple-300 border-purple-800',
-    'High Draft Capital':   'bg-purple-900/30 text-purple-400 border-purple-800',
-    'UDFA Ascent':          'bg-indigo-900/40 text-indigo-300 border-indigo-800',
-};
-
-function InsightBadge({ label }: { label: string }) {
-    return (
-        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${INSIGHT_COLORS[label] ?? 'bg-gray-800 text-gray-400 border-gray-700'}`}>
-            {label}
-        </span>
-    );
-}
 
 function FactorBar({ label, value, max = 1.30 }: { label: string; value: number; max?: number }) {
     const pct = Math.min(100, Math.round((value / max) * 100));
@@ -103,9 +74,25 @@ function PlayerPill({ result, onRemove, leagueSize }: { result: DtvResult; onRem
                         {result.position}
                     </span>
                     <div className="min-w-0">
-                        <p className="text-white text-sm font-semibold truncate">
-                            {result.position === 'PICK' ? pickLabel(result.name, leagueSize) : result.name}
-                        </p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="text-white text-sm font-semibold truncate">
+                                {result.position === 'PICK' ? pickLabel(result.name, leagueSize) : result.name}
+                            </p>
+                            {result.injuryStatus && result.injuryStatus !== 'Active' && (
+                                <span className={`text-[10px] font-bold px-1 py-0.5 rounded shrink-0 ${
+                                    result.injuryStatus === 'IR'  ? 'bg-red-900/60 text-red-400' :
+                                    result.injuryStatus === 'Out' ? 'bg-red-900/40 text-red-400' :
+                                    result.injuryStatus === 'PUP' ? 'bg-red-900/40 text-red-300' :
+                                    result.injuryStatus === 'Doubtful' ? 'bg-orange-900/60 text-orange-400' :
+                                    'bg-yellow-900/40 text-yellow-400'
+                                }`}>
+                                    {result.injuryStatus === 'Questionable' ? 'Q' :
+                                     result.injuryStatus === 'Doubtful'     ? 'D' :
+                                     result.injuryStatus === 'Out'          ? 'O' :
+                                     result.injuryStatus}
+                                </span>
+                            )}
+                        </div>
                         <p className="text-gray-500 text-xs">{result.position === 'PICK' ? `${result.team} Draft` : `${result.team}${result.age ? ` · Age ${result.age}` : ''}`}</p>
                     </div>
                 </div>
@@ -118,12 +105,6 @@ function PlayerPill({ result, onRemove, leagueSize }: { result: DtvResult; onRem
                 </div>
             </div>
 
-            {/* Insight badges */}
-            {result.insights && result.insights.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                    {result.insights.map(i => <InsightBadge key={i} label={i} />)}
-                </div>
-            )}
         </div>
     );
 }
@@ -159,8 +140,15 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, leagu
     const [pickYear, setPickYear] = useState(PICK_YEARS[0]);
 
     const sorted = useMemo(() =>
-        [...players].sort((a, b) => (POS_ORDER[a.position] ?? 9) - (POS_ORDER[b.position] ?? 9)),
-        [players]
+        [...players].sort((a, b) => {
+            const posDiff = (POS_ORDER[a.position] ?? 9) - (POS_ORDER[b.position] ?? 9);
+            if (posDiff !== 0) return posDiff;
+            // Within each position: highest DTV first
+            const aDtv = calcDtv(a, ppr, leagueType, undefined, settings).finalDtv;
+            const bDtv = calcDtv(b, ppr, leagueType, undefined, settings).finalDtv;
+            return bDtv - aDtv;
+        }),
+        [players, ppr, leagueType, settings]
     );
 
     // Extract round number from either "YYYY R.SS" or "YYYY Round N ..." format
@@ -188,7 +176,6 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, leagu
                 const ar = pickRound(a.name), br = pickRound(b.name);
                 return ar !== br ? ar - br : pickSlotOrder(a.name) - pickSlotOrder(b.name);
             });
-        console.log('[RosterQuickPick] picks prop length:', picks.length, 'pickYear:', pickYear, 'yearPicks:', result.map(p => p.name));
         return result;
     }, [picks, pickYear]);
 
@@ -411,11 +398,6 @@ function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEA
                                                     {p.position === 'PICK' ? `${p.team} Draft` : p.team}
                                                 </span>
                                             </div>
-                                            {dtv.insights && dtv.insights.length > 0 && (
-                                                <div className="flex flex-wrap gap-1 mt-0.5">
-                                                    {dtv.insights.map(i => <InsightBadge key={i} label={i} />)}
-                                                </div>
-                                            )}
                                         </div>
                                     </div>
                                     <div className="text-right shrink-0">
@@ -477,14 +459,15 @@ export default function TradeEvaluator({
     const [sideB, setSideB]           = useState<Player[]>([]);
     const [sideC, setSideC]           = useState<Player[]>([]);
     const [threeWay, setThreeWay]     = useState(false);
-    const [selectedTeamId, setSelectedTeamId] = useState<number | null>(otherTeams[0]?.rosterId ?? null);
-    const [fcMap, setFcMap] = useState<Record<string, { dynasty: number; dynastySf: number; redraft: number; redraftSf: number }>>({});
+    const [selectedTeamId, setSelectedTeamId]   = useState<number | null>(otherTeams[0]?.rosterId ?? null);
+    const [selectedTeamCId, setSelectedTeamCId] = useState<number | null>(null);
+    const [fcMap, setFcMap] = useState<Record<string, { dynasty: number; dynastySf: number; redraft: number; redraftSf: number; injuryStatus: string | null }>>({});
 
     // Load live KTC values (cached 1hr on CDN)
     useEffect(() => {
         fetch('/api/players/fc-values')
             .then(r => r.json())
-            .then((data: Record<string, { dynasty: number; dynastySf: number; redraft: number; redraftSf: number }>) => {
+            .then((data: Record<string, { dynasty: number; dynastySf: number; redraft: number; redraftSf: number; injuryStatus: string | null }>) => {
                 setFcMap(data);
             })
             .catch(() => {});
@@ -535,7 +518,7 @@ export default function TradeEvaluator({
             baseValue = Math.round(Math.max(1, baseValue) * 10) / 10;
         }
 
-        return { ...p, baseValue };
+        return { ...p, baseValue, injuryStatus: fc?.injuryStatus ?? p.injuryStatus ?? null };
     }, [fcMap, leagueType, leagueSettings, ppr, leagueSize]);
 
     const allExcluded = [...sideA.map(p => p.name), ...sideB.map(p => p.name), ...sideC.map(p => p.name)];
@@ -562,6 +545,7 @@ export default function TradeEvaluator({
         () => (myTeam?.players ?? myRoster).map(patchPlayer),
         [myTeam, myRoster, patchPlayer],
     );
+
     const givePicks    = myTeam?.picks ?? (myPicks.length > 0 ? myPicks : draftPicks);
     const selectedTeam = useMemo(
         () => otherTeams.find(t => t.rosterId === selectedTeamId) ?? null,
@@ -572,6 +556,21 @@ export default function TradeEvaluator({
         [selectedTeam, myTeam, myRoster, patchPlayer],
     );
     const receivePicks  = selectedTeam?.picks ?? (myTeam ? [] : draftPicks);
+
+    // Team 3 — all teams are selectable (including the member's own team)
+    const allTeamsForC = useMemo(
+        () => [...(myTeam ? [myTeam] : []), ...otherTeams],
+        [myTeam, otherTeams],
+    );
+    const selectedTeamC = useMemo(
+        () => allTeamsForC.find(t => t.rosterId === selectedTeamCId) ?? null,
+        [allTeamsForC, selectedTeamCId],
+    );
+    const teamCRoster = useMemo(
+        () => (selectedTeamC?.players ?? []).map(patchPlayer),
+        [selectedTeamC, patchPlayer],
+    );
+    const teamCPicks = selectedTeamC?.picks ?? [];
 
     const result = useMemo(() => {
         if (sideA.length === 0 && sideB.length === 0) return null;
@@ -585,9 +584,28 @@ export default function TradeEvaluator({
 
     const positions = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'PICK'];
 
+    // Rank map: computed across ALL players sorted by finalDtv, so ranks are
+    // stable and consistent regardless of which position filter is active.
+    const dtvRankMap = useMemo(() => {
+        const sorted = [...allPlayers].sort((a, b) => {
+            const diff = calcDtv(b, ppr, leagueType, undefined, leagueSettings).finalDtv
+                       - calcDtv(a, ppr, leagueType, undefined, leagueSettings).finalDtv;
+            return diff !== 0 ? diff : a.name.localeCompare(b.name);
+        });
+        const map = new Map<string, number>();
+        sorted.forEach((p, i) => map.set(p.name, i + 1));
+        return map;
+    }, [allPlayers, ppr, leagueType, leagueSettings]);
+
     const filteredPlayers = useMemo(() =>
-        allPlayers.filter(p => posFilter === 'ALL' || p.position === posFilter),
-        [allPlayers, posFilter]
+        allPlayers
+            .filter(p => posFilter === 'ALL' || p.position === posFilter)
+            .sort((a, b) => {
+                const diff = calcDtv(b, ppr, leagueType, undefined, leagueSettings).finalDtv
+                           - calcDtv(a, ppr, leagueType, undefined, leagueSettings).finalDtv;
+                return diff !== 0 ? diff : a.name.localeCompare(b.name);
+            }),
+        [allPlayers, posFilter, ppr, leagueType, leagueSettings]
     );
 
     return (
@@ -657,6 +675,14 @@ export default function TradeEvaluator({
                         <h2 className="font-bold text-white">Team 1</h2>
                         {result && <span className="text-2xl font-extrabold text-white">{result.totalA}</span>}
                     </div>
+                    {myTeam && (
+                        <div>
+                            <label className="text-gray-500 text-xs font-medium block mb-1">Your team</label>
+                            <div className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white">
+                                {myTeam.teamName}
+                            </div>
+                        </div>
+                    )}
                     {(giveRoster.length > 0 || givePicks.length > 0) && (
                         <RosterQuickPick
                             players={giveRoster}
@@ -726,17 +752,33 @@ export default function TradeEvaluator({
                             <h2 className="font-bold text-white">Team 3</h2>
                             {sideC.length > 0 && <span className="text-2xl font-extrabold text-white">{totalC}</span>}
                         </div>
-                        <RosterQuickPick
-                            players={[]}
-                            picks={draftPicks}
-                            excluded={allExcluded}
-                            ppr={ppr}
-                            leagueType={leagueType}
-                            leagueSize={leagueSize}
-                            settings={leagueSettings}
-                            rosterLabel="Team 3"
-                            onAdd={p => setSideC(prev => prev.length < 5 ? [...prev, p] : prev)}
-                        />
+                        {allTeamsForC.length > 0 && (
+                            <div>
+                                <label className="text-gray-500 text-xs font-medium block mb-1">Trading with</label>
+                                <select
+                                    value={selectedTeamCId ?? ''}
+                                    onChange={e => setSelectedTeamCId(Number(e.target.value))}
+                                    className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C8A951]/60">
+                                    <option value="">Select a team</option>
+                                    {allTeamsForC.map(t => (
+                                        <option key={t.rosterId} value={t.rosterId}>{t.teamName}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+                        {(teamCRoster.length > 0 || teamCPicks.length > 0) && (
+                            <RosterQuickPick
+                                players={teamCRoster}
+                                picks={teamCPicks}
+                                excluded={allExcluded}
+                                ppr={ppr}
+                                leagueType={leagueType}
+                                leagueSize={leagueSize}
+                                settings={leagueSettings}
+                                rosterLabel={selectedTeamC ? `${selectedTeamC.teamName.split(' ')[0]}'s Roster` : 'Roster'}
+                                onAdd={p => setSideC(prev => prev.length < 5 ? [...prev, p] : prev)}
+                            />
+                        )}
                         <PlayerSearch onAdd={p => setSideC(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} settings={leagueSettings} players={allPlayers} allPicks={searchablePicks} leagueSize={leagueSize} />
                         <div className="space-y-2">
                             {sideC.map(p => {
@@ -801,8 +843,8 @@ export default function TradeEvaluator({
                                     </div>
                                     <p className="text-gray-600 text-xs">
                                         {result.winner === 'Even' ? 'Essentially even' :
-                                         result.winner === 'A' ? `Team 1 overpays by ${result.diff}` :
-                                         `Team 1 wins by ${result.diff}`}
+                                         result.winner === 'A' ? `Team 1 wins by ${result.diff}` :
+                                         `Team 1 overpays by ${result.diff}`}
                                     </p>
                                 </div>
                                 <div>
@@ -830,7 +872,7 @@ export default function TradeEvaluator({
                                 </div>
                             </div>
                             <div className="text-xs text-gray-600 text-center">
-                                0–14 Robbery · 15–29 Bad Deal · 30–44 Slight Loss · 45–59 Fair Trade · 60–74 Slight Edge · 75–89 Strong Win · 90–100 Slam Dunk
+                                0–14 Robbery · 15–29 Bad Deal · 30–44 Slight Loss · 45–55 Fair Trade · 56–74 Slight Edge · 75–89 Strong Win · 90–100 Slam Dunk
                             </div>
                         </>
                     )}
@@ -873,11 +915,13 @@ export default function TradeEvaluator({
                             const ord = ['1st','2nd','3rd','4th','5th'][round - 1] ?? `${round}th`;
                             const roundPicks = draftPicks.filter(p => {
                                 if (p.team !== String(pickYear)) return false;
-                                // Exact-slot: "2027 1.04"
-                                if (p.name.startsWith(`${pickYear} ${round}.`)) return true;
-                                // Tier pick: "2027 Round 1 Early 1st"
-                                const tierMatch = p.name.match(/^(\d{4}) Round (\d+) /);
-                                return tierMatch && parseInt(tierMatch[2]) === round;
+                                if (isFutureChart) {
+                                    // Future years: tier picks only ("2027 Round 1 Early 1st")
+                                    const tierMatch = p.name.match(/^(\d{4}) Round (\d+) /);
+                                    return !!tierMatch && parseInt(tierMatch[2]) === round;
+                                }
+                                // Current year: exact-slot picks only ("2026 1.04")
+                                return p.name.startsWith(`${pickYear} ${round}.`);
                             }).sort((a, b) => {
                                 const as_ = parseInt(a.name.split('.')[1] ?? '0');
                                 const bs_ = parseInt(b.name.split('.')[1] ?? '0');
@@ -938,7 +982,7 @@ export default function TradeEvaluator({
                                     <th className="text-left px-3 py-3 text-gray-500 font-medium">Player</th>
                                     <th className="text-left px-3 py-3 text-gray-500 font-medium">Pos</th>
                                     <th className="text-left px-3 py-3 text-gray-500 font-medium">Team</th>
-                                    <th className="text-left px-3 py-3 text-gray-500 font-medium hidden sm:table-cell">Intel</th>
+
                                     <th className="text-right px-3 py-3 text-gray-500 font-medium">DTV</th>
                                     <th className="text-right px-3 py-3 text-gray-500 font-medium">Tier</th>
                                     <th className="text-right px-4 py-3 text-gray-500 font-medium">Add</th>
@@ -950,7 +994,7 @@ export default function TradeEvaluator({
                                     const inTrade = allExcluded.includes(p.name);
                                     return (
                                         <tr key={p.name} className="hover:bg-gray-800/30 transition">
-                                            <td className="px-4 py-3 text-gray-600 text-xs">{p.rank}</td>
+                                            <td className="px-4 py-3 text-gray-600 text-xs">{dtvRankMap.get(p.name) ?? p.rank}</td>
                                             <td className="px-3 py-3 text-white font-medium">{p.name}</td>
                                             <td className="px-3 py-3">
                                                 <span className={`text-xs font-bold px-1.5 py-0.5 rounded border ${POS_COLORS[p.position] ?? ''}`}>
@@ -958,11 +1002,6 @@ export default function TradeEvaluator({
                                                 </span>
                                             </td>
                                             <td className="px-3 py-3 text-gray-400">{p.team}</td>
-                                            <td className="px-3 py-3 hidden sm:table-cell">
-                                                <div className="flex flex-wrap gap-1">
-                                                    {dtv.insights?.map(i => <InsightBadge key={i} label={i} />)}
-                                                </div>
-                                            </td>
                                             <td className="px-3 py-3 text-right font-bold text-white">{dtv.finalDtv}</td>
                                             <td className={`px-3 py-3 text-right font-semibold text-xs ${TIER_COLORS[dtv.tier]}`}>{dtv.tier}</td>
                                             <td className="px-4 py-3 text-right">

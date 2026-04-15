@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import TradeEvaluator from '@/app/dashboard/trade/TradeEvaluator';
-import { PLAYERS, getDraftPicks, DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
+import { PLAYERS, getDraftPicks, DEFAULT_LEAGUE_SETTINGS, roundOrdinal } from '@/lib/trade-engine';
 import type { PprFormat, LeagueType, LeagueSettings, Player } from '@/lib/trade-engine';
 import type { TradeTeam } from '@/app/dashboard/trade/TradeEvaluator';
 
@@ -34,8 +34,9 @@ function buildLeagueSettings(
     scoringSettings: {
         pass_td?:      number;
         bonus_rec_te?: number;
-    },
+    } | null | undefined,
 ): LeagueSettings {
+    scoringSettings = scoringSettings ?? {};
     let qbSlots = 0, rbSlots = 0, wrSlots = 0, teSlots = 0, flexSlots = 0, sfSlots = 0;
 
     for (const pos of rosterPositions) {
@@ -64,10 +65,12 @@ function buildLeagueSettings(
 }
 
 interface RawOwnedPick {
-    season:      string;
-    round:       number;
-    slot:        number;
-    origTeamName?: string; // set when pick was traded — "from Team X"
+    season:         string;
+    round:          number;
+    slot?:          number;    // set when draft_order is known for this season
+    tier?:          string;    // "Early" | "Mid" | "Late" — when draft_order is not yet set
+    tierProjected?: boolean;   // true when all teams are 0-0 (no standings data)
+    origTeamName?:  string;    // set when pick was traded — "from Team X"
 }
 
 export interface RawTeamData {
@@ -151,7 +154,13 @@ export default function LeagueTradeEvaluator({
 
         const picks: Player[] = raw.ownedPicks
             .map(op => {
-                const base = pickByName.get(`${op.season} ${op.round}.${op.slot.toString().padStart(2, '0')}`);
+                const key = op.slot !== undefined
+                    ? `${op.season} ${op.round}.${op.slot.toString().padStart(2, '0')}`
+                    : op.tier
+                        ? `${op.season} Round ${op.round} ${op.tier} ${roundOrdinal(op.round)}`  // "2027 Round 1 Early 1st"
+                        : undefined;
+                if (!key) return undefined;
+                const base = pickByName.get(key);
                 if (!base) return undefined;
                 return op.origTeamName
                     ? { ...base, name: `${base.name} (from ${op.origTeamName})` }
