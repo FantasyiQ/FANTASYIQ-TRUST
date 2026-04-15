@@ -182,14 +182,8 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, leagu
     };
 
     const yearPicks = useMemo(() => {
-        const seen = new Set<string>();
         return picks
-            .filter(p => {
-                if (p.team !== String(pickYear)) return false;
-                if (seen.has(p.name)) return false;
-                seen.add(p.name);
-                return true;
-            })
+            .filter(p => p.team === String(pickYear))
             .sort((a, b) => {
                 const ar = pickRound(a.name), br = pickRound(b.name);
                 return ar !== br ? ar - br : pickSlotOrder(a.name) - pickSlotOrder(b.name);
