@@ -269,11 +269,19 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, leagu
                                 <div key={round} className="flex items-center gap-2 flex-wrap">
                                     <span className="text-gray-600 text-[10px] font-semibold w-8 shrink-0">Rd {round}</span>
                                     {isFuture
-                                        ? roundPicks.map((p, i) => {
+                                        ? roundPicks
+                                            // Exact-slot picks (e.g. "2027 1.04") are hypothetical for future years;
+                                            // only show tier picks ("2027 Round 1 Early 1st") which come from
+                                            // buildPickOwnerMap. Exact picks only appear if draft_order is set early.
+                                            .filter(p => !p.name.match(/^\d{4} \d+\./))
+                                            .map((p, i) => {
                                             const used = excluded.includes(p.name);
                                             const dtv  = calcDtv(p, ppr, leagueType, undefined, settings);
-                                            const tierLabel = p.name.includes('Early') ? 'Early'
-                                                : p.name.includes('Late') ? 'Late' : 'Mid';
+                                            const slotM = p.name.match(/\d+\.(\d+)/);
+                                            const tierLabel = slotM
+                                                ? tierOf(parseInt(slotM[1]))
+                                                : p.name.includes('Early') ? 'Early'
+                                                : p.name.includes('Late')  ? 'Late' : 'Mid';
                                             return (
                                                 <button key={`${p.name}-${i}`} type="button" disabled={used}
                                                     onClick={() => onAdd(p)}
