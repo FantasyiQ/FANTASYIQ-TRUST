@@ -182,12 +182,14 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, leagu
     };
 
     const yearPicks = useMemo(() => {
-        return picks
+        const result = picks
             .filter(p => p.team === String(pickYear))
             .sort((a, b) => {
                 const ar = pickRound(a.name), br = pickRound(b.name);
                 return ar !== br ? ar - br : pickSlotOrder(a.name) - pickSlotOrder(b.name);
             });
+        console.log('[RosterQuickPick] picks prop length:', picks.length, 'pickYear:', pickYear, 'yearPicks:', result.map(p => p.name));
+        return result;
     }, [picks, pickYear]);
 
     const rounds = useMemo(() => {
