@@ -309,6 +309,10 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
         trade_deadline: sleeperLeague.settings?.trade_deadline,
     };
 
+    // Commissioner check: Sleeper marks the commissioner via is_owner on the member list
+    const commissionerSleeperUserId = members.find(m => m.is_owner)?.user_id;
+    const isCommissioner = !!commissionerSleeperUserId && commissionerSleeperUserId === dbUser?.sleeperUserId;
+
     // Trade evaluator content — pre-composed server component passed as slot
     const tradeEvaluatorContent = canUseTradeEvaluator ? (
         <LeagueTradeEvaluator
@@ -388,6 +392,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                     duesData={duesData}
                     announcements={announcements}
                     tradeEvaluatorContent={tradeEvaluatorContent}
+                    isCommissioner={isCommissioner}
                 />
 
             </div>

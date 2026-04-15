@@ -65,6 +65,7 @@ interface Props {
     duesData:               DuesData | null;
     announcements:          AnnouncementData[];
     tradeEvaluatorContent:  React.ReactNode;
+    isCommissioner:         boolean;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -129,7 +130,7 @@ function CollapsibleCard({ title, children }: { title: string; children: React.R
     );
 }
 
-// ── Player Rankings card (mini DTV table) ─────────────────────────────────────
+// ── Collapsible Player Rankings card (mini DTV table) ────────────────────────
 
 const POS_FILTER_OPTIONS = ['All', 'QB', 'RB', 'WR', 'TE', 'PICK'];
 
@@ -151,9 +152,9 @@ const POS_COLORS: Record<string, string> = {
 };
 
 function PlayerRankingsCard({
-    ppr, leagueType, leagueSettings, leagueName: _leagueName,
+    ppr, leagueType, leagueSettings,
 }: {
-    ppr: PprFormat; leagueType: LeagueType; leagueSettings: LeagueSettings; leagueName: string;
+    ppr: PprFormat; leagueType: LeagueType; leagueSettings: LeagueSettings;
 }) {
     const [posFilter, setPosFilter] = useState('All');
     const [search, setSearch] = useState('');
@@ -175,12 +176,9 @@ function PlayerRankingsCard({
     }, [ranked, posFilter, search]);
 
     return (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between flex-wrap gap-3">
-                <div>
-                    <h2 className="font-semibold text-lg">Player Rankings</h2>
-                    <p className="text-gray-500 text-xs mt-0.5">DTV values scoped to this league's roster and scoring settings.</p>
-                </div>
+        <>
+            <p className="text-gray-500 text-xs px-6 pt-4 pb-2">DTV values scoped to this league&apos;s roster and scoring settings.</p>
+            <div className="px-6 pb-3 border-b border-gray-800 flex items-center justify-between flex-wrap gap-3">
                 <div className="flex gap-2 flex-wrap">
                     {POS_FILTER_OPTIONS.map(pos => (
                         <button key={pos} onClick={() => setPosFilter(pos)}
@@ -189,14 +187,12 @@ function PlayerRankingsCard({
                         </button>
                     ))}
                 </div>
-            </div>
-            <div className="px-6 py-3 border-b border-gray-800">
                 <input
                     type="text"
                     placeholder="Search players…"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-gray-500"
+                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-gray-500 w-48"
                 />
             </div>
             <div className="overflow-x-auto">
@@ -239,14 +235,14 @@ function PlayerRankingsCard({
                     Showing top 100 — use the Trade Evaluator tab for full rankings and trade analysis.
                 </div>
             )}
-        </div>
+        </>
     );
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function LeagueDetailTabs({
-    leagueId,
+    leagueId: _leagueId,
     leagueName,
     scoringType,
     totalRosters: _totalRosters,
@@ -263,6 +259,7 @@ export default function LeagueDetailTabs({
     duesData,
     announcements,
     tradeEvaluatorContent,
+    isCommissioner,
 }: Props) {
     const [activeTab, setActiveTab] = useState<Tab>('overview');
 
@@ -293,7 +290,17 @@ export default function LeagueDetailTabs({
 
                     {/* Card 1: League Dues & Payouts */}
                     <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-                        <h2 className="font-semibold text-lg mb-4">League Dues & Payouts</h2>
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="font-semibold text-lg">League Dues & Payouts</h2>
+                            {isCommissioner && duesData && (
+                                <a
+                                    href="/dashboard/commissioner"
+                                    className="text-xs font-semibold bg-[#C8A951]/10 hover:bg-[#C8A951]/20 border border-[#C8A951]/30 text-[#C8A951] px-3 py-1.5 rounded-lg transition"
+                                >
+                                    Manage Dues →
+                                </a>
+                            )}
+                        </div>
                         {duesData ? (
                             <div className="space-y-5">
                                 {/* Summary row */}
@@ -351,12 +358,79 @@ export default function LeagueDetailTabs({
                         ) : (
                             <div className="text-center py-6">
                                 <p className="text-gray-500 text-sm">No dues or payout information configured for this league.</p>
-                                <p className="text-gray-700 text-xs mt-1">The commissioner can set this up in the Commissioner Hub.</p>
+                                {isCommissioner ? (
+                                    <a
+                                        href="/dashboard/commissioner"
+                                        className="inline-block mt-3 text-sm font-semibold text-[#C8A951] hover:text-[#b8992f] transition"
+                                    >
+                                        Set up dues in Commissioner Hub →
+                                    </a>
+                                ) : (
+                                    <p className="text-gray-700 text-xs mt-1">The commissioner can set this up in the Commissioner Hub.</p>
+                                )}
                             </div>
                         )}
                     </div>
 
-                    {/* Card 2: Standings (collapsible) */}
+                    {/* Card 2: League Announcements (moved up) */}
+                    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="font-semibold text-lg">League Announcements</h2>
+                            <div className="flex items-center gap-3">
+                                {isCommissioner && (
+                                    <a
+                                        href="/dashboard/commissioner"
+                                        className="text-xs font-semibold bg-[#C8A951]/10 hover:bg-[#C8A951]/20 border border-[#C8A951]/30 text-[#C8A951] px-3 py-1.5 rounded-lg transition"
+                                    >
+                                        + Post Announcement
+                                    </a>
+                                )}
+                                <a href="/dashboard/commissioner"
+                                    className="text-[#C8A951]/70 hover:text-[#C8A951] text-sm font-medium transition">
+                                    View All →
+                                </a>
+                            </div>
+                        </div>
+                        {announcements.length > 0 ? (
+                            <div className="space-y-4">
+                                {announcements.map(a => (
+                                    <div key={a.id} className="bg-gray-800/40 rounded-xl p-4">
+                                        {a.pinned && (
+                                            <span className="text-xs font-semibold text-[#C8A951] mb-1 block">📌 Pinned</span>
+                                        )}
+                                        <p className="text-gray-200 text-sm leading-relaxed">{a.body}</p>
+                                        {a.mediaUrl && (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img src={a.mediaUrl} alt="announcement media"
+                                                className="mt-3 max-h-40 rounded-lg object-contain" />
+                                        )}
+                                        <p className="text-gray-600 text-xs mt-2">
+                                            {a.authorName && `${a.authorName} · `}
+                                            {new Date(a.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-gray-500 text-sm">No announcements for this league yet.</p>
+                        )}
+                    </div>
+
+                    {/* Card 3: Trade Evaluator (embedded above standings) */}
+                    <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+                        <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+                            <h2 className="font-semibold text-lg">Trade Evaluator</h2>
+                            <button
+                                onClick={() => setActiveTab('trade')}
+                                className="text-xs text-[#C8A951]/70 hover:text-[#C8A951] font-medium transition"
+                            >
+                                Open full view →
+                            </button>
+                        </div>
+                        <div className="p-4">{tradeEvaluatorContent}</div>
+                    </div>
+
+                    {/* Card 4: Standings (collapsible) */}
                     <CollapsibleCard title="Standings">
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
@@ -401,14 +475,14 @@ export default function LeagueDetailTabs({
                         </div>
                     </CollapsibleCard>
 
-                    {/* Card 3: Team Rosters (collapsible) */}
+                    {/* Card 5: Team Rosters (collapsible) */}
                     <CollapsibleCard title="Team Rosters">
                         <div className="p-4">
                             <RosterCards teams={teamRosters} players={players} />
                         </div>
                     </CollapsibleCard>
 
-                    {/* Card 4: Roster Slots */}
+                    {/* Card 6: Roster Slots */}
                     <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
                         <h2 className="font-semibold text-lg mb-4">Roster Slots</h2>
                         {rosterPositions.length > 0 ? (
@@ -429,7 +503,7 @@ export default function LeagueDetailTabs({
                         )}
                     </div>
 
-                    {/* Card 5: League Settings */}
+                    {/* Card 7: League Settings */}
                     <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
                         <h2 className="font-semibold text-lg mb-4">League Settings</h2>
                         <dl className="grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
@@ -449,46 +523,14 @@ export default function LeagueDetailTabs({
                         </dl>
                     </div>
 
-                    {/* Card 6: League Announcements */}
-                    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="font-semibold text-lg">League Announcements</h2>
-                            <a href={`/dashboard/commissioner`}
-                                className="text-[#C8A951]/70 hover:text-[#C8A951] text-sm font-medium transition">
-                                View All →
-                            </a>
-                        </div>
-                        {announcements.length > 0 ? (
-                            <div className="space-y-4">
-                                {announcements.map(a => (
-                                    <div key={a.id} className="bg-gray-800/40 rounded-xl p-4">
-                                        {a.pinned && (
-                                            <span className="text-xs font-semibold text-[#C8A951] mb-1 block">📌 Pinned</span>
-                                        )}
-                                        <p className="text-gray-200 text-sm leading-relaxed">{a.body}</p>
-                                        {a.mediaUrl && (
-                                            <img src={a.mediaUrl} alt="announcement media"
-                                                className="mt-3 max-h-40 rounded-lg object-contain" />
-                                        )}
-                                        <p className="text-gray-600 text-xs mt-2">
-                                            {a.authorName && `${a.authorName} · `}
-                                            {new Date(a.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                        </p>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-gray-500 text-sm">No announcements for this league yet.</p>
-                        )}
-                    </div>
-
-                    {/* Card 7: Player Rankings */}
-                    <PlayerRankingsCard
-                        ppr={ppr}
-                        leagueType={leagueType}
-                        leagueSettings={leagueSettings}
-                        leagueName={leagueName}
-                    />
+                    {/* Card 8: Player Rankings (collapsible) */}
+                    <CollapsibleCard title="Player Rankings">
+                        <PlayerRankingsCard
+                            ppr={ppr}
+                            leagueType={leagueType}
+                            leagueSettings={leagueSettings}
+                        />
+                    </CollapsibleCard>
 
                 </div>
             )}
