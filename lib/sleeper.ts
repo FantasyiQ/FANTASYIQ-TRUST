@@ -33,6 +33,7 @@ export interface SleeperLeague {
         bonus_rec_yd_100?:  number;  // 100-yd receiving bonus
     };
     roster_positions: string[];
+    previous_league_id?: string | null;
 }
 
 export interface SleeperLeagueMember {
@@ -249,23 +250,42 @@ export function rosterFpts(settings: SleeperRoster['settings']): number {
     return (settings?.fpts ?? 0) + (settings?.fpts_decimal ?? 0) / 100;
 }
 
+export interface PickOwnerEntry {
+    owner:          number;    // current owner roster_id
+    slot?:          number;    // exact 1-based draft slot when draft_order is known for this season
+    tier?:          PickTier;  // tier label when draft_order is unknown
+    tierProjected?: boolean;   // true when all teams are 0-0 (no standings data yet)
+}
+
 /**
- * Build a map of `${season}-${round}-${origRosterId}` → current owner roster_id.
- * Prefers roster.draft_picks when populated (authoritative); falls back to
- * reconstructing from traded_picks trade events.
+ * Builds a fully resolved pick map: `${season}-${round}-${origRosterId}` → PickOwnerEntry.
+ * Covers every combination of future season × round × original roster.
+ *
+ * - Seasons with a matching draft that has draft_order set → exact slot numbers.
+ * - All other seasons → tier labels (Early/Mid/Late) based on original owner's standings.
+ *   If all teams are 0-0 (new league) every pick defaults to Mid and tierProjected=true.
+ *
+ * Ownership prefers roster.draft_picks when populated (authoritative for dynasty leagues);
+ * otherwise reconstructs from traded_picks trade events.
  */
 export function buildPickOwnerMap(
-    rosters: SleeperRoster[],
-    tradedPicks: SleeperTradedPick[],
-    futureSeasons: string[],
-): Map<string, number> {
-    const map = new Map<string, number>();
+    rosters:          SleeperRoster[],
+    tradedPicks:      SleeperTradedPick[],
+    futureSeasons:    string[],
+    drafts:           SleeperDraft[],
+    draftRounds:      number,
+    standingsRosters?: SleeperRoster[], // previous-season rosters for tier computation
+): Map<string, PickOwnerEntry> {
+    const rosterIds = rosters.map(r => r.roster_id);
+
+    // ── Step 1: Raw ownership ─────────────────────────────────────────────────
+    const ownerMap = new Map<string, number>();
     const anyHasDraftPicks = rosters.some(r => r.draft_picks && r.draft_picks.length > 0);
     if (anyHasDraftPicks) {
         for (const roster of rosters) {
             for (const dp of roster.draft_picks ?? []) {
                 if (!futureSeasons.includes(dp.season)) continue;
-                map.set(`${dp.season}-${Number(dp.round)}-${Number(dp.roster_id)}`, Number(roster.roster_id));
+                ownerMap.set(`${dp.season}-${Number(dp.round)}-${Number(dp.roster_id)}`, Number(roster.roster_id));
             }
         }
     } else {
@@ -278,15 +298,110 @@ export function buildPickOwnerMap(
         }
         for (const [key, trades] of groups) {
             if (trades.length === 1) {
-                map.set(key, Number(trades[0].owner_id));
+                ownerMap.set(key, Number(trades[0].owner_id));
             } else {
                 const prevOwnerIds = new Set(trades.map(t => Number(t.previous_owner_id)));
                 const terminal = trades.find(t => !prevOwnerIds.has(Number(t.owner_id)));
-                map.set(key, Number(terminal?.owner_id ?? trades[trades.length - 1].owner_id));
+                ownerMap.set(key, Number(terminal?.owner_id ?? trades[trades.length - 1].owner_id));
             }
         }
     }
-    return map;
+
+    // ── Step 2: Season → slotMap (draft_order known) ─────────────────────────
+    const seasonSlotMap = new Map<string, Map<number, number>>();
+    for (const draft of drafts) {
+        if (!draft.draft_order || !futureSeasons.includes(draft.season)) continue;
+        const slotMap = new Map<number, number>();
+        for (const roster of rosters) {
+            if (!roster.owner_id) continue;
+            const slot = draft.draft_order[roster.owner_id];
+            if (slot != null) slotMap.set(roster.roster_id, slot);
+        }
+        if (slotMap.size > 0) seasonSlotMap.set(draft.season, slotMap);
+    }
+
+    // ── Step 3: Tier map from standings ───────────────────────────────────────
+    // Fallback chain:
+    //   1. Current season standings exist (not all 0-0) → use them.
+    //   2. Current season all 0-0 → use standingsRosters (previous season, matched by owner_id).
+    //   3. No previous season data → default all to Mid + tierProjected = true.
+    //
+    // roster_ids CAN change between seasons; owner_id (user_id) is stable — match on that.
+    const currentAllZero = rosters.every(
+        r => (r.settings?.wins ?? 0) === 0 && (r.settings?.losses ?? 0) === 0
+    );
+
+    const tierSource: SleeperRoster[] = (() => {
+        if (!currentAllZero) return rosters; // (1) current season has real data
+        if (!standingsRosters || standingsRosters.length === 0) return rosters; // (3) fall to projected
+        // (2) build synthetic rosters: current roster_id + previous season's settings
+        const prevByOwner = new Map(
+            standingsRosters.filter(r => r.owner_id != null).map(r => [r.owner_id!, r])
+        );
+        return rosters.map(r => {
+            const prev = r.owner_id ? prevByOwner.get(r.owner_id) : undefined;
+            if (!prev) return r; // expansion team / new owner → stays 0-0 → gets Mid
+            return { ...r, settings: prev.settings }; // current roster_id, previous stats
+        });
+    })();
+
+    const allZero = tierSource.every(r => (r.settings?.wins ?? 0) === 0 && (r.settings?.losses ?? 0) === 0);
+    const tierMap  = buildPickTierMap(tierSource);
+    // When standings are unknown, buildPickTierMap still distributes Early/Mid/Late by roster_id
+    // order — this is a reasonable projected spread. Only set tierProjected=true to signal the UI.
+
+    // ── Step 4: Enumerate every season × round × origId ──────────────────────
+    const result  = new Map<string, PickOwnerEntry>();
+    const rounds  = Array.from({ length: draftRounds }, (_, i) => i + 1);
+    for (const season of futureSeasons) {
+        const slotMap = seasonSlotMap.get(season);
+        for (const round of rounds) {
+            for (const origId of rosterIds) {
+                const key   = `${season}-${round}-${origId}`;
+                const owner = ownerMap.get(key) ?? origId;
+                if (slotMap) {
+                    result.set(key, { owner, slot: slotMap.get(origId) });
+                } else {
+                    result.set(key, { owner, tier: tierMap.get(origId) ?? 'Mid', tierProjected: allZero });
+                }
+            }
+        }
+    }
+    return result;
+}
+
+// ─── Draft pick tier helpers ───────────────────────────────────────────────────
+
+export type PickTier = 'Early' | 'Mid' | 'Late';
+
+/**
+ * Maps roster_id → draft pick tier based on current-season win totals.
+ * Bottom third (fewest wins) = Early, top third (most wins) = Late.
+ * Used for seasons where draft_order has not been set yet.
+ */
+export function buildPickTierMap(rosters: SleeperRoster[]): Map<number, PickTier> {
+    const n = rosters.length;
+    if (n === 0) return new Map();
+
+    const earlyEnd  = Math.ceil(n / 3);           // ranks 1..earlyEnd  → Early
+    const lateStart = n - Math.floor(n / 3) + 1;  // ranks lateStart..n → Late
+
+    // Sort ascending: fewest wins first = rank 1 = worst team = picks earliest
+    const sorted = [...rosters].sort((a, b) => {
+        const wDiff = (a.settings?.wins ?? 0) - (b.settings?.wins ?? 0);
+        if (wDiff !== 0) return wDiff;
+        const aFpts = (a.settings?.fpts ?? 0) + (a.settings?.fpts_decimal ?? 0) / 100;
+        const bFpts = (b.settings?.fpts ?? 0) + (b.settings?.fpts_decimal ?? 0) / 100;
+        return aFpts - bFpts;
+    });
+
+    const tierMap = new Map<number, PickTier>();
+    sorted.forEach((roster, i) => {
+        const rank = i + 1;
+        const tier: PickTier = rank <= earlyEnd ? 'Early' : rank < lateStart ? 'Mid' : 'Late';
+        tierMap.set(roster.roster_id, tier);
+    });
+    return tierMap;
 }
 
 /** True if we should be polling live matchup scores right now (ET game windows) */
