@@ -106,10 +106,9 @@ export default function DuesManager({
     const [togglingId, setTogglingId] = useState<string | null>(null);
 
     // ── Invite state ────────────────────────────────────────────────────────
-    const [inviteUrl, setInviteUrl]       = useState<string | null>(null);
+    const [inviteUrl, setInviteUrl]         = useState<string | null>(null);
     const [inviteLoading, setInviteLoading] = useState(false);
-    const [copied, setCopied]             = useState(false);
-    const [showInvite, setShowInvite]     = useState(false);
+    const [copied, setCopied]               = useState(false);
 
     // ── Setup form handlers ─────────────────────────────────────────────────
 
@@ -232,6 +231,45 @@ export default function DuesManager({
         setTimeout(() => setCopied(false), 2000);
     }
 
+    // ── Invite block (commissioner-only, always rendered) ────────────────────
+
+    const inviteBlock = isCommissioner ? (
+        <div className="bg-gray-800/40 border border-gray-700 rounded-xl p-4 space-y-2">
+            <div className="flex items-center justify-between">
+                <p className="text-gray-300 text-sm font-medium">Invite Link</p>
+                <span className="text-gray-600 text-xs">Commissioner only</span>
+            </div>
+            <p className="text-gray-500 text-xs">Share with league members so they can sign up and view this league on FantasyIQ Trust.</p>
+            {inviteUrl ? (
+                <div className="flex items-center gap-2">
+                    <input
+                        readOnly
+                        value={inviteUrl}
+                        className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-gray-300 text-xs font-mono focus:outline-none"
+                    />
+                    <button
+                        onClick={copyInvite}
+                        className={`shrink-0 text-xs font-bold px-3 py-2 rounded-lg transition border ${
+                            copied
+                                ? 'bg-green-900/40 text-green-400 border-green-800'
+                                : 'bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 border-[#C8A951]'
+                        }`}
+                    >
+                        {copied ? '✓ Copied!' : 'Copy'}
+                    </button>
+                </div>
+            ) : (
+                <button
+                    onClick={generateInvite}
+                    disabled={inviteLoading}
+                    className="w-full bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-50 text-gray-950 font-bold px-4 py-2 rounded-lg text-sm transition"
+                >
+                    {inviteLoading ? 'Generating…' : 'Get Invite Link'}
+                </button>
+            )}
+        </div>
+    ) : null;
+
     // ── Render ───────────────────────────────────────────────────────────────
 
     const paidCount   = members.filter(m => m.duesStatus === 'paid').length;
@@ -250,14 +288,17 @@ export default function DuesManager({
 
         if (!showSetup) {
             return (
-                <div className="text-center py-6 space-y-3">
-                    <p className="text-gray-500 text-sm">No dues or payout information configured for this league.</p>
-                    <button
-                        onClick={() => setShowSetup(true)}
-                        className="inline-block bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-5 py-2.5 rounded-xl transition text-sm"
-                    >
-                        Set Up Dues →
-                    </button>
+                <div className="space-y-4">
+                    <div className="text-center py-4 space-y-3">
+                        <p className="text-gray-500 text-sm">No dues configured for this league yet.</p>
+                        <button
+                            onClick={() => setShowSetup(true)}
+                            className="inline-block bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-5 py-2.5 rounded-xl transition text-sm"
+                        >
+                            Set Up Dues →
+                        </button>
+                    </div>
+                    {inviteBlock}
                 </div>
             );
         }
@@ -491,57 +532,16 @@ export default function DuesManager({
                 </div>
             )}
 
-            {/* Commissioner actions: Manage link + Invite */}
+            {/* Commissioner actions */}
             {isCommissioner && (
                 <div className="border-t border-gray-800 pt-4 space-y-3">
-                    <div className="flex items-center gap-3 flex-wrap">
-                        <a
-                            href="/dashboard/commissioner"
-                            className="text-xs font-semibold bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 px-3 py-1.5 rounded-lg transition"
-                        >
-                            Full Commissioner Hub →
-                        </a>
-                        <button
-                            onClick={() => setShowInvite(v => !v)}
-                            className="text-xs font-semibold bg-[#C8A951]/10 hover:bg-[#C8A951]/20 border border-[#C8A951]/30 text-[#C8A951] px-3 py-1.5 rounded-lg transition"
-                        >
-                            {showInvite ? 'Hide Invite Link' : '+ Invite Members'}
-                        </button>
-                    </div>
-
-                    {showInvite && (
-                        <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 space-y-3">
-                            <p className="text-gray-300 text-sm font-medium">Invite Link</p>
-                            <p className="text-gray-500 text-xs">Share this link with your league members so they can sign up and view this league on FantasyIQ Trust.</p>
-                            {inviteUrl ? (
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        readOnly
-                                        value={inviteUrl}
-                                        className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-gray-300 text-xs font-mono focus:outline-none"
-                                    />
-                                    <button
-                                        onClick={copyInvite}
-                                        className={`shrink-0 text-xs font-semibold px-3 py-2 rounded-lg transition ${
-                                            copied
-                                                ? 'bg-green-900/40 text-green-400 border border-green-800'
-                                                : 'bg-[#C8A951] hover:bg-[#b8992f] text-gray-950'
-                                        }`}
-                                    >
-                                        {copied ? 'Copied!' : 'Copy'}
-                                    </button>
-                                </div>
-                            ) : (
-                                <button
-                                    onClick={generateInvite}
-                                    disabled={inviteLoading}
-                                    className="bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-50 text-gray-950 font-bold px-4 py-2 rounded-lg text-sm transition"
-                                >
-                                    {inviteLoading ? 'Generating…' : 'Generate Invite Link'}
-                                </button>
-                            )}
-                        </div>
-                    )}
+                    {inviteBlock}
+                    <a
+                        href="/dashboard/commissioner"
+                        className="inline-block text-xs font-semibold bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 px-3 py-1.5 rounded-lg transition"
+                    >
+                        Full Commissioner Hub →
+                    </a>
                 </div>
             )}
         </div>
