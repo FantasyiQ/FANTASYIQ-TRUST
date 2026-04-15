@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getLeague, getLeagueRosters, getTradedPicks, buildPickOwnerMap } from '@/lib/sleeper';
+import { getLeague, getLeagueRosters, getTradedPicks, getLeagueDrafts, buildPickOwnerMap, buildRosterSlotMap } from '@/lib/sleeper';
 import type { SleeperRoster, SleeperTradedPick } from '@/lib/sleeper';
 import { getDraftPicks } from '@/lib/trade-engine';
 import type { Player } from '@/lib/trade-engine';
@@ -40,13 +40,15 @@ export default async function TradePage() {
         const FUTURE = futureSeasons();
         const results = await Promise.allSettled(
             dbUser.leagues.map(async league => {
-                const [sleeperLeague, rosters, tradedPicks] = await Promise.all([
+                const [sleeperLeague, rosters, tradedPicks, drafts] = await Promise.all([
                     getLeague(league.leagueId),
                     getLeagueRosters(league.leagueId),
                     getTradedPicks(league.leagueId),
+                    getLeagueDrafts(league.leagueId),
                 ]);
                 const draftRounds = sleeperLeague.settings?.draft_rounds ?? 5;
 
+                // Standings fallback: worst record → rank 1 (picks first)
                 const sorted = [...rosters].sort((a, b) => {
                     const wa = a.settings?.wins ?? 0, wb = b.settings?.wins ?? 0;
                     if (wa !== wb) return wb - wa;
@@ -54,9 +56,13 @@ export default async function TradePage() {
                     const fb = (b.settings?.fpts ?? 0) + (b.settings?.fpts_decimal ?? 0) / 100;
                     return fb - fa;
                 });
-                const standings = new Map(sorted.map((r, i) => [r.roster_id, league.totalRosters - i]));
-                const rosterIds = rosters.map(r => r.roster_id);
-                const pickGrid  = getDraftPicks(league.totalRosters, draftRounds);
+                const standingsRank = new Map(sorted.map((r, i) => [r.roster_id, i + 1]));
+
+                const draft = drafts[0] ?? null;
+                const { slotMap } = buildRosterSlotMap(rosters, draft, standingsRank, league.totalRosters);
+
+                const rosterIds  = rosters.map(r => r.roster_id);
+                const pickGrid   = getDraftPicks(league.totalRosters, draftRounds);
                 const pickByName = new Map(pickGrid.map(p => [p.name, p]));
                 const pickOwnerMap = buildPickOwnerMap(rosters, tradedPicks, FUTURE);
                 const ROUNDS = rounds(draftRounds);
@@ -69,7 +75,7 @@ export default async function TradePage() {
                                 const key = `${season}-${round}-${origId}`;
                                 const owner = pickOwnerMap.get(key) ?? origId;
                                 if (Number(owner) === Number(roster.roster_id)) {
-                                    const slot = standings.get(origId) ?? 1;
+                                    const slot = slotMap.get(origId) ?? origId;
                                     const pick = pickByName.get(`${season} ${round}.${slot.toString().padStart(2, '0')}`);
                                     if (pick) picks.push(pick);
                                 }

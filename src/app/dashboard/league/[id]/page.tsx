@@ -6,7 +6,8 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import {
-    getLeague, getLeagueUsers, getLeagueRosters, getPlayers, getTradedPicks, buildPickOwnerMap,
+    getLeague, getLeagueUsers, getLeagueRosters, getPlayers, getTradedPicks,
+    getLeagueDrafts, buildPickOwnerMap, buildRosterSlotMap,
     scoringLabel, summariseRosterPositions,
     type SleeperLeagueMember, type SleeperRoster,
 } from '@/lib/sleeper';
@@ -55,12 +56,13 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
 
     if (!league || league.userId !== session.user.id) notFound();
 
-    const [sleeperLeague, members, rosters, allPlayers, tradedPicks, dbUser, commSubForLeague] = await Promise.all([
+    const [sleeperLeague, members, rosters, allPlayers, tradedPicks, drafts, dbUser, commSubForLeague] = await Promise.all([
         getLeague(league.leagueId),
         getLeagueUsers(league.leagueId),
         getLeagueRosters(league.leagueId),
         getPlayers(),
         getTradedPicks(league.leagueId),
+        getLeagueDrafts(league.leagueId),
         prisma.user.findUnique({
             where: { id: session.user.id },
             select: {
@@ -138,11 +140,6 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
     const players: Record<string, typeof allPlayers[string]> = {};
     for (const pid of neededIds) { if (allPlayers[pid]) players[pid] = allPlayers[pid]; }
 
-    // Build pick ownership per roster
-    // Slot = reverse standings rank (worst record → slot 1, best record → slot n)
-    const rosterIdToSlot = new Map(
-        rows.map(row => [row.roster.roster_id, league.totalRosters - row.rank + 1])
-    );
     // NFL draft is typically ~April 24; before that date current-year picks still trade.
     const _now = new Date();
     const _pastDraft = _now.getMonth() + 1 > 4 || (_now.getMonth() + 1 === 4 && _now.getDate() >= 25);
@@ -152,17 +149,28 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
     const ROUNDS = Array.from({ length: draftRounds }, (_, i) => i + 1);
     const rosterIds = rosters.map(r => r.roster_id);
 
+    // Standings fallback: worst record → rank 1 (picks first)
+    const standingsRank = new Map(rows.map(row => [row.roster.roster_id, row.rank]));
+    const draft = drafts[0] ?? null;
+    const { slotMap: rosterIdToSlot, projected: draftOrderProjected } =
+        buildRosterSlotMap(rosters, draft, standingsRank, league.totalRosters);
+
     const pickOwnerMap = buildPickOwnerMap(rosters, tradedPicks, FUTURE_SEASONS);
 
     function computeOwnedPicks(rosterId: number) {
-        const owned: { season: string; round: number; slot: number }[] = [];
+        const owned: { season: string; round: number; slot: number; origTeamName?: string }[] = [];
         for (const season of FUTURE_SEASONS) {
             for (const round of ROUNDS) {
                 for (const origId of rosterIds) {
                     const key = `${season}-${round}-${origId}`;
                     const currentOwner = pickOwnerMap.get(key) ?? origId;
                     if (Number(currentOwner) === Number(rosterId)) {
-                        owned.push({ season, round, slot: rosterIdToSlot.get(origId) ?? 1 });
+                        const slot = rosterIdToSlot.get(origId) ?? origId;
+                        const traded = origId !== rosterId;
+                        const origTeamName = traded
+                            ? (rows.find(r => r.roster.roster_id === origId)?.teamName)
+                            : undefined;
+                        owned.push({ season, round, slot, origTeamName });
                     }
                 }
             }
@@ -363,6 +371,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                             scoringType={league.scoringType ?? null}
                             totalRosters={league.totalRosters}
                             draftRounds={draftRounds}
+                            draftOrderProjected={draftOrderProjected}
                             leagueType={sleeperLeague.settings?.type === 2 ? 'Dynasty' : 'Redraft'}
                             rosterPositions={rosterPositions}
                             scoringSettings={sleeperLeague.scoring_settings}

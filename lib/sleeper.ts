@@ -113,6 +113,64 @@ export async function getLeagueMatchups(leagueId: string, week: number): Promise
     return sleeperFetch<SleeperMatchup[]>(`/league/${leagueId}/matchups/${week}`, 0);
 }
 
+export interface SleeperDraft {
+    draft_id:    string;
+    league_id:   string;
+    season:      string;
+    status:      string; // pre_draft | drafting | complete
+    type:        string; // linear | snake | auction
+    // user_id → 1-based draft position (1 = picks first).
+    // null when the draft hasn't been configured yet.
+    draft_order: Record<string, number> | null;
+    settings: {
+        rounds: number;
+        teams:  number;
+    };
+}
+
+export async function getLeagueDrafts(leagueId: string): Promise<SleeperDraft[]> {
+    return sleeperFetch<SleeperDraft[]>(`/league/${leagueId}/drafts`, 0);
+}
+
+/**
+ * Build a map of roster_id → draft slot (1-based pick number within each round).
+ * Uses the draft's draft_order when available; falls back to standings rank
+ * (worst record = slot 1) and marks the result as projected.
+ *
+ * Returns { slotMap, projected } where projected=true means no real draft order yet.
+ */
+export function buildRosterSlotMap(
+    rosters: SleeperRoster[],
+    draft:   SleeperDraft | null,
+    standingsRank: Map<number, number>, // roster_id → rank (1=best)
+    totalRosters:  number,
+): { slotMap: Map<number, number>; projected: boolean } {
+    const slotMap = new Map<number, number>();
+
+    if (draft?.draft_order) {
+        // draft_order: user_id → draft_position
+        for (const roster of rosters) {
+            if (!roster.owner_id) continue;
+            const slot = draft.draft_order[roster.owner_id];
+            if (slot != null) slotMap.set(roster.roster_id, slot);
+        }
+        // Fill in any roster without an owner (orphaned) using roster_id order
+        for (const roster of rosters) {
+            if (!slotMap.has(roster.roster_id)) {
+                slotMap.set(roster.roster_id, roster.roster_id);
+            }
+        }
+        return { slotMap, projected: false };
+    }
+
+    // Fallback: worst record → slot 1, best record → slot n
+    for (const roster of rosters) {
+        const rank = standingsRank.get(roster.roster_id) ?? roster.roster_id;
+        slotMap.set(roster.roster_id, totalRosters - rank + 1);
+    }
+    return { slotMap, projected: true };
+}
+
 export interface SleeperTradedPick {
     season:           string;
     round:            number;

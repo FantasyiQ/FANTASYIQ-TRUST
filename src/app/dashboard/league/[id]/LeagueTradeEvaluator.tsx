@@ -64,9 +64,10 @@ function buildLeagueSettings(
 }
 
 interface RawOwnedPick {
-    season: string;
-    round:  number;
-    slot:   number;
+    season:      string;
+    round:       number;
+    slot:        number;
+    origTeamName?: string; // set when pick was traded — "from Team X"
 }
 
 export interface RawTeamData {
@@ -82,20 +83,21 @@ interface ScoringSettings {
 }
 
 interface Props {
-    leagueName:       string;
-    scoringType:      string | null;
-    totalRosters:     number;
-    draftRounds?:     number;
-    leagueType:       LeagueType;
-    rosterPositions?: string[];
-    scoringSettings?: ScoringSettings;
-    myTeamData?:      RawTeamData;
-    otherTeamsData?:  RawTeamData[];
+    leagueName:           string;
+    scoringType:          string | null;
+    totalRosters:         number;
+    draftRounds?:         number;
+    draftOrderProjected?: boolean;
+    leagueType:           LeagueType;
+    rosterPositions?:     string[];
+    scoringSettings?:     ScoringSettings;
+    myTeamData?:          RawTeamData;
+    otherTeamsData?:      RawTeamData[];
 }
 
 export default function LeagueTradeEvaluator({
-    leagueName, scoringType, totalRosters, draftRounds = 5, leagueType,
-    rosterPositions = [], scoringSettings = {}, myTeamData, otherTeamsData = [],
+    leagueName, scoringType, totalRosters, draftRounds = 5, draftOrderProjected = false,
+    leagueType, rosterPositions = [], scoringSettings = {}, myTeamData, otherTeamsData = [],
 }: Props) {
     const ppr           = scoringTypeToPpr(scoringType);
     const leagueSize    = nearestLeagueSize(totalRosters);
@@ -109,7 +111,8 @@ export default function LeagueTradeEvaluator({
     const sfLabel   = superflex ? ' · Superflex' : '';
     const passTdLabel = leagueSettings.passTd === 6 ? ' · 6pt TD' : '';
     const tePremLabel = leagueSettings.bonusRecTe > 0 ? ' · TE+' : '';
-    const label     = `${leagueName} — ${scoringLabel(scoringType)} · ${totalRosters} Teams · ${leagueType}${sfLabel}${passTdLabel}${tePremLabel}`;
+    const projectedLabel = draftOrderProjected ? ' · Projected Order' : '';
+    const label     = `${leagueName} — ${scoringLabel(scoringType)} · ${totalRosters} Teams · ${leagueType}${sfLabel}${passTdLabel}${tePremLabel}${projectedLabel}`;
 
     const allPicks     = useMemo(() => getDraftPicks(leagueSize, draftRounds), [leagueSize, draftRounds]);
     const pickByName   = useMemo(() => new Map(allPicks.map(p => [p.name, p])), [allPicks]);
@@ -147,7 +150,13 @@ export default function LeagueTradeEvaluator({
             .filter((p): p is Player => p !== undefined);
 
         const picks: Player[] = raw.ownedPicks
-            .map(op => pickByName.get(`${op.season} ${op.round}.${op.slot.toString().padStart(2, '0')}`))
+            .map(op => {
+                const base = pickByName.get(`${op.season} ${op.round}.${op.slot.toString().padStart(2, '0')}`);
+                if (!base) return undefined;
+                return op.origTeamName
+                    ? { ...base, name: `${base.name} (from ${op.origTeamName})` }
+                    : base;
+            })
             .filter((p): p is Player => p !== undefined);
 
         return { rosterId: raw.rosterId, teamName: raw.teamName, players, picks };
