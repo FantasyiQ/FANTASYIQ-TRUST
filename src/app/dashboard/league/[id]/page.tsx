@@ -130,7 +130,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                     orderBy: { sortOrder: 'asc' },
                 },
                 members: {
-                    select: { displayName: true, teamName: true, duesStatus: true },
+                    select: { id: true, displayName: true, teamName: true, duesStatus: true },
                     orderBy: { displayName: 'asc' },
                 },
                 announcements: {
@@ -288,6 +288,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
         teamCount:   leagueDuesRecord.teamCount,
         payoutSpots: leagueDuesRecord.payoutSpots,
         members:     leagueDuesRecord.members.map(m => ({
+            id:          m.id,
             displayName: m.displayName,
             teamName:    m.teamName ?? null,
             duesStatus:  m.duesStatus,
@@ -312,6 +313,12 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
     // Commissioner check: Sleeper marks the commissioner via is_owner on the member list
     const commissionerSleeperUserId = members.find(m => m.is_owner)?.user_id;
     const isCommissioner = !!commissionerSleeperUserId && commissionerSleeperUserId === dbUser?.sleeperUserId;
+
+    // Serialised member list for dues setup form (displayName + teamName from Sleeper rosters)
+    const sleeperMembers = rows.map(row => ({
+        displayName: row.member?.display_name ?? row.teamName,
+        teamName: row.teamName,
+    }));
 
     // Trade evaluator content — pre-composed server component passed as slot
     const tradeEvaluatorContent = canUseTradeEvaluator ? (
@@ -377,6 +384,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                 <LeagueDetailTabs
                     leagueId={id}
                     leagueName={league.leagueName}
+                    season={league.season}
                     scoringType={league.scoringType ?? null}
                     totalRosters={league.totalRosters}
                     leagueType={leagueType}
@@ -394,6 +402,8 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                     tradeEvaluatorContent={tradeEvaluatorContent}
                     isCommissioner={isCommissioner}
                     canUsePlayerRankings={canUseTradeEvaluator}
+                    sleeperLeagueId={league.leagueId}
+                    sleeperMembers={sleeperMembers}
                 />
 
             </div>

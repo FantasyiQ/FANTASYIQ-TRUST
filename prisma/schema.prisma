@@ -41,6 +41,7 @@ model User {
     proBowlEntries   ProBowlEntry[]    @relation("ProBowlEntries")
     proBowlContests  ProBowlContest[]  @relation("CommissionerProBowl")
     announcements    Announcement[]    @relation("AuthorAnnouncements")
+    leagueInvites    LeagueInvite[]    @relation("LeagueInvites")
 }
 
 model League {
@@ -349,6 +350,22 @@ model FutureDuesObligation {
     @@unique([leagueDuesId, memberId, season])
     @@index([leagueDuesId])
     @@index([memberId])
+}
+
+// ── League Invite Links ───────────────────────────────────────────────────────
+
+model LeagueInvite {
+    id              String   @id @default(cuid())
+    token           String   @unique @default(cuid())
+    sleeperLeagueId String
+    leagueName      String
+    season          String
+    createdById     String
+    createdAt       DateTime @default(now())
+
+    createdBy       User     @relation("LeagueInvites", fields: [createdById], references: [id], onDelete: Cascade)
+
+    @@index([sleeperLeagueId])
 }
 
 // ── Sleeper Player Database ──────────────────────────────────────────────────

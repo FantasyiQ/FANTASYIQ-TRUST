@@ -7,6 +7,8 @@ import RosterCards from './RosterCards';
 import type { SlimPlayer } from '@/lib/sleeper';
 import { PLAYERS, calcDtv, DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
 import type { LeagueSettings, LeagueType, PprFormat } from '@/lib/trade-engine';
+import DuesManager from './DuesManager';
+import type { DuesManagerData, SleeperMember } from './DuesManager';
 
 // ── Serialisable prop types ──────────────────────────────────────────────────
 
@@ -22,15 +24,8 @@ export interface StandingRow {
     fpts:      number;
 }
 
-export interface DuesData {
-    id:          string;
-    buyInAmount: number;
-    potTotal:    number;
-    status:      string;
-    teamCount:   number;
-    payoutSpots: { label: string; amount: number; sortOrder: number }[];
-    members:     { displayName: string; teamName?: string | null; duesStatus: string }[];
-}
+// DuesData is now DuesManagerData (re-exported for page.tsx compatibility)
+export type { DuesManagerData as DuesData } from './DuesManager';
 
 export interface AnnouncementData {
     id:          string;
@@ -50,6 +45,7 @@ export interface SleeperSettings {
 interface Props {
     leagueId:               string;
     leagueName:             string;
+    season:                 string;
     scoringType:            string | null;
     totalRosters:           number;
     leagueType:             LeagueType;
@@ -62,11 +58,13 @@ interface Props {
     rosterPositions:        string[];
     rosterPositionsSummary: string;
     sleeperSettings:        SleeperSettings;
-    duesData:               DuesData | null;
+    duesData:               DuesManagerData | null;
     announcements:          AnnouncementData[];
-    tradeEvaluatorContent:   React.ReactNode;
-    isCommissioner:          boolean;
-    canUsePlayerRankings:    boolean;
+    tradeEvaluatorContent:  React.ReactNode;
+    isCommissioner:         boolean;
+    canUsePlayerRankings:   boolean;
+    sleeperLeagueId:        string;
+    sleeperMembers:         SleeperMember[];
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -79,22 +77,6 @@ const TABS: { id: Tab; label: string }[] = [
     { id: 'commish',       label: 'Commissioner Hub' },
     { id: 'roster-values', label: 'Roster Values' },
 ];
-
-const DUES_STATUS_LABEL: Record<string, string> = {
-    setup:              'Setting Up',
-    active:             'Active',
-    season_ended:       'Season Ended',
-    pending_approval:   'Pending Approval',
-    approved:           'Approved',
-    paid_out:           'Paid Out',
-};
-
-const MEMBER_STATUS_STYLE: Record<string, string> = {
-    paid:           'bg-green-900/40 text-green-400 border-green-800',
-    unpaid:         'bg-red-900/40 text-red-400 border-red-800',
-    pending_refund: 'bg-yellow-900/40 text-yellow-400 border-yellow-800',
-};
-
 
 function chevron(open: boolean) {
     return (
@@ -245,8 +227,9 @@ function PlayerRankingsCard({
 export default function LeagueDetailTabs({
     leagueId: _leagueId,
     leagueName,
+    season,
     scoringType,
-    totalRosters: _totalRosters,
+    totalRosters,
     leagueType,
     leagueSettings,
     standingRows,
@@ -262,6 +245,8 @@ export default function LeagueDetailTabs({
     tradeEvaluatorContent,
     isCommissioner,
     canUsePlayerRankings,
+    sleeperLeagueId,
+    sleeperMembers,
 }: Props) {
     const [activeTab, setActiveTab] = useState<Tab>('overview');
 
@@ -292,86 +277,16 @@ export default function LeagueDetailTabs({
 
                     {/* Card 1: League Dues & Payouts */}
                     <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="font-semibold text-lg">League Dues & Payouts</h2>
-                            {isCommissioner && duesData && (
-                                <a
-                                    href="/dashboard/commissioner"
-                                    className="text-xs font-semibold bg-[#C8A951]/10 hover:bg-[#C8A951]/20 border border-[#C8A951]/30 text-[#C8A951] px-3 py-1.5 rounded-lg transition"
-                                >
-                                    Manage Dues →
-                                </a>
-                            )}
-                        </div>
-                        {duesData ? (
-                            <div className="space-y-5">
-                                {/* Summary row */}
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                    <div className="bg-gray-800/60 rounded-xl p-4">
-                                        <p className="text-gray-500 text-xs mb-1">Buy-In</p>
-                                        <p className="text-white font-bold text-lg">${duesData.buyInAmount.toFixed(0)}</p>
-                                    </div>
-                                    <div className="bg-gray-800/60 rounded-xl p-4">
-                                        <p className="text-gray-500 text-xs mb-1">Total Pot</p>
-                                        <p className="text-[#C8A951] font-bold text-lg">${duesData.potTotal.toFixed(0)}</p>
-                                    </div>
-                                    <div className="bg-gray-800/60 rounded-xl p-4">
-                                        <p className="text-gray-500 text-xs mb-1">Teams</p>
-                                        <p className="text-white font-bold text-lg">{duesData.teamCount}</p>
-                                    </div>
-                                    <div className="bg-gray-800/60 rounded-xl p-4">
-                                        <p className="text-gray-500 text-xs mb-1">Status</p>
-                                        <p className="text-white font-semibold text-sm">{DUES_STATUS_LABEL[duesData.status] ?? duesData.status}</p>
-                                    </div>
-                                </div>
-
-                                {/* Payout structure */}
-                                {duesData.payoutSpots.length > 0 && (
-                                    <div>
-                                        <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-2">Payout Structure</p>
-                                        <div className="space-y-1.5">
-                                            {duesData.payoutSpots.map((spot, i) => (
-                                                <div key={i} className="flex items-center justify-between bg-gray-800/40 rounded-lg px-4 py-2.5">
-                                                    <span className="text-gray-300 text-sm">{spot.label}</span>
-                                                    <span className="text-[#C8A951] font-semibold text-sm">${spot.amount.toFixed(0)}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Payment status */}
-                                {duesData.members.length > 0 && (
-                                    <div>
-                                        <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-2">Payment Status</p>
-                                        <div className="grid sm:grid-cols-2 gap-2">
-                                            {duesData.members.map((m, i) => (
-                                                <div key={i} className="flex items-center justify-between bg-gray-800/40 rounded-lg px-4 py-2.5">
-                                                    <span className="text-gray-300 text-sm truncate">{m.teamName || m.displayName}</span>
-                                                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${MEMBER_STATUS_STYLE[m.duesStatus] ?? 'bg-gray-800 text-gray-500 border-gray-700'}`}>
-                                                        {m.duesStatus === 'pending_refund' ? 'Refund' : m.duesStatus.charAt(0).toUpperCase() + m.duesStatus.slice(1)}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="text-center py-6">
-                                <p className="text-gray-500 text-sm">No dues or payout information configured for this league.</p>
-                                {isCommissioner ? (
-                                    <a
-                                        href="/dashboard/commissioner"
-                                        className="inline-block mt-3 text-sm font-semibold text-[#C8A951] hover:text-[#b8992f] transition"
-                                    >
-                                        Set up dues in Commissioner Hub →
-                                    </a>
-                                ) : (
-                                    <p className="text-gray-700 text-xs mt-1">The commissioner can set this up in the Commissioner Hub.</p>
-                                )}
-                            </div>
-                        )}
+                        <h2 className="font-semibold text-lg mb-4">League Dues & Payouts</h2>
+                        <DuesManager
+                            initialDuesData={duesData}
+                            isCommissioner={isCommissioner}
+                            leagueName={leagueName}
+                            season={season}
+                            sleeperLeagueId={sleeperLeagueId}
+                            totalRosters={totalRosters}
+                            sleeperMembers={sleeperMembers}
+                        />
                     </div>
 
                     {/* Card 2: League Announcements (moved up) */}
