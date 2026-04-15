@@ -39,7 +39,7 @@ export default async function Navbar() {
                 href="/dashboard"
                 className="text-gray-300 hover:text-white transition"
               >
-                Dashboard
+                My Leagues
               </Link>
               {isElite ? (
                 <Link
