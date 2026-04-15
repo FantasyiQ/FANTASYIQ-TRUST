@@ -869,9 +869,14 @@ export default function TradeEvaluator({
                         {[1, 2, 3, 4, 5].map(round => {
                             const isFutureChart = pickYear > PICK_YEARS[0];
                             const ord = ['1st','2nd','3rd','4th','5th'][round - 1] ?? `${round}th`;
-                            const roundPicks = draftPicks.filter(p =>
-                                p.team === String(pickYear) && p.name.startsWith(`${pickYear} ${round}.`)
-                            ).sort((a, b) => {
+                            const roundPicks = draftPicks.filter(p => {
+                                if (p.team !== String(pickYear)) return false;
+                                // Exact-slot: "2027 1.04"
+                                if (p.name.startsWith(`${pickYear} ${round}.`)) return true;
+                                // Tier pick: "2027 Round 1 Early 1st"
+                                const tierMatch = p.name.match(/^(\d{4}) Round (\d+) /);
+                                return tierMatch && parseInt(tierMatch[2]) === round;
+                            }).sort((a, b) => {
                                 const as_ = parseInt(a.name.split('.')[1] ?? '0');
                                 const bs_ = parseInt(b.name.split('.')[1] ?? '0');
                                 return as_ - bs_;
