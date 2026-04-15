@@ -883,7 +883,7 @@ export default function TradeEvaluator({
             <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between flex-wrap gap-3">
                     <div>
-                        <h2 className="font-bold">DTV Reference Chart</h2>
+                        <h2 className="font-bold">Player Rankings</h2>
                         <p className="text-gray-500 text-xs mt-0.5">Values adjust for position scarcity, age curve ({leagueType}), and PPR format.</p>
                     </div>
                     <div className="flex gap-2 flex-wrap">

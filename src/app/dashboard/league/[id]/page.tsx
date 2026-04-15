@@ -12,8 +12,11 @@ import {
     type SleeperLeagueMember, type SleeperRoster,
 } from '@/lib/sleeper';
 import { effectiveTierForLeague, tierLevel } from '@/lib/league-limits';
-import RosterCards, { type TeamRosterData } from './RosterCards';
+import { DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
+import type { LeagueSettings, LeagueType } from '@/lib/trade-engine';
+import type { TeamRosterData } from './RosterCards';
 import LeagueTradeEvaluator from './LeagueTradeEvaluator';
+import LeagueDetailTabs, { type StandingRow, type DuesData, type AnnouncementData, type SleeperSettings } from './LeagueDetailTabs';
 
 const BENCH_SLOTS = new Set(['BN', 'IR']);
 
@@ -40,6 +43,32 @@ function statusLabel(status: string) {
     }
 }
 
+function buildLeagueSettings(rosterPositions: string[], scoringSettings: Record<string, number> | null | undefined): LeagueSettings {
+    const ss = scoringSettings ?? {};
+    let qbSlots = 0, rbSlots = 0, wrSlots = 0, teSlots = 0, flexSlots = 0, sfSlots = 0;
+    for (const pos of rosterPositions) {
+        switch (pos) {
+            case 'QB':         qbSlots++;   break;
+            case 'RB':         rbSlots++;   break;
+            case 'WR':         wrSlots++;   break;
+            case 'TE':         teSlots++;   break;
+            case 'FLEX':       flexSlots++; break;
+            case 'SUPER_FLEX': sfSlots++;   break;
+            case 'REC_FLEX':   flexSlots++; break;
+        }
+    }
+    return {
+        passTd:     ss.pass_td      ?? DEFAULT_LEAGUE_SETTINGS.passTd,
+        bonusRecTe: ss.bonus_rec_te ?? DEFAULT_LEAGUE_SETTINGS.bonusRecTe,
+        qbSlots:    qbSlots  || DEFAULT_LEAGUE_SETTINGS.qbSlots,
+        rbSlots:    rbSlots  || DEFAULT_LEAGUE_SETTINGS.rbSlots,
+        wrSlots:    wrSlots  || DEFAULT_LEAGUE_SETTINGS.wrSlots,
+        teSlots:    teSlots  || DEFAULT_LEAGUE_SETTINGS.teSlots,
+        flexSlots,
+        sfSlots,
+    };
+}
+
 export default async function LeagueDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
     const session = await auth();
@@ -56,7 +85,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
 
     if (!league || league.userId !== session.user.id) notFound();
 
-    const [sleeperLeague, members, rosters, allPlayers, tradedPicks, drafts, dbUser, commSubForLeague] = await Promise.all([
+    const [sleeperLeague, members, rosters, allPlayers, tradedPicks, drafts, dbUser, commSubForLeague, leagueDuesRecord] = await Promise.all([
         getLeague(league.leagueId),
         getLeagueUsers(league.leagueId),
         getLeagueRosters(league.leagueId),
@@ -73,12 +102,9 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                     orderBy: { createdAt: 'desc' },
                     select: { type: true, tier: true, leagueName: true },
                 },
-                // Fetch the user's synced leagues so we can match by ID, not just name
                 leagues: { select: { id: true, leagueName: true } },
             },
         }),
-        // Any active commissioner plan for this league (not just the current user's)
-        // so all league members benefit from the commissioner's tier.
         prisma.subscription.findFirst({
             where: {
                 type: 'commissioner',
@@ -87,40 +113,59 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
             },
             select: { tier: true },
         }),
+        // Dues + payouts + announcements for THIS league only
+        prisma.leagueDues.findFirst({
+            where: {
+                leagueName: { equals: league.leagueName, mode: 'insensitive' },
+                season: league.season,
+            },
+            select: {
+                id: true,
+                buyInAmount: true,
+                potTotal: true,
+                status: true,
+                teamCount: true,
+                payoutSpots: {
+                    select: { label: true, amount: true, sortOrder: true },
+                    orderBy: { sortOrder: 'asc' },
+                },
+                members: {
+                    select: { displayName: true, teamName: true, duesStatus: true },
+                    orderBy: { displayName: 'asc' },
+                },
+                announcements: {
+                    select: {
+                        id: true, body: true, mediaUrl: true, pinned: true, createdAt: true,
+                        author: { select: { name: true } },
+                    },
+                    orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
+                    take: 3,
+                },
+            },
+        }),
     ]);
 
-    // Effective tier rules:
-    // - Commissioner plan for this league applies to ALL members regardless of player plan.
-    // - Player plan only applies (and can override commissioner) if the user has
-    //   connected this league to their player plan (used a slot).
-    // - If no player plan slot used, the member gets at most the commissioner tier.
+    // ── Access control ────────────────────────────────────────────────────────
     const activePlayerSub = dbUser?.subscriptions.find(s => s.type === 'player') ?? null;
     const playerTier = activePlayerSub?.tier ?? 'FREE';
 
-    // Build a map: connectedLeague name → League.id (via the user's synced leagues)
-    // This lets us match by ID so minor name differences don't break access.
     const syncedNameToId = new Map(
         (dbUser?.leagues ?? []).map(l => [l.leagueName.toLowerCase().trim(), l.id])
     );
     const leagueConnected = (dbUser?.connectedLeagues ?? []).some(cl => {
-        // Direct name match
         if (cl.leagueName.toLowerCase().trim() === league.leagueName.toLowerCase().trim()) return true;
-        // Match via League.id — catches slight name discrepancies
         return syncedNameToId.get(cl.leagueName.toLowerCase().trim()) === league.id;
     });
-    const effectiveTier = effectiveTierForLeague(
-        playerTier,
-        commSubForLeague?.tier ?? null,
-        leagueConnected,
-    );
-    const effectiveLevel = tierLevel(effectiveTier); // 0=FREE 1=Pro 2=All-Pro 3=Elite
-    const canUseTradeEvaluator = effectiveLevel >= 2; // All-Pro+
+    const effectiveTier  = effectiveTierForLeague(playerTier, commSubForLeague?.tier ?? null, leagueConnected);
+    const effectiveLevel = tierLevel(effectiveTier);
+    const canUseTradeEvaluator = effectiveLevel >= 2;
 
+    // ── Derived data ──────────────────────────────────────────────────────────
     const memberMap = new Map<string, SleeperLeagueMember>(members.map(m => [m.user_id, m]));
 
     const rows = rosters
         .map((roster) => {
-            const member = roster.owner_id ? memberMap.get(roster.owner_id) : undefined;
+            const member   = roster.owner_id ? memberMap.get(roster.owner_id) : undefined;
             const teamName = member?.metadata?.team_name || member?.display_name || `Team ${roster.roster_id}`;
             return { roster, member, teamName, wins: roster.settings?.wins ?? 0, losses: roster.settings?.losses ?? 0, ties: roster.settings?.ties ?? 0, fpts: fpts(roster) };
         })
@@ -128,7 +173,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
         .map((row, i) => ({ ...row, rank: i + 1 }));
 
     const rosterPositions = (league.rosterPositions as string[]) ?? sleeperLeague.roster_positions ?? [];
-    const starterSlots = rosterPositions.filter(pos => !BENCH_SLOTS.has(pos));
+    const starterSlots    = rosterPositions.filter(pos => !BENCH_SLOTS.has(pos));
 
     const neededIds = new Set<string>();
     for (const r of rosters) {
@@ -140,22 +185,19 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
     const players: Record<string, typeof allPlayers[string]> = {};
     for (const pid of neededIds) { if (allPlayers[pid]) players[pid] = allPlayers[pid]; }
 
-    // NFL draft is typically ~April 24; before that date current-year picks still trade.
-    const _now = new Date();
+    const _now       = new Date();
     const _pastDraft = _now.getMonth() + 1 > 4 || (_now.getMonth() + 1 === 4 && _now.getDate() >= 25);
-    const _base = _pastDraft ? _now.getFullYear() + 1 : _now.getFullYear();
+    const _base      = _pastDraft ? _now.getFullYear() + 1 : _now.getFullYear();
     const FUTURE_SEASONS = [String(_base), String(_base + 1), String(_base + 2)];
-    const draftRounds = sleeperLeague.settings?.draft_rounds ?? 5;
-    const ROUNDS = Array.from({ length: draftRounds }, (_, i) => i + 1);
-    const rosterIds = rosters.map(r => r.roster_id);
+    const draftRounds    = sleeperLeague.settings?.draft_rounds ?? 5;
+    const ROUNDS         = Array.from({ length: draftRounds }, (_, i) => i + 1);
+    const rosterIds      = rosters.map(r => r.roster_id);
 
-    // Standings fallback: worst record → rank 1 (picks first)
     const standingsRank = new Map(rows.map(row => [row.roster.roster_id, row.rank]));
-    const draft = drafts[0] ?? null;
+    const draft         = drafts[0] ?? null;
     const { slotMap: rosterIdToSlot, projected: draftOrderProjected } =
         buildRosterSlotMap(rosters, draft, standingsRank, league.totalRosters);
 
-    // Fetch previous season rosters for tier computation when standings are all 0-0
     const currentAllZero = rosters.every(
         r => (r.settings?.wins ?? 0) === 0 && (r.settings?.losses ?? 0) === 0
     );
@@ -184,11 +226,10 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
         return owned;
     }
 
-    // Build team data for the trade evaluator
     const teamTradeData = rows.map(row => ({
-        rosterId:  row.roster.roster_id,
-        teamName:  row.teamName,
-        players:   (row.roster.players ?? [])
+        rosterId:   row.roster.roster_id,
+        teamName:   row.teamName,
+        players:    (row.roster.players ?? [])
             .filter(pid => pid !== '0' && allPlayers[pid])
             .map(pid => ({
                 name:     allPlayers[pid].full_name,
@@ -198,15 +239,12 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
         ownedPicks: computeOwnedPicks(row.roster.roster_id),
     }));
 
-    const myTeamData  = teamTradeData.find(
-        t => rosters.find(r => r.roster_id === t.rosterId)?.owner_id === dbUser?.sleeperUserId
-    );
-
+    const myTeamData     = teamTradeData.find(t => rosters.find(r => r.roster_id === t.rosterId)?.owner_id === dbUser?.sleeperUserId);
     const otherTeamsData = teamTradeData.filter(t => t.rosterId !== myTeamData?.rosterId);
 
     const teamRosters: TeamRosterData[] = rows.map(row => {
         const starterSet = new Set((row.roster.starters ?? []).filter(pid => pid !== '0'));
-        const bench = (row.roster.players ?? []).filter(pid => !starterSet.has(pid));
+        const bench      = (row.roster.players ?? []).filter(pid => !starterSet.has(pid));
         return {
             rosterId:    row.roster.roster_id,
             rank:        row.rank,
@@ -226,15 +264,87 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
     const hasTies = rows.some(r => r.ties > 0);
     const hasPA   = rows.some(r => r.fpts > 0);
 
+    // ── Serialise for client component ────────────────────────────────────────
+    const leagueType: LeagueType = sleeperLeague.settings?.type === 2 ? 'Dynasty' : 'Redraft';
+    const leagueSettings = buildLeagueSettings(rosterPositions, sleeperLeague.scoring_settings);
+
+    const standingRows: StandingRow[] = rows.map(row => ({
+        rosterId:  row.roster.roster_id,
+        rank:      row.rank,
+        teamName:  row.teamName,
+        username:  row.member?.username,
+        avatar:    row.member?.avatar ?? null,
+        wins:      row.wins,
+        losses:    row.losses,
+        ties:      row.ties,
+        fpts:      row.fpts,
+    }));
+
+    const duesData: DuesData | null = leagueDuesRecord ? {
+        id:          leagueDuesRecord.id,
+        buyInAmount: leagueDuesRecord.buyInAmount,
+        potTotal:    leagueDuesRecord.potTotal,
+        status:      leagueDuesRecord.status,
+        teamCount:   leagueDuesRecord.teamCount,
+        payoutSpots: leagueDuesRecord.payoutSpots,
+        members:     leagueDuesRecord.members.map(m => ({
+            displayName: m.displayName,
+            teamName:    m.teamName ?? null,
+            duesStatus:  m.duesStatus,
+        })),
+    } : null;
+
+    const announcements: AnnouncementData[] = (leagueDuesRecord?.announcements ?? []).map(a => ({
+        id:         a.id,
+        body:       a.body,
+        mediaUrl:   a.mediaUrl ?? null,
+        pinned:     a.pinned,
+        createdAt:  a.createdAt.toISOString(),
+        authorName: a.author.name ?? null,
+    }));
+
+    const sleeperSettings: SleeperSettings = {
+        playoff_teams:  sleeperLeague.settings?.playoff_teams,
+        type:           sleeperLeague.settings?.type,
+        trade_deadline: sleeperLeague.settings?.trade_deadline,
+    };
+
+    // Trade evaluator content — pre-composed server component passed as slot
+    const tradeEvaluatorContent = canUseTradeEvaluator ? (
+        <LeagueTradeEvaluator
+            leagueName={league.leagueName}
+            scoringType={league.scoringType ?? null}
+            totalRosters={league.totalRosters}
+            draftRounds={draftRounds}
+            draftOrderProjected={draftOrderProjected}
+            leagueType={leagueType}
+            rosterPositions={rosterPositions}
+            scoringSettings={sleeperLeague.scoring_settings}
+            myTeamData={myTeamData}
+            otherTeamsData={otherTeamsData}
+        />
+    ) : (
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center">
+            <p className="text-gray-400 text-sm mb-1">Trade Evaluator requires All-Pro or higher.</p>
+            <p className="text-gray-600 text-xs mb-4">
+                Upgrade your player plan, or the commissioner can upgrade their league plan —{' '}
+                and connect this league to your player plan to unlock it.
+            </p>
+            <a href="/pricing" className="inline-block bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-5 py-2.5 rounded-lg transition text-sm">
+                View Plans
+            </a>
+        </div>
+    );
+
     return (
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
-            <div className="max-w-5xl mx-auto space-y-8">
+            <div className="max-w-5xl mx-auto space-y-6">
 
                 <Link href="/dashboard" className="text-gray-500 hover:text-gray-300 text-sm transition">
-                    ← Back to Dashboard
+                    ← My Leagues
                 </Link>
 
-                {/* Header */}
+                {/* League header */}
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
                     <div className="flex items-center gap-4 flex-wrap">
                         {league.avatar ? (
@@ -259,144 +369,26 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                     </div>
                 </div>
 
-                {/* Standings */}
-                <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-800">
-                        <h2 className="font-semibold text-lg">Standings</h2>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="text-gray-400 text-left border-b border-gray-800">
-                                    <th className="px-6 py-3 font-medium w-12">#</th>
-                                    <th className="px-4 py-3 font-medium">Team</th>
-                                    <th className="px-4 py-3 font-medium text-center">W</th>
-                                    <th className="px-4 py-3 font-medium text-center">L</th>
-                                    {hasTies && <th className="px-4 py-3 font-medium text-center">T</th>}
-                                    {hasPA && <th className="px-4 py-3 font-medium text-right pr-6">PF</th>}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {rows.map(row => (
-                                    <tr key={row.roster.roster_id} className="border-b border-gray-800/50 last:border-0 hover:bg-gray-800/20 transition-colors">
-                                        <td className="px-6 py-4 text-gray-500 font-medium">{row.rank}</td>
-                                        <td className="px-4 py-4">
-                                            <a href={`#team-${row.roster.roster_id}`} className="flex items-center gap-3 group">
-                                                {row.member?.avatar ? (
-                                                    <Image src={`https://sleepercdn.com/avatars/thumbs/${row.member.avatar}`}
-                                                        alt={row.teamName} width={28} height={28} className="rounded-full shrink-0" />
-                                                ) : (
-                                                    <div className="w-7 h-7 rounded-full bg-gray-800 shrink-0 flex items-center justify-center text-xs font-bold text-gray-600">
-                                                        {row.teamName[0]?.toUpperCase() ?? '?'}
-                                                    </div>
-                                                )}
-                                                <div>
-                                                    <p className="font-medium text-white group-hover:text-[#C8A951] transition">{row.teamName}</p>
-                                                    {row.member && <p className="text-gray-600 text-xs">@{row.member.username}</p>}
-                                                </div>
-                                            </a>
-                                        </td>
-                                        <td className="px-4 py-4 text-center font-semibold text-white">{row.wins}</td>
-                                        <td className="px-4 py-4 text-center text-gray-400">{row.losses}</td>
-                                        {hasTies && <td className="px-4 py-4 text-center text-gray-500">{row.ties}</td>}
-                                        {hasPA && <td className="px-4 py-4 text-right text-gray-300 pr-6">{row.fpts.toFixed(2)}</td>}
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                {/* Rosters */}
-                <div>
-                    <h2 className="font-semibold text-lg mb-4">Team Rosters</h2>
-                    <RosterCards teams={teamRosters} players={players} />
-                </div>
-
-                {/* League info */}
-                <div className="grid sm:grid-cols-2 gap-6">
-                    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-                        <h2 className="font-semibold text-lg mb-4">Roster Slots</h2>
-                        {rosterPositions.length > 0 ? (
-                            <>
-                                <p className="text-gray-300 text-sm leading-relaxed">{summariseRosterPositions(rosterPositions)}</p>
-                                <div className="flex flex-wrap gap-1.5 mt-3">
-                                    {rosterPositions.map((pos, i) => (
-                                        <span key={i} className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                                            pos === 'BN' ? 'bg-gray-800 text-gray-500' :
-                                            pos === 'IR' ? 'bg-red-900/30 text-red-500' :
-                                            'bg-[#C8A951]/10 text-[#C8A951]'
-                                        }`}>{pos}</span>
-                                    ))}
-                                </div>
-                            </>
-                        ) : (
-                            <p className="text-gray-600 text-sm">No roster data available.</p>
-                        )}
-                    </div>
-
-                    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-                        <h2 className="font-semibold text-lg mb-4">League Settings</h2>
-                        <dl className="space-y-3 text-sm">
-                            <div className="flex justify-between">
-                                <dt className="text-gray-500">Scoring</dt>
-                                <dd className="text-gray-200 font-medium">{scoringLabel(league.scoringType ?? 'std')}</dd>
-                            </div>
-                            <div className="flex justify-between">
-                                <dt className="text-gray-500">Teams</dt>
-                                <dd className="text-gray-200 font-medium">{league.totalRosters}</dd>
-                            </div>
-                            <div className="flex justify-between">
-                                <dt className="text-gray-500">Roster Size</dt>
-                                <dd className="text-gray-200 font-medium">{rosterPositions.length > 0 ? rosterPositions.length : '—'}</dd>
-                            </div>
-                            {sleeperLeague.settings?.playoff_teams != null && (
-                                <div className="flex justify-between">
-                                    <dt className="text-gray-500">Playoff Teams</dt>
-                                    <dd className="text-gray-200 font-medium">{sleeperLeague.settings.playoff_teams}</dd>
-                                </div>
-                            )}
-                            <div className="flex justify-between">
-                                <dt className="text-gray-500">Type</dt>
-                                <dd className="text-gray-200 font-medium">{sleeperLeague.settings?.type === 2 ? 'Dynasty' : 'Redraft'}</dd>
-                            </div>
-                            <div className="flex justify-between">
-                                <dt className="text-gray-500">Platform</dt>
-                                <dd className="text-gray-200 font-medium">Sleeper</dd>
-                            </div>
-                        </dl>
-                    </div>
-                </div>
-
-                {/* Trade Evaluator */}
-                <div>
-                    <h2 className="font-semibold text-lg mb-4">Trade Evaluator</h2>
-                    {canUseTradeEvaluator ? (
-                        <LeagueTradeEvaluator
-                            leagueName={league.leagueName}
-                            scoringType={league.scoringType ?? null}
-                            totalRosters={league.totalRosters}
-                            draftRounds={draftRounds}
-                            draftOrderProjected={draftOrderProjected}
-                            leagueType={sleeperLeague.settings?.type === 2 ? 'Dynasty' : 'Redraft'}
-                            rosterPositions={rosterPositions}
-                            scoringSettings={sleeperLeague.scoring_settings}
-                            myTeamData={myTeamData}
-                            otherTeamsData={otherTeamsData}
-                        />
-                    ) : (
-                        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center">
-                            <p className="text-gray-400 text-sm mb-1">Trade Evaluator requires All-Pro or higher.</p>
-                            <p className="text-gray-600 text-xs mb-4">
-                                Upgrade your player plan, or the commissioner can upgrade their league plan —{' '}
-                                and connect this league to your player plan to unlock it.
-                            </p>
-                            <a href="/pricing" className="inline-block bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-5 py-2.5 rounded-lg transition text-sm">
-                                View Plans
-                            </a>
-                        </div>
-                    )}
-                </div>
+                {/* Tabbed content */}
+                <LeagueDetailTabs
+                    leagueId={id}
+                    leagueName={league.leagueName}
+                    scoringType={league.scoringType ?? null}
+                    totalRosters={league.totalRosters}
+                    leagueType={leagueType}
+                    leagueSettings={leagueSettings}
+                    standingRows={standingRows}
+                    hasTies={hasTies}
+                    hasPA={hasPA}
+                    teamRosters={teamRosters}
+                    players={players}
+                    rosterPositions={rosterPositions}
+                    rosterPositionsSummary={summariseRosterPositions(rosterPositions)}
+                    sleeperSettings={sleeperSettings}
+                    duesData={duesData}
+                    announcements={announcements}
+                    tradeEvaluatorContent={tradeEvaluatorContent}
+                />
 
             </div>
         </main>
