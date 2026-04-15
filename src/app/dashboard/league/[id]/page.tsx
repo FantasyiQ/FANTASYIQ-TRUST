@@ -7,7 +7,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import {
     getLeague, getLeagueUsers, getLeagueRosters, getPlayers, getTradedPicks,
-    getLeagueDrafts, buildPickOwnerMap,
+    getLeagueDrafts, buildPickOwnerMap, buildRosterSlotMap,
     scoringLabel, summariseRosterPositions,
     type SleeperLeagueMember, type SleeperRoster,
 } from '@/lib/sleeper';
@@ -56,7 +56,8 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
 
     if (!league || league.userId !== session.user.id) notFound();
 
-    const [sleeperLeague, members, rosters, allPlayers, tradedPicks, drafts, dbUser, commSubForLeague] = await Promise.all([        getLeague(league.leagueId),
+    const [sleeperLeague, members, rosters, allPlayers, tradedPicks, drafts, dbUser, commSubForLeague] = await Promise.all([
+        getLeague(league.leagueId),
         getLeagueUsers(league.leagueId),
         getLeagueRosters(league.leagueId),
         getPlayers(),
@@ -87,15 +88,6 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
             select: { tier: true },
         }),
     ]);
-
-    // Fetch previous season's final standings when current season has no data yet (all 0-0).
-    // roster_ids can change between seasons, so we match by owner_id inside buildPickOwnerMap.
-    const currentAllZero = rosters.every(
-        r => (r.settings?.wins ?? 0) === 0 && (r.settings?.losses ?? 0) === 0
-    );
-    const prevSeasonRosters = (currentAllZero && sleeperLeague.previous_league_id)
-        ? await getLeagueRosters(sleeperLeague.previous_league_id)
-        : undefined;
 
     // Effective tier rules:
     // - Commissioner plan for this league applies to ALL members regardless of player plan.
@@ -157,26 +149,29 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
     const ROUNDS = Array.from({ length: draftRounds }, (_, i) => i + 1);
     const rosterIds = rosters.map(r => r.roster_id);
 
-    const pickOwnerMap = buildPickOwnerMap(
-        rosters, tradedPicks, FUTURE_SEASONS, drafts, draftRounds, prevSeasonRosters,
-    );
-    // Show "Projected Order" in label only when we have zero standings data even after
-    // falling back to previous season (brand new league with no history).
-    const draftOrderProjected = currentAllZero && !prevSeasonRosters;
+    // Standings fallback: worst record → rank 1 (picks first)
+    const standingsRank = new Map(rows.map(row => [row.roster.roster_id, row.rank]));
+    const draft = drafts[0] ?? null;
+    const { slotMap: rosterIdToSlot, projected: draftOrderProjected } =
+        buildRosterSlotMap(rosters, draft, standingsRank, league.totalRosters);
+
+    const pickOwnerMap = buildPickOwnerMap(rosters, tradedPicks, FUTURE_SEASONS);
 
     function computeOwnedPicks(rosterId: number) {
-        const owned: { season: string; round: number; slot?: number; tier?: string; tierProjected?: boolean; origTeamName?: string }[] = [];
+        const owned: { season: string; round: number; slot: number; origTeamName?: string }[] = [];
         for (const season of FUTURE_SEASONS) {
             for (const round of ROUNDS) {
                 for (const origId of rosterIds) {
-                    const key   = `${season}-${round}-${origId}`;
-                    const entry = pickOwnerMap.get(key);
-                    if (!entry || Number(entry.owner) !== Number(rosterId)) continue;
-                    const traded       = origId !== rosterId;
-                    const origTeamName = traded
-                        ? rows.find(r => r.roster.roster_id === origId)?.teamName
-                        : undefined;
-                    owned.push({ season, round, slot: entry.slot, tier: entry.tier, tierProjected: entry.tierProjected, origTeamName });
+                    const key = `${season}-${round}-${origId}`;
+                    const currentOwner = pickOwnerMap.get(key) ?? origId;
+                    if (Number(currentOwner) === Number(rosterId)) {
+                        const slot = rosterIdToSlot.get(origId) ?? origId;
+                        const traded = origId !== rosterId;
+                        const origTeamName = traded
+                            ? (rows.find(r => r.roster.roster_id === origId)?.teamName)
+                            : undefined;
+                        owned.push({ season, round, slot, origTeamName });
+                    }
                 }
             }
         }
@@ -229,8 +224,8 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
             <div className="max-w-5xl mx-auto space-y-8">
 
-                <Link href="/my-leagues" className="text-gray-500 hover:text-gray-300 text-sm transition">
-                    ← My Leagues
+                <Link href="/dashboard" className="text-gray-500 hover:text-gray-300 text-sm transition">
+                    ← Back to Dashboard
                 </Link>
 
                 {/* Header */}
