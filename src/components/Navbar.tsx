@@ -27,26 +27,6 @@ export default async function Navbar() {
         <div className="flex items-center gap-8">
           <Link href="/" className="text-gray-300 hover:text-white transition">Home</Link>
 
-          {/* Pricing link — dynamic for logged-in users */}
-          {loggedIn ? (
-            isElite ? (
-              <Link
-                href="/pricing"
-                className="bg-[#C9A227]/15 border border-[#C9A227]/50 text-[#C9A227] font-bold px-3 py-1 rounded-lg transition text-sm"
-              >
-                Elite ✦
-              </Link>
-            ) : (
-              <Link href="/pricing" className="text-gray-300 hover:text-white transition">
-                Upgrade
-              </Link>
-            )
-          ) : (
-            <Link href="/pricing" className="text-gray-300 hover:text-white transition">
-              Pricing
-            </Link>
-          )}
-
           {loggedIn ? (
             <>
               <Link
@@ -61,6 +41,18 @@ export default async function Navbar() {
               >
                 Dashboard
               </Link>
+              {isElite ? (
+                <Link
+                  href="/pricing"
+                  className="bg-[#C9A227]/15 border border-[#C9A227]/50 text-[#C9A227] font-bold px-3 py-1 rounded-lg transition text-sm"
+                >
+                  Elite ✦
+                </Link>
+              ) : (
+                <Link href="/pricing" className="text-gray-300 hover:text-white transition">
+                  Upgrade
+                </Link>
+              )}
               <form
                 action={async () => {
                   'use server';
@@ -76,12 +68,17 @@ export default async function Navbar() {
               </form>
             </>
           ) : (
-            <Link
-              href="/sign-in"
-              className="bg-[#C9A227] hover:bg-[#B8911F] text-gray-950 font-semibold px-5 py-2 rounded-lg transition"
-            >
-              Sign In
-            </Link>
+            <>
+              <Link href="/pricing" className="text-gray-300 hover:text-white transition">
+                Pricing
+              </Link>
+              <Link
+                href="/sign-in"
+                className="bg-[#C9A227] hover:bg-[#B8911F] text-gray-950 font-semibold px-5 py-2 rounded-lg transition"
+              >
+                Sign In
+              </Link>
+            </>
           )}
         </div>
       </div>
