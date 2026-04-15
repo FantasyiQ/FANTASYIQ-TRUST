@@ -191,6 +191,46 @@ export function rosterFpts(settings: SleeperRoster['settings']): number {
     return (settings?.fpts ?? 0) + (settings?.fpts_decimal ?? 0) / 100;
 }
 
+/**
+ * Build a map of `${season}-${round}-${origRosterId}` → current owner roster_id.
+ * Prefers roster.draft_picks when populated (authoritative); falls back to
+ * reconstructing from traded_picks trade events.
+ */
+export function buildPickOwnerMap(
+    rosters: SleeperRoster[],
+    tradedPicks: SleeperTradedPick[],
+    futureSeasons: string[],
+): Map<string, number> {
+    const map = new Map<string, number>();
+    const anyHasDraftPicks = rosters.some(r => r.draft_picks && r.draft_picks.length > 0);
+    if (anyHasDraftPicks) {
+        for (const roster of rosters) {
+            for (const dp of roster.draft_picks ?? []) {
+                if (!futureSeasons.includes(dp.season)) continue;
+                map.set(`${dp.season}-${Number(dp.round)}-${Number(dp.roster_id)}`, Number(roster.roster_id));
+            }
+        }
+    } else {
+        const groups = new Map<string, SleeperTradedPick[]>();
+        for (const tp of tradedPicks) {
+            const key = `${tp.season}-${Number(tp.round)}-${Number(tp.roster_id)}`;
+            const g = groups.get(key) ?? [];
+            g.push(tp);
+            groups.set(key, g);
+        }
+        for (const [key, trades] of groups) {
+            if (trades.length === 1) {
+                map.set(key, Number(trades[0].owner_id));
+            } else {
+                const prevOwnerIds = new Set(trades.map(t => Number(t.previous_owner_id)));
+                const terminal = trades.find(t => !prevOwnerIds.has(Number(t.owner_id)));
+                map.set(key, Number(terminal?.owner_id ?? trades[trades.length - 1].owner_id));
+            }
+        }
+    }
+    return map;
+}
+
 /** True if we should be polling live matchup scores right now (ET game windows) */
 export function isGameWindow(): boolean {
     const etString = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });

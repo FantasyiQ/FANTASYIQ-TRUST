@@ -6,7 +6,7 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import {
-    getLeague, getLeagueUsers, getLeagueRosters, getPlayers, getTradedPicks,
+    getLeague, getLeagueUsers, getLeagueRosters, getPlayers, getTradedPicks, buildPickOwnerMap,
     scoringLabel, summariseRosterPositions,
     type SleeperLeagueMember, type SleeperRoster,
 } from '@/lib/sleeper';
@@ -152,40 +152,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
     const ROUNDS = Array.from({ length: draftRounds }, (_, i) => i + 1);
     const rosterIds = rosters.map(r => r.roster_id);
 
-    // Build pick ownership map.
-    // Prefer roster.draft_picks (authoritative — reflects all cross-season trades).
-    // Fall back to traded_picks reconstruction only if draft_picks isn't populated.
-    const pickOwnerMap = new Map<string, number>(); // `${season}-${round}-${roster_id}` → current owner
-    const anyHasDraftPicks = rosters.some(r => r.draft_picks && r.draft_picks.length > 0);
-    if (anyHasDraftPicks) {
-        // Each roster's draft_picks lists picks they received via trades (not their own untouched picks).
-        // Picks not in any roster's draft_picks are still with the original owner (roster_id).
-        for (const roster of rosters) {
-            for (const dp of roster.draft_picks ?? []) {
-                if (!FUTURE_SEASONS.includes(dp.season)) continue;
-                const key = `${dp.season}-${Number(dp.round)}-${Number(dp.roster_id)}`;
-                pickOwnerMap.set(key, Number(roster.roster_id));
-            }
-        }
-    } else {
-        // Fallback: reconstruct from traded_picks trade events
-        const groups = new Map<string, typeof tradedPicks>();
-        for (const tp of tradedPicks) {
-            const key = `${tp.season}-${Number(tp.round)}-${Number(tp.roster_id)}`;
-            const g = groups.get(key) ?? [];
-            g.push(tp);
-            groups.set(key, g);
-        }
-        for (const [key, trades] of groups) {
-            if (trades.length === 1) {
-                pickOwnerMap.set(key, Number(trades[0].owner_id));
-            } else {
-                const prevOwnerIds = new Set(trades.map(t => Number(t.previous_owner_id)));
-                const terminal = trades.find(t => !prevOwnerIds.has(Number(t.owner_id)));
-                pickOwnerMap.set(key, Number(terminal?.owner_id ?? trades[trades.length - 1].owner_id));
-            }
-        }
-    }
+    const pickOwnerMap = buildPickOwnerMap(rosters, tradedPicks, FUTURE_SEASONS);
 
     function computeOwnedPicks(rosterId: number) {
         const owned: { season: string; round: number; slot: number }[] = [];

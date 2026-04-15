@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getLeague, getLeagueRosters, getTradedPicks } from '@/lib/sleeper';
+import { getLeague, getLeagueRosters, getTradedPicks, buildPickOwnerMap } from '@/lib/sleeper';
 import type { SleeperRoster, SleeperTradedPick } from '@/lib/sleeper';
 import { getDraftPicks } from '@/lib/trade-engine';
 import type { Player } from '@/lib/trade-engine';
@@ -21,41 +21,6 @@ function futureSeasons(): string[] {
 
 function rounds(n: number) { return Array.from({ length: n }, (_, i) => i + 1); }
 
-function buildPickOwnerMap(
-    rosters: SleeperRoster[],
-    tradedPicks: SleeperTradedPick[],
-    futureSeason: string[],
-): Map<string, number> {
-    const map = new Map<string, number>();
-    // Prefer roster.draft_picks (authoritative across seasons) over traded_picks events
-    const anyHasDraftPicks = rosters.some(r => r.draft_picks && r.draft_picks.length > 0);
-    if (anyHasDraftPicks) {
-        for (const roster of rosters) {
-            for (const dp of roster.draft_picks ?? []) {
-                if (!futureSeason.includes(dp.season)) continue;
-                map.set(`${dp.season}-${Number(dp.round)}-${Number(dp.roster_id)}`, Number(roster.roster_id));
-            }
-        }
-    } else {
-        const groups = new Map<string, SleeperTradedPick[]>();
-        for (const tp of tradedPicks) {
-            const key = `${tp.season}-${Number(tp.round)}-${Number(tp.roster_id)}`;
-            const g = groups.get(key) ?? [];
-            g.push(tp);
-            groups.set(key, g);
-        }
-        for (const [key, trades] of groups) {
-            if (trades.length === 1) {
-                map.set(key, Number(trades[0].owner_id));
-            } else {
-                const prevOwnerIds = new Set(trades.map(t => Number(t.previous_owner_id)));
-                const terminal = trades.find(t => !prevOwnerIds.has(Number(t.owner_id)));
-                map.set(key, Number(terminal?.owner_id ?? trades[trades.length - 1].owner_id));
-            }
-        }
-    }
-    return map;
-}
 
 export default async function TradePage() {
     const session = await auth();
