@@ -155,23 +155,29 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
     const { slotMap: rosterIdToSlot, projected: draftOrderProjected } =
         buildRosterSlotMap(rosters, draft, standingsRank, league.totalRosters);
 
-    const pickOwnerMap = buildPickOwnerMap(rosters, tradedPicks, FUTURE_SEASONS);
+    // Fetch previous season rosters for tier computation when standings are all 0-0
+    const currentAllZero = rosters.every(
+        r => (r.settings?.wins ?? 0) === 0 && (r.settings?.losses ?? 0) === 0
+    );
+    const prevSeasonRosters = (currentAllZero && sleeperLeague.previous_league_id)
+        ? await getLeagueRosters(sleeperLeague.previous_league_id)
+        : undefined;
+
+    const pickOwnerMap = buildPickOwnerMap(rosters, tradedPicks, FUTURE_SEASONS, drafts, draftRounds, prevSeasonRosters);
 
     function computeOwnedPicks(rosterId: number) {
-        const owned: { season: string; round: number; slot: number; origTeamName?: string }[] = [];
+        const owned: { season: string; round: number; slot?: number; tier?: string; tierProjected?: boolean; origTeamName?: string }[] = [];
         for (const season of FUTURE_SEASONS) {
             for (const round of ROUNDS) {
                 for (const origId of rosterIds) {
-                    const key = `${season}-${round}-${origId}`;
-                    const currentOwner = pickOwnerMap.get(key) ?? origId;
-                    if (Number(currentOwner) === Number(rosterId)) {
-                        const slot = rosterIdToSlot.get(origId) ?? origId;
-                        const traded = origId !== rosterId;
-                        const origTeamName = traded
-                            ? (rows.find(r => r.roster.roster_id === origId)?.teamName)
-                            : undefined;
-                        owned.push({ season, round, slot, origTeamName });
-                    }
+                    const key   = `${season}-${round}-${origId}`;
+                    const entry = pickOwnerMap.get(key);
+                    if (!entry || Number(entry.owner) !== Number(rosterId)) continue;
+                    const traded       = origId !== rosterId;
+                    const origTeamName = traded
+                        ? rows.find(r => r.roster.roster_id === origId)?.teamName
+                        : undefined;
+                    owned.push({ season, round, slot: entry.slot, tier: entry.tier, tierProjected: entry.tierProjected, origTeamName });
                 }
             }
         }
