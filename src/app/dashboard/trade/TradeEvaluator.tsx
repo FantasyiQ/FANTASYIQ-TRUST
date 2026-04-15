@@ -275,31 +275,22 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, leagu
                                 <div key={round} className="flex items-center gap-2 flex-wrap">
                                     <span className="text-gray-600 text-[10px] font-semibold w-8 shrink-0">Rd {round}</span>
                                     {isFuture
-                                        ? (['Early','Mid','Late'] as const).map(tierName => {
-                                            const tierPicks = roundPicks.filter(p => {
-                                                if (p.name.includes(tierName)) return true;
-                                                const slotMatch = p.name.match(/\d+\.(\d+)/);
-                                                return slotMatch ? tierOf(parseInt(slotMatch[1])) === tierName : false;
-                                            });
-                                            if (tierPicks.length === 0) return null;
-                                            const available = tierPicks.filter(p => !excluded.includes(p.name));
-                                            const allUsed = available.length === 0;
-                                            const avgDtv = Math.round(tierPicks.reduce((sum, p) => sum + calcDtv(p, ppr, leagueType, undefined, settings).finalDtv, 0) / tierPicks.length);
-                                            const remaining = available.length;
+                                        ? roundPicks.map((p, i) => {
+                                            const used = excluded.includes(p.name);
+                                            const dtv  = calcDtv(p, ppr, leagueType, undefined, settings);
+                                            const tierLabel = p.name.includes('Early') ? 'Early'
+                                                : p.name.includes('Late') ? 'Late' : 'Mid';
                                             return (
-                                                <button key={tierName} type="button" disabled={allUsed}
-                                                    onClick={() => available[0] && onAdd(available[0])}
-                                                    title={`${tierName} ${ord} — avg DTV ${avgDtv}`}
+                                                <button key={`${p.name}-${i}`} type="button" disabled={used}
+                                                    onClick={() => onAdd(p)}
+                                                    title={`${p.name} — DTV ${dtv.finalDtv}`}
                                                     className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] font-medium transition ${
-                                                        allUsed
+                                                        used
                                                             ? 'border-gray-800 text-gray-700 cursor-not-allowed'
                                                             : 'border-indigo-800/60 text-indigo-300 hover:border-indigo-500 hover:text-white'
                                                     }`}>
-                                                    {tierName} {ord}
-                                                    {tierPicks.length > 1 && remaining > 0 && (
-                                                        <span className="text-indigo-500 text-[10px]">×{remaining}</span>
-                                                    )}
-                                                    <span className="text-gray-600">{avgDtv}</span>
+                                                    {tierLabel} {ord}
+                                                    <span className="text-gray-600">{dtv.finalDtv}</span>
                                                 </button>
                                             );
                                         })
