@@ -163,6 +163,24 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, leagu
         [players]
     );
 
+    // Extract round number from either "YYYY R.SS" or "YYYY Round N ..." format
+    const pickRound = (name: string): number => {
+        const exact = name.match(/^\d{4} (\d+)\./);
+        if (exact) return parseInt(exact[1], 10);
+        const tier = name.match(/^\d{4} Round (\d+)/i);
+        if (tier) return parseInt(tier[1], 10);
+        return 1;
+    };
+    // Sort order within a round: exact picks by slot, tier picks by Early→Mid→Late
+    const pickSlotOrder = (name: string): number => {
+        const slot = name.match(/\d+\.(\d+)/);
+        if (slot) return parseInt(slot[1], 10);
+        if (name.includes('Early')) return 1;
+        if (name.includes('Mid'))   return 50;
+        if (name.includes('Late'))  return 99;
+        return 50;
+    };
+
     const yearPicks = useMemo(() => {
         const seen = new Set<string>();
         return picks
@@ -173,17 +191,15 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, leagu
                 return true;
             })
             .sort((a, b) => {
-                const [ar, as_] = (a.name.split(' ')[1] ?? '0.0').split('.').map(Number);
-                const [br, bs_] = (b.name.split(' ')[1] ?? '0.0').split('.').map(Number);
-                return ar !== br ? ar - br : as_ - bs_;
+                const ar = pickRound(a.name), br = pickRound(b.name);
+                return ar !== br ? ar - br : pickSlotOrder(a.name) - pickSlotOrder(b.name);
             });
     }, [picks, pickYear]);
 
-    // group by round number (pick name starts with "YYYY R.")
     const rounds = useMemo(() => {
         const map = new Map<number, Player[]>();
         for (const p of yearPicks) {
-            const round = parseInt(p.name.split(' ')[1]?.split('.')[0] ?? '1', 10);
+            const round = pickRound(p.name);
             if (!map.has(round)) map.set(round, []);
             map.get(round)!.push(p);
         }
@@ -260,7 +276,11 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, leagu
                                     <span className="text-gray-600 text-[10px] font-semibold w-8 shrink-0">Rd {round}</span>
                                     {isFuture
                                         ? (['Early','Mid','Late'] as const).map(tierName => {
-                                            const tierPicks = roundPicks.filter(p => tierOf(parseInt(p.name.split('.')[1] ?? '1')) === tierName);
+                                            const tierPicks = roundPicks.filter(p => {
+                                                if (p.name.includes(tierName)) return true;
+                                                const slotMatch = p.name.match(/\d+\.(\d+)/);
+                                                return slotMatch ? tierOf(parseInt(slotMatch[1])) === tierName : false;
+                                            });
                                             if (tierPicks.length === 0) return null;
                                             const available = tierPicks.filter(p => !excluded.includes(p.name));
                                             const allUsed = available.length === 0;
@@ -872,7 +892,11 @@ export default function TradeEvaluator({
                                     {isFutureChart ? (
                                         <div className="grid grid-cols-3 gap-3">
                                             {(['Early','Mid','Late'] as const).map(tierName => {
-                                                const tierPicks = roundPicks.filter(p => tierOf(parseInt(p.name.split('.')[1] ?? '1')) === tierName);
+                                                const tierPicks = roundPicks.filter(p => {
+                                                    if (p.name.includes(tierName)) return true;
+                                                    const slotMatch = p.name.match(/\d+\.(\d+)/);
+                                                    return slotMatch ? tierOf(parseInt(slotMatch[1])) === tierName : false;
+                                                });
                                                 if (tierPicks.length === 0) return null;
                                                 const avgDtv = Math.round(tierPicks.reduce((s, p) => s + calcDtv(p, ppr, leagueType, undefined, leagueSettings).finalDtv, 0) / tierPicks.length * 10) / 10;
                                                 const repDtv = calcDtv(tierPicks[Math.floor(tierPicks.length / 2)], ppr, leagueType, undefined, leagueSettings);
