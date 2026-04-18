@@ -344,7 +344,11 @@ export default async function DashboardPage() {
                         </Link>
                     </div>
 
-                    <SleeperLeaguesList leagues={leagues} />
+                    <SleeperLeaguesList
+                        leagues={leagues}
+                        playerTier={playerSubTier}
+                        commSubs={commSubs.map(s => ({ leagueName: s.leagueName, tier: s.tier }))}
+                    />
                 </div>
 
                 {/* ── Quick actions ─────────────────────────────────────── */}

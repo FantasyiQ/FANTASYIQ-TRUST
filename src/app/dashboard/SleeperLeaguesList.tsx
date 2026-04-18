@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { unsyncLeague } from '@/app/actions/leagues';
+import { tierBadgeProps } from '@/lib/tier-badge';
 
 interface League {
     id: string;
@@ -17,8 +18,15 @@ interface League {
     lastSyncedAt: Date | null;
 }
 
+interface CommSub {
+    leagueName: string | null;
+    tier: string;
+}
+
 interface Props {
     leagues: League[];
+    playerTier: string;
+    commSubs: CommSub[];
 }
 
 function statusBadgeClass(status: string) {
@@ -44,7 +52,7 @@ function formatSyncTime(date: Date | null): string {
     return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-export default function SleeperLeaguesList({ leagues }: Props) {
+export default function SleeperLeaguesList({ leagues, playerTier, commSubs }: Props) {
 
     if (leagues.length === 0) {
         return (
@@ -63,6 +71,11 @@ export default function SleeperLeaguesList({ leagues }: Props) {
         <ul className="divide-y divide-gray-800/50">
             {leagues.map((league) => {
                 const standing = (league.standings as { wins: number; losses: number }[] | null)?.[0];
+                // Player tier applies to all leagues; commissioner tier scoped to matching league name
+                const leagueTier = playerTier !== 'FREE'
+                    ? playerTier
+                    : (commSubs.find(s => s.leagueName?.toLowerCase().trim() === league.leagueName.toLowerCase().trim())?.tier ?? 'FREE');
+                const badge = tierBadgeProps(leagueTier);
                 return (
                     <li key={league.id} className="flex items-center gap-4 px-6 py-4 hover:bg-gray-800/30 transition-colors">
                         <Link
@@ -78,7 +91,14 @@ export default function SleeperLeaguesList({ leagues }: Props) {
                                 <div className="w-10 h-10 rounded-lg bg-gray-800 shrink-0 flex items-center justify-center text-gray-600 text-xs font-bold">FF</div>
                             )}
                             <div className="flex-1 min-w-0">
-                                <p className="font-medium text-white truncate group-hover:text-[#C8A951]">{league.leagueName}</p>
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <p className="font-medium text-white truncate">{league.leagueName}</p>
+                                    {badge && (
+                                        <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${badge.className}`}>
+                                            {badge.label}
+                                        </span>
+                                    )}
+                                </div>
                                 <p className="text-gray-500 text-xs mt-0.5">
                                     {league.season} · {league.totalRosters} teams
                                     {league.scoringType ? ` · ${league.scoringType.replace('_', ' ').toUpperCase()}` : ''}
