@@ -310,9 +310,11 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
         trade_deadline: sleeperLeague.settings?.trade_deadline,
     };
 
-    // Commissioner check: Sleeper marks the commissioner via is_owner on the member list
+    // Commissioner check: Sleeper marks the commissioner via is_owner on the member list.
+    // Use String() on both sides to guard against type/whitespace mismatches.
     const commissionerSleeperUserId = members.find(m => m.is_owner)?.user_id;
-    const isCommissioner = !!commissionerSleeperUserId && commissionerSleeperUserId === dbUser?.sleeperUserId;
+    const isCommissioner = !!commissionerSleeperUserId &&
+        String(commissionerSleeperUserId).trim() === String(dbUser?.sleeperUserId ?? '').trim();
 
     // Serialised member list for dues setup form (displayName + teamName from Sleeper rosters)
     const sleeperMembers = rows.map(row => ({

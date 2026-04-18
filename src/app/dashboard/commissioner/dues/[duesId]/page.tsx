@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import MemberRow from './MemberRow';
 import CreateProBowlButton from './CreateProBowlButton';
 import SyncMembersButton from './SyncMembersButton';
+import InviteLinkButton from '@/components/InviteLinkButton';
 
 function potProgress(paid: number, total: number) {
     if (total <= 0) return 0;
@@ -38,6 +39,17 @@ export default async function DuesTrackerPage({ params }: { params: Promise<{ du
 
     if (!dues) notFound();
     if (dues.commissionerId !== user.id) redirect('/dashboard/commissioner/dues');
+
+    // Look up Sleeper league ID so we can generate invite links
+    const matchedLeague = await prisma.league.findFirst({
+        where: {
+            userId: user.id,
+            leagueName: { equals: dues.leagueName, mode: 'insensitive' },
+            season: dues.season,
+        },
+        select: { leagueId: true },
+    });
+    const sleeperLeagueId = matchedLeague?.leagueId ?? null;
 
     const fullPot = dues.buyInAmount * dues.teamCount;
     const progress = potProgress(dues.potTotal, fullPot);
@@ -76,6 +88,15 @@ export default async function DuesTrackerPage({ params }: { params: Promise<{ du
                         )}
                     </div>
                 </div>
+
+                {/* Invite members */}
+                {sleeperLeagueId && (
+                    <InviteLinkButton
+                        sleeperLeagueId={sleeperLeagueId}
+                        leagueName={dues.leagueName}
+                        season={dues.season}
+                    />
+                )}
 
                 {/* Pot summary */}
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
