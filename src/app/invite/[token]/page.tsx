@@ -36,7 +36,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
                     <p className="text-gray-300 text-sm leading-relaxed">
                         Your commissioner has invited you to track dues, payouts, standings, and trades for{' '}
                         <strong className="text-white">{invite.leagueName}</strong> on{' '}
-                        <span className="text-[#C8A951] font-semibold">FantasyIQ Trust</span>.
+                        <span className="text-[#C8A951] font-semibold">FantasyiQ Trust</span>.
                     </p>
                     <ul className="space-y-1.5 text-gray-500 text-xs">
                         <li>✓ See who&apos;s paid dues and who hasn&apos;t</li>

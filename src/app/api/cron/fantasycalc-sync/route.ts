@@ -35,7 +35,7 @@ function parsePlayersArray(html: string): KtcPlayer[] {
 async function fetchKtcPage(url: string): Promise<KtcPlayer[]> {
     const res = await fetch(url, {
         cache: 'no-store',
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FantasyIQ/1.0)' },
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FantasyiQ/1.0)' },
     });
     if (!res.ok) throw new Error(`KTC responded ${res.status} for ${url}`);
     return parsePlayersArray(await res.text());

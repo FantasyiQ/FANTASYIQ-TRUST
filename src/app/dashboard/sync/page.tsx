@@ -109,7 +109,7 @@ export default function SyncPage() {
                         ← Back to Dashboard
                     </Link>
                     <h1 className="text-2xl font-bold mt-3">Sync Sleeper Leagues</h1>
-                    <p className="text-gray-400 text-sm mt-1">Connect your Sleeper leagues to FantasyIQ Trust.</p>
+                    <p className="text-gray-400 text-sm mt-1">Connect your Sleeper leagues to FantasyiQ Trust.</p>
                 </div>
 
                 {/* Step indicator */}

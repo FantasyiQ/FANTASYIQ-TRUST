@@ -1,4 +1,4 @@
-// FantasyIQ Trust — Dynamic Trade Value Engine
+// FantasyiQ Trust — Dynamic Trade Value Engine
 // Formula: BaseValue × WeightedFactors (7 factors summing to 1.0)
 // Trade Score: 0–100 scale based on DTV differential
 // Dynasty vs Redraft use distinct weight sets

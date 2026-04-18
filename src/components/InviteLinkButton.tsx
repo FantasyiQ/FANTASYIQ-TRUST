@@ -47,7 +47,7 @@ export default function InviteLinkButton({ sleeperLeagueId, leagueName, season }
                 <p className="text-gray-300 text-sm font-medium">Invite Members</p>
                 <span className="text-gray-600 text-xs">Commissioner only</span>
             </div>
-            <p className="text-gray-500 text-xs">Share with league members so they can sign up and view this league on FantasyIQ Trust.</p>
+            <p className="text-gray-500 text-xs">Share with league members so they can sign up and view this league on FantasyiQ Trust.</p>
             {inviteUrl ? (
                 <div className="flex items-center gap-2">
                     <input

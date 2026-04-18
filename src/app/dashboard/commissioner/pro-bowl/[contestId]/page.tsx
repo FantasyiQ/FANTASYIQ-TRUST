@@ -139,7 +139,7 @@ export default async function ManageProBowlPage({ params }: { params: Promise<{ 
                 {contest.status === 'open' && (
                     <div className="bg-[#C8A951]/10 border border-[#C8A951]/30 rounded-2xl p-5">
                         <p className="text-sm font-semibold text-[#C8A951] mb-1">Share Entry Link</p>
-                        <p className="text-gray-400 text-xs mb-3">Send this link to your league members. They must have a FantasyIQ account to enter.</p>
+                        <p className="text-gray-400 text-xs mb-3">Send this link to your league members. They must have a FantasyiQ account to enter.</p>
                         <div className="flex items-center gap-2">
                             <code className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-300 truncate">
                                 {typeof window !== 'undefined' ? window.location.origin : ''}{entryUrl}

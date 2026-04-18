@@ -1,4 +1,4 @@
-// FantasyIQ Trust — Player Intelligence Layer
+// FantasyiQ Trust — Player Intelligence Layer
 // Provides: per-position age curves, team scheme data, contract tiers, draft capital
 // Used by trade-engine.ts to enhance DTV calculations
 
