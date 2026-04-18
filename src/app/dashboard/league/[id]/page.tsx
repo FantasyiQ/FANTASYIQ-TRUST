@@ -386,13 +386,16 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
 
                 {/* League header */}
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-                    <div className="flex items-center gap-4 flex-wrap">
+                    <div className="flex items-start gap-4">
+                        {/* Avatar */}
                         {league.avatar ? (
                             <Image src={`https://sleepercdn.com/avatars/thumbs/${league.avatar}`}
                                 alt={league.leagueName} width={64} height={64} className="rounded-xl shrink-0" />
                         ) : (
                             <div className="w-16 h-16 rounded-xl bg-gray-800 shrink-0 flex items-center justify-center text-2xl font-bold text-gray-600">FF</div>
                         )}
+
+                        {/* Name + subtitle — left column */}
                         <div className="flex-1 min-w-0">
                             <h1 className="text-2xl font-bold truncate">{league.leagueName}</h1>
                             <div className="flex items-center gap-3 mt-2 flex-wrap text-sm text-gray-400">
@@ -404,16 +407,30 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusBadge(league.status)}`}>
                                     {statusLabel(league.status)}
                                 </span>
-                                {(() => {
-                                    const tb = tierBadgeProps(effectiveTier);
-                                    if (!tb) return null;
-                                    return (
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${tb.className}`}>
-                                            {tb.label}
-                                        </span>
-                                    );
-                                })()}
                             </div>
+                        </div>
+
+                        {/* Tier badge + Manage link — right column */}
+                        <div className="flex flex-col items-end gap-2 shrink-0">
+                            {(() => {
+                                const tb = tierBadgeProps(effectiveTier);
+                                if (!tb) return null;
+                                return (
+                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${tb.className}`}>
+                                        {tb.label}
+                                    </span>
+                                );
+                            })()}
+                            {isCommissioner && (
+                                <Link
+                                    href={leagueDuesRecord
+                                        ? `/dashboard/commissioner/dues/${leagueDuesRecord.id}`
+                                        : '/dashboard/commissioner'}
+                                    className="text-sm text-[#C8A951]/70 hover:text-[#C8A951] font-medium transition whitespace-nowrap"
+                                >
+                                    Manage Dues →
+                                </Link>
+                            )}
                         </div>
                     </div>
                 </div>
