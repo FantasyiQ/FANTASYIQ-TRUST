@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import MemberRow from './MemberRow';
 import CreateProBowlButton from './CreateProBowlButton';
+import SyncMembersButton from './SyncMembersButton';
 
 function potProgress(paid: number, total: number) {
     if (total <= 0) return 0;
@@ -109,9 +110,12 @@ export default async function DuesTrackerPage({ params }: { params: Promise<{ du
 
                 {/* Roster */}
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+                    <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between gap-4">
                         <h2 className="font-bold">League Roster</h2>
-                        <span className="text-gray-500 text-sm">{dues.members.length} of {dues.teamCount} added</span>
+                        <div className="flex items-center gap-3">
+                            <span className="text-gray-500 text-sm">{dues.members.length} of {dues.teamCount} added</span>
+                            <SyncMembersButton duesId={duesId} />
+                        </div>
                     </div>
 
                     {dues.members.length === 0 ? (
@@ -134,8 +138,9 @@ export default async function DuesTrackerPage({ params }: { params: Promise<{ du
                     )}
 
                     {dues.members.length === 0 && (
-                        <div className="px-6 py-5 border-t border-gray-800 text-center">
-                            <p className="text-gray-500 text-sm">Roster will be imported automatically when Sleeper/ESPN integration is connected.</p>
+                        <div className="px-6 py-6 border-t border-gray-800 flex flex-col items-center gap-3">
+                            <p className="text-gray-500 text-sm">Your Sleeper league is connected — click below to import your roster.</p>
+                            <SyncMembersButton duesId={duesId} />
                         </div>
                     )}
                 </div>
