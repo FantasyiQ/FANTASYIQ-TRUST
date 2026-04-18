@@ -30,6 +30,7 @@ export interface SleeperMember {
 interface Props {
     initialDuesData: DuesManagerData | null;
     isCommissioner: boolean;
+    canInvite: boolean;
     leagueName: string;
     season: string;
     sleeperLeagueId: string;
@@ -69,6 +70,7 @@ function defaultPayoutSpots(pot: number) {
 export default function DuesManager({
     initialDuesData,
     isCommissioner,
+    canInvite,
     leagueName,
     season,
     sleeperLeagueId,
@@ -233,7 +235,7 @@ export default function DuesManager({
 
     // ── Invite block (commissioner-only, always rendered) ────────────────────
 
-    const inviteBlock = isCommissioner ? (
+    const inviteBlock = canInvite ? (
         <div className="bg-gray-800/40 border border-gray-700 rounded-xl p-4 space-y-2">
             <div className="flex items-center justify-between">
                 <p className="text-gray-300 text-sm font-medium">Invite Link</p>
@@ -280,9 +282,12 @@ export default function DuesManager({
     if (!duesData) {
         if (!isCommissioner) {
             return (
-                <p className="text-gray-500 text-sm text-center py-6">
-                    The commissioner has not configured dues for this league yet.
-                </p>
+                <div className="space-y-4">
+                    <p className="text-gray-500 text-sm text-center py-6">
+                        The commissioner has not configured dues for this league yet.
+                    </p>
+                    {inviteBlock}
+                </div>
             );
         }
 

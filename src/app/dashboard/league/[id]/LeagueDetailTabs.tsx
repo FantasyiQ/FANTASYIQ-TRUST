@@ -281,6 +281,7 @@ export default function LeagueDetailTabs({
                         <DuesManager
                             initialDuesData={duesData}
                             isCommissioner={isCommissioner}
+                            canInvite={true}
                             leagueName={leagueName}
                             season={season}
                             sleeperLeagueId={sleeperLeagueId}
