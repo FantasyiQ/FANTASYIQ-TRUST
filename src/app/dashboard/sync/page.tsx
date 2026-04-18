@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import type { SleeperLeague, SleeperUser } from '@/lib/sleeper';
 
 type Step = 'username' | 'select' | 'done';
@@ -39,7 +40,14 @@ function scoringLabel(league: SleeperLeague) {
     return 'Std';
 }
 
-export default function SyncPage() {
+function SyncPageInner() {
+    const router = useRouter();
+    const searchParams   = useSearchParams();
+    const inviteToken    = searchParams.get('invite');
+    const inviteLeagueId = searchParams.get('leagueId');
+    const inviteLeagueName = searchParams.get('leagueName');
+    const fromInvite = !!(inviteToken && inviteLeagueId);
+
     const [step, setStep]       = useState<Step>('username');
     const [username, setUsername] = useState('');
     const [loading, setLoading] = useState(false);
@@ -61,7 +69,17 @@ export default function SyncPage() {
             const data = await res.json() as LookupResult & { error?: string };
             if (!res.ok) { setError(data.error ?? 'Failed to look up username'); return; }
             setResult(data);
-            setSelected(new Set(data.leagues.map((l) => l.league_id)));
+            // When coming from an invite, pre-select only the invited league.
+            // If that league isn't found under this username, select all (graceful fallback).
+            if (fromInvite && inviteLeagueId) {
+                const hasInvited = data.leagues.some(l => l.league_id === inviteLeagueId);
+                setSelected(hasInvited
+                    ? new Set([inviteLeagueId])
+                    : new Set(data.leagues.map(l => l.league_id))
+                );
+            } else {
+                setSelected(new Set(data.leagues.map((l) => l.league_id)));
+            }
             setStep('select');
         } catch {
             setError('Network error — please try again');
@@ -92,6 +110,12 @@ export default function SyncPage() {
             const data = await res.json() as { synced?: number; error?: string };
             if (!res.ok) { setError(data.error ?? 'Sync failed'); return; }
             setSynced(data.synced ?? selected.size);
+            // If we came from an invite, loop back through the invite page.
+            // It will find the newly synced league and redirect to /dashboard/league/[id].
+            if (fromInvite && inviteToken) {
+                router.replace(`/invite/${inviteToken}`);
+                return;
+            }
             setStep('done');
         } catch {
             setError('Network error — please try again');
@@ -111,6 +135,21 @@ export default function SyncPage() {
                     <h1 className="text-2xl font-bold mt-3">Sync Sleeper Leagues</h1>
                     <p className="text-gray-400 text-sm mt-1">Connect your Sleeper leagues to FantasyiQ Trust.</p>
                 </div>
+
+                {/* Invite context banner */}
+                {fromInvite && inviteLeagueName && (
+                    <div className="bg-[#C8A951]/10 border border-[#C8A951]/30 rounded-xl px-4 py-3 flex items-start gap-3">
+                        <span className="text-xl shrink-0">🏆</span>
+                        <div>
+                            <p className="text-[#C8A951] font-semibold text-sm">
+                                You were invited to {inviteLeagueName}
+                            </p>
+                            <p className="text-gray-400 text-xs mt-0.5">
+                                Enter your Sleeper username below. We&apos;ll automatically select this league so you can join in one click.
+                            </p>
+                        </div>
+                    </div>
+                )}
 
                 {/* Step indicator */}
                 <div className="flex items-center gap-2 text-sm">
@@ -188,28 +227,38 @@ export default function SyncPage() {
                                 <div className="px-5 py-10 text-center text-gray-500 text-sm">No leagues found for {result.season}.</div>
                             ) : (
                                 <ul className="divide-y divide-gray-800/50">
-                                    {result.leagues.map((league) => (
-                                        <li key={league.league_id} onClick={() => toggleLeague(league.league_id)}
-                                            className="flex items-center gap-4 px-5 py-4 hover:bg-gray-800/30 cursor-pointer transition">
-                                            <input type="checkbox" checked={selected.has(league.league_id)}
-                                                onChange={() => toggleLeague(league.league_id)}
-                                                onClick={(e) => e.stopPropagation()}
-                                                className="w-4 h-4 rounded accent-[#C8A951]" />
-                                            {league.avatar ? (
-                                                <Image src={`https://sleepercdn.com/avatars/thumbs/${league.avatar}`}
-                                                    alt={league.name} width={36} height={36} className="rounded-lg shrink-0" />
-                                            ) : (
-                                                <div className="w-9 h-9 rounded-lg bg-gray-800 shrink-0 flex items-center justify-center text-gray-600 text-xs font-bold">FF</div>
-                                            )}
-                                            <div className="flex-1 min-w-0">
-                                                <p className="font-medium text-white truncate">{league.name}</p>
-                                                <p className="text-gray-500 text-xs mt-0.5">{league.total_rosters} teams · {scoringLabel(league)}</p>
-                                            </div>
-                                            <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${statusBadge(league.status)}`}>
-                                                {statusLabel(league.status)}
-                                            </span>
-                                        </li>
-                                    ))}
+                                    {result.leagues.map((league) => {
+                                        const isInvited = fromInvite && league.league_id === inviteLeagueId;
+                                        return (
+                                            <li key={league.league_id} onClick={() => toggleLeague(league.league_id)}
+                                                className={`flex items-center gap-4 px-5 py-4 cursor-pointer transition ${isInvited ? 'bg-[#C8A951]/5 hover:bg-[#C8A951]/10' : 'hover:bg-gray-800/30'}`}>
+                                                <input type="checkbox" checked={selected.has(league.league_id)}
+                                                    onChange={() => toggleLeague(league.league_id)}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="w-4 h-4 rounded accent-[#C8A951]" />
+                                                {league.avatar ? (
+                                                    <Image src={`https://sleepercdn.com/avatars/thumbs/${league.avatar}`}
+                                                        alt={league.name} width={36} height={36} className="rounded-lg shrink-0" />
+                                                ) : (
+                                                    <div className="w-9 h-9 rounded-lg bg-gray-800 shrink-0 flex items-center justify-center text-gray-600 text-xs font-bold">FF</div>
+                                                )}
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-medium text-white truncate">{league.name}</p>
+                                                    <p className="text-gray-500 text-xs mt-0.5">{league.total_rosters} teams · {scoringLabel(league)}</p>
+                                                </div>
+                                                <div className="shrink-0 flex items-center gap-2">
+                                                    {isInvited && (
+                                                        <span className="text-xs font-semibold text-[#C8A951] bg-[#C8A951]/10 border border-[#C8A951]/30 px-2 py-0.5 rounded-full">
+                                                            Invited
+                                                        </span>
+                                                    )}
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${statusBadge(league.status)}`}>
+                                                        {statusLabel(league.status)}
+                                                    </span>
+                                                </div>
+                                            </li>
+                                        );
+                                    })}
                                 </ul>
                             )}
                         </div>
@@ -246,5 +295,13 @@ export default function SyncPage() {
                 )}
             </div>
         </main>
+    );
+}
+
+export default function SyncPage() {
+    return (
+        <Suspense>
+            <SyncPageInner />
+        </Suspense>
     );
 }

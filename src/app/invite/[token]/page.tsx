@@ -14,14 +14,21 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
     if (!invite) notFound();
 
     // Already logged in — redirect to their League page if they have this league synced,
-    // otherwise send them to the dashboard (they'll need to connect Sleeper first).
+    // otherwise send them to the Sleeper sync flow with this league pre-selected.
     const session = await auth();
     if (session?.user?.id) {
         const userLeague = await prisma.league.findFirst({
             where: { userId: session.user.id, leagueId: invite.sleeperLeagueId },
             select: { id: true },
         });
-        redirect(userLeague ? `/dashboard/league/${userLeague.id}` : '/dashboard');
+        if (userLeague) {
+            redirect(`/dashboard/league/${userLeague.id}`);
+        }
+        // League not synced yet — send them to the sync page with this league pre-selected.
+        // After sync, the sync page loops back to /invite/[token], which will find the
+        // newly created League record and redirect to the correct league page.
+        const syncUrl = `/dashboard/sync?invite=${token}&leagueId=${invite.sleeperLeagueId}&leagueName=${encodeURIComponent(invite.leagueName)}`;
+        redirect(syncUrl);
     }
 
     // Not logged in — after OAuth/sign-up, loop back through this same invite page.
