@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { auth, signOut } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { stripe, priceIdToTier } from '@/lib/stripe';
 import { createPortalSession } from '@/app/actions/stripe';
 import ConnectedLeagues from '@/components/ConnectedLeagues';
 import SleeperLeaguesList from './SleeperLeaguesList';
@@ -102,21 +103,52 @@ export default async function DashboardPage() {
     const activeSubs = subscriptions.filter(
         s => s.status === 'active' || s.status === 'trialing'
     );
-    const playerSub  = activeSubs.find(s => s.type === 'player') ?? null;
-    const commSubs   = activeSubs
+    const rawPlayerSub = activeSubs.find(s => s.type === 'player') ?? null;
+    const commSubs     = activeSubs
         .filter(s => s.type === 'commissioner')
         .sort((a, b) => (a.leagueName ?? '').localeCompare(b.leagueName ?? ''));
+
+    // Verify player plan tier against Stripe — heals DB when webhook fires with stale metadata
+    // (e.g. billing-portal upgrades where subscription metadata retains the original checkout tier)
+    let playerSubTier: string = rawPlayerSub?.tier ?? 'FREE';
+    if (rawPlayerSub?.stripeSubscriptionId) {
+        try {
+            const stripeSub = await stripe.subscriptions.retrieve(rawPlayerSub.stripeSubscriptionId);
+            const currentPriceId = stripeSub.items.data[0]?.price.id;
+            const stripeTier = currentPriceId ? priceIdToTier(currentPriceId) : null;
+            if (stripeTier) {
+                playerSubTier = stripeTier;
+                // Passively heal stale tier fields in the background
+                if (stripeTier !== rawPlayerSub.tier) {
+                    prisma.subscription.update({
+                        where: { id: rawPlayerSub.id },
+                        data: { tier: stripeTier as SubscriptionTier },
+                    }).catch(() => {});
+                }
+                if (stripeTier !== subscriptionTier) {
+                    prisma.user.update({
+                        where: { email: session.user.email! },
+                        data: { subscriptionTier: stripeTier as SubscriptionTier },
+                    }).catch(() => {});
+                }
+            }
+        } catch {
+            // Stripe unreachable — fall back to DB value
+        }
+    }
+    const playerSub = rawPlayerSub ? { ...rawPlayerSub, tier: playerSubTier } : null;
 
     const syncedLeagueIdByName = new Map(
         leagues.map(l => [l.leagueName.toLowerCase().trim(), l.id])
     );
 
     const hasAnyActiveSub = activeSubs.length > 0;
-    const isElite = subscriptionTier === 'PLAYER_ELITE' || subscriptionTier === 'COMMISSIONER_ELITE';
+    const displayTier = (playerSubTier !== 'FREE' ? playerSubTier : subscriptionTier) as SubscriptionTier;
+    const isElite = displayTier === 'PLAYER_ELITE' || displayTier === 'COMMISSIONER_ELITE';
 
-    const leagueLimitKey = tierToLimitKey(subscriptionTier);
+    const leagueLimitKey = tierToLimitKey(displayTier);
     const leagueLimit    = getLeagueLimit(leagueLimitKey);
-    const nextTier       = nextTierName(subscriptionTier);
+    const nextTier       = nextTierName(displayTier);
 
     return (
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
@@ -201,7 +233,7 @@ export default async function DashboardPage() {
                                 }))}
                                 limit={leagueLimit}
                                 nextTier={nextTier}
-                                tierLabel={formatTier(subscriptionTier)}
+                                tierLabel={formatTier(displayTier)}
                             />
                         </>
                     ) : (

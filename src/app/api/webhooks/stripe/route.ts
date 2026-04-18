@@ -101,19 +101,21 @@ export async function POST(request: NextRequest): Promise<Response> {
                 const sub = event.data.object as Stripe.Subscription;
                 const customerId   = sub.customer as string;
                 const priceId      = sub.items.data[0]?.price.id;
-                const metaTier     = sub.metadata?.tier as SubscriptionTier | undefined;
                 const metaPlanType = sub.metadata?.planType;
                 const metaSize     = sub.metadata?.leagueSize ? parseInt(sub.metadata.leagueSize) : null;
 
                 if (!customerId) break;
 
-                // Derive from PLAN_CATALOG — price ID is authoritative over metadata
+                // Derive tier ONLY from PLAN_CATALOG — never fall back to subscription metadata.
+                // metadata.tier reflects the tier at the time of the ORIGINAL checkout, not the
+                // current plan. Using it as a fallback would revert the tier after a billing-portal
+                // upgrade where the price ID isn't yet in PLAN_CATALOG.
                 const info     = priceId ? planInfo(priceId) : null;
-                const tier     = info?.tier ?? metaTier ?? null;
+                const tier     = info?.tier ?? null;
                 const subType  = resolveSubType(tier, metaPlanType, info?.type);
                 const leagueSize = info?.leagueSize ?? metaSize ?? null;
 
-                if (!tier) break;
+                if (!tier) break;  // Price not in catalog — skip; don't revert the stored tier.
 
                 const user = await prisma.user.findUnique({
                     where: { stripeCustomerId: customerId },
