@@ -83,7 +83,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
         select: {
             id: true, userId: true, leagueId: true, leagueName: true,
             season: true, status: true, totalRosters: true, scoringType: true,
-            avatar: true, rosterPositions: true,
+            avatar: true, rosterPositions: true, sleeperUserId: true,
         },
     });
 
@@ -148,6 +148,17 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
             },
         }),
     ]);
+
+    // ── Sleeper user identity ─────────────────────────────────────────────────
+    // User.sleeperUserId is set during sync. League.sleeperUserId is a fallback for users
+    // who synced before User.sleeperUserId was persisted. Heal User record if needed.
+    const mySleeperUserId = dbUser?.sleeperUserId ?? league.sleeperUserId ?? null;
+    if (!dbUser?.sleeperUserId && league.sleeperUserId) {
+        prisma.user.update({
+            where: { id: session.user.id },
+            data: { sleeperUserId: league.sleeperUserId },
+        }).catch(() => {});
+    }
 
     // ── Access control ────────────────────────────────────────────────────────
     const activePlayerSub = dbUser?.subscriptions.find(s => s.type === 'player') ?? null;
@@ -261,7 +272,9 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
         ownedPicks: computeOwnedPicks(row.roster.roster_id),
     }));
 
-    const myTeamData     = teamTradeData.find(t => rosters.find(r => r.roster_id === t.rosterId)?.owner_id === dbUser?.sleeperUserId);
+    const myTeamData     = mySleeperUserId
+        ? teamTradeData.find(t => rosters.find(r => r.roster_id === t.rosterId)?.owner_id === mySleeperUserId)
+        : undefined;
     const otherTeamsData = teamTradeData.filter(t => t.rosterId !== myTeamData?.rosterId);
 
     const teamRosters: TeamRosterData[] = rows.map(row => {
@@ -333,10 +346,9 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
     };
 
     // Commissioner check: Sleeper marks the commissioner via is_owner on the member list.
-    // Use String() on both sides to guard against type/whitespace mismatches.
     const commissionerSleeperUserId = members.find(m => m.is_owner)?.user_id;
-    const isCommissioner = !!commissionerSleeperUserId &&
-        String(commissionerSleeperUserId).trim() === String(dbUser?.sleeperUserId ?? '').trim();
+    const isCommissioner = !!commissionerSleeperUserId && !!mySleeperUserId &&
+        String(commissionerSleeperUserId).trim() === String(mySleeperUserId).trim();
 
     // Serialised member list for dues setup form (displayName + teamName from Sleeper rosters)
     const sleeperMembers = rows.map(row => ({

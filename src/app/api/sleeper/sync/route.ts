@@ -41,6 +41,7 @@ export async function POST(request: NextRequest): Promise<Response> {
                         scoringType: deriveScoringType(league),
                         avatar: league.avatar,
                         rosterPositions: league.roster_positions,
+                        sleeperUserId,
                         lastSyncedAt: new Date(),
                     },
                     update: {
@@ -51,6 +52,7 @@ export async function POST(request: NextRequest): Promise<Response> {
                         scoringType: deriveScoringType(league),
                         avatar: league.avatar,
                         rosterPositions: league.roster_positions,
+                        sleeperUserId,
                         lastSyncedAt: new Date(),
                     },
                 })
