@@ -410,11 +410,17 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                             </div>
                         </div>
 
-                        {/* Tier badge + Manage link — right column */}
-                        <div className="flex flex-col items-end gap-2 shrink-0">
+                        {/* Tier badge (top) + Manage Dues (bottom) — right column */}
+                        <div className="flex flex-col items-end justify-between self-stretch shrink-0">
                             {(() => {
-                                const tb = tierBadgeProps(effectiveTier);
-                                if (!tb) return null;
+                                // Badge shows the user's OWN tier, not effectiveTier which can be
+                                // inflated by the commissioner's plan (used for feature gating only).
+                                // For commissioners without a player plan, show their commissioner tier.
+                                const ownTier = playerTier !== 'FREE'
+                                    ? playerTier
+                                    : (isCommissioner ? (commSubForLeague?.tier ?? 'FREE') : 'FREE');
+                                const tb = tierBadgeProps(ownTier);
+                                if (!tb) return <span />;  // keep justify-between spacing
                                 return (
                                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${tb.className}`}>
                                         {tb.label}
