@@ -21,8 +21,12 @@ export default function InviteLinkButton({ sleeperLeagueId, leagueName, season }
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ leagueName, season }),
             });
-            const data = await res.json() as { url?: string; error?: string };
-            if (res.ok && data.url) setInviteUrl(data.url);
+            const data = await res.json() as { path?: string; error?: string };
+            if (res.ok && data.path) {
+                // Build the full URL from the current origin so it always
+                // uses the correct production domain, not an env var.
+                setInviteUrl(`${window.location.origin}${data.path}`);
+            }
         } catch {
             // silently fail
         } finally {
