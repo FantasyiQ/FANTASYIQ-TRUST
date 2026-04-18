@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getLeagueUsers } from '@/lib/sleeper';
 
 export async function POST(
     request: NextRequest,
@@ -12,9 +13,23 @@ export async function POST(
 
     const user = await prisma.user.findUnique({
         where: { email: session.user.email },
-        select: { id: true },
+        select: { id: true, sleeperUserId: true },
     });
     if (!user) return Response.json({ error: 'User not found.' }, { status: 404 });
+
+    // Verify the requesting user is the commissioner (is_owner) of this Sleeper league.
+    if (!user.sleeperUserId) {
+        return Response.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    try {
+        const members = await getLeagueUsers(leagueId);
+        const commissioner = members.find(m => m.is_owner);
+        if (!commissioner || String(commissioner.user_id).trim() !== String(user.sleeperUserId).trim()) {
+            return Response.json({ error: 'Forbidden' }, { status: 403 });
+        }
+    } catch {
+        return Response.json({ error: 'Could not verify commissioner status' }, { status: 502 });
+    }
 
     const body = await request.json() as { leagueName?: string; season?: string };
     const { leagueName, season } = body;
