@@ -13,14 +13,23 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
 
     if (!invite) notFound();
 
-    const leaguePath = `/dashboard/league/${invite.sleeperLeagueId}`;
-
-    // Already logged in — send directly to the league page
+    // Already logged in — redirect to their League page if they have this league synced,
+    // otherwise send them to the dashboard (they'll need to connect Sleeper first).
     const session = await auth();
-    if (session?.user) redirect(leaguePath);
+    if (session?.user?.id) {
+        const userLeague = await prisma.league.findFirst({
+            where: { userId: session.user.id, leagueId: invite.sleeperLeagueId },
+            select: { id: true },
+        });
+        redirect(userLeague ? `/dashboard/league/${userLeague.id}` : '/dashboard');
+    }
 
-    const signInHref = `/sign-in?redirect=${encodeURIComponent(leaguePath)}`;
-    const signUpHref = `/sign-up?redirect=${encodeURIComponent(leaguePath)}`;
+    // Not logged in — after OAuth/sign-up, loop back through this same invite page.
+    // The server-side logged-in branch above will then look up the correct DB League ID
+    // and redirect to the actual league page (or /dashboard if not synced yet).
+    const invitePath = `/invite/${token}`;
+    const signInHref = `/sign-in?redirect=${encodeURIComponent(invitePath)}`;
+    const signUpHref = `/sign-up?redirect=${encodeURIComponent(invitePath)}`;
 
     return (
         <main className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-6">

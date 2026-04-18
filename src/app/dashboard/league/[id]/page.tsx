@@ -12,8 +12,10 @@ import {
     type SleeperLeagueMember, type SleeperRoster,
 } from '@/lib/sleeper';
 import { effectiveTierForLeague, tierLevel } from '@/lib/league-limits';
+import { stripe, priceIdToTier } from '@/lib/stripe';
 import { DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
 import type { LeagueSettings, LeagueType } from '@/lib/trade-engine';
+import type { SubscriptionTier } from '@prisma/client';
 import type { TeamRosterData } from './RosterCards';
 import LeagueTradeEvaluator from './LeagueTradeEvaluator';
 import LeagueDetailTabs, { type StandingRow, type DuesData, type AnnouncementData, type SleeperSettings } from './LeagueDetailTabs';
@@ -41,6 +43,13 @@ function statusLabel(status: string) {
         case 'complete':   return 'Complete';
         default:           return status;
     }
+}
+
+function tierBadgeProps(tier: string): { label: string; className: string } | null {
+    if (tier.includes('ELITE'))   return { label: 'Elite ✦', className: 'bg-[#C8A951]/20 text-[#C8A951] border-[#C8A951]/40' };
+    if (tier.includes('ALL_PRO')) return { label: 'All-Pro',  className: 'bg-[#C8A951]/10 text-[#C8A951]/80 border-[#C8A951]/30' };
+    if (tier.includes('_PRO'))    return { label: 'Pro',      className: 'bg-blue-900/40 text-blue-400 border-blue-800' };
+    return null;
 }
 
 function buildLeagueSettings(rosterPositions: string[], scoringSettings: Record<string, number> | null | undefined): LeagueSettings {
@@ -100,7 +109,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                 subscriptions: {
                     where: { status: { in: ['active', 'trialing'] } },
                     orderBy: { createdAt: 'desc' },
-                    select: { type: true, tier: true, leagueName: true },
+                    select: { id: true, type: true, tier: true, leagueName: true, stripeSubscriptionId: true },
                 },
                 leagues: { select: { id: true, leagueName: true } },
             },
@@ -147,7 +156,25 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
 
     // ── Access control ────────────────────────────────────────────────────────
     const activePlayerSub = dbUser?.subscriptions.find(s => s.type === 'player') ?? null;
-    const playerTier = activePlayerSub?.tier ?? 'FREE';
+
+    // Verify player tier against Stripe so feature gating is accurate after billing-portal upgrades.
+    let playerTier: string = activePlayerSub?.tier ?? 'FREE';
+    if (activePlayerSub?.stripeSubscriptionId) {
+        try {
+            const stripeSub = await stripe.subscriptions.retrieve(activePlayerSub.stripeSubscriptionId);
+            const currentPriceId = stripeSub.items.data[0]?.price.id;
+            const stripeTier = currentPriceId ? priceIdToTier(currentPriceId) : null;
+            if (stripeTier) {
+                playerTier = stripeTier;
+                if (stripeTier !== activePlayerSub.tier) {
+                    prisma.subscription.update({
+                        where: { id: activePlayerSub.id },
+                        data: { tier: stripeTier as SubscriptionTier },
+                    }).catch(() => {});
+                }
+            }
+        } catch { /* Stripe unreachable — fall back to DB */ }
+    }
 
     const syncedNameToId = new Map(
         (dbUser?.leagues ?? []).map(l => [l.leagueName.toLowerCase().trim(), l.id])
@@ -377,6 +404,15 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusBadge(league.status)}`}>
                                     {statusLabel(league.status)}
                                 </span>
+                                {(() => {
+                                    const tb = tierBadgeProps(effectiveTier);
+                                    if (!tb) return null;
+                                    return (
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${tb.className}`}>
+                                            {tb.label}
+                                        </span>
+                                    );
+                                })()}
                             </div>
                         </div>
                     </div>
