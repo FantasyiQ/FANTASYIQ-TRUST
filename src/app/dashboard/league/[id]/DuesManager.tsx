@@ -321,83 +321,91 @@ export default function DuesManager({
                     </div>
                 )}
 
-                {/* Buy-in */}
+                {/* Buy-in + Total Pot */}
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1.5">Buy-In Per Team</label>
                         <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none">$</span>
                             <input
-                                type="number" min="1" step="0.01"
+                                type="text"
+                                inputMode="decimal"
                                 value={buyIn}
                                 onChange={e => handleBuyInChange(e.target.value)}
                                 placeholder="100"
-                                className="w-full bg-gray-800 border border-gray-700 rounded-xl pl-7 pr-4 py-2.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#C8A951]/60"
+                                className="w-full bg-gray-800 border border-gray-700 rounded-xl pl-7 pr-4 py-3 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#C8A951]/60"
                             />
                         </div>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1.5">Total Pot</label>
-                        <div className="bg-gray-800/40 border border-gray-700 rounded-xl px-4 py-2.5 text-sm">
+                        <div className="bg-gray-800/40 border border-gray-700 rounded-xl px-4 py-3 text-sm min-h-[46px] flex items-center gap-2">
                             {potPreview > 0 ? (
-                                <span className="text-[#C8A951] font-bold">${potPreview.toFixed(0)}</span>
+                                <>
+                                    <span className="text-[#C8A951] font-bold">${potPreview.toFixed(0)}</span>
+                                    <span className="text-gray-600 text-xs">{totalRosters} × ${parseFloat(buyIn || '0').toFixed(0)}</span>
+                                </>
                             ) : (
                                 <span className="text-gray-600">auto-calculated</span>
-                            )}
-                            {potPreview > 0 && (
-                                <span className="text-gray-500 text-xs ml-2">{totalRosters} teams × ${parseFloat(buyIn || '0').toFixed(0)}</span>
                             )}
                         </div>
                     </div>
                 </div>
 
-                {/* Payout spots */}
-                <div>
-                    <div className="flex items-center justify-between mb-2">
+                {/* Payout structure */}
+                <div className="bg-gray-800/30 border border-gray-700/50 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
                         <label className="text-sm font-medium text-gray-300">Payout Structure</label>
                         {remaining !== null && (
                             <span className={`text-xs font-semibold ${Math.abs(remaining) < 0.01 ? 'text-green-400' : remaining > 0 ? 'text-yellow-400' : 'text-red-400'}`}>
-                                {Math.abs(remaining) < 0.01 ? '✓ Balanced' : remaining > 0 ? `$${remaining.toFixed(0)} unallocated` : `$${Math.abs(remaining).toFixed(0)} over budget`}
+                                {Math.abs(remaining) < 0.01 ? '✓ Balanced' : remaining > 0 ? `$${remaining.toFixed(0)} left` : `$${Math.abs(remaining).toFixed(0)} over`}
                             </span>
                         )}
                     </div>
+
                     <div className="space-y-2">
                         {payoutSpots.map((spot, i) => (
-                            <div key={i} className="flex items-center gap-2">
+                            <div key={i} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                {/* Label */}
                                 <input
                                     type="text"
                                     value={spot.label}
                                     onChange={e => updatePayoutSpot(i, 'label', e.target.value)}
                                     placeholder="e.g. 1st Place"
-                                    className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#C8A951]/60"
+                                    className="flex-1 min-w-0 bg-gray-800 border border-gray-700 rounded-lg px-3 py-3 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#C8A951]/60"
                                 />
-                                <div className="relative w-28">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
-                                    <input
-                                        type="number" min="0" step="1"
-                                        value={spot.amount}
-                                        onChange={e => updatePayoutSpot(i, 'amount', e.target.value)}
-                                        placeholder="0"
-                                        className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-7 pr-3 py-2 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#C8A951]/60"
-                                    />
+                                {/* Amount */}
+                                <div className="flex items-center gap-2">
+                                    <div className="relative flex-1 sm:flex-none sm:w-32">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none select-none">$</span>
+                                        <input
+                                            type="text"
+                                            inputMode="decimal"
+                                            value={spot.amount}
+                                            onChange={e => updatePayoutSpot(i, 'amount', e.target.value)}
+                                            placeholder="0"
+                                            className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-7 pr-3 py-3 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#C8A951]/60"
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => removePayoutLine(i)}
+                                        className="shrink-0 w-10 h-10 flex items-center justify-center text-gray-600 hover:text-red-400 transition rounded-lg hover:bg-red-900/20"
+                                    >
+                                        ✕
+                                    </button>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => removePayoutLine(i)}
-                                    className="text-gray-700 hover:text-red-400 text-sm transition px-1"
-                                >
-                                    ✕
-                                </button>
                             </div>
                         ))}
-                        <button
-                            type="button"
-                            onClick={addPayoutLine}
-                            className="text-xs text-[#C8A951]/70 hover:text-[#C8A951] font-medium transition"
-                        >
-                            + Add payout line
-                        </button>
                     </div>
+
+                    <button
+                        type="button"
+                        onClick={addPayoutLine}
+                        className="text-xs text-[#C8A951]/70 hover:text-[#C8A951] font-medium transition"
+                    >
+                        + Add payout line
+                    </button>
                 </div>
 
                 {/* Teams preview */}
