@@ -111,6 +111,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
         }),
         prisma.subscription.findFirst({
             where: {
+                userId: session.user.id,
                 type: 'commissioner',
                 leagueName: { equals: league.leagueName, mode: 'insensitive' },
                 status: { in: ['active', 'trialing'] },
