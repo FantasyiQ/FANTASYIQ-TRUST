@@ -8,6 +8,12 @@ import { prisma } from '../../../lib/prisma';
 
 export type AuthActionState = { error: string } | null;
 
+function safeRedirectTo(value: FormDataEntryValue | null): string {
+    const str = typeof value === 'string' ? value.trim() : '';
+    // Only allow relative paths (no open redirect)
+    return str && str.startsWith('/') && !str.startsWith('//') ? str : '/dashboard';
+}
+
 export async function signUpAction(
     _prevState: AuthActionState,
     formData: FormData
@@ -15,6 +21,7 @@ export async function signUpAction(
     const name = (formData.get('name') as string)?.trim();
     const email = (formData.get('email') as string)?.trim().toLowerCase();
     const password = formData.get('password') as string;
+    const redirectTo = safeRedirectTo(formData.get('redirectTo'));
 
     if (!name || !email || !password) {
         return { error: 'All fields are required.' };
@@ -35,7 +42,7 @@ export async function signUpAction(
     });
 
     // Auto sign-in after account creation — signIn throws a redirect internally.
-    await signIn('credentials', { email, password, redirectTo: '/dashboard' });
+    await signIn('credentials', { email, password, redirectTo });
 
     // Unreachable — signIn redirects. Satisfy the return type.
     return null;
@@ -47,13 +54,14 @@ export async function signInAction(
 ): Promise<AuthActionState> {
     const email = (formData.get('email') as string)?.trim().toLowerCase();
     const password = formData.get('password') as string;
+    const redirectTo = safeRedirectTo(formData.get('redirectTo'));
 
     if (!email || !password) {
         return { error: 'Email and password are required.' };
     }
 
     try {
-        await signIn('credentials', { email, password, redirectTo: '/dashboard' });
+        await signIn('credentials', { email, password, redirectTo });
     } catch (error) {
         if (error instanceof AuthError) {
             return { error: 'Invalid email or password.' };
@@ -65,8 +73,9 @@ export async function signInAction(
     return null;
 }
 
-export async function signInWithGoogle(): Promise<never> {
-    await signIn('google', { redirectTo: '/dashboard' });
+export async function signInWithGoogle(formData: FormData): Promise<never> {
+    const redirectTo = safeRedirectTo(formData.get('redirectTo'));
+    await signIn('google', { redirectTo });
     // signIn always redirects; redirect here satisfies the return type.
-    redirect('/dashboard');
+    redirect(redirectTo);
 }

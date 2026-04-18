@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
+import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
 export default async function InvitePage({ params }: { params: Promise<{ token: string }> }) {
@@ -7,10 +8,19 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
 
     const invite = await prisma.leagueInvite.findUnique({
         where: { token },
-        select: { leagueName: true, season: true },
+        select: { leagueName: true, season: true, sleeperLeagueId: true },
     });
 
     if (!invite) notFound();
+
+    const leaguePath = `/dashboard/league/${invite.sleeperLeagueId}`;
+
+    // Already logged in — send directly to the league page
+    const session = await auth();
+    if (session?.user) redirect(leaguePath);
+
+    const signInHref = `/sign-in?redirect=${encodeURIComponent(leaguePath)}`;
+    const signUpHref = `/sign-up?redirect=${encodeURIComponent(leaguePath)}`;
 
     return (
         <main className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-6">
@@ -38,13 +48,13 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
 
                 <div className="space-y-3">
                     <Link
-                        href="/sign-in?redirect=/dashboard"
+                        href={signInHref}
                         className="block bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold py-3 px-6 rounded-xl transition text-sm"
                     >
                         Sign In to Get Started →
                     </Link>
                     <Link
-                        href="/sign-up?redirect=/dashboard"
+                        href={signUpHref}
                         className="block bg-gray-800 hover:bg-gray-700 text-white font-semibold py-3 px-6 rounded-xl transition text-sm"
                     >
                         Create a Free Account
