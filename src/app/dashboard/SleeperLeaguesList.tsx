@@ -1,9 +1,18 @@
 'use client';
 
+import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { unsyncLeague } from '@/app/actions/leagues';
 import { tierBadgeProps } from '@/lib/tier-badge';
+
+function RefreshIcon({ className }: { className?: string }) {
+    return (
+        <svg className={className} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+        </svg>
+    );
+}
 
 interface League {
     id: string;
@@ -52,7 +61,33 @@ function formatSyncTime(date: Date | null): string {
     return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-export default function SleeperLeaguesList({ leagues, playerTier, commSubs }: Props) {
+export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier, commSubs }: Props) {
+    const [leagues, setLeagues] = useState<League[]>(initialLeagues);
+    const [syncingId, setSyncingId] = useState<string | null>(null);
+    const [syncError, setSyncError] = useState<{ id: string; message: string } | null>(null);
+
+    async function handleSync(leagueId: string) {
+        if (syncingId) return;
+        setSyncingId(leagueId);
+        setSyncError(null);
+        try {
+            const res = await fetch(`/api/sleeper/leagues/${leagueId}/refresh`, { method: 'POST' });
+            if (!res.ok) {
+                const data = await res.json() as { error?: string };
+                const message = data.error ?? 'Sync failed';
+                setSyncError({ id: leagueId, message });
+                setTimeout(() => setSyncError(null), 3000);
+                return;
+            }
+            const updated = await res.json() as League;
+            setLeagues(prev => prev.map(l => l.id === leagueId ? { ...l, ...updated } : l));
+        } catch {
+            setSyncError({ id: leagueId, message: 'Network error' });
+            setTimeout(() => setSyncError(null), 3000);
+        } finally {
+            setSyncingId(null);
+        }
+    }
 
     if (leagues.length === 0) {
         return (
@@ -117,6 +152,19 @@ export default function SleeperLeaguesList({ leagues, playerTier, commSubs }: Pr
                                 <span className="text-[#C8A951] text-sm font-semibold whitespace-nowrap">View →</span>
                             </div>
                         </Link>
+                        <div className="flex flex-col items-center gap-1">
+                            <button
+                                onClick={() => handleSync(league.id)}
+                                disabled={syncingId !== null}
+                                title="Sync league data from Sleeper"
+                                className="p-1.5 rounded-full text-gray-600 hover:text-[#C8A951] hover:bg-[#C8A951]/10 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                <RefreshIcon className={`w-3.5 h-3.5 ${syncingId === league.id ? 'animate-spin' : ''}`} />
+                            </button>
+                            {syncError?.id === league.id && (
+                                <span className="text-red-400 text-xs max-w-[60px] text-center leading-tight">{syncError.message}</span>
+                            )}
+                        </div>
                         <form action={unsyncLeague.bind(null, league.leagueId)}>
                             <button type="submit" title="Unsync"
                                 className="text-gray-600 hover:text-red-400 transition text-sm px-2 py-1 rounded">
