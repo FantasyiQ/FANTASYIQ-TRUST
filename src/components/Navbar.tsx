@@ -25,8 +25,6 @@ export default async function Navbar() {
           Fantasy<span className="text-[#C9A227]">i</span>Q Trust
         </Link>
         <div className="flex items-center gap-3 sm:gap-6">
-          <Link href="/" className="text-gray-300 hover:text-white transition text-sm sm:text-base whitespace-nowrap">Home</Link>
-
           {loggedIn ? (
             <>
               <Link
