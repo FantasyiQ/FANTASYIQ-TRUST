@@ -116,6 +116,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                 leagueName: { equals: league.leagueName, mode: 'insensitive' },
                 status: { in: ['active', 'trialing'] },
             },
+            orderBy: { createdAt: 'desc' },
             select: { tier: true },
         }),
         // Dues + payouts + announcements for THIS league only
@@ -145,7 +146,6 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                         author: { select: { name: true } },
                     },
                     orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
-                    take: 3,
                 },
             },
         }),

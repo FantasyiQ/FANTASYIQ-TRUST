@@ -73,8 +73,8 @@ type Tab = 'overview' | 'trade' | 'commish' | 'roster-values';
 
 const TABS: { id: Tab; label: string }[] = [
     { id: 'overview',      label: 'League Overview' },
-    { id: 'trade',         label: 'Trade Evaluator' },
     { id: 'commish',       label: 'Commissioner Hub' },
+    { id: 'trade',         label: 'Trade Evaluator' },
     { id: 'roster-values', label: 'Roster Values' },
 ];
 
@@ -222,6 +222,145 @@ function PlayerRankingsCard({
     );
 }
 
+// ── Inline Announcements Section ─────────────────────────────────────────────
+
+function AnnouncementsSection({
+    initialAnnouncements,
+    duesId,
+    isCommissioner,
+}: {
+    initialAnnouncements: AnnouncementData[];
+    duesId: string | null;
+    isCommissioner: boolean;
+}) {
+    const [items, setItems] = useState<AnnouncementData[]>(initialAnnouncements);
+    const [body, setBody] = useState('');
+    const [mediaUrl, setMediaUrl] = useState('');
+    const [posting, setPosting] = useState(false);
+    const [postError, setPostError] = useState('');
+
+    async function handlePost() {
+        if (!body.trim() || !duesId) return;
+        setPosting(true);
+        setPostError('');
+        try {
+            const res = await fetch(`/api/dues/${duesId}/announcements`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ body: body.trim(), mediaUrl: mediaUrl.trim() || undefined }),
+            });
+            if (!res.ok) {
+                const data = await res.json() as { error?: string };
+                setPostError(data.error ?? 'Failed to post.');
+                return;
+            }
+            const raw = await res.json() as { id: string; body: string; mediaUrl?: string | null; pinned: boolean; createdAt: string; author?: { name?: string | null } };
+            const ann: AnnouncementData = {
+                id: raw.id, body: raw.body, mediaUrl: raw.mediaUrl ?? null,
+                pinned: raw.pinned, createdAt: raw.createdAt, authorName: raw.author?.name ?? null,
+            };
+            setItems(prev => [ann, ...prev]);
+            setBody('');
+            setMediaUrl('');
+        } finally {
+            setPosting(false);
+        }
+    }
+
+    async function handleDelete(id: string) {
+        if (!duesId) return;
+        await fetch(`/api/dues/${duesId}/announcements/${id}`, { method: 'DELETE' });
+        setItems(prev => prev.filter(a => a.id !== id));
+    }
+
+    async function handleTogglePin(id: string) {
+        if (!duesId) return;
+        const res = await fetch(`/api/dues/${duesId}/announcements/${id}`, { method: 'PATCH' });
+        if (res.ok) {
+            const raw = await res.json() as { id: string; pinned: boolean };
+            setItems(prev =>
+                [...prev.map(a => a.id === raw.id ? { ...a, pinned: raw.pinned } : a)]
+                    .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) ||
+                        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            );
+        }
+    }
+
+    return (
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+            <h2 className="font-semibold text-lg mb-4">League Announcements</h2>
+
+            {isCommissioner && duesId && (
+                <div className="mb-6 space-y-3 bg-gray-800/40 rounded-xl p-4">
+                    <textarea
+                        value={body}
+                        onChange={e => setBody(e.target.value)}
+                        placeholder="Write an announcement for your league…"
+                        rows={3}
+                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/50 resize-none"
+                    />
+                    <input
+                        value={mediaUrl}
+                        onChange={e => setMediaUrl(e.target.value)}
+                        placeholder="Image / GIF URL (optional)"
+                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/50"
+                    />
+                    {postError && <p className="text-red-400 text-xs">{postError}</p>}
+                    <button
+                        onClick={handlePost}
+                        disabled={posting || !body.trim()}
+                        className="bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-50 disabled:cursor-not-allowed text-gray-950 font-semibold px-4 py-2 rounded-lg text-sm transition"
+                    >
+                        {posting ? 'Posting…' : '+ Post Announcement'}
+                    </button>
+                </div>
+            )}
+
+            {items.length > 0 ? (
+                <div className="space-y-4">
+                    {items.map(a => (
+                        <div key={a.id} className="bg-gray-800/40 rounded-xl p-4">
+                            {a.pinned && (
+                                <span className="text-xs font-semibold text-[#C8A951] mb-1 block">📌 Pinned</span>
+                            )}
+                            <p className="text-gray-200 text-sm leading-relaxed">{a.body}</p>
+                            {a.mediaUrl && (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={a.mediaUrl} alt="announcement media"
+                                    className="mt-3 max-h-40 rounded-lg object-contain" />
+                            )}
+                            <div className="flex items-center justify-between mt-2">
+                                <p className="text-gray-600 text-xs">
+                                    {a.authorName && `${a.authorName} · `}
+                                    {new Date(a.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </p>
+                                {isCommissioner && (
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={() => handleTogglePin(a.id)}
+                                            className="text-xs text-gray-500 hover:text-[#C8A951] transition"
+                                        >
+                                            {a.pinned ? 'Unpin' : 'Pin'}
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(a.id)}
+                                            className="text-xs text-red-500 hover:text-red-400 transition"
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <p className="text-gray-500 text-sm">No announcements yet.</p>
+            )}
+        </div>
+    );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function LeagueDetailTabs({
@@ -275,66 +414,7 @@ export default function LeagueDetailTabs({
             {activeTab === 'overview' && (
                 <div className="space-y-4">
 
-                    {/* Card 1: League Dues & Payouts */}
-                    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-                        <h2 className="font-semibold text-lg mb-4">League Dues & Payouts</h2>
-                        <DuesManager
-                            initialDuesData={duesData}
-                            isCommissioner={isCommissioner}
-                            canInvite={isCommissioner}
-                            leagueName={leagueName}
-                            season={season}
-                            sleeperLeagueId={sleeperLeagueId}
-                            totalRosters={totalRosters}
-                            sleeperMembers={sleeperMembers}
-                        />
-                    </div>
-
-                    {/* Card 2: League Announcements (moved up) */}
-                    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="font-semibold text-lg">League Announcements</h2>
-                            <div className="flex items-center gap-3">
-                                {isCommissioner && (
-                                    <a
-                                        href="/dashboard/commissioner"
-                                        className="text-xs font-semibold bg-[#C8A951]/10 hover:bg-[#C8A951]/20 border border-[#C8A951]/30 text-[#C8A951] px-3 py-1.5 rounded-lg transition"
-                                    >
-                                        + Post Announcement
-                                    </a>
-                                )}
-                                <a href="/dashboard/commissioner"
-                                    className="text-[#C8A951]/70 hover:text-[#C8A951] text-sm font-medium transition">
-                                    View All →
-                                </a>
-                            </div>
-                        </div>
-                        {announcements.length > 0 ? (
-                            <div className="space-y-4">
-                                {announcements.map(a => (
-                                    <div key={a.id} className="bg-gray-800/40 rounded-xl p-4">
-                                        {a.pinned && (
-                                            <span className="text-xs font-semibold text-[#C8A951] mb-1 block">📌 Pinned</span>
-                                        )}
-                                        <p className="text-gray-200 text-sm leading-relaxed">{a.body}</p>
-                                        {a.mediaUrl && (
-                                            // eslint-disable-next-line @next/next/no-img-element
-                                            <img src={a.mediaUrl} alt="announcement media"
-                                                className="mt-3 max-h-40 rounded-lg object-contain" />
-                                        )}
-                                        <p className="text-gray-600 text-xs mt-2">
-                                            {a.authorName && `${a.authorName} · `}
-                                            {new Date(a.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                        </p>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-gray-500 text-sm">No announcements for this league yet.</p>
-                        )}
-                    </div>
-
-                    {/* Card 3: Standings (collapsible) */}
+                    {/* Card 1: Standings (collapsible) */}
                     <CollapsibleCard title="Standings">
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
@@ -482,18 +562,48 @@ export default function LeagueDetailTabs({
 
             {/* ── Commissioner Hub tab ─────────────────────────────────── */}
             {activeTab === 'commish' && (
-                <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center space-y-4">
-                    <div className="text-4xl">🏆</div>
-                    <h2 className="text-xl font-bold">{leagueName}</h2>
-                    <p className="text-gray-400 text-sm max-w-sm mx-auto">
-                        Manage dues, payouts, announcements, polls, and league documents from the Commissioner Hub.
-                    </p>
-                    <a
-                        href="/dashboard/commissioner"
-                        className="inline-block bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-6 py-3 rounded-xl transition text-sm"
-                    >
-                        Open Commissioner Hub →
-                    </a>
+                <div className="space-y-4">
+
+                    {/* Dues & Payouts */}
+                    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+                        <h2 className="font-semibold text-lg mb-4">League Dues & Payouts</h2>
+                        <DuesManager
+                            initialDuesData={duesData}
+                            isCommissioner={isCommissioner}
+                            canInvite={isCommissioner}
+                            leagueName={leagueName}
+                            season={season}
+                            sleeperLeagueId={sleeperLeagueId}
+                            totalRosters={totalRosters}
+                            sleeperMembers={sleeperMembers}
+                        />
+                    </div>
+
+                    {/* Announcements */}
+                    <AnnouncementsSection
+                        initialAnnouncements={announcements}
+                        duesId={duesData?.id ?? null}
+                        isCommissioner={isCommissioner}
+                    />
+
+                    {/* Season Calendar placeholder */}
+                    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center space-y-3">
+                        <div className="text-3xl">📅</div>
+                        <h3 className="font-semibold text-base">Season Calendar</h3>
+                        <p className="text-gray-500 text-sm max-w-sm mx-auto">
+                            Key dates, trade deadlines, and playoff schedules — coming soon.
+                        </p>
+                    </div>
+
+                    {/* Pro Bowl Contest placeholder */}
+                    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center space-y-3">
+                        <div className="text-3xl">🏆</div>
+                        <h3 className="font-semibold text-base">Pro Bowl Contest</h3>
+                        <p className="text-gray-500 text-sm max-w-sm mx-auto">
+                            Week 18 DK-style free contest for your league — coming soon.
+                        </p>
+                    </div>
+
                 </div>
             )}
 
