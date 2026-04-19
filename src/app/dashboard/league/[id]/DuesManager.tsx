@@ -16,6 +16,7 @@ export interface DuesMemberRow {
 export interface DuesManagerData {
     id: string;
     buyInAmount: number;
+    collectedAmount: number;
     potTotal: number;
     status: string;
     teamCount: number;
@@ -81,14 +82,16 @@ export default function DuesManager({
     const router = useRouter();
 
     // ── Live dues state (syncs when server re-renders) ──────────────────────
-    const [duesData, setDuesData]   = useState(initialDuesData);
-    const [members, setMembers]     = useState<DuesMemberRow[]>(initialDuesData?.members ?? []);
-    const [potTotal, setPotTotal]   = useState(initialDuesData?.potTotal ?? 0);
+    const [duesData, setDuesData]           = useState(initialDuesData);
+    const [members, setMembers]             = useState<DuesMemberRow[]>(initialDuesData?.members ?? []);
+    const [potTotal, setPotTotal]           = useState(initialDuesData?.potTotal ?? 0);
+    const [collectedAmount, setCollected]   = useState(initialDuesData?.collectedAmount ?? 0);
 
     useEffect(() => {
         setDuesData(initialDuesData);
         setMembers(initialDuesData?.members ?? []);
         setPotTotal(initialDuesData?.potTotal ?? 0);
+        setCollected(initialDuesData?.collectedAmount ?? 0);
     }, [initialDuesData]);
 
     // ── Setup form state ────────────────────────────────────────────────────
@@ -106,7 +109,14 @@ export default function DuesManager({
     const potPreview = buyIn ? parseFloat(buyIn) * totalRosters : 0;
 
     // ── Payment toggle state ────────────────────────────────────────────────
-    const [togglingId, setTogglingId] = useState<string | null>(null);
+    const [togglingId, setTogglingId]     = useState<string | null>(null);
+    const [toggleError, setToggleError]   = useState<string | null>(null);
+
+    // ── Add to Pot state ────────────────────────────────────────────────────
+    const [addAmount, setAddAmount]       = useState('');
+    const [addSaving, setAddSaving]       = useState(false);
+    const [addError, setAddError]         = useState('');
+    const [addInputShake, setAddInputShake] = useState(false);
 
 
     // ── Setup form handlers ─────────────────────────────────────────────────
@@ -169,19 +179,50 @@ export default function DuesManager({
         }
     }
 
+    // ── Add to Pot ──────────────────────────────────────────────────────────
+
+    async function handleAddToPot(e: React.FormEvent) {
+        e.preventDefault();
+        if (!duesData || addSaving) return;
+        const amount = parseFloat(addAmount);
+        if (!addAmount || isNaN(amount) || amount <= 0) {
+            setAddError('Enter a valid amount.');
+            return;
+        }
+        setAddError('');
+        setAddSaving(true);
+        try {
+            const res = await fetch(`/api/dues/${duesData.id}/collect`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amount }),
+            });
+            const data = await res.json() as { collectedAmount?: number; error?: string };
+            if (!res.ok) { setAddError(data.error ?? 'Failed to add.'); return; }
+            setCollected(data.collectedAmount ?? collectedAmount + amount);
+            setAddAmount('');
+            setToggleError(null);
+        } catch {
+            setAddError('Network error — please try again.');
+        } finally {
+            setAddSaving(false);
+        }
+    }
+
     // ── Payment toggle ──────────────────────────────────────────────────────
 
     async function toggleMemberStatus(memberId: string, currentStatus: string) {
         if (togglingId || !duesData) return;
         const newStatus = currentStatus === 'paid' ? 'unpaid' : 'paid';
         setTogglingId(memberId);
+        setToggleError(null);
 
-        // Optimistic update
-        setMembers(prev => prev.map(m => m.id === memberId ? { ...m, duesStatus: newStatus } : m));
-        setPotTotal(prev => newStatus === 'paid'
-            ? prev + (duesData.buyInAmount)
-            : prev - (duesData.buyInAmount)
-        );
+        // Optimistic update for paid→unpaid only; wait for server on unpaid→paid
+        const goingPaid = newStatus === 'paid';
+        if (!goingPaid) {
+            setMembers(prev => prev.map(m => m.id === memberId ? { ...m, duesStatus: newStatus } : m));
+            setPotTotal(prev => prev - duesData.buyInAmount);
+        }
 
         try {
             const res = await fetch(`/api/dues/${duesData.id}/member-status`, {
@@ -190,15 +231,32 @@ export default function DuesManager({
                 body: JSON.stringify({ memberId, status: newStatus }),
             });
             if (!res.ok) {
-                // Revert on failure
-                setMembers(prev => prev.map(m => m.id === memberId ? { ...m, duesStatus: currentStatus } : m));
-                setPotTotal(prev => currentStatus === 'paid'
-                    ? prev + (duesData.buyInAmount)
-                    : prev - (duesData.buyInAmount)
-                );
+                const data = await res.json() as { error?: string };
+                if (res.status === 409) {
+                    // Pot insufficient — show error and highlight Add to Pot input
+                    setToggleError(data.error ?? 'Add funds to the pot first.');
+                    setAddInputShake(true);
+                    setTimeout(() => setAddInputShake(false), 600);
+                }
+                // Revert optimistic update if we made one
+                if (!goingPaid) {
+                    setMembers(prev => prev.map(m => m.id === memberId ? { ...m, duesStatus: currentStatus } : m));
+                    setPotTotal(prev => prev + duesData.buyInAmount);
+                }
+            } else {
+                // Confirm paid→unpaid was already applied optimistically above;
+                // for unpaid→paid, apply it now after server confirmed
+                if (goingPaid) {
+                    setMembers(prev => prev.map(m => m.id === memberId ? { ...m, duesStatus: newStatus } : m));
+                    setPotTotal(prev => prev + duesData.buyInAmount);
+                }
             }
         } catch {
-            setMembers(prev => prev.map(m => m.id === memberId ? { ...m, duesStatus: currentStatus } : m));
+            if (!goingPaid) {
+                setMembers(prev => prev.map(m => m.id === memberId ? { ...m, duesStatus: currentStatus } : m));
+                setPotTotal(prev => prev + duesData.buyInAmount);
+            }
+            setToggleError('Network error — please try again.');
         } finally {
             setTogglingId(null);
         }
@@ -398,8 +456,8 @@ export default function DuesManager({
                     <p className="text-white font-bold text-lg">${duesData.buyInAmount.toFixed(0)}</p>
                 </div>
                 <div className="bg-gray-800/60 rounded-xl p-4">
-                    <p className="text-gray-500 text-xs mb-1">Pot Collected</p>
-                    <p className="text-[#C8A951] font-bold text-lg">${potTotal.toFixed(0)}</p>
+                    <p className="text-gray-500 text-xs mb-1">Cash Collected</p>
+                    <p className="text-[#C8A951] font-bold text-lg">${collectedAmount.toFixed(0)}</p>
                     <p className="text-gray-600 text-xs">of ${fullPot.toFixed(0)}</p>
                 </div>
                 <div className="bg-gray-800/60 rounded-xl p-4">
@@ -418,16 +476,63 @@ export default function DuesManager({
             {/* Progress bar */}
             {fullPot > 0 && (
                 <div className="space-y-1">
-                    <div className="w-full bg-gray-800 rounded-full h-2">
+                    <div className="w-full bg-gray-800 rounded-full h-2 relative">
+                        {/* Members paid (gold) */}
                         <div
                             className="bg-[#C8A951] h-2 rounded-full transition-all duration-500"
                             style={{ width: `${Math.min(100, (potTotal / fullPot) * 100)}%` }}
                         />
+                        {/* Cash collected marker (slightly lighter, behind) */}
+                        {collectedAmount > potTotal && (
+                            <div
+                                className="absolute top-0 left-0 bg-[#C8A951]/30 h-2 rounded-full transition-all duration-500"
+                                style={{ width: `${Math.min(100, (collectedAmount / fullPot) * 100)}%` }}
+                            />
+                        )}
                     </div>
-                    <p className="text-gray-600 text-xs text-right">
-                        {Math.round((potTotal / fullPot) * 100)}% collected
-                    </p>
+                    <div className="flex items-center justify-between text-xs text-gray-600">
+                        <span>Members paid: {paidCount} / {duesData.teamCount}</span>
+                        <span>{Math.round((potTotal / fullPot) * 100)}% confirmed</span>
+                    </div>
                 </div>
+            )}
+
+            {/* Add to Pot (commissioner only) */}
+            {isCommissioner && (
+                <form onSubmit={(e) => { void handleAddToPot(e); }}
+                    className="bg-gray-800/40 border border-gray-700/50 rounded-xl px-4 py-3">
+                    <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                        Record Cash Received
+                    </p>
+                    <div className="flex gap-2">
+                        <div className="relative flex-1">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none">$</span>
+                            <input
+                                type="text"
+                                inputMode="decimal"
+                                value={addAmount}
+                                onChange={e => { setAddAmount(e.target.value); setAddError(''); }}
+                                placeholder="0"
+                                className={`w-full bg-gray-800 border rounded-lg pl-7 pr-3 py-2 text-white placeholder-gray-600 text-sm focus:outline-none transition ${
+                                    addInputShake
+                                        ? 'border-red-500 ring-2 ring-red-500/40'
+                                        : 'border-gray-700 focus:border-[#C8A951]/60'
+                                }`}
+                            />
+                        </div>
+                        <button
+                            type="submit"
+                            disabled={addSaving || !addAmount.trim()}
+                            className="bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-50 text-gray-950 font-bold px-4 py-2 rounded-lg text-sm transition whitespace-nowrap"
+                        >
+                            {addSaving ? '…' : '+ Add'}
+                        </button>
+                    </div>
+                    {addError && <p className="text-red-400 text-xs mt-1.5">{addError}</p>}
+                    <p className="text-gray-600 text-xs mt-1.5">
+                        Enter cash or Venmo received. Balance must cover each member before marking them paid.
+                    </p>
+                </form>
             )}
 
             {/* Payout structure */}
@@ -449,6 +554,11 @@ export default function DuesManager({
             {members.length > 0 && (
                 <div>
                     <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-2">Payment Status</p>
+                    {toggleError && (
+                        <div className="bg-red-900/20 border border-red-800/50 rounded-xl px-3 py-2.5 text-red-400 text-xs mb-2">
+                            {toggleError}
+                        </div>
+                    )}
                     <div className="space-y-1.5">
                         {members.map(m => {
                             const isPaid = m.duesStatus === 'paid';
@@ -482,7 +592,9 @@ export default function DuesManager({
                         })}
                     </div>
                     {isCommissioner && (
-                        <p className="text-gray-700 text-xs mt-2">Click a status to toggle it.</p>
+                        <p className="text-gray-700 text-xs mt-2">
+                            Add cash received above, then click a status to mark as paid.
+                        </p>
                     )}
                 </div>
             )}

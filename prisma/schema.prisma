@@ -153,7 +153,8 @@ model LeagueDues {
     season               String             // e.g. "2025"
     buyInAmount          Float              // per-player buy-in in dollars
     teamCount            Int                // number of teams in the league
-    potTotal             Float              @default(0) // running total of verified payments in
+    collectedAmount      Float              @default(0) // cash actually received (manually entered by commissioner)
+    potTotal             Float              @default(0) // running total of confirmed payments (paidCount × buyIn)
     // setup | active | season_ended | pending_approval | approved | paid_out
     status               String             @default("setup")
     platform             String?            // "Sleeper" | "ESPN" | "Yahoo" | "Manual"

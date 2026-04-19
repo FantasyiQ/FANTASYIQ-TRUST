@@ -18,7 +18,7 @@ export async function PATCH(
 
     const dues = await prisma.leagueDues.findUnique({
         where: { id: duesId },
-        select: { commissionerId: true, buyInAmount: true },
+        select: { commissionerId: true, buyInAmount: true, collectedAmount: true },
     });
     if (!dues) return Response.json({ error: 'Not found.' }, { status: 404 });
     if (dues.commissionerId !== user.id) return Response.json({ error: 'Forbidden.' }, { status: 403 });
@@ -39,6 +39,22 @@ export async function PATCH(
 
     const wasAlreadyPaid = member.duesStatus === 'paid';
     const nowPaid = status === 'paid';
+
+    // Enforce pot balance before marking paid.
+    // collectedAmount must cover all currently-paid members plus this new one.
+    if (nowPaid && !wasAlreadyPaid) {
+        const currentPaidCount = await prisma.duesMember.count({
+            where: { leagueDuesId: duesId, duesStatus: 'paid' },
+        });
+        const required = (currentPaidCount + 1) * dues.buyInAmount;
+        if (dues.collectedAmount < required) {
+            const shortfall = required - dues.collectedAmount;
+            return Response.json({
+                error: `Pot has $${dues.collectedAmount.toFixed(0)} but needs $${required.toFixed(0)} to mark this member as paid. Add $${shortfall.toFixed(0)} to the pot first.`,
+                shortfall,
+            }, { status: 409 });
+        }
+    }
 
     await prisma.duesMember.update({
         where: { id: memberId },

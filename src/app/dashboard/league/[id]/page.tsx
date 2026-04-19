@@ -127,6 +127,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
             select: {
                 id: true,
                 buyInAmount: true,
+                collectedAmount: true,
                 potTotal: true,
                 status: true,
                 teamCount: true,
@@ -317,9 +318,10 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
     }));
 
     const duesData: DuesData | null = leagueDuesRecord ? {
-        id:          leagueDuesRecord.id,
-        buyInAmount: leagueDuesRecord.buyInAmount,
-        potTotal:    leagueDuesRecord.potTotal,
+        id:              leagueDuesRecord.id,
+        buyInAmount:     leagueDuesRecord.buyInAmount,
+        collectedAmount: leagueDuesRecord.collectedAmount,
+        potTotal:        leagueDuesRecord.potTotal,
         status:      leagueDuesRecord.status,
         teamCount:   leagueDuesRecord.teamCount,
         payoutSpots: leagueDuesRecord.payoutSpots,
