@@ -62,6 +62,7 @@ interface Props {
     announcements:          AnnouncementData[];
     tradeEvaluatorContent:  React.ReactNode;
     isCommissioner:         boolean;
+    currentUserId:          string;
     canUsePlayerRankings:   boolean;
     sleeperLeagueId:        string;
     sleeperMembers:         SleeperMember[];
@@ -383,6 +384,7 @@ export default function LeagueDetailTabs({
     announcements,
     tradeEvaluatorContent,
     isCommissioner,
+    currentUserId,
     canUsePlayerRankings,
     sleeperLeagueId,
     sleeperMembers,
@@ -570,6 +572,7 @@ export default function LeagueDetailTabs({
                         <DuesManager
                             initialDuesData={duesData}
                             isCommissioner={isCommissioner}
+                            currentUserId={currentUserId}
                             canInvite={isCommissioner}
                             leagueName={leagueName}
                             season={season}

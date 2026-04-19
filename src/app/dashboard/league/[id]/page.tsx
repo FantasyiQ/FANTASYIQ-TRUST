@@ -89,7 +89,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
 
     if (!league || league.userId !== session.user.id) notFound();
 
-    const [sleeperLeague, members, rosters, allPlayers, tradedPicks, drafts, dbUser, commSubForLeague, leagueDuesRecord] = await Promise.all([
+    const [sleeperLeague, members, rosters, allPlayers, tradedPicks, drafts, dbUser, leagueDuesRecord] = await Promise.all([
         getLeague(league.leagueId),
         getLeagueUsers(league.leagueId),
         getLeagueRosters(league.leagueId),
@@ -109,16 +109,6 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                 leagues: { select: { id: true, leagueName: true } },
             },
         }),
-        prisma.subscription.findFirst({
-            where: {
-                userId: session.user.id,
-                type: 'commissioner',
-                leagueName: { equals: league.leagueName, mode: 'insensitive' },
-                status: { in: ['active', 'trialing'] },
-            },
-            orderBy: { createdAt: 'desc' },
-            select: { tier: true },
-        }),
         // Dues + payouts + announcements for THIS league only
         prisma.leagueDues.findFirst({
             where: {
@@ -127,6 +117,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
             },
             select: {
                 id: true,
+                commissionerId: true,
                 buyInAmount: true,
                 collectedAmount: true,
                 potTotal: true,
@@ -137,7 +128,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                     orderBy: { sortOrder: 'asc' },
                 },
                 members: {
-                    select: { id: true, displayName: true, teamName: true, duesStatus: true },
+                    select: { id: true, userId: true, displayName: true, teamName: true, duesStatus: true },
                     orderBy: { displayName: 'asc' },
                 },
                 announcements: {
@@ -150,6 +141,39 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
             },
         }),
     ]);
+
+    // ── Commissioner tier lookup (member tier inheritance) ───────────────────
+    // commSubForLeague must belong to THIS LEAGUE's commissioner, not the current
+    // user — so that any league member inherits the commissioner's plan tier.
+    // Primary source: leagueDuesRecord.commissionerId (already in DB, no extra fetch).
+    // Fallback: derive the commissioner from Sleeper's is_owner flag, then look up
+    // their User record by sleeperUserId.
+    let commSubForLeague: { tier: string } | null = null;
+    {
+        let commDbUserId: string | null = leagueDuesRecord?.commissionerId ?? null;
+        if (!commDbUserId) {
+            const sleeperCommId = members.find(m => m.is_owner)?.user_id ?? null;
+            if (sleeperCommId) {
+                const commUser = await prisma.user.findFirst({
+                    where: { sleeperUserId: sleeperCommId },
+                    select: { id: true },
+                });
+                commDbUserId = commUser?.id ?? null;
+            }
+        }
+        if (commDbUserId) {
+            commSubForLeague = await prisma.subscription.findFirst({
+                where: {
+                    userId: commDbUserId,
+                    type: 'commissioner',
+                    leagueName: { equals: league.leagueName, mode: 'insensitive' },
+                    status: { in: ['active', 'trialing'] },
+                },
+                orderBy: { createdAt: 'desc' },
+                select: { tier: true },
+            });
+        }
+    }
 
     // ── Sleeper user identity ─────────────────────────────────────────────────
     // User.sleeperUserId is set during sync. League.sleeperUserId is a fallback for users
@@ -327,6 +351,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
         payoutSpots: leagueDuesRecord.payoutSpots,
         members:     leagueDuesRecord.members.map(m => ({
             id:          m.id,
+            userId:      m.userId ?? null,
             displayName: m.displayName,
             teamName:    m.teamName ?? null,
             duesStatus:  m.duesStatus,
@@ -472,6 +497,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                     announcements={announcements}
                     tradeEvaluatorContent={tradeEvaluatorContent}
                     isCommissioner={isCommissioner}
+                    currentUserId={session.user.id}
                     canUsePlayerRankings={canUseTradeEvaluator}
                     sleeperLeagueId={league.leagueId}
                     sleeperMembers={sleeperMembers}

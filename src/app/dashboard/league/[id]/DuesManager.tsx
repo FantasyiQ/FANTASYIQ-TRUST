@@ -8,6 +8,7 @@ import InviteLinkButton from '@/components/InviteLinkButton';
 
 export interface DuesMemberRow {
     id: string;
+    userId?: string | null;
     displayName: string;
     teamName?: string | null;
     duesStatus: string;
@@ -32,6 +33,7 @@ export interface SleeperMember {
 interface Props {
     initialDuesData: DuesManagerData | null;
     isCommissioner: boolean;
+    currentUserId?: string;
     canInvite: boolean;
     leagueName: string;
     season: string;
@@ -72,6 +74,7 @@ function defaultPayoutSpots(pot: number) {
 export default function DuesManager({
     initialDuesData,
     isCommissioner,
+    currentUserId,
     canInvite,
     leagueName,
     season,
@@ -447,8 +450,42 @@ export default function DuesManager({
 
     // ── Dues tracker view ────────────────────────────────────────────────────
 
+    // Identify the current member's own row (matched by userId if linked)
+    const myMemberRow = currentUserId
+        ? members.find(m => m.userId === currentUserId) ?? null
+        : null;
+
     return (
         <div className="space-y-5">
+            {/* My payment status (members only — prominent, at the top) */}
+            {!isCommissioner && myMemberRow && (
+                <div className={`rounded-xl border px-4 py-3.5 flex items-center justify-between gap-4 ${
+                    myMemberRow.duesStatus === 'paid'
+                        ? 'bg-green-900/20 border-green-800/50'
+                        : 'bg-amber-900/20 border-amber-800/50'
+                }`}>
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-0.5">Your Status</p>
+                        <p className="font-bold text-base text-white">{myMemberRow.teamName || myMemberRow.displayName}</p>
+                    </div>
+                    <span className={`text-sm font-bold px-3 py-1.5 rounded-full border ${
+                        myMemberRow.duesStatus === 'paid'
+                            ? 'bg-green-900/40 text-green-400 border-green-800'
+                            : 'bg-amber-900/30 text-amber-400 border-amber-800'
+                    }`}>
+                        {myMemberRow.duesStatus === 'paid' ? '✓ Paid' : '⚠ Unpaid'}
+                    </span>
+                </div>
+            )}
+
+            {/* Payment instructions for unpaid members */}
+            {!isCommissioner && myMemberRow && myMemberRow.duesStatus !== 'paid' && (
+                <div className="bg-gray-800/40 border border-gray-700/50 rounded-xl px-4 py-3 text-sm text-gray-400">
+                    <span className="font-semibold text-gray-300">Buy-in: ${duesData.buyInAmount.toFixed(0)}</span>
+                    {' · '}Contact your commissioner to arrange payment (cash, Venmo, Zelle, etc.). Your status will update once they record it.
+                </div>
+            )}
+
             {/* Summary row */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="bg-gray-800/60 rounded-xl p-4">
