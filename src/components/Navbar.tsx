@@ -30,12 +30,6 @@ export default async function Navbar() {
           {loggedIn ? (
             <>
               <Link
-                href="/dashboard/commissioner"
-                className="text-gray-300 hover:text-white transition"
-              >
-                Commissioner Hub
-              </Link>
-              <Link
                 href="/dashboard"
                 className="text-gray-300 hover:text-white transition"
               >
