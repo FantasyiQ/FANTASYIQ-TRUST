@@ -12,6 +12,7 @@ export interface DuesMemberRow {
     displayName: string;
     teamName?: string | null;
     duesStatus: string;
+    paymentMethod?: string | null;
 }
 
 export interface DuesManagerData {
@@ -121,6 +122,29 @@ export default function DuesManager({
     const [addError, setAddError]         = useState('');
     const [addInputShake, setAddInputShake] = useState(false);
 
+    // ── Stripe dues payment state ────────────────────────────────────────
+    const [payingDues, setPayingDues]     = useState(false);
+    const [payError, setPayError]         = useState('');
+    const [showPaidBanner, setShowPaidBanner]     = useState(false);
+    const [showCancelledBanner, setShowCancelledBanner] = useState(false);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const sp = new URLSearchParams(window.location.search);
+        if (sp.get('dues_paid') === 'true') {
+            setShowPaidBanner(true);
+            const url = new URL(window.location.href);
+            url.searchParams.delete('dues_paid');
+            window.history.replaceState({}, '', url.toString());
+        }
+        if (sp.get('dues_cancelled') === 'true') {
+            setShowCancelledBanner(true);
+            const url = new URL(window.location.href);
+            url.searchParams.delete('dues_cancelled');
+            window.history.replaceState({}, '', url.toString());
+        }
+    }, []);
+
 
     // ── Setup form handlers ─────────────────────────────────────────────────
 
@@ -209,6 +233,27 @@ export default function DuesManager({
             setAddError('Network error — please try again.');
         } finally {
             setAddSaving(false);
+        }
+    }
+
+    // ── Stripe dues payment ─────────────────────────────────────────────────
+
+    async function handlePayDues() {
+        if (!duesData || payingDues) return;
+        setPayingDues(true);
+        setPayError('');
+        try {
+            const res = await fetch(`/api/dues/${duesData.id}/pay`, { method: 'POST' });
+            const data = await res.json() as { url?: string; error?: string };
+            if (!res.ok || !data.url) {
+                setPayError(data.error ?? 'Could not start payment. Please try again.');
+                return;
+            }
+            window.location.href = data.url;
+        } catch {
+            setPayError('Network error — please try again.');
+        } finally {
+            setPayingDues(false);
         }
     }
 
@@ -457,6 +502,26 @@ export default function DuesManager({
 
     return (
         <div className="space-y-5">
+            {/* Success banner — shown after returning from Stripe */}
+            {showPaidBanner && (
+                <div className="bg-green-900/30 border border-green-700/60 rounded-xl px-4 py-3 flex items-center gap-3">
+                    <span className="text-green-400 text-lg">✓</span>
+                    <div>
+                        <p className="text-green-300 font-semibold text-sm">Payment received!</p>
+                        <p className="text-green-500 text-xs">Your dues have been recorded. The commissioner will see your payment.</p>
+                    </div>
+                    <button onClick={() => setShowPaidBanner(false)} className="ml-auto text-green-600 hover:text-green-400 text-lg leading-none">×</button>
+                </div>
+            )}
+
+            {/* Cancelled banner */}
+            {showCancelledBanner && (
+                <div className="bg-gray-800/60 border border-gray-700 rounded-xl px-4 py-3 flex items-center gap-3">
+                    <span className="text-gray-400 text-sm">Payment cancelled. No charge was made.</span>
+                    <button onClick={() => setShowCancelledBanner(false)} className="ml-auto text-gray-600 hover:text-gray-400 text-lg leading-none">×</button>
+                </div>
+            )}
+
             {/* My payment status (members only — prominent, at the top) */}
             {!isCommissioner && myMemberRow && (
                 <div className={`rounded-xl border px-4 py-3.5 flex items-center justify-between gap-4 ${
@@ -478,11 +543,32 @@ export default function DuesManager({
                 </div>
             )}
 
-            {/* Payment instructions for unpaid members */}
+            {/* Pay Dues button + instructions (unpaid members only) */}
             {!isCommissioner && myMemberRow && myMemberRow.duesStatus !== 'paid' && (
-                <div className="bg-gray-800/40 border border-gray-700/50 rounded-xl px-4 py-3 text-sm text-gray-400">
-                    <span className="font-semibold text-gray-300">Buy-in: ${duesData.buyInAmount.toFixed(0)}</span>
-                    {' · '}Contact your commissioner to arrange payment (cash, Venmo, Zelle, etc.). Your status will update once they record it.
+                <div className="space-y-3">
+                    <button
+                        onClick={handlePayDues}
+                        disabled={payingDues}
+                        className="w-full bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-60 disabled:cursor-not-allowed text-gray-950 font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 text-sm"
+                    >
+                        {payingDues ? (
+                            <>
+                                <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                                </svg>
+                                Redirecting to payment…
+                            </>
+                        ) : (
+                            <>💳 Pay Dues — ${duesData.buyInAmount.toFixed(0)}</>
+                        )}
+                    </button>
+                    {payError && <p className="text-red-400 text-xs text-center">{payError}</p>}
+                    <p className="text-gray-600 text-xs text-center leading-relaxed">
+                        A small card processing fee applies. —{' '}
+                        <span className="text-gray-500">or</span>
+                        {' '}— Contact your commissioner to pay by cash or Venmo.
+                    </p>
                 </div>
             )}
 
@@ -604,17 +690,26 @@ export default function DuesManager({
                                 <div key={m.id} className="flex items-center justify-between bg-gray-800/40 rounded-lg px-4 py-2.5">
                                     <span className="text-gray-300 text-sm truncate">{m.teamName || m.displayName}</span>
                                     {isCommissioner ? (
-                                        <button
-                                            onClick={() => toggleMemberStatus(m.id, m.duesStatus)}
-                                            disabled={!!togglingId}
-                                            className={`text-xs font-semibold px-3 py-1 rounded-full border transition disabled:opacity-50 ${
-                                                isPaid
-                                                    ? 'bg-green-900/40 text-green-400 border-green-800 hover:bg-green-900/60'
-                                                    : 'bg-red-900/30 text-red-400 border-red-900 hover:bg-red-900/50'
-                                            }`}
-                                        >
-                                            {isToggling ? '…' : isPaid ? '✓ Paid' : 'Unpaid'}
-                                        </button>
+                                        <div className="flex items-center gap-2">
+                                            {isPaid && m.paymentMethod === 'stripe_direct' && (
+                                                <span className="text-xs text-blue-400 border border-blue-800 bg-blue-900/20 px-2 py-0.5 rounded-full">Stripe</span>
+                                            )}
+                                            {isPaid && m.paymentMethod === 'manual' && (
+                                                <span className="text-xs text-gray-500 border border-gray-700 bg-gray-800/40 px-2 py-0.5 rounded-full">Cash</span>
+                                            )}
+                                            <button
+                                                onClick={() => toggleMemberStatus(m.id, m.duesStatus)}
+                                                disabled={!!togglingId || m.paymentMethod === 'stripe_direct'}
+                                                title={m.paymentMethod === 'stripe_direct' ? 'Stripe payment — cannot be reversed here' : undefined}
+                                                className={`text-xs font-semibold px-3 py-1 rounded-full border transition disabled:opacity-50 ${
+                                                    isPaid
+                                                        ? 'bg-green-900/40 text-green-400 border-green-800 hover:bg-green-900/60'
+                                                        : 'bg-red-900/30 text-red-400 border-red-900 hover:bg-red-900/50'
+                                                } ${m.paymentMethod === 'stripe_direct' ? 'cursor-default' : ''}`}
+                                            >
+                                                {isToggling ? '…' : isPaid ? '✓ Paid' : 'Unpaid'}
+                                            </button>
+                                        </div>
                                     ) : (
                                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${
                                             isPaid

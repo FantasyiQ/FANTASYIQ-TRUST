@@ -43,6 +43,44 @@ export async function POST(request: NextRequest): Promise<Response> {
         switch (event.type) {
             case 'checkout.session.completed': {
                 const cs = event.data.object as Stripe.Checkout.Session;
+
+                // ── League dues one-time payment ──────────────────────────────────
+                if (cs.metadata?.type === 'LEAGUE_DUES') {
+                    if (cs.payment_status === 'paid') {
+                        const { duesId, memberId, buyInAmount } = cs.metadata;
+                        if (duesId && memberId) {
+                            const member = await prisma.duesMember.findUnique({
+                                where: { id: memberId },
+                                select: { duesStatus: true, leagueDuesId: true },
+                            });
+                            // Idempotent: pay-confirm route may have already written this
+                            if (member && member.leagueDuesId === duesId && member.duesStatus !== 'paid') {
+                                const amount = parseFloat(buyInAmount ?? '0');
+                                await prisma.$transaction([
+                                    prisma.duesMember.update({
+                                        where: { id: memberId },
+                                        data: {
+                                            duesStatus:     'paid',
+                                            paidAt:         new Date(),
+                                            paymentMethod:  'stripe_direct',
+                                            stripePaymentId: typeof cs.payment_intent === 'string' ? cs.payment_intent : null,
+                                        },
+                                    }),
+                                    prisma.leagueDues.update({
+                                        where: { id: duesId },
+                                        data: {
+                                            collectedAmount: { increment: amount },
+                                            potTotal:        { increment: amount },
+                                        },
+                                    }),
+                                ]);
+                            }
+                        }
+                    }
+                    break;
+                }
+                // ── End league dues ───────────────────────────────────────────────
+
                 const customerId   = cs.customer as string;
                 const stripeSubId  = cs.subscription as string | null;
                 const metaTier       = cs.metadata?.tier as SubscriptionTier | undefined;

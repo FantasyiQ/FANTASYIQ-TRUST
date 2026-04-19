@@ -128,7 +128,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                     orderBy: { sortOrder: 'asc' },
                 },
                 members: {
-                    select: { id: true, userId: true, displayName: true, teamName: true, duesStatus: true },
+                    select: { id: true, userId: true, displayName: true, teamName: true, duesStatus: true, paymentMethod: true },
                     orderBy: { displayName: 'asc' },
                 },
                 announcements: {
@@ -350,11 +350,12 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
         teamCount:   leagueDuesRecord.teamCount,
         payoutSpots: leagueDuesRecord.payoutSpots,
         members:     leagueDuesRecord.members.map(m => ({
-            id:          m.id,
-            userId:      m.userId ?? null,
-            displayName: m.displayName,
-            teamName:    m.teamName ?? null,
-            duesStatus:  m.duesStatus,
+            id:            m.id,
+            userId:        m.userId ?? null,
+            displayName:   m.displayName,
+            teamName:      m.teamName ?? null,
+            duesStatus:    m.duesStatus,
+            paymentMethod: m.paymentMethod ?? null,
         })),
     } : null;
 
