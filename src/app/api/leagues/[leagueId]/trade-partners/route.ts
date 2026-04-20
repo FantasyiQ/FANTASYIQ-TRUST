@@ -98,11 +98,19 @@ function scoringTypeToPpr(scoringType: string | null): 0 | 0.5 | 1 {
     return 0;
 }
 
-function rosterTier(totalValue: number): RosterTier {
-    if (totalValue >= 600) return 'Elite';
-    if (totalValue >= 450) return 'Contender';
-    if (totalValue >= 300) return 'Competitive';
-    return 'Rebuilding';
+// Tiers are league-relative percentiles — identical logic to roster-values route.
+// Built once from the full sorted value list, then used as a lookup per team.
+// percentile 0.0 = top of league, 1.0 = bottom of league.
+function buildTierClassifier(sortedValuesDesc: number[]): (value: number) => RosterTier {
+    const n = sortedValuesDesc.length;
+    return (value: number): RosterTier => {
+        const rank = sortedValuesDesc.filter(v => v > value).length;
+        const percentile = n > 1 ? rank / n : 0;
+        if (percentile <= 0.20) return 'Elite';
+        if (percentile <= 0.50) return 'Contender';
+        if (percentile <= 0.80) return 'Competitive';
+        return 'Rebuilding';
+    };
 }
 
 type StrengthClass = 'Strong' | 'Neutral' | 'Weak';
@@ -337,6 +345,16 @@ export async function GET(
         return out;
     }
 
+    // 9b. Build percentile-based tier map — same classifier as roster-values route
+    //     so both tabs always show identical tiers.
+    const sortedValues = teamBuckets
+        .map(t => t.totalRosterValue)
+        .sort((a, b) => b - a);
+    const classifyTier = buildTierClassifier(sortedValues);
+    const tierByRosterId = new Map<number, RosterTier>(
+        teamBuckets.map(t => [t.rosterId, classifyTier(t.totalRosterValue)])
+    );
+
     // 10. Identify the requesting user's team
     const myBucket = teamBuckets.find(t => t.ownerId === ownerId) ?? null;
     const myMember = myBucket?.ownerId ? memberMap.get(myBucket.ownerId) : undefined;
@@ -353,7 +371,7 @@ export async function GET(
     const myRatios    = strengthRatios(myBucket.posValues);
     const myNeeds     = SCORED_POSITIONS.filter(pos => strengthClass(myRatios[pos]) === 'Weak');
     const myStrengths = SCORED_POSITIONS.filter(pos => strengthClass(myRatios[pos]) === 'Strong');
-    const myTier      = rosterTier(myBucket.totalRosterValue);
+    const myTier      = tierByRosterId.get(myBucket.rosterId) ?? 'Competitive';
     const myDeltas    = myBucket.players.map(p => p.delta).filter((d): d is number => d !== null);
     const myAvgDelta  = myDeltas.length > 0 ? myDeltas.reduce((a, b) => a + b, 0) / myDeltas.length : null;
 
@@ -364,7 +382,7 @@ export async function GET(
             const theirRatios    = strengthRatios(partner.posValues);
             const theirNeeds     = SCORED_POSITIONS.filter(pos => strengthClass(theirRatios[pos]) === 'Weak');
             const theirStrengths = SCORED_POSITIONS.filter(pos => strengthClass(theirRatios[pos]) === 'Strong');
-            const theirTier      = rosterTier(partner.totalRosterValue);
+            const theirTier      = tierByRosterId.get(partner.rosterId) ?? 'Competitive';
 
             // Complementarity: reward large gaps that match across rosters
             let rawScore = 0;
