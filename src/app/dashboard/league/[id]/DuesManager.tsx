@@ -128,6 +128,10 @@ export default function DuesManager({
     const [showPaidBanner, setShowPaidBanner]     = useState(false);
     const [showCancelledBanner, setShowCancelledBanner] = useState(false);
 
+    // ── Manual payment confirmation modal ────────────────────────────────
+    const [showManualModal, setShowManualModal] = useState(false);
+    const [pendingManualId, setPendingManualId] = useState<string | null>(null);
+
     useEffect(() => {
         if (typeof window === 'undefined') return;
         const sp = new URLSearchParams(window.location.search);
@@ -308,6 +312,20 @@ export default function DuesManager({
         } finally {
             setTogglingId(null);
         }
+    }
+
+    // ── Manual payment modal: commissioner clicked "Record Manual" for a member ─
+    function requestManualPay(memberId: string) {
+        setPendingManualId(memberId);
+        setShowManualModal(true);
+    }
+
+    function handleManualConfirm() {
+        setShowManualModal(false);
+        if (pendingManualId) {
+            void toggleMemberStatus(pendingManualId, 'unpaid');
+        }
+        setPendingManualId(null);
     }
 
     // ── Invite block (commissioner/canInvite only) ───────────────────────────
@@ -522,6 +540,14 @@ export default function DuesManager({
                 </div>
             )}
 
+            {/* Transparency banner */}
+            <div className="bg-blue-950/40 border border-blue-900/50 rounded-xl px-4 py-3 flex items-start gap-3">
+                <span className="text-blue-400 shrink-0 mt-0.5">ℹ</span>
+                <p className="text-blue-300 text-xs leading-relaxed">
+                    For full transparency and automatic pot tracking, members should pay through their own account using the Stripe checkout below.
+                </p>
+            </div>
+
             {/* My payment status (members only — prominent, at the top) */}
             {!isCommissioner && myMemberRow && (
                 <div className={`rounded-xl border px-4 py-3.5 flex items-center justify-between gap-4 ${
@@ -543,31 +569,33 @@ export default function DuesManager({
                 </div>
             )}
 
-            {/* Pay Dues button + instructions (unpaid members only) */}
+            {/* Pay Dues (Recommended) — shown to unpaid members */}
             {!isCommissioner && myMemberRow && myMemberRow.duesStatus !== 'paid' && (
-                <div className="space-y-3">
+                <div className="space-y-2">
                     <button
                         onClick={handlePayDues}
                         disabled={payingDues}
-                        className="w-full bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-60 disabled:cursor-not-allowed text-gray-950 font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 text-sm"
+                        className="w-full bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-60 disabled:cursor-not-allowed text-gray-950 font-bold py-3.5 rounded-xl transition flex flex-col items-center gap-0.5 text-sm"
                     >
                         {payingDues ? (
-                            <>
+                            <span className="flex items-center gap-2">
                                 <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
                                 </svg>
                                 Redirecting to payment…
-                            </>
+                            </span>
                         ) : (
-                            <>💳 Pay Dues — ${duesData.buyInAmount.toFixed(0)}</>
+                            <>
+                                <span className="font-bold">💳 Pay Dues — ${duesData.buyInAmount.toFixed(0)} <span className="text-gray-950/60 font-normal text-xs">(Recommended)</span></span>
+                                <span className="text-gray-950/50 text-[11px] font-normal">Secure · Instant · Automatically updates the pot</span>
+                            </>
                         )}
                     </button>
                     {payError && <p className="text-red-400 text-xs text-center">{payError}</p>}
                     <p className="text-gray-600 text-xs text-center leading-relaxed">
-                        A small card processing fee applies. —{' '}
-                        <span className="text-gray-500">or</span>
-                        {' '}— Contact your commissioner to pay by cash or Venmo.
+                        A small card processing fee applies.{' '}
+                        <span className="text-gray-500">Or contact your commissioner to pay by cash or Venmo — manual payments are not automatically tracked.</span>
                     </p>
                 </div>
             )}
@@ -620,12 +648,46 @@ export default function DuesManager({
                 </div>
             )}
 
+            {/* Pot breakdown — Stripe vs Manual (visible to all) */}
+            {duesData && paidCount > 0 && (() => {
+                const stripePaid = members.filter(m => m.duesStatus === 'paid' && (m.paymentMethod === 'stripe_direct' || m.paymentMethod === 'stripe_on_behalf')).length;
+                const manualPaid = members.filter(m => m.duesStatus === 'paid' && m.paymentMethod === 'manual').length;
+                const stripeTotal = stripePaid * duesData.buyInAmount;
+                const manualTotal = manualPaid * duesData.buyInAmount;
+                return (
+                    <div className="bg-gray-800/40 rounded-xl px-4 py-3 space-y-2">
+                        <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider">Pot Breakdown</p>
+                        <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-300 font-semibold">${potTotal.toFixed(2)} collected</span>
+                        </div>
+                        {stripePaid > 0 && (
+                            <div className="flex items-center justify-between text-xs">
+                                <span className="flex items-center gap-1.5 text-gray-400">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+                                    ${stripeTotal.toFixed(2)} — Stripe <span className="text-green-500 font-semibold">(Verified)</span>
+                                </span>
+                                <span className="text-gray-600">{stripePaid} member{stripePaid !== 1 ? 's' : ''}</span>
+                            </div>
+                        )}
+                        {manualPaid > 0 && (
+                            <div className="flex items-center justify-between text-xs">
+                                <span className="flex items-center gap-1.5 text-gray-400">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-gray-500 inline-block" />
+                                    ${manualTotal.toFixed(2)} — Manual <span className="text-gray-500 font-medium">(Commissioner Entered)</span>
+                                </span>
+                                <span className="text-gray-600">{manualPaid} member{manualPaid !== 1 ? 's' : ''}</span>
+                            </div>
+                        )}
+                    </div>
+                );
+            })()}
+
             {/* Add to Pot (commissioner only) */}
             {isCommissioner && (
                 <form onSubmit={(e) => { void handleAddToPot(e); }}
                     className="bg-gray-800/40 border border-gray-700/50 rounded-xl px-4 py-3">
                     <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
-                        Record Cash Received
+                        Record Cash Received <span className="text-gray-600 font-normal normal-case">(required before marking members paid manually)</span>
                     </p>
                     <div className="flex gap-2">
                         <div className="relative flex-1">
@@ -684,48 +746,58 @@ export default function DuesManager({
                     )}
                     <div className="space-y-1.5">
                         {members.map(m => {
-                            const isPaid = m.duesStatus === 'paid';
+                            const isPaid    = m.duesStatus === 'paid';
+                            const isStripe  = m.paymentMethod === 'stripe_direct' || m.paymentMethod === 'stripe_on_behalf';
+                            const isManual  = m.paymentMethod === 'manual';
                             const isToggling = togglingId === m.id;
                             return (
-                                <div key={m.id} className="flex items-center justify-between bg-gray-800/40 rounded-lg px-4 py-2.5">
-                                    <span className="text-gray-300 text-sm truncate">{m.teamName || m.displayName}</span>
-                                    {isCommissioner ? (
-                                        <div className="flex items-center gap-2">
-                                            {isPaid && m.paymentMethod === 'stripe_direct' && (
-                                                <span className="text-xs text-blue-400 border border-blue-800 bg-blue-900/20 px-2 py-0.5 rounded-full">Stripe</span>
-                                            )}
-                                            {isPaid && m.paymentMethod === 'manual' && (
-                                                <span className="text-xs text-gray-500 border border-gray-700 bg-gray-800/40 px-2 py-0.5 rounded-full">Cash</span>
-                                            )}
+                                <div key={m.id} className="flex items-center justify-between bg-gray-800/40 rounded-lg px-4 py-2.5 gap-3">
+                                    <span className="text-gray-300 text-sm truncate min-w-0">{m.teamName || m.displayName}</span>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        {/* Payment method badge */}
+                                        {isPaid && isStripe && (
+                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-green-900/30 text-green-400 border-green-800/50">
+                                                ✓ Verified Payment
+                                            </span>
+                                        )}
+                                        {isPaid && isManual && (
+                                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-gray-800 text-gray-500 border-gray-700">
+                                                Commissioner Entered
+                                            </span>
+                                        )}
+                                        {!isPaid && (
+                                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-red-900/20 text-red-500 border-red-900/50">
+                                                Unpaid
+                                            </span>
+                                        )}
+
+                                        {/* Commissioner actions */}
+                                        {isCommissioner && isPaid && !isStripe && (
                                             <button
                                                 onClick={() => toggleMemberStatus(m.id, m.duesStatus)}
-                                                disabled={!!togglingId || m.paymentMethod === 'stripe_direct'}
-                                                title={m.paymentMethod === 'stripe_direct' ? 'Stripe payment — cannot be reversed here' : undefined}
-                                                className={`text-xs font-semibold px-3 py-1 rounded-full border transition disabled:opacity-50 ${
-                                                    isPaid
-                                                        ? 'bg-green-900/40 text-green-400 border-green-800 hover:bg-green-900/60'
-                                                        : 'bg-red-900/30 text-red-400 border-red-900 hover:bg-red-900/50'
-                                                } ${m.paymentMethod === 'stripe_direct' ? 'cursor-default' : ''}`}
+                                                disabled={!!togglingId}
+                                                className="text-[10px] text-gray-600 hover:text-red-400 transition disabled:opacity-40 font-medium"
                                             >
-                                                {isToggling ? '…' : isPaid ? '✓ Paid' : 'Unpaid'}
+                                                {isToggling ? '…' : 'Mark Unpaid'}
                                             </button>
-                                        </div>
-                                    ) : (
-                                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${
-                                            isPaid
-                                                ? 'bg-green-900/40 text-green-400 border-green-800'
-                                                : 'bg-red-900/30 text-red-400 border-red-900'
-                                        }`}>
-                                            {isPaid ? '✓ Paid' : 'Unpaid'}
-                                        </span>
-                                    )}
+                                        )}
+                                        {isCommissioner && !isPaid && (
+                                            <button
+                                                onClick={() => requestManualPay(m.id)}
+                                                disabled={!!togglingId}
+                                                className="text-xs font-semibold px-3 py-1 rounded-lg border bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500 transition disabled:opacity-40"
+                                            >
+                                                {isToggling ? '…' : 'Record Manual'}
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             );
                         })}
                     </div>
                     {isCommissioner && (
                         <p className="text-gray-700 text-xs mt-2">
-                            Add cash received above, then click a status to mark as paid.
+                            Record cash received above first. Manual entries are not automatically verified.
                         </p>
                     )}
                 </div>
@@ -743,6 +815,37 @@ export default function DuesManager({
                             Full Commissioner Hub →
                         </a>
                     )}
+                </div>
+            )}
+
+            {/* Manual payment warning modal */}
+            {showManualModal && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl">
+                        <div className="flex items-start gap-3">
+                            <span className="text-amber-400 text-xl shrink-0 mt-0.5">⚠</span>
+                            <div>
+                                <h3 className="font-bold text-white">Manual Payment (Not Recommended)</h3>
+                                <p className="text-gray-400 text-sm mt-2 leading-relaxed">
+                                    Manual payments rely on commissioner accuracy and are not visible to the league. For full transparency and automatic pot tracking, members should pay through their own account.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex gap-3 pt-1">
+                            <button
+                                onClick={() => { setShowManualModal(false); setPendingManualId(null); }}
+                                className="flex-1 bg-[#C8A951] hover:bg-[#b8992f] text-black font-bold py-2.5 rounded-xl text-sm transition"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleManualConfirm}
+                                className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold py-2.5 rounded-xl text-sm transition border border-gray-700"
+                            >
+                                Continue Anyway
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

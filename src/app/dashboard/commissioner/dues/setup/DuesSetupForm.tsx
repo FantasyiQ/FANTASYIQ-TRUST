@@ -36,6 +36,8 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
     );
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    // Payment model preference — stored as informational; both paths remain available
+    const [paymentModel, setPaymentModel] = useState<'stripe' | 'manual'>('stripe');
 
     // Season checkboxes — default to the auto-matched season, else current year
     const baseYear = parseInt(autoMatch?.season ?? new Date().getFullYear().toString());
@@ -99,6 +101,64 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
                     {error}
                 </div>
             )}
+
+            {/* Payment model selection */}
+            <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-300">How will members pay?</label>
+                <div className="space-y-2">
+                    <button
+                        type="button"
+                        onClick={() => setPaymentModel('stripe')}
+                        className={`w-full text-left px-4 py-3.5 rounded-xl border transition ${
+                            paymentModel === 'stripe'
+                                ? 'border-[#C8A951]/60 bg-[#C8A951]/8'
+                                : 'border-gray-700 bg-gray-800/40 hover:border-gray-600'
+                        }`}
+                    >
+                        <div className="flex items-start gap-3">
+                            <span className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                paymentModel === 'stripe' ? 'border-[#C8A951]' : 'border-gray-600'
+                            }`}>
+                                {paymentModel === 'stripe' && <span className="w-2 h-2 rounded-full bg-[#C8A951] block" />}
+                            </span>
+                            <div>
+                                <p className="text-white text-sm font-semibold">
+                                    Member-Direct Payments
+                                    <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#C8A951]/15 text-[#C8A951] border border-[#C8A951]/30">RECOMMENDED</span>
+                                </p>
+                                <p className="text-gray-500 text-xs mt-0.5">Each member pays through their own account via Stripe. Automatic tracking, full transparency.</p>
+                            </div>
+                        </div>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setPaymentModel('manual')}
+                        className={`w-full text-left px-4 py-3.5 rounded-xl border transition ${
+                            paymentModel === 'manual'
+                                ? 'border-gray-600 bg-gray-800/60'
+                                : 'border-gray-700 bg-gray-800/40 hover:border-gray-600'
+                        }`}
+                    >
+                        <div className="flex items-start gap-3">
+                            <span className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                paymentModel === 'manual' ? 'border-gray-400' : 'border-gray-600'
+                            }`}>
+                                {paymentModel === 'manual' && <span className="w-2 h-2 rounded-full bg-gray-400 block" />}
+                            </span>
+                            <div>
+                                <p className="text-gray-400 text-sm font-semibold">Manual Payments (Cash / Venmo)</p>
+                                <p className="text-gray-600 text-xs mt-0.5">Commissioner collects and enters payments manually. Less transparent — not automatically verified.</p>
+                            </div>
+                        </div>
+                    </button>
+                </div>
+                {paymentModel === 'manual' && (
+                    <p className="text-amber-500/80 text-xs flex items-start gap-1.5 bg-amber-900/10 border border-amber-900/30 rounded-lg px-3 py-2">
+                        <span className="shrink-0 mt-0.5">⚠</span>
+                        Manual payments are not automatically verified and rely on commissioner accuracy. Members can still pay via Stripe if they choose.
+                    </p>
+                )}
+            </div>
 
             {/* Synced league picker — hidden when pre-filled from commissioner plan */}
             {!isPreFilled && syncedLeagues.length > 0 && (

@@ -51,11 +51,20 @@ export default async function DuesTrackerPage({ params }: { params: Promise<{ du
     });
     const sleeperLeagueId = matchedLeague?.leagueId ?? null;
 
-    const fullPot = dues.buyInAmount * dues.teamCount;
-    const progress = potProgress(dues.potTotal, fullPot);
-    const paidCount = dues.members.filter(m => m.duesStatus === 'paid').length;
+    const fullPot     = dues.buyInAmount * dues.teamCount;
+    const progress    = potProgress(dues.potTotal, fullPot);
+    const paidCount   = dues.members.filter(m => m.duesStatus === 'paid').length;
     const unpaidCount = dues.members.filter(m => m.duesStatus === 'unpaid').length;
-    const potWhole = dues.potTotal >= fullPot && dues.members.length === dues.teamCount;
+    const potWhole    = dues.potTotal >= fullPot && dues.members.length === dues.teamCount;
+
+    const stripePaidCount = dues.members.filter(m =>
+        m.duesStatus === 'paid' && (m.paymentMethod === 'stripe_direct' || m.paymentMethod === 'stripe_on_behalf')
+    ).length;
+    const manualPaidCount = dues.members.filter(m =>
+        m.duesStatus === 'paid' && m.paymentMethod === 'manual'
+    ).length;
+    const stripeTotal = stripePaidCount * dues.buyInAmount;
+    const manualTotal = manualPaidCount * dues.buyInAmount;
     const latestProposal = dues.proposals[0] ?? null;
 
     return (
@@ -127,6 +136,33 @@ export default async function DuesTrackerPage({ params }: { params: Promise<{ du
                             <p className="text-gray-500 text-xs mt-0.5">Roster Added</p>
                         </div>
                     </div>
+
+                    {/* Breakdown: Stripe (verified) vs Manual (commissioner-entered) */}
+                    {paidCount > 0 && (
+                        <div className="border-t border-gray-800 pt-3 space-y-1.5">
+                            <p className="text-gray-600 text-xs font-semibold uppercase tracking-wide">Payment Breakdown</p>
+                            {stripePaidCount > 0 && (
+                                <div className="flex items-center justify-between text-xs">
+                                    <span className="flex items-center gap-1.5 text-gray-400">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block shrink-0" />
+                                        ${stripeTotal.toFixed(2)} Stripe
+                                        <span className="text-green-500 font-semibold">(Verified)</span>
+                                    </span>
+                                    <span className="text-gray-600">{stripePaidCount} member{stripePaidCount !== 1 ? 's' : ''}</span>
+                                </div>
+                            )}
+                            {manualPaidCount > 0 && (
+                                <div className="flex items-center justify-between text-xs">
+                                    <span className="flex items-center gap-1.5 text-gray-400">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-gray-500 inline-block shrink-0" />
+                                        ${manualTotal.toFixed(2)} Manual
+                                        <span className="text-gray-500 font-medium">(Commissioner Entered)</span>
+                                    </span>
+                                    <span className="text-gray-600">{manualPaidCount} member{manualPaidCount !== 1 ? 's' : ''}</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* Roster */}
