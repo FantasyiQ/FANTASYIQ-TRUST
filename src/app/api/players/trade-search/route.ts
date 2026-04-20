@@ -64,6 +64,7 @@ export async function GET(request: NextRequest): Promise<Response> {
             baseValue:       fcValue ?? (DEPTH_BASE[p.position] ?? 10),
             birthDate:       p.birthDate ?? null,
             playerImageUrl:  `https://sleepercdn.com/content/nfl/players/${p.playerId}.jpg`,
+            image:           `https://sleepercdn.com/content/nfl/players/${p.playerId}.jpg`,
         };
     });
 

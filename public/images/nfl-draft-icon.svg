@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none">
+  <!-- Background circle -->
+  <circle cx="20" cy="20" r="20" fill="#312e81"/>
+  <!-- Football shape -->
+  <ellipse cx="20" cy="20" rx="10" ry="7" fill="#a5b4fc" opacity="0.15"/>
+  <ellipse cx="20" cy="20" rx="9" ry="6" stroke="#a5b4fc" stroke-width="1.5" fill="none"/>
+  <!-- Laces -->
+  <line x1="20" y1="14.5" x2="20" y2="25.5" stroke="#a5b4fc" stroke-width="1.2"/>
+  <line x1="17.5" y1="17.5" x2="22.5" y2="17.5" stroke="#a5b4fc" stroke-width="1"/>
+  <line x1="17.5" y1="20" x2="22.5" y2="20" stroke="#a5b4fc" stroke-width="1"/>
+  <line x1="17.5" y1="22.5" x2="22.5" y2="22.5" stroke="#a5b4fc" stroke-width="1"/>
+  <!-- Star accent top -->
+  <circle cx="20" cy="8" r="2" fill="#C8A951" opacity="0.9"/>
+  <path d="M20 5.5 L20.6 7.2 L22.4 7.2 L21 8.3 L21.6 10 L20 9 L18.4 10 L19 8.3 L17.6 7.2 L19.4 7.2 Z" fill="#C8A951"/>
+</svg>

@@ -85,14 +85,20 @@ function PlayerPill({ result, onRemove, leagueSize }: { result: DtvResult; onRem
         <div className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 space-y-2">
             <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                    {/* Player headshot */}
-                    {!isPick && result.playerImageUrl && (
+                    {/* Player headshot or draft pick icon */}
+                    {result.image && (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                            src={result.playerImageUrl}
-                            alt={result.name}
-                            className="h-10 w-10 rounded-full object-cover shrink-0 bg-gray-700"
-                            onError={(e) => { e.currentTarget.src = '/images/player-placeholder.svg'; }}
+                            src={result.image}
+                            alt={isPick ? 'Draft Pick' : result.name}
+                            className={isPick
+                                ? 'h-10 w-10 shrink-0 object-contain'
+                                : 'h-10 w-10 rounded-full object-cover shrink-0 bg-gray-700'}
+                            {...(!isPick && {
+                                onError: (e: React.SyntheticEvent<HTMLImageElement>) => {
+                                    e.currentTarget.src = '/images/player-placeholder.svg';
+                                },
+                            })}
                         />
                     )}
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-md border shrink-0 ${POS_COLORS[result.position] ?? 'bg-gray-800 text-gray-400 border-gray-700'}`}>
@@ -518,6 +524,7 @@ export default function TradeEvaluator({
         if (p.position === 'PICK') return p;
         const u = universeMap.get(p.name.toLowerCase());
         if (!u) return p;
+        const resolvedImageUrl = u.playerImageUrl ?? p.playerImageUrl ?? null;
         return {
             ...p,
             baseValue:       computePlayerBaseValue(u, p.position, { leagueType, superflex, ppr, leagueSize, passTd: leagueSettings.passTd, bonusRecTe: leagueSettings.bonusRecTe }),
@@ -525,7 +532,8 @@ export default function TradeEvaluator({
             age:             u.age ?? p.age,
             injuryStatus:    u.injuryStatus ?? p.injuryStatus ?? null,
             birthDate:       u.birthDate ?? p.birthDate ?? null,
-            playerImageUrl:  u.playerImageUrl ?? p.playerImageUrl ?? null,
+            playerImageUrl:  resolvedImageUrl,
+            image:           resolvedImageUrl,
         };
     }, [universeMap, leagueType, superflex, ppr, leagueSize, leagueSettings]);
 
@@ -543,6 +551,7 @@ export default function TradeEvaluator({
             injuryStatus:    u.injuryStatus,
             birthDate:       u.birthDate,
             playerImageUrl:  u.playerImageUrl,
+            image:           u.playerImageUrl,
         }));
         return [...players, ...draftPicks];
     }, [universe, draftPicks, leagueType, superflex, ppr, leagueSize, leagueSettings]);

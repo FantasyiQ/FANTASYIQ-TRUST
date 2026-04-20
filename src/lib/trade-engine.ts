@@ -15,7 +15,8 @@ export interface Player {
     baseValue:        number;
     injuryStatus?:    string | null;
     birthDate?:       string | null;  // ISO date from Sleeper — used for runtime age display
-    playerImageUrl?:  string | null;  // Sleeper CDN headshot URL
+    playerImageUrl?:  string | null;  // Sleeper CDN headshot URL (raw)
+    image?:           string | null;  // resolved UI image: draft icon for picks, headshot for players
 }
 
 export interface DtvResult extends Player {
@@ -305,6 +306,7 @@ export function getDraftPicks(leagueSize: number, draftRounds = 5): Player[] {
                     team: String(year),
                     age: 23,
                     baseValue: value,
+                    image: '/images/nfl-draft-icon.svg',
                 });
             }
             // Tier picks — used when exact draft order is not yet set
@@ -317,6 +319,7 @@ export function getDraftPicks(leagueSize: number, draftRounds = 5): Player[] {
                     team: String(year),
                     age: 23,
                     baseValue: value,
+                    image: '/images/nfl-draft-icon.svg',
                 });
             }
         }
