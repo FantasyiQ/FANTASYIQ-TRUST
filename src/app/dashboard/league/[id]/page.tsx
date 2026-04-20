@@ -522,6 +522,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                     canUsePlayerRankings={canUseTradeEvaluator}
                     sleeperLeagueId={league.leagueId}
                     sleeperMembers={sleeperMembers}
+                    mySleeperUserId={mySleeperUserId}
                 />
 
             </div>

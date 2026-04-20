@@ -12,6 +12,7 @@ import { computePlayerBaseValue } from '@/lib/player-universe';
 import DuesManager from './DuesManager';
 import type { DuesManagerData, SleeperMember } from './DuesManager';
 import RosterValuesPanel from './RosterValuesPanel';
+import TradePartnersPanel from './TradePartnersPanel';
 
 // ── Serialisable prop types ──────────────────────────────────────────────────
 
@@ -69,17 +70,19 @@ interface Props {
     canUsePlayerRankings:   boolean;
     sleeperLeagueId:        string;
     sleeperMembers:         SleeperMember[];
+    mySleeperUserId:        string | null;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-type Tab = 'overview' | 'trade' | 'commish' | 'roster-values';
+type Tab = 'overview' | 'trade' | 'commish' | 'roster-values' | 'trade-partners';
 
 const TABS: { id: Tab; label: string }[] = [
-    { id: 'overview',      label: 'League Overview' },
-    { id: 'commish',       label: 'Commissioner Hub' },
-    { id: 'trade',         label: 'Trade Evaluator' },
-    { id: 'roster-values', label: 'Roster Values' },
+    { id: 'overview',       label: 'League Overview' },
+    { id: 'commish',        label: 'Commissioner Hub' },
+    { id: 'trade',          label: 'Trade Evaluator' },
+    { id: 'roster-values',  label: 'Roster Values' },
+    { id: 'trade-partners', label: 'Trade Partners' },
 ];
 
 function chevron(open: boolean) {
@@ -411,6 +414,7 @@ export default function LeagueDetailTabs({
     canUsePlayerRankings,
     sleeperLeagueId,
     sleeperMembers,
+    mySleeperUserId,
 }: Props) {
     const [activeTab, setActiveTab] = useState<Tab>('overview');
 
@@ -636,6 +640,14 @@ export default function LeagueDetailTabs({
             {/* ── Roster Values tab ─────────────────────────────────────── */}
             {activeTab === 'roster-values' && (
                 <RosterValuesPanel sleeperLeagueId={sleeperLeagueId} />
+            )}
+
+            {/* ── Trade Partners tab ────────────────────────────────────── */}
+            {activeTab === 'trade-partners' && (
+                <TradePartnersPanel
+                    sleeperLeagueId={sleeperLeagueId}
+                    mySleeperUserId={mySleeperUserId}
+                />
             )}
 
         </div>

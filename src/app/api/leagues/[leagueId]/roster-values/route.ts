@@ -1,6 +1,6 @@
 import { type NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getLeagueRosters, getLeagueMembers, getPlayers } from '@/lib/sleeper';
+import { getLeagueRosters, getLeagueUsers, getPlayers } from '@/lib/sleeper';
 import { calcDtv, DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
 import type { Player, LeagueSettings, LeagueType } from '@/lib/trade-engine';
 import { computePlayerBaseValue } from '@/lib/player-universe';
@@ -148,7 +148,7 @@ export async function GET(
     // 2. Fetch Sleeper rosters + members + KTC universe in parallel
     const [rosters, members, ktcRows, sleeperAllPlayers, latestSnapshot] = await Promise.all([
         getLeagueRosters(leagueId),
-        getLeagueMembers(leagueId),
+        getLeagueUsers(leagueId),
         prisma.fantasyCalcValue.findMany({
             where: { OR: [{ dynastyValue: { gt: 0 } }, { redraftValue: { gt: 0 } }] },
             select: {
