@@ -226,10 +226,12 @@ export default function RosterValuesPanel({ sleeperLeagueId }: { sleeperLeagueId
                 </table>
             </div>
 
-            {/* Footer */}
+            {/* Footer — tier bands come from the API so they always match the model */}
             <div className="px-6 py-3 border-t border-gray-800 flex items-center justify-between flex-wrap gap-2">
                 <p className="text-gray-600 text-xs">
-                    Elite ≥600 · Contender 450–599 · Competitive 300–449 · Rebuilding &lt;300
+                    {(Object.entries(meta.tierBands) as [string, string][])
+                        .map(([tier, band]) => `${tier}: ${band}`)
+                        .join(' · ')}
                 </p>
                 <p className="text-gray-700 text-xs">
                     Generated {new Date(meta.generatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

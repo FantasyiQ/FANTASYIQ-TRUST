@@ -53,6 +53,14 @@ export interface RosterValuesResponse {
         superflex:       boolean;
         teamCount:       number;
         scoringSettings: Record<string, number>;
+        // Tiers are league-relative (percentile), not absolute DTV thresholds.
+        tierModel:       'percentile';
+        tierBands: {
+            Elite:       string;
+            Contender:   string;
+            Competitive: string;
+            Rebuilding:  string;
+        };
     };
     teams: RosterTeam[];
 }
@@ -107,11 +115,20 @@ function scoringTypeToPpr(scoringType: string | null): 0 | 0.5 | 1 {
     return 0;
 }
 
-function rosterTier(totalValue: number): RosterTier {
-    if (totalValue >= 600) return 'Elite';
-    if (totalValue >= 450) return 'Contender';
-    if (totalValue >= 300) return 'Competitive';
-    return 'Rebuilding';
+// Tiers are league-relative: each team's rank within the league determines its
+// tier, so the model is format-agnostic and scales to any league size.
+// Percentile: 0.0 = top of league, 1.0 = bottom of league.
+function buildTierClassifier(sortedValuesDesc: number[]): (value: number) => RosterTier {
+    const n = sortedValuesDesc.length;
+    return (value: number): RosterTier => {
+        // Count how many teams score strictly above this value (higher = better)
+        const rank = sortedValuesDesc.filter(v => v > value).length;
+        const percentile = n > 1 ? rank / n : 0;
+        if (percentile <= 0.20) return 'Elite';
+        if (percentile <= 0.50) return 'Contender';
+        if (percentile <= 0.80) return 'Competitive';
+        return 'Rebuilding';
+    };
 }
 
 // ── Route ──────────────────────────────────────────────────────────────────────
@@ -315,17 +332,23 @@ export async function GET(
             rosterId:            roster.roster_id,
             ownerId:             roster.owner_id,
             displayName,
-            rank:                0, // assigned after sort
-            tier:                rosterTier(totalRosterValue),
+            rank:                0,            // assigned after sort
+            tier:                'Rebuilding', // overwritten after sort
             totalRosterValue,
             positionalBreakdown: breakdown,
             players:             rosterPlayers,
         };
     });
 
-    // 9. Sort by totalRosterValue desc, assign rank
+    // 9. Sort by totalRosterValue desc, assign rank and percentile-based tiers.
+    //    Tiers are league-relative so they automatically adapt to any DTV scale.
     teams.sort((a, b) => b.totalRosterValue - a.totalRosterValue);
-    teams.forEach((t, i) => { t.rank = i + 1; });
+    const sortedValues  = teams.map(t => t.totalRosterValue);
+    const classifyTier  = buildTierClassifier(sortedValues);
+    teams.forEach((t, i) => {
+        t.rank = i + 1;
+        t.tier = classifyTier(t.totalRosterValue);
+    });
 
     const body: RosterValuesResponse = {
         meta: {
@@ -337,6 +360,13 @@ export async function GET(
             superflex,
             teamCount:       teams.length,
             scoringSettings,
+            tierModel:       'percentile',
+            tierBands: {
+                Elite:       'Top 20%',
+                Contender:   '20–50%',
+                Competitive: '50–80%',
+                Rebuilding:  'Bottom 20%',
+            },
         },
         teams,
     };
