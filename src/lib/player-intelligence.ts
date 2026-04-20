@@ -288,6 +288,7 @@ export const TEAM_SCHEMES: Record<string, TeamScheme> = {
 // ── Per-position age curves (Dynasty only) ────────────────────────────────
 // Redraft uses flat 1.0; Dynasty rewards youth heavily, especially at RB
 export function ageCurveDynasty(position: string, age: number): number {
+    if (!age || age <= 0) return 1.0;
     if (position === 'K' || position === 'DEF' || position === 'PICK') return 1.0;
 
     switch (position) {

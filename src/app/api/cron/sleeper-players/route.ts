@@ -15,7 +15,8 @@ type RawPlayer = {
     number?:          number | string | null;
     height?:          string | null;  // inches as string e.g. "74"
     weight?:          string | null;  // lbs as string e.g. "225"
-    age?:             number | null;
+    birth_date?:      string | null;  // ISO date e.g. "1998-05-15" — canonical DOB source
+    age?:             number | null;  // pre-calculated by Sleeper (fallback when birth_date absent)
 };
 
 function formatHeight(inches: string | null | undefined): string | null {
@@ -51,6 +52,7 @@ export async function GET(request: Request): Promise<Response> {
             jerseyNumber:   p.number ? parseInt(String(p.number)) || null : null,
             height:         formatHeight(p.height),
             weight:         p.weight ? parseInt(String(p.weight)) || null : null,
+            birthDate:      p.birth_date ?? null,
             age:            p.age ?? null,
         }));
 
@@ -74,6 +76,7 @@ export async function GET(request: Request): Promise<Response> {
                         jerseyNumber:   r.jerseyNumber,
                         height:         r.height,
                         weight:         r.weight,
+                        birthDate:      r.birthDate,
                         age:            r.age,
                     },
                 })

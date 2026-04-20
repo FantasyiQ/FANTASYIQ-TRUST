@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import type { UniversePlayer, UniverseResponse } from '@/lib/player-universe';
+import { calculateAge } from '@/lib/calculateAge';
 
 const KTC_CAP = 9999;
 const SKILL_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE']);
@@ -40,7 +41,7 @@ export async function GET(): Promise<Response> {
         }),
         prisma.sleeperPlayer.findMany({
             where:  { active: true, position: { in: ['QB', 'RB', 'WR', 'TE'] } },
-            select: { fullName: true, team: true, injuryStatus: true, age: true },
+            select: { playerId: true, fullName: true, team: true, injuryStatus: true, birthDate: true, age: true },
         }),
         // Latest KTC sync time — max updatedAt across all rows
         prisma.fantasyCalcValue.findFirst({
@@ -69,19 +70,21 @@ export async function GET(): Promise<Response> {
 
             const rawTeam = sleeper?.team ?? null;
             const team    = (rawTeam && rawTeam !== 'FA') ? rawTeam : null;
-            const age     = sleeper?.age ?? (r.age ? Math.round(r.age) : null);
+            const age     = calculateAge(sleeper?.birthDate) ?? sleeper?.age ?? (r.age ? Math.round(r.age) : null);
 
             return {
-                name:         r.playerName,
-                position:     r.position,
+                name:            r.playerName,
+                position:        r.position,
                 team,
                 age,
-                dynasty:      normalise(r.dynastyValue),
-                dynastySf:    normalise(r.dynastyValueSf),
-                redraft:      normalise(r.redraftValue),
-                redraftSf:    normalise(r.redraftValueSf),
-                trend:        r.trend30Day ?? null,
-                injuryStatus: sleeper?.injuryStatus ?? null,
+                dynasty:         normalise(r.dynastyValue),
+                dynastySf:       normalise(r.dynastyValueSf),
+                redraft:         normalise(r.redraftValue),
+                redraftSf:       normalise(r.redraftValueSf),
+                trend:           r.trend30Day ?? null,
+                injuryStatus:    sleeper?.injuryStatus ?? null,
+                birthDate:       sleeper?.birthDate ?? null,
+                playerImageUrl:  sleeper ? `https://sleepercdn.com/content/nfl/players/${sleeper.playerId}.jpg` : null,
             };
         })
         .sort((a, b) => b.dynasty - a.dynasty || a.name.localeCompare(b.name));

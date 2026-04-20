@@ -390,7 +390,8 @@ model SleeperPlayer {
     jerseyNumber    Int?
     height          String?  // e.g. "6' 2\""
     weight          Int?     // lbs
-    age             Int?
+    birthDate       String?  // birth_date from Sleeper API e.g. "1998-05-15" — canonical DOB source
+    age             Int?     // pre-calculated by Sleeper (kept as fallback when birthDate is absent)
     updatedAt       DateTime @updatedAt
 
     projections     PlayerProjection[]

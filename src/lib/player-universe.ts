@@ -13,16 +13,18 @@ export interface UniverseResponse {
 }
 
 export interface UniversePlayer {
-    name:         string;
-    position:     string;
-    team:         string | null;
-    age:          number | null;
-    dynasty:      number;       // 0–100 normalised KTC 1QB dynasty
-    dynastySf:    number;       // 0–100 normalised KTC superflex dynasty
-    redraft:      number;       // 0–100 normalised KTC 1QB redraft
-    redraftSf:    number;       // 0–100 normalised KTC superflex redraft
-    trend:        number | null;
-    injuryStatus: string | null;
+    name:            string;
+    position:        string;
+    team:            string | null;
+    age:             number | null;
+    dynasty:         number;       // 0–100 normalised KTC 1QB dynasty
+    dynastySf:       number;       // 0–100 normalised KTC superflex dynasty
+    redraft:         number;       // 0–100 normalised KTC 1QB redraft
+    redraftSf:       number;       // 0–100 normalised KTC superflex redraft
+    trend:           number | null;
+    injuryStatus:    string | null;
+    birthDate:       string | null;  // ISO date from Sleeper — runtime age source
+    playerImageUrl:  string | null;  // Sleeper CDN headshot
 }
 
 // ── Delta types ──────────────────────────────────────────────────────────────

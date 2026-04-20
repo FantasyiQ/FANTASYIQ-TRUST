@@ -3,17 +3,19 @@
 // Trade Score: 0–100 scale based on DTV differential
 // Dynasty vs Redraft use distinct weight sets
 
-import { getPlayerIntel } from './player-intelligence';
+import { getPlayerIntel, ageCurveDynasty } from './player-intelligence';
 export type { ContractTier } from './player-intelligence';
 
 export interface Player {
-    rank:          number;
-    name:          string;
-    position:      string;
-    team:          string;
-    age:           number;
-    baseValue:     number;
-    injuryStatus?: string | null;
+    rank:             number;
+    name:             string;
+    position:         string;
+    team:             string;
+    age:              number;
+    baseValue:        number;
+    injuryStatus?:    string | null;
+    birthDate?:       string | null;  // ISO date from Sleeper — used for runtime age display
+    playerImageUrl?:  string | null;  // Sleeper CDN headshot URL
 }
 
 export interface DtvResult extends Player {
@@ -179,13 +181,16 @@ export function calcDtv(
     const isPick        = player.position === 'PICK';
     const posMultiplier = isPick ? 1 : computeScarcity(player.position, settings);
     const injuryFactor  = isPick ? 1 : calcInjuryFactor(player.injuryStatus);
+    const ageMultiplier = (leagueType === 'Dynasty' && !isPick)
+        ? ageCurveDynasty(player.position, player.age)
+        : 1;
     const rawDtv        = Math.round(player.baseValue * 10) / 10;
-    const finalDtv      = Math.round(rawDtv * posMultiplier * injuryFactor * 10) / 10;
+    const finalDtv      = Math.round(rawDtv * posMultiplier * injuryFactor * ageMultiplier * 10) / 10;
 
     return {
         ...player,
         posMultiplier,
-        ageMultiplier:  1,
+        ageMultiplier,
         perfFactor:     1,
         schedFactor:    1,
         injuryFactor,

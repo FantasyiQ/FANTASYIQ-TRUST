@@ -5,6 +5,7 @@ import { getDraftPicks, evaluateTrade, calcDtv, DEFAULT_LEAGUE_SETTINGS } from '
 import type { Player, PprFormat, LeagueType, DtvResult, LeagueSettings } from '@/lib/trade-engine';
 import type { UniversePlayer, UniverseResponse, UniverseMeta, DeltaEntry, DeltaResponse } from '@/lib/player-universe';
 import { computePlayerBaseValue, playerVolatility } from '@/lib/player-universe';
+import { calculateAge } from '@/lib/calculateAge';
 
 const LEAGUE_SIZES = [8, 10, 12, 14, 16, 32] as const;
 type LeagueSize = typeof LEAGUE_SIZES[number];
@@ -78,23 +79,35 @@ function FactorBar({ label, value, max = 1.30 }: { label: string; value: number;
 }
 
 function PlayerPill({ result, onRemove, leagueSize }: { result: DtvResult; onRemove: () => void; leagueType: LeagueType; leagueSize: number }) {
+    const displayAge = result.birthDate ? calculateAge(result.birthDate) : result.age || null;
+    const isPick = result.position === 'PICK';
     return (
         <div className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 space-y-2">
             <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
+                    {/* Player headshot */}
+                    {!isPick && result.playerImageUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                            src={result.playerImageUrl}
+                            alt={result.name}
+                            className="h-10 w-10 rounded-full object-cover shrink-0 bg-gray-700"
+                            onError={(e) => { e.currentTarget.src = '/images/player-placeholder.svg'; }}
+                        />
+                    )}
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-md border shrink-0 ${POS_COLORS[result.position] ?? 'bg-gray-800 text-gray-400 border-gray-700'}`}>
                         {result.position}
                     </span>
                     <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
                             <p className="text-white text-sm font-semibold truncate">
-                                {result.position === 'PICK' ? pickLabel(result.name, leagueSize) : result.name}
+                                {isPick ? pickLabel(result.name, leagueSize) : result.name}
                             </p>
                             {result.injuryStatus && result.injuryStatus !== 'Active' && (
                                 <span className={`text-[10px] font-bold px-1 py-0.5 rounded shrink-0 ${
-                                    result.injuryStatus === 'IR'  ? 'bg-red-900/60 text-red-400' :
-                                    result.injuryStatus === 'Out' ? 'bg-red-900/40 text-red-400' :
-                                    result.injuryStatus === 'PUP' ? 'bg-red-900/40 text-red-300' :
+                                    result.injuryStatus === 'IR'       ? 'bg-red-900/60 text-red-400' :
+                                    result.injuryStatus === 'Out'      ? 'bg-red-900/40 text-red-400' :
+                                    result.injuryStatus === 'PUP'      ? 'bg-red-900/40 text-red-300' :
                                     result.injuryStatus === 'Doubtful' ? 'bg-orange-900/60 text-orange-400' :
                                     'bg-yellow-900/40 text-yellow-400'
                                 }`}>
@@ -105,7 +118,9 @@ function PlayerPill({ result, onRemove, leagueSize }: { result: DtvResult; onRem
                                 </span>
                             )}
                         </div>
-                        <p className="text-gray-500 text-xs">{result.position === 'PICK' ? `${result.team} Draft` : `${result.team}${result.age ? ` · Age ${result.age}` : ''}`}</p>
+                        <p className="text-gray-500 text-xs">
+                            {isPick ? `${result.team} Draft` : `${result.team}${displayAge ? ` · Age ${displayAge}` : ''}`}
+                        </p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -505,9 +520,12 @@ export default function TradeEvaluator({
         if (!u) return p;
         return {
             ...p,
-            baseValue:    computePlayerBaseValue(u, p.position, { leagueType, superflex, ppr, leagueSize, passTd: leagueSettings.passTd, bonusRecTe: leagueSettings.bonusRecTe }),
-            team:         u.team ?? p.team,
-            injuryStatus: u.injuryStatus ?? p.injuryStatus ?? null,
+            baseValue:       computePlayerBaseValue(u, p.position, { leagueType, superflex, ppr, leagueSize, passTd: leagueSettings.passTd, bonusRecTe: leagueSettings.bonusRecTe }),
+            team:            u.team ?? p.team,
+            age:             u.age ?? p.age,
+            injuryStatus:    u.injuryStatus ?? p.injuryStatus ?? null,
+            birthDate:       u.birthDate ?? p.birthDate ?? null,
+            playerImageUrl:  u.playerImageUrl ?? p.playerImageUrl ?? null,
         };
     }, [universeMap, leagueType, superflex, ppr, leagueSize, leagueSettings]);
 
@@ -516,13 +534,15 @@ export default function TradeEvaluator({
     const draftPicks = useMemo(() => getDraftPicks(leagueSize), [leagueSize]);
     const allPlayers = useMemo(() => {
         const players: Player[] = universe.map((u, i) => ({
-            rank:         i + 1,
-            name:         u.name,
-            position:     u.position,
-            team:         u.team ?? 'FA',
-            age:          u.age ?? 0,
-            baseValue:    computePlayerBaseValue(u, u.position, { leagueType, superflex, ppr, leagueSize, passTd: leagueSettings.passTd, bonusRecTe: leagueSettings.bonusRecTe }),
-            injuryStatus: u.injuryStatus,
+            rank:            i + 1,
+            name:            u.name,
+            position:        u.position,
+            team:            u.team ?? 'FA',
+            age:             u.age ?? 0,
+            baseValue:       computePlayerBaseValue(u, u.position, { leagueType, superflex, ppr, leagueSize, passTd: leagueSettings.passTd, bonusRecTe: leagueSettings.bonusRecTe }),
+            injuryStatus:    u.injuryStatus,
+            birthDate:       u.birthDate,
+            playerImageUrl:  u.playerImageUrl,
         }));
         return [...players, ...draftPicks];
     }, [universe, draftPicks, leagueType, superflex, ppr, leagueSize, leagueSettings]);

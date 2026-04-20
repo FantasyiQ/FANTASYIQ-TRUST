@@ -1,5 +1,6 @@
 import { type NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { calculateAge } from '@/lib/calculateAge';
 import { getLeagueRosters, getLeagueUsers, getPlayers } from '@/lib/sleeper';
 import { calcDtv, DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
 import type { Player, LeagueSettings, LeagueType } from '@/lib/trade-engine';
@@ -176,7 +177,7 @@ export async function GET(
         }),
         prisma.sleeperPlayer.findMany({
             where:  { active: true },
-            select: { playerId: true, fullName: true, team: true, injuryStatus: true, age: true },
+            select: { playerId: true, fullName: true, team: true, injuryStatus: true, birthDate: true, age: true },
         }),
         // Latest snapshot for delta computation
         prisma.fantasyCalcSnapshot.findFirst({
@@ -192,11 +193,11 @@ export async function GET(
     const playerById = await getPlayers(allPlayerIds);
 
     // 4. Build Sleeper lookup by fullName (exact + normalized)
-    type SleeperInfo = { team: string; injuryStatus: string | null; age: number | null };
+    type SleeperInfo = { team: string; injuryStatus: string | null; birthDate: string | null; age: number | null };
     const sleeperExact      = new Map<string, SleeperInfo>();
     const sleeperNormalized = new Map<string, SleeperInfo>();
     for (const p of sleeperAllPlayers) {
-        const val = { team: p.team, injuryStatus: p.injuryStatus, age: p.age };
+        const val = { team: p.team, injuryStatus: p.injuryStatus, birthDate: p.birthDate, age: p.age };
         const exact = p.fullName.toLowerCase();
         const normd = normalizeName(p.fullName);
         if (!sleeperExact.has(exact))      sleeperExact.set(exact, val);
@@ -211,19 +212,21 @@ export async function GET(
         const sl     = sleeperExact.get(exact) ?? sleeperNormalized.get(normd) ?? null;
         const rawTeam = sl?.team ?? null;
         const team   = (rawTeam && rawTeam !== 'FA') ? rawTeam : null;
-        const age    = sl?.age ?? 0;
+        const age    = calculateAge(sl?.birthDate) ?? sl?.age ?? 0;
 
         const u: UniversePlayer = {
-            name:         r.playerName,
-            position:     r.position,
+            name:            r.playerName,
+            position:        r.position,
             team,
             age,
-            dynasty:      normalise(r.dynastyValue),
-            dynastySf:    normalise(r.dynastyValueSf),
-            redraft:      normalise(r.redraftValue),
-            redraftSf:    normalise(r.redraftValueSf),
-            trend:        null,
-            injuryStatus: sl?.injuryStatus ?? null,
+            dynasty:         normalise(r.dynastyValue),
+            dynastySf:       normalise(r.dynastyValueSf),
+            redraft:         normalise(r.redraftValue),
+            redraftSf:       normalise(r.redraftValueSf),
+            trend:           null,
+            injuryStatus:    sl?.injuryStatus ?? null,
+            birthDate:       null,
+            playerImageUrl:  null,
         };
         const baseValue = SKILL_POSITIONS.has(r.position)
             ? computePlayerBaseValue(u, r.position, {

@@ -138,7 +138,7 @@ export default function LeagueTradeEvaluator({
                     name:      p.name,
                     position:  p.position,
                     team:      p.team ?? '',
-                    age:       26,
+                    age:       0,   // will be overlaid by patchPlayer from universe
                     baseValue: DEPTH_BASE[p.position] ?? 10,
                 } satisfies Player;
             })

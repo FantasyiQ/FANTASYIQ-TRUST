@@ -1,5 +1,6 @@
 import { type NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { calculateAge } from '@/lib/calculateAge';
 import { calcDtv, DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
 import type { Player, LeagueSettings, LeagueType } from '@/lib/trade-engine';
 import { computePlayerBaseValue } from '@/lib/player-universe';
@@ -122,7 +123,7 @@ export async function GET(
         }),
         prisma.sleeperPlayer.findMany({
             where:  { active: true, position: { in: ['QB', 'RB', 'WR', 'TE'] } },
-            select: { fullName: true, team: true, injuryStatus: true, age: true },
+            select: { fullName: true, team: true, injuryStatus: true, birthDate: true, age: true },
         }),
     ]);
 
@@ -141,16 +142,18 @@ export async function GET(
             const sleeper = sleeperExact.get(r.nameLower) ?? sleeperNormalized.get(normalizeName(r.nameLower)) ?? null;
             const rawTeam = sleeper?.team ?? null;
             return {
-                name:         r.playerName,
-                position:     r.position,
-                team:         (rawTeam && rawTeam !== 'FA') ? rawTeam : null,
-                age:          sleeper?.age ?? (r.age ? Math.round(r.age) : null),
-                dynasty:      normalise(r.dynastyValue),
-                dynastySf:    normalise(r.dynastyValueSf),
-                redraft:      normalise(r.redraftValue),
-                redraftSf:    normalise(r.redraftValueSf),
-                trend:        r.trend30Day ?? null,
-                injuryStatus: sleeper?.injuryStatus ?? null,
+                name:            r.playerName,
+                position:        r.position,
+                team:            (rawTeam && rawTeam !== 'FA') ? rawTeam : null,
+                age:             calculateAge(sleeper?.birthDate) ?? sleeper?.age ?? (r.age ? Math.round(r.age) : null),
+                dynasty:         normalise(r.dynastyValue),
+                dynastySf:       normalise(r.dynastyValueSf),
+                redraft:         normalise(r.redraftValue),
+                redraftSf:       normalise(r.redraftValueSf),
+                trend:           r.trend30Day ?? null,
+                injuryStatus:    sleeper?.injuryStatus ?? null,
+                birthDate:       null,
+                playerImageUrl:  null,
             };
         });
 

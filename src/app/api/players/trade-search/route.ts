@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { calculateAge } from '@/lib/calculateAge';
 import type { Player } from '@/lib/trade-engine';
 
 const KTC_CAP = 9999;
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest): Promise<Response> {
                 OR: [{ active: true }, { team: { not: 'FA' } }],
                 fullName: { contains: q, mode: 'insensitive' },
             },
-            select: { fullName: true, position: true, team: true, age: true },
+            select: { playerId: true, fullName: true, position: true, team: true, birthDate: true, age: true },
             take: 50,
         }),
         prisma.fantasyCalcValue.findMany({
@@ -55,12 +56,14 @@ export async function GET(request: NextRequest): Promise<Response> {
             ? normaliseFc(Math.max(fcRow.dynastyValue, fcRow.redraftValue))
             : undefined;
         return {
-            rank:      i + 1,
-            name:      p.fullName,
-            position:  p.position,
-            team:      p.team,
-            age:       p.age ?? 26,
-            baseValue: fcValue ?? (DEPTH_BASE[p.position] ?? 10),
+            rank:            i + 1,
+            name:            p.fullName,
+            position:        p.position,
+            team:            p.team,
+            age:             calculateAge(p.birthDate) ?? p.age ?? 0,
+            baseValue:       fcValue ?? (DEPTH_BASE[p.position] ?? 10),
+            birthDate:       p.birthDate ?? null,
+            playerImageUrl:  `https://sleepercdn.com/content/nfl/players/${p.playerId}.jpg`,
         };
     });
 
