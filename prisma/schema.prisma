@@ -54,6 +54,8 @@ model League {
     status          String    // pre_draft | drafting | in_season | complete
     totalRosters    Int
     scoringType     String?   // ppr | half_ppr | std
+    leagueType      String    @default("Redraft")  // "Dynasty" | "Redraft"
+    scoringSettings Json?     // Sleeper scoring_settings (pass_td, bonus_rec_te, etc.)
     avatar          String?
     rosterPositions String[]
     sleeperUserId   String?   // Sleeper user_id of whoever synced this record (fallback for commissioner check)
@@ -445,4 +447,23 @@ model FantasyCalcValue {
     updatedAt    DateTime @updatedAt @default(now())
 
     @@index([nameLower])
+}
+
+// Daily snapshot of KTC values + Sleeper metadata, taken before each fantasycalc-sync run.
+// Powers the /api/players/delta endpoint (what changed since yesterday).
+// Retention: 7 days (older rows deleted by the cron).
+model FantasyCalcSnapshot {
+    id             String   @id @default(cuid())
+    nameLower      String
+    position       String
+    dynastyValue   Int
+    dynastyValueSf Int
+    redraftValue   Int
+    redraftValueSf Int
+    team           String?       // Sleeper team at snapshot time
+    injuryStatus   String?       // Sleeper injury status at snapshot time
+    takenAt        DateTime @default(now())
+
+    @@index([nameLower])
+    @@index([takenAt])
 }

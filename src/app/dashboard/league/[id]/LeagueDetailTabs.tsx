@@ -1,14 +1,17 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Image from 'next/image';
 import type { TeamRosterData } from './RosterCards';
 import RosterCards from './RosterCards';
 import type { SlimPlayer } from '@/lib/sleeper';
-import { PLAYERS, calcDtv, DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
-import type { LeagueSettings, LeagueType, PprFormat } from '@/lib/trade-engine';
+import { calcDtv, DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
+import type { LeagueSettings, LeagueType, PprFormat, Player } from '@/lib/trade-engine';
+import type { UniversePlayer, UniverseResponse } from '@/lib/player-universe';
+import { computePlayerBaseValue } from '@/lib/player-universe';
 import DuesManager from './DuesManager';
 import type { DuesManagerData, SleeperMember } from './DuesManager';
+import RosterValuesPanel from './RosterValuesPanel';
 
 // ── Serialisable prop types ──────────────────────────────────────────────────
 
@@ -142,12 +145,32 @@ function PlayerRankingsCard({
 }) {
     const [posFilter, setPosFilter] = useState('All');
     const [search, setSearch] = useState('');
+    const [universe, setUniverse] = useState<UniversePlayer[]>([]);
+
+    useEffect(() => {
+        fetch('/api/players/universe')
+            .then(r => r.json())
+            .then((data: UniverseResponse) => setUniverse(data.players))
+            .catch(() => {});
+    }, []);
+
+    const superflex = leagueSettings.sfSlots > 0;
 
     const ranked = useMemo(() => {
-        return PLAYERS
-            .map(p => ({ p, dtv: calcDtv(p, ppr, leagueType, undefined, leagueSettings) }))
-            .sort((a, b) => b.dtv.finalDtv - a.dtv.finalDtv || a.p.name.localeCompare(b.p.name));
-    }, [ppr, leagueType, leagueSettings]);
+        if (!universe.length) return [];
+        return universe.map((u, i) => {
+            const p: Player = {
+                rank:         i + 1,
+                name:         u.name,
+                position:     u.position,
+                team:         u.team ?? 'FA',
+                age:          u.age ?? 0,
+                baseValue:    computePlayerBaseValue(u, u.position, { leagueType, superflex, ppr, leagueSize: 12, passTd: leagueSettings.passTd, bonusRecTe: leagueSettings.bonusRecTe }),
+                injuryStatus: u.injuryStatus,
+            };
+            return { p, dtv: calcDtv(p, ppr, leagueType, undefined, leagueSettings) };
+        }).sort((a, b) => b.dtv.finalDtv - a.dtv.finalDtv || a.p.name.localeCompare(b.p.name));
+    }, [universe, ppr, leagueType, leagueSettings, superflex]);
 
     const filtered = useMemo(() => {
         let list = ranked;
@@ -612,16 +635,7 @@ export default function LeagueDetailTabs({
 
             {/* ── Roster Values tab ─────────────────────────────────────── */}
             {activeTab === 'roster-values' && (
-                <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center space-y-3">
-                    <div className="text-4xl">📊</div>
-                    <h2 className="text-xl font-bold">Roster Values</h2>
-                    <p className="text-gray-400 text-sm max-w-sm mx-auto">
-                        Team-by-team DTV grades and roster strength rankings — coming soon.
-                    </p>
-                    <p className="text-gray-600 text-xs">
-                        In the meantime, use the Trade Evaluator tab to assess individual players and picks.
-                    </p>
-                </div>
+                <RosterValuesPanel sleeperLeagueId={sleeperLeagueId} />
             )}
 
         </div>

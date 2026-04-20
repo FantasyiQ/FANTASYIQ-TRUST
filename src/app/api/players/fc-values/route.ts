@@ -25,7 +25,7 @@ function normalizeName(name: string): string {
 // Returns a map of lowercase player name → { dynasty, redraft, team, age, trend, injuryStatus }
 // Used by TradeEvaluator to overlay live KTC values onto hardcoded baseValues.
 export async function GET(): Promise<Response> {
-    const [rows, injuries] = await Promise.all([
+    const [rows, sleeperPlayers] = await Promise.all([
         prisma.fantasyCalcValue.findMany({
             select: {
                 nameLower:      true,
@@ -38,32 +38,42 @@ export async function GET(): Promise<Response> {
                 trend30Day:     true,
             },
         }),
+        // Fetch all active Sleeper players — team updates daily from Sleeper API,
+        // so it's authoritative for trades/signings. Also provides injury status.
         prisma.sleeperPlayer.findMany({
-            where:  { active: true, injuryStatus: { not: null } },
-            select: { fullName: true, injuryStatus: true },
+            where:  { active: true },
+            select: { fullName: true, injuryStatus: true, team: true },
         }),
     ]);
 
-    // Build injury lookup keyed by both exact lowercase name AND normalized name.
+    // Build injury + team lookups keyed by exact lowercase name AND normalized name.
     // Exact key wins if present; normalized key catches suffix/period mismatches.
     const injuryExact      = new Map<string, string | null>();
     const injuryNormalized = new Map<string, string | null>();
+    const teamExact        = new Map<string, string | null>();
+    const teamNormalized   = new Map<string, string | null>();
 
-    for (const p of injuries) {
+    for (const p of sleeperPlayers) {
         const exact = p.fullName.toLowerCase();
         const normd = normalizeName(p.fullName);
-        injuryExact.set(exact, p.injuryStatus);
-        // Don't overwrite a more-specific existing entry for the same normalized key
-        if (!injuryNormalized.has(normd)) {
-            injuryNormalized.set(normd, p.injuryStatus);
+
+        if (p.injuryStatus != null) {
+            injuryExact.set(exact, p.injuryStatus);
+            if (!injuryNormalized.has(normd)) injuryNormalized.set(normd, p.injuryStatus);
         }
+
+        // team: 'FA' means free agent — treat as null for display
+        const team = (p.team && p.team !== 'FA') ? p.team : null;
+        teamExact.set(exact, team);
+        if (!teamNormalized.has(normd)) teamNormalized.set(normd, team);
     }
 
     // Build set of normalized KTC names for the warn pass below
     const ktcNormalized = new Set(rows.map(r => normalizeName(r.nameLower)));
 
-    // Warn about Sleeper injury players that have no KTC counterpart after normalization
-    for (const p of injuries) {
+    // Warn about Sleeper players with injuries that have no KTC counterpart
+    for (const p of sleeperPlayers) {
+        if (!p.injuryStatus) continue;
         const normd = normalizeName(p.fullName);
         if (!ktcNormalized.has(normd)) {
             console.warn(`[DTV] No KTC match for: ${p.fullName} (normalized: ${normd})`);
@@ -90,12 +100,14 @@ export async function GET(): Promise<Response> {
             injuryNormalized.get(normd) ??
             null;
 
+        const sleeperTeam = teamExact.get(exact) ?? teamNormalized.get(normd) ?? null;
+
         map[exact] = {
             dynasty:      normalise(r.dynastyValue),
             dynastySf:    normalise(r.dynastyValueSf),
             redraft:      normalise(r.redraftValue),
             redraftSf:    normalise(r.redraftValueSf),
-            team:         r.team,
+            team:         sleeperTeam ?? r.team,   // Sleeper authoritative, KTC fallback
             age:          r.age ? Math.round(r.age) : null,
             trend:        r.trend30Day,
             injuryStatus,

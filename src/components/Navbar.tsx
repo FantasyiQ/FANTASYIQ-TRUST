@@ -6,16 +6,32 @@ export default async function Navbar() {
   const session = await auth();
   const loggedIn = !!session?.user;
 
-  // Read tier from DB — not from JWT, which is stale after an upgrade
-  let isElite = false;
+  // Derive display tier from active Subscription rows — source of truth.
+  // Priority: ELITE > ALL_PRO > PRO. Ignores user.subscriptionTier (can be stale).
+  type NavBadge = { label: string; className: string } | null;
+  let navBadge: NavBadge = null;
   if (session?.user?.email) {
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
-      select: { subscriptionTier: true },
+      select: {
+        subscriptions: {
+          where: { status: { in: ['active', 'trialing'] } },
+          select: { tier: true },
+        },
+      },
     });
-    isElite =
-      user?.subscriptionTier === 'PLAYER_ELITE' ||
-      user?.subscriptionTier === 'COMMISSIONER_ELITE';
+    // Only PLAYER_* tiers — navbar reflects the user's personal identity, not
+    // their commissioner plan (which is league-specific and belongs on league pages).
+    const tiers = (user?.subscriptions ?? [])
+      .filter(s => s.tier.startsWith('PLAYER_'))
+      .map(s => s.tier);
+    if (tiers.includes('PLAYER_ELITE')) {
+      navBadge = { label: 'ELITE ✦',  className: 'bg-[#C9A227]/15 border border-[#C9A227]/50 text-[#C9A227]' };
+    } else if (tiers.includes('PLAYER_ALL_PRO')) {
+      navBadge = { label: 'ALL-PRO', className: 'bg-[#C9A227]/10 border border-[#C9A227]/30 text-[#C9A227]/80' };
+    } else if (tiers.includes('PLAYER_PRO')) {
+      navBadge = { label: 'PRO',     className: 'bg-gray-800 border border-gray-600 text-gray-300' };
+    }
   }
 
   return (
@@ -33,12 +49,12 @@ export default async function Navbar() {
               >
                 My Leagues
               </Link>
-              {isElite ? (
+              {navBadge ? (
                 <Link
                   href="/pricing"
-                  className="bg-[#C9A227]/15 border border-[#C9A227]/50 text-[#C9A227] font-bold px-2 sm:px-3 py-1 rounded-lg transition text-xs sm:text-sm whitespace-nowrap"
+                  className={`${navBadge.className} font-bold px-2 sm:px-3 py-1 rounded-lg transition text-xs sm:text-sm whitespace-nowrap hover:opacity-80`}
                 >
-                  Elite ✦
+                  {navBadge.label}
                 </Link>
               ) : (
                 <Link href="/pricing" className="text-gray-300 hover:text-white transition text-sm sm:text-base whitespace-nowrap">

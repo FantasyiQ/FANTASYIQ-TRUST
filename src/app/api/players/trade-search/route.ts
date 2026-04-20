@@ -1,6 +1,5 @@
 import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { PLAYERS } from '@/lib/trade-engine';
 import type { Player } from '@/lib/trade-engine';
 
 const KTC_CAP = 9999;
@@ -8,7 +7,7 @@ function normaliseFc(raw: number): number {
     return Math.min(100, Math.max(1, Math.round((raw / KTC_CAP) * 100)));
 }
 
-// Default baseValues for depth players not in the top-300 list
+// Default baseValues for unranked / non-skill-position players
 const DEPTH_BASE: Record<string, number> = {
     QB:  22, RB:  18, WR:  18, TE:  14,
     K:    8, DEF:  8,
@@ -46,33 +45,17 @@ export async function GET(request: NextRequest): Promise<Response> {
         }),
     ]);
 
-    // 2. Build lookups
-    const staticByName = new Map(PLAYERS.map(p => [p.name.toLowerCase(), p]));
     const fcByName = new Map(fcRows.map(r => [r.nameLower, r]));
 
-    // 3. Merge: FC baseValue > curated > depth default
-    // Use redraft value by default for search (client applies dynasty/redraft via patchPlayer)
+    // 2. Merge: KTC value wins; fall back to position-based depth default
     const merged: Player[] = dbMatches.map((p, i) => {
         const nameLower = p.fullName.toLowerCase();
         const fcRow  = fcByName.get(nameLower);
-        const curated = staticByName.get(nameLower);
-        // Use the higher of dynasty/redraft as the neutral search baseValue
         const fcValue = fcRow !== undefined
             ? normaliseFc(Math.max(fcRow.dynastyValue, fcRow.redraftValue))
             : undefined;
-        if (curated) {
-            // FC can boost freely; can only lower curated value by up to 15%
-            const floor = curated.baseValue * 0.85;
-            const adjusted = fcValue !== undefined ? Math.max(fcValue, floor) : curated.baseValue;
-            return {
-                ...curated,
-                team:      p.team ?? curated.team,
-                age:       p.age  ?? curated.age,
-                baseValue: adjusted,
-            };
-        }
         return {
-            rank:      300 + i + 1,
+            rank:      i + 1,
             name:      p.fullName,
             position:  p.position,
             team:      p.team,
@@ -81,12 +64,11 @@ export async function GET(request: NextRequest): Promise<Response> {
         };
     });
 
-    // 4. Sort: curated (higher baseValue) first, then by name relevance
+    // 3. Sort by name relevance, then higher baseValue first
     merged.sort((a, b) => {
         const ra = relevanceScore(a.name, ql);
         const rb = relevanceScore(b.name, ql);
         if (ra !== rb) return ra - rb;
-        // Within same relevance bucket: higher baseValue first
         return b.baseValue - a.baseValue;
     });
 

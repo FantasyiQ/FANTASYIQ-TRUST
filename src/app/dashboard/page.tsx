@@ -37,9 +37,9 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 const COMM_TIER_BADGE: Record<string, { label: string; className: string }> = {
-    COMMISSIONER_PRO:     { label: 'Pro',     className: 'bg-gray-800 text-gray-300 border-gray-600' },
-    COMMISSIONER_ALL_PRO: { label: 'All-Pro', className: 'bg-[#C8A951] text-black border-[#C8A951]' },
-    COMMISSIONER_ELITE:   { label: 'Elite ✦', className: 'bg-[#C8A951]/25 text-[#C8A951] border-[#C8A951]/60' },
+    COMMISSIONER_PRO:     { label: 'PRO',      className: 'bg-gray-800 text-gray-300 border-gray-600' },
+    COMMISSIONER_ALL_PRO: { label: 'ALL-PRO',  className: 'bg-[#C8A951] text-black border-[#C8A951]' },
+    COMMISSIONER_ELITE:   { label: 'ELITE ✦',  className: 'bg-[#C8A951]/25 text-[#C8A951] border-[#C8A951]/60' },
 };
 
 function periodLabel(sub: { cancelAtPeriodEnd: boolean; currentPeriodEnd: Date | null } | undefined) {
@@ -354,7 +354,7 @@ export default async function DashboardPage() {
                 {/* ── Quick actions ─────────────────────────────────────── */}
                 <div>
                     <h2 className="font-semibold text-lg mb-4">Quick Actions</h2>
-                    <div className="grid sm:grid-cols-4 gap-3">
+                    <div className="grid sm:grid-cols-3 gap-3">
                         <Link href="/dashboard/trade"
                             className="block bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">
                             <div className="text-2xl mb-2">📊</div>
@@ -366,12 +366,6 @@ export default async function DashboardPage() {
                             <div className="text-2xl mb-2">🔗</div>
                             <p className="font-semibold text-white group-hover:text-[#C8A951] transition">Sync League</p>
                             <p className="text-gray-500 text-sm mt-0.5">Connect your Sleeper account</p>
-                        </Link>
-                        <Link href="/dashboard/commissioner"
-                            className="block bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">
-                            <div className="text-2xl mb-2">🏆</div>
-                            <p className="font-semibold text-white group-hover:text-[#C8A951] transition">Commissioner Hub</p>
-                            <p className="text-gray-500 text-sm mt-0.5">Manage your league</p>
                         </Link>
                         <Link href="/pricing"
                             className="block bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">

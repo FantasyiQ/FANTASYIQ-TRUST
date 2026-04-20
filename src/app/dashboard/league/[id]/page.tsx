@@ -1,4 +1,5 @@
 export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
 
 import Image from 'next/image';
 import Link from 'next/link';
@@ -20,6 +21,7 @@ import type { SubscriptionTier } from '@prisma/client';
 import type { TeamRosterData } from './RosterCards';
 import LeagueTradeEvaluator from './LeagueTradeEvaluator';
 import LeagueDetailTabs, { type StandingRow, type DuesData, type AnnouncementData, type SleeperSettings } from './LeagueDetailTabs';
+import LeagueResyncButton from './LeagueResyncButton';
 
 const BENCH_SLOTS = new Set(['BN', 'IR']);
 
@@ -83,7 +85,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
         select: {
             id: true, userId: true, leagueId: true, leagueName: true,
             season: true, status: true, totalRosters: true, scoringType: true,
-            avatar: true, rosterPositions: true, sleeperUserId: true,
+            avatar: true, rosterPositions: true, sleeperUserId: true, lastSyncedAt: true,
         },
     });
 
@@ -145,21 +147,25 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
     // ── Commissioner tier lookup (member tier inheritance) ───────────────────
     // commSubForLeague must belong to THIS LEAGUE's commissioner, not the current
     // user — so that any league member inherits the commissioner's plan tier.
-    // Primary source: leagueDuesRecord.commissionerId (already in DB, no extra fetch).
-    // Fallback: derive the commissioner from Sleeper's is_owner flag, then look up
-    // their User record by sleeperUserId.
+    // Primary source: Sleeper is_owner flag (authoritative, immune to cross-user
+    // leagueDues contamination). Fallback: leagueDuesRecord.commissionerId.
+    // NOTE: leagueDuesRecord has NO userId filter, so its commissionerId can belong
+    // to a different user if another user has a league with the same name/season.
     let commSubForLeague: { tier: string } | null = null;
     {
-        let commDbUserId: string | null = leagueDuesRecord?.commissionerId ?? null;
+        // Always prefer Sleeper's is_owner — it's scoped to this specific league.
+        const sleeperCommId = members.find(m => m.is_owner)?.user_id ?? null;
+        let commDbUserId: string | null = null;
+        if (sleeperCommId) {
+            const commUser = await prisma.user.findFirst({
+                where: { sleeperUserId: sleeperCommId },
+                select: { id: true },
+            });
+            commDbUserId = commUser?.id ?? null;
+        }
+        // Only fall back to leagueDuesRecord if Sleeper lookup yielded nothing.
         if (!commDbUserId) {
-            const sleeperCommId = members.find(m => m.is_owner)?.user_id ?? null;
-            if (sleeperCommId) {
-                const commUser = await prisma.user.findFirst({
-                    where: { sleeperUserId: sleeperCommId },
-                    select: { id: true },
-                });
-                commDbUserId = commUser?.id ?? null;
-            }
+            commDbUserId = leagueDuesRecord?.commissionerId ?? null;
         }
         if (commDbUserId) {
             commSubForLeague = await prisma.subscription.findFirst({
@@ -174,6 +180,16 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
             });
         }
     }
+
+    // ── Own commissioner sub (badge only) ────────────────────────────────────
+    // Use the subscriptions already loaded in dbUser — same data source and same
+    // ordering (createdAt:desc) as the My Leagues dashboard page, which shows the
+    // correct "All-Pro" badge. A separate findFirst(orderBy:updatedAt) can return
+    // a different (stale/old) row if a webhook later touched an old ELITE sub.
+    const myOwnCommSub = dbUser?.subscriptions.find(
+        s => s.type === 'commissioner' &&
+             s.leagueName?.toLowerCase().trim() === league.leagueName.toLowerCase().trim()
+    ) ?? null;
 
     // ── Sleeper user identity ─────────────────────────────────────────────────
     // User.sleeperUserId is set during sync. League.sleeperUserId is a fallback for users
@@ -446,34 +462,38 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                             </div>
                         </div>
 
-                        {/* Tier badge (top) + Manage Dues (bottom) — right column */}
-                        <div className="flex flex-col items-end justify-between self-stretch shrink-0">
+                        {/* Tier badge — right column */}
+                        <div className="shrink-0">
                             {(() => {
-                                // Badge shows the user's OWN tier, not effectiveTier which can be
-                                // inflated by the commissioner's plan (used for feature gating only).
-                                // For commissioners without a player plan, show their commissioner tier.
                                 const ownTier = playerTier !== 'FREE'
                                     ? playerTier
-                                    : (isCommissioner ? (commSubForLeague?.tier ?? 'FREE') : 'FREE');
+                                    : (isCommissioner ? (myOwnCommSub?.tier ?? 'FREE') : 'FREE');
                                 const tb = tierBadgeProps(ownTier);
-                                if (!tb) return <span />;  // keep justify-between spacing
+                                if (!tb) return null;
                                 return (
-                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${tb.className}`}>
+                                    <Link href="/pricing" className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border hover:opacity-80 transition whitespace-nowrap ${tb.className}`}>
                                         {tb.label}
-                                    </span>
+                                    </Link>
                                 );
                             })()}
-                            {isCommissioner && (
-                                <Link
-                                    href={leagueDuesRecord
-                                        ? `/dashboard/commissioner/dues/${leagueDuesRecord.id}`
-                                        : '/dashboard/commissioner'}
-                                    className="text-sm text-[#C8A951]/70 hover:text-[#C8A951] font-medium transition whitespace-nowrap"
-                                >
-                                    Manage Dues →
-                                </Link>
-                            )}
                         </div>
+                    </div>
+                    {/* Bottom row: Re-Sync left, Manage Dues right */}
+                    <div className="flex justify-between items-center mt-4">
+                        <LeagueResyncButton
+                            leagueId={id}
+                            lastSyncedAt={league.lastSyncedAt?.toISOString() ?? null}
+                        />
+                        {isCommissioner && (
+                            <Link
+                                href={leagueDuesRecord
+                                    ? `/dashboard/commissioner/dues/${leagueDuesRecord.id}`
+                                    : '/dashboard/commissioner'}
+                                className="text-sm text-[#C8A951]/70 hover:text-[#C8A951] font-medium transition whitespace-nowrap"
+                            >
+                                Manage Dues →
+                            </Link>
+                        )}
                     </div>
                 </div>
 

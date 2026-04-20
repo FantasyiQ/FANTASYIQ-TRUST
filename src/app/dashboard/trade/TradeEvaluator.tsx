@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { PLAYERS, getDraftPicks, evaluateTrade, calcDtv, DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
+import { getDraftPicks, evaluateTrade, calcDtv, DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
 import type { Player, PprFormat, LeagueType, DtvResult, LeagueSettings } from '@/lib/trade-engine';
+import type { UniversePlayer, UniverseResponse, UniverseMeta, DeltaEntry, DeltaResponse } from '@/lib/player-universe';
+import { computePlayerBaseValue, playerVolatility } from '@/lib/player-universe';
 
 const LEAGUE_SIZES = [8, 10, 12, 14, 16, 32] as const;
 type LeagueSize = typeof LEAGUE_SIZES[number];
@@ -50,6 +52,16 @@ function verdictColor(v: string) {
     }
 }
 
+
+function timeAgo(iso: string | null | undefined): string {
+    if (!iso) return 'unknown';
+    const diff = Date.now() - new Date(iso).getTime();
+    const h = Math.floor(diff / 3_600_000);
+    if (h < 1)  return 'just now';
+    if (h < 24) return `${h}h ago`;
+    const d = Math.floor(h / 24);
+    return `${d}d ago`;
+}
 
 function FactorBar({ label, value, max = 1.30 }: { label: string; value: number; max?: number }) {
     const pct = Math.min(100, Math.round((value / max) * 100));
@@ -461,73 +473,59 @@ export default function TradeEvaluator({
     const [threeWay, setThreeWay]     = useState(false);
     const [selectedTeamId, setSelectedTeamId]   = useState<number | null>(otherTeams[0]?.rosterId ?? null);
     const [selectedTeamCId, setSelectedTeamCId] = useState<number | null>(null);
-    const [fcMap, setFcMap] = useState<Record<string, { dynasty: number; dynastySf: number; redraft: number; redraftSf: number; injuryStatus: string | null }>>({});
+    const [universe,     setUniverse]     = useState<UniversePlayer[]>([]);
+    const [universeMeta, setUniverseMeta] = useState<UniverseMeta | null>(null);
+    const [deltaEntries, setDeltaEntries] = useState<DeltaEntry[]>([]);
+    const [deltaAge,     setDeltaAge]     = useState<string | null>(null);
 
-    // Load live KTC values (cached 1hr on CDN)
+    // Load universe + delta in parallel (both cached 5 min on CDN)
     useEffect(() => {
-        fetch('/api/players/fc-values')
-            .then(r => r.json())
-            .then((data: Record<string, { dynasty: number; dynastySf: number; redraft: number; redraftSf: number; injuryStatus: string | null }>) => {
-                setFcMap(data);
-            })
-            .catch(() => {});
+        Promise.all([
+            fetch('/api/players/universe').then(r => r.json() as Promise<UniverseResponse>),
+            fetch('/api/players/delta').then(r => r.json() as Promise<DeltaResponse>),
+        ]).then(([uData, dData]) => {
+            setUniverse(uData.players);
+            setUniverseMeta(uData.meta);
+            setDeltaEntries(dData.entries ?? []);
+            setDeltaAge(dData.snapshotTakenAt);
+        }).catch(() => {});
     }, []);
 
-    // Apply KTC base value + league format adjustments
+    // Universe keyed by lowercase name for fast lookup (roster player overlay)
+    const universeMap = useMemo(
+        () => new Map(universe.map(u => [u.name.toLowerCase(), u])),
+        [universe],
+    );
+
+    // Overlay universe values onto an existing Player (used for roster players
+    // whose names come from Sleeper and may already be Player-shaped objects).
     const patchPlayer = useCallback((p: Player): Player => {
-        const fc = fcMap[p.name.toLowerCase()];
-        const superflex = leagueSettings.sfSlots > 0;
-
-        // Pick KTC value for this league format
-        let ktcVal: number | undefined;
-        if (fc) {
-            if (leagueType === 'Dynasty') {
-                ktcVal = superflex ? fc.dynastySf : fc.dynasty;
-            } else {
-                ktcVal = superflex ? fc.redraftSf : fc.redraft;
-            }
-        }
-
-        // Use KTC directly; fall back to hardcoded baseValue only when KTC has no data
-        let baseValue: number;
-        if (ktcVal !== undefined && ktcVal > 0) {
-            baseValue = ktcVal;
-        } else {
-            baseValue = p.baseValue;
-        }
-
-        // League format adjustments (on top of KTC base)
-        // PPR: KTC is full PPR — reduce catching positions for non-PPR
-        if (p.position !== 'PICK') {
-            const catchWeight: Record<string, number> = { WR: 0.55, RB: 0.35, TE: 0.65 };
-            const cw = catchWeight[p.position] ?? 0;
-            if (ppr === 0 && cw > 0)        baseValue = Math.max(1, baseValue - cw * 10);
-            else if (ppr === 0.5 && cw > 0) baseValue = Math.max(1, baseValue - cw * 5);
-            else if (ppr === 'te_prem' && p.position === 'TE') baseValue = baseValue * 1.12;
-
-            // 6pt passing TDs boost QB value
-            if (p.position === 'QB' && leagueSettings.passTd >= 6) baseValue = baseValue * 1.08;
-
-            // TE bonus reception scoring
-            if (p.position === 'TE' && leagueSettings.bonusRecTe > 0) baseValue = baseValue * (1 + leagueSettings.bonusRecTe * 0.06);
-
-            // League size: KTC baseline is 12-team — adjust scarcity for other sizes
-            const sizeFactor = 1 + (leagueSize - 12) * 0.012;
-            baseValue = baseValue * sizeFactor;
-
-            baseValue = Math.round(Math.max(1, baseValue) * 10) / 10;
-        }
-
-        return { ...p, baseValue, injuryStatus: fc?.injuryStatus ?? p.injuryStatus ?? null };
-    }, [fcMap, leagueType, leagueSettings, ppr, leagueSize]);
+        if (p.position === 'PICK') return p;
+        const u = universeMap.get(p.name.toLowerCase());
+        if (!u) return p;
+        return {
+            ...p,
+            baseValue:    computePlayerBaseValue(u, p.position, { leagueType, superflex, ppr, leagueSize, passTd: leagueSettings.passTd, bonusRecTe: leagueSettings.bonusRecTe }),
+            team:         u.team ?? p.team,
+            injuryStatus: u.injuryStatus ?? p.injuryStatus ?? null,
+        };
+    }, [universeMap, leagueType, superflex, ppr, leagueSize, leagueSettings]);
 
     const allExcluded = [...sideA.map(p => p.name), ...sideB.map(p => p.name), ...sideC.map(p => p.name)];
 
     const draftPicks = useMemo(() => getDraftPicks(leagueSize), [leagueSize]);
-    const allPlayers = useMemo(
-        () => [...PLAYERS.map(patchPlayer), ...draftPicks],
-        [draftPicks, patchPlayer],
-    );
+    const allPlayers = useMemo(() => {
+        const players: Player[] = universe.map((u, i) => ({
+            rank:         i + 1,
+            name:         u.name,
+            position:     u.position,
+            team:         u.team ?? 'FA',
+            age:          u.age ?? 0,
+            baseValue:    computePlayerBaseValue(u, u.position, { leagueType, superflex, ppr, leagueSize, passTd: leagueSettings.passTd, bonusRecTe: leagueSettings.bonusRecTe }),
+            injuryStatus: u.injuryStatus,
+        }));
+        return [...players, ...draftPicks];
+    }, [universe, draftPicks, leagueType, superflex, ppr, leagueSize, leagueSettings]);
 
     // All picks available for search: league-synced picks + full draft pick grid
     // Deduplicated: league picks first (have correct values), fill in missing slots from draftPicks
@@ -582,7 +580,32 @@ export default function TradeEvaluator({
         [sideC, ppr, leagueType, leagueSettings]
     );
 
-    const positions = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'PICK'];
+    const positions = ['ALL', 'QB', 'RB', 'WR', 'TE', 'PICK', 'MOVERS'];
+
+    // Delta lookup keyed by lowercase player name
+    const deltaMap = useMemo(
+        () => new Map(deltaEntries.map(e => [e.name.toLowerCase(), e])),
+        [deltaEntries],
+    );
+
+    // Asset momentum insight for the trade verdict
+    const tradeInsight = useMemo(() => {
+        if (!result || deltaEntries.length === 0) return null;
+        const avgDelta = (players: Player[]) => {
+            const vals = players
+                .filter(p => p.position !== 'PICK')
+                .map(p => deltaMap.get(p.name.toLowerCase())?.dynasty.delta ?? 0);
+            return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
+        };
+        const give = avgDelta(sideA);
+        const recv = avgDelta(sideB);
+        const diff = give - recv;
+        if (Math.abs(diff) < 3) return null;
+        if (diff > 0) {
+            return { type: 'warn' as const,  text: `You're trading away rising assets (avg +${give.toFixed(1)}) for declining ones (avg ${recv.toFixed(1)}) — reconsider.` };
+        }
+        return { type: 'good' as const, text: `You're acquiring rising assets (avg +${recv.toFixed(1)}) from declining ones (avg ${give.toFixed(1)}) — good timing.` };
+    }, [result, sideA, sideB, deltaMap, deltaEntries]);
 
     // Rank map: computed across ALL players sorted by finalDtv, so ranks are
     // stable and consistent regardless of which position filter is active.
@@ -874,6 +897,16 @@ export default function TradeEvaluator({
                             <div className="text-xs text-gray-600 text-center">
                                 0–14 Robbery · 15–29 Bad Deal · 30–44 Slight Loss · 45–55 Fair Trade · 56–74 Slight Edge · 75–89 Strong Win · 90–100 Slam Dunk
                             </div>
+                            {tradeInsight && (
+                                <div className={`flex items-start gap-2 px-4 py-3 rounded-xl border text-sm ${
+                                    tradeInsight.type === 'warn'
+                                        ? 'bg-orange-950/30 border-orange-800/50 text-orange-300'
+                                        : 'bg-green-950/30 border-green-800/50 text-green-300'
+                                }`}>
+                                    <span className="text-base shrink-0">{tradeInsight.type === 'warn' ? '⚠️' : '📈'}</span>
+                                    <span>{tradeInsight.text}</span>
+                                </div>
+                            )}
                         </>
                     )}
                 </div>
@@ -884,7 +917,12 @@ export default function TradeEvaluator({
                 <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between flex-wrap gap-3">
                     <div>
                         <h2 className="font-bold">Player Rankings</h2>
-                        <p className="text-gray-500 text-xs mt-0.5">Values adjust for position scarcity, age curve ({leagueType}), and PPR format.</p>
+                        <p className="text-gray-500 text-xs mt-0.5">
+                            Values adjust for position scarcity, age curve ({leagueType}), and PPR format.
+                            {universeMeta?.ktcSyncedAt && (
+                                <span className="ml-2 text-gray-600">· KTC synced {timeAgo(universeMeta.ktcSyncedAt)}</span>
+                            )}
+                        </p>
                     </div>
                     <div className="flex gap-2 flex-wrap">
                         {positions.map(pos => (
@@ -972,6 +1010,95 @@ export default function TradeEvaluator({
                             );
                         })}
                     </div>
+                ) : posFilter === 'MOVERS' ? (
+                    /* Market Movers view */
+                    <div className="p-6 space-y-6">
+                        {deltaEntries.length === 0 ? (
+                            <div className="text-center py-10 text-gray-600">
+                                <p className="text-2xl mb-2">📊</p>
+                                <p className="text-sm font-medium text-gray-500">No delta data yet</p>
+                                <p className="text-xs text-gray-600 mt-1">Available after the next daily KTC sync (runs at 7 AM UTC)</p>
+                            </div>
+                        ) : (
+                            <>
+                                {deltaAge && (
+                                    <p className="text-gray-600 text-xs">Compared to snapshot from {timeAgo(deltaAge)}</p>
+                                )}
+                                <div className="grid md:grid-cols-2 gap-6">
+                                    {/* Risers */}
+                                    <div>
+                                        <h3 className="text-green-400 font-bold text-sm mb-3 flex items-center gap-1.5">📈 Risers <span className="text-gray-600 font-normal">(dynasty)</span></h3>
+                                        <div className="space-y-1.5">
+                                            {[...deltaEntries].filter(e => !e.isNew && !e.isDropped && e.dynasty.delta > 0)
+                                                .sort((a, b) => b.dynasty.delta - a.dynasty.delta)
+                                                .slice(0, 20)
+                                                .map(e => (
+                                                    <div key={e.name} className="flex items-center justify-between px-3 py-2 bg-gray-800/60 rounded-lg hover:bg-gray-800 transition">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <span className={`text-[10px] font-bold px-1 py-0.5 rounded border shrink-0 ${POS_COLORS[e.position] ?? 'bg-gray-800 text-gray-400 border-gray-700'}`}>{e.position}</span>
+                                                            <span className="text-white text-sm font-medium truncate">{e.name}</span>
+                                                        </div>
+                                                        <span className="text-green-400 font-bold text-sm shrink-0">+{e.dynasty.delta}</span>
+                                                    </div>
+                                                ))}
+                                        </div>
+                                    </div>
+                                    {/* Fallers */}
+                                    <div>
+                                        <h3 className="text-red-400 font-bold text-sm mb-3 flex items-center gap-1.5">📉 Fallers <span className="text-gray-600 font-normal">(dynasty)</span></h3>
+                                        <div className="space-y-1.5">
+                                            {[...deltaEntries].filter(e => !e.isNew && !e.isDropped && e.dynasty.delta < 0)
+                                                .sort((a, b) => a.dynasty.delta - b.dynasty.delta)
+                                                .slice(0, 20)
+                                                .map(e => (
+                                                    <div key={e.name} className="flex items-center justify-between px-3 py-2 bg-gray-800/60 rounded-lg hover:bg-gray-800 transition">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <span className={`text-[10px] font-bold px-1 py-0.5 rounded border shrink-0 ${POS_COLORS[e.position] ?? 'bg-gray-800 text-gray-400 border-gray-700'}`}>{e.position}</span>
+                                                            <span className="text-white text-sm font-medium truncate">{e.name}</span>
+                                                        </div>
+                                                        <span className="text-red-400 font-bold text-sm shrink-0">{e.dynasty.delta}</span>
+                                                    </div>
+                                                ))}
+                                        </div>
+                                    </div>
+                                    {/* New players */}
+                                    {deltaEntries.some(e => e.isNew) && (
+                                        <div>
+                                            <h3 className="text-[#C8A951] font-bold text-sm mb-3">✨ New to Universe</h3>
+                                            <div className="space-y-1.5">
+                                                {deltaEntries.filter(e => e.isNew).map(e => (
+                                                    <div key={e.name} className="flex items-center justify-between px-3 py-2 bg-gray-800/60 rounded-lg">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <span className={`text-[10px] font-bold px-1 py-0.5 rounded border shrink-0 ${POS_COLORS[e.position] ?? 'bg-gray-800 text-gray-400 border-gray-700'}`}>{e.position}</span>
+                                                            <span className="text-white text-sm font-medium truncate">{e.name}</span>
+                                                        </div>
+                                                        <span className="text-[#C8A951] font-bold text-xs">NEW</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {/* Dropped players */}
+                                    {deltaEntries.some(e => e.isDropped) && (
+                                        <div>
+                                            <h3 className="text-gray-500 font-bold text-sm mb-3">🗑 Dropped from Universe</h3>
+                                            <div className="space-y-1.5">
+                                                {deltaEntries.filter(e => e.isDropped).map(e => (
+                                                    <div key={e.name} className="flex items-center justify-between px-3 py-2 bg-gray-800/30 rounded-lg opacity-60">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <span className="text-[10px] font-bold px-1 py-0.5 rounded border bg-gray-800 text-gray-500 border-gray-700 shrink-0">{e.position}</span>
+                                                            <span className="text-gray-400 text-sm truncate">{e.name}</span>
+                                                        </div>
+                                                        <span className="text-gray-600 font-bold text-xs">DROPPED</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        )}
+                    </div>
                 ) : (
                     /* Standard player table */
                     <div className="overflow-x-auto">
@@ -982,7 +1109,6 @@ export default function TradeEvaluator({
                                     <th className="text-left px-3 py-3 text-gray-500 font-medium">Player</th>
                                     <th className="text-left px-3 py-3 text-gray-500 font-medium">Pos</th>
                                     <th className="text-left px-3 py-3 text-gray-500 font-medium">Team</th>
-
                                     <th className="text-right px-3 py-3 text-gray-500 font-medium">DTV</th>
                                     <th className="text-right px-3 py-3 text-gray-500 font-medium">Tier</th>
                                     <th className="text-right px-4 py-3 text-gray-500 font-medium">Add</th>
@@ -990,19 +1116,38 @@ export default function TradeEvaluator({
                             </thead>
                             <tbody className="divide-y divide-gray-800/50">
                                 {filteredPlayers.map(p => {
-                                    const dtv     = calcDtv(p, ppr, leagueType, undefined, leagueSettings);
-                                    const inTrade = allExcluded.includes(p.name);
+                                    const dtv      = calcDtv(p, ppr, leagueType, undefined, leagueSettings);
+                                    const inTrade  = allExcluded.includes(p.name);
+                                    const de       = deltaMap.get(p.name.toLowerCase());
+                                    const vol      = playerVolatility(de);
+                                    const dDelta   = de?.dynasty.delta;
                                     return (
                                         <tr key={p.name} className="hover:bg-gray-800/30 transition">
                                             <td className="px-4 py-3 text-gray-600 text-xs">{dtvRankMap.get(p.name) ?? p.rank}</td>
-                                            <td className="px-3 py-3 text-white font-medium">{p.name}</td>
+                                            <td className="px-3 py-3">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-white font-medium">{p.name}</span>
+                                                    {vol === 'volatile' && <span className="text-[9px] font-bold px-1 py-px rounded bg-orange-900/40 text-orange-400 border border-orange-800/50 shrink-0">HOT</span>}
+                                                    {de?.isNew && <span className="text-[9px] font-bold px-1 py-px rounded bg-[#C8A951]/10 text-[#C8A951] border border-[#C8A951]/30 shrink-0">NEW</span>}
+                                                    {de?.team && <span className="text-[9px] font-bold px-1 py-px rounded bg-blue-900/30 text-blue-400 border border-blue-800/40 shrink-0" title={`Traded: ${de.team.prev ?? 'FA'} → ${de.team.current ?? 'FA'}`}>TRADED</span>}
+                                                </div>
+                                            </td>
                                             <td className="px-3 py-3">
                                                 <span className={`text-xs font-bold px-1.5 py-0.5 rounded border ${POS_COLORS[p.position] ?? ''}`}>
                                                     {p.position}
                                                 </span>
                                             </td>
                                             <td className="px-3 py-3 text-gray-400">{p.team}</td>
-                                            <td className="px-3 py-3 text-right font-bold text-white">{dtv.finalDtv}</td>
+                                            <td className="px-3 py-3 text-right">
+                                                <div className="flex items-center justify-end gap-1.5">
+                                                    <span className="font-bold text-white">{dtv.finalDtv}</span>
+                                                    {dDelta !== undefined && dDelta !== 0 && (
+                                                        <span className={`text-[10px] font-bold ${dDelta > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                            {dDelta > 0 ? `+${dDelta}` : dDelta}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
                                             <td className={`px-3 py-3 text-right font-semibold text-xs ${TIER_COLORS[dtv.tier]}`}>{dtv.tier}</td>
                                             <td className="px-4 py-3 text-right">
                                                 {inTrade ? (

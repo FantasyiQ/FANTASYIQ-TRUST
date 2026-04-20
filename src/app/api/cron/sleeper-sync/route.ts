@@ -45,8 +45,10 @@ export async function GET(request: Request): Promise<Response> {
                         await prisma.league.update({
                             where: { id: dbLeague.id },
                             data: {
-                                status:      sleeperLeague.status,
-                                scoringType: deriveScoringType(sleeperLeague),
+                                status:          sleeperLeague.status,
+                                scoringType:     deriveScoringType(sleeperLeague),
+                                leagueType:      sleeperLeague.settings?.type === 2 ? 'Dynasty' : 'Redraft',
+                                scoringSettings: sleeperLeague.scoring_settings ?? {},
                                 standings,
                                 lastSyncedAt: new Date(),
                             },

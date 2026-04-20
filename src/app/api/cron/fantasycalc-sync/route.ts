@@ -41,12 +41,68 @@ async function fetchKtcPage(url: string): Promise<KtcPlayer[]> {
     return parsePlayersArray(await res.text());
 }
 
+function normalizeName(name: string): string {
+    return name
+        .toLowerCase()
+        .replace(/\s+\b(jr\.?|sr\.?|ii|iii|iv|v)\s*$/i, '')
+        .replace(/\./g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
 export async function GET(request: Request): Promise<Response> {
     if (request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Fetch both dynasty and redraft pages in parallel
+    // ── Step 1: Snapshot current values (before today's update) ──────────────
+    // Merge with Sleeper for accurate team/injury at snapshot time.
+    const [currentRows, sleeperPlayers] = await Promise.all([
+        prisma.fantasyCalcValue.findMany({
+            where: { OR: [{ dynastyValue: { gt: 0 } }, { redraftValue: { gt: 0 } }] },
+            select: { nameLower: true, position: true, dynastyValue: true, dynastyValueSf: true, redraftValue: true, redraftValueSf: true, team: true },
+        }),
+        prisma.sleeperPlayer.findMany({
+            where:  { active: true },
+            select: { fullName: true, team: true, injuryStatus: true },
+        }),
+    ]);
+
+    const sleeperExact      = new Map<string, { team: string; injuryStatus: string | null }>();
+    const sleeperNormalized = new Map<string, { team: string; injuryStatus: string | null }>();
+    for (const p of sleeperPlayers) {
+        const exact = p.fullName.toLowerCase();
+        const normd = normalizeName(p.fullName);
+        const val   = { team: p.team, injuryStatus: p.injuryStatus };
+        if (!sleeperExact.has(exact))      sleeperExact.set(exact, val);
+        if (!sleeperNormalized.has(normd)) sleeperNormalized.set(normd, val);
+    }
+
+    const snapshotRows = currentRows.map(r => {
+        const sl = sleeperExact.get(r.nameLower) ?? sleeperNormalized.get(normalizeName(r.nameLower)) ?? null;
+        const rawTeam = sl?.team ?? r.team ?? null;
+        return {
+            nameLower:      r.nameLower,
+            position:       r.position,
+            dynastyValue:   r.dynastyValue,
+            dynastyValueSf: r.dynastyValueSf,
+            redraftValue:   r.redraftValue,
+            redraftValueSf: r.redraftValueSf,
+            team:           (rawTeam && rawTeam !== 'FA') ? rawTeam : null,
+            injuryStatus:   sl?.injuryStatus ?? null,
+        };
+    });
+
+    const SNAP_BATCH = 500;
+    for (let i = 0; i < snapshotRows.length; i += SNAP_BATCH) {
+        await prisma.fantasyCalcSnapshot.createMany({ data: snapshotRows.slice(i, i + SNAP_BATCH) });
+    }
+
+    // Prune snapshots older than 7 days
+    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    await prisma.fantasyCalcSnapshot.deleteMany({ where: { takenAt: { lt: cutoff } } });
+
+    // ── Step 2: Fetch fresh KTC values ────────────────────────────────────────
     let dynastyPlayers: KtcPlayer[], redraftPlayers: KtcPlayer[];
     try {
         [dynastyPlayers, redraftPlayers] = await Promise.all([

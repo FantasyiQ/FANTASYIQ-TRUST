@@ -16,10 +16,23 @@ export async function POST(
 
     const league = await prisma.league.findUnique({
         where: { id: leagueId },
-        select: { id: true, leagueId: true, userId: true },
+        select: { id: true, leagueId: true, userId: true, lastSyncedAt: true },
     });
     if (!league || league.userId !== session.user.id) {
         return Response.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    // 30-minute server-side cooldown — hard backstop regardless of client state
+    const COOLDOWN_MS = 30 * 60 * 1000;
+    if (league.lastSyncedAt) {
+        const elapsed = Date.now() - league.lastSyncedAt.getTime();
+        if (elapsed < COOLDOWN_MS) {
+            const remainingMinutes = Math.ceil((COOLDOWN_MS - elapsed) / 60000);
+            return Response.json(
+                { error: 'Please wait before syncing again', retryAfter: remainingMinutes },
+                { status: 429 }
+            );
+        }
     }
 
     try {

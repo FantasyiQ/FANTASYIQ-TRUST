@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import TradeEvaluator from '@/app/dashboard/trade/TradeEvaluator';
-import { PLAYERS, getDraftPicks, DEFAULT_LEAGUE_SETTINGS, roundOrdinal } from '@/lib/trade-engine';
+import { getDraftPicks, DEFAULT_LEAGUE_SETTINGS, roundOrdinal } from '@/lib/trade-engine';
 import type { PprFormat, LeagueType, LeagueSettings, Player } from '@/lib/trade-engine';
 import type { TradeTeam } from '@/app/dashboard/trade/TradeEvaluator';
 
@@ -117,11 +117,10 @@ export default function LeagueTradeEvaluator({
     const projectedLabel = draftOrderProjected ? ' · Projected Order' : '';
     const label     = `${leagueName} — ${scoringLabel(scoringType)} · ${totalRosters} Teams · ${leagueType}${sfLabel}${passTdLabel}${tePremLabel}${projectedLabel}`;
 
-    const allPicks     = useMemo(() => getDraftPicks(leagueSize, draftRounds), [leagueSize, draftRounds]);
-    const pickByName   = useMemo(() => new Map(allPicks.map(p => [p.name, p])), [allPicks]);
-    const playerByName = useMemo(() => new Map(PLAYERS.map(p => [p.name.toLowerCase(), p])), []);
+    const allPicks   = useMemo(() => getDraftPicks(leagueSize, draftRounds), [leagueSize, draftRounds]);
+    const pickByName = useMemo(() => new Map(allPicks.map(p => [p.name, p])), [allPicks]);
 
-    // Depth base values for players not in the curated top-300 list
+    // Depth base values for unranked / non-skill-position players
     const DEPTH_BASE: Record<string, number> = {
         QB: 22, RB: 18, WR: 18, TE: 14, K: 8, DEF: 8,
     };
@@ -131,16 +130,9 @@ export default function LeagueTradeEvaluator({
     function convertRaw(raw: RawTeamData): TradeTeam {
         const players: Player[] = raw.players
             .map(p => {
-                const curated = playerByName.get(p.name.toLowerCase());
-                if (curated) {
-                    return {
-                        ...curated,
-                        team:     p.team     || curated.team,
-                        position: p.position || curated.position,
-                    };
-                }
-                // Include depth/unranked players with a basic profile
                 if (!p.name || !p.position) return undefined;
+                // Build a Player shell — patchPlayer in TradeEvaluator will overlay
+                // the correct KTC baseValue from the universe once it loads.
                 return {
                     rank:      depthRank++,
                     name:      p.name,
@@ -174,13 +166,13 @@ export default function LeagueTradeEvaluator({
     const myTeam = useMemo<TradeTeam | undefined>(
         () => (myTeamData ? convertRaw(myTeamData) : undefined),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [myTeamData, playerByName, pickByName]
+        [myTeamData, pickByName]
     );
 
     const otherTeams = useMemo<TradeTeam[]>(
         () => otherTeamsData.map(convertRaw),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [otherTeamsData, playerByName, pickByName]
+        [otherTeamsData, pickByName]
     );
 
     return (
