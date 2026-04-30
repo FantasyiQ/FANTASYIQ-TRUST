@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic';
+// force rebuild
 
 import Link from 'next/link';
 import { getUserSubscriptionTier } from '@/lib/user/getUserSubscriptionTier';
