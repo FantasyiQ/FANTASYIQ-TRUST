@@ -32,11 +32,11 @@ export default function LeagueDuesView({
     league, duesId, buyInAmount, isCommissioner, currentUserId,
     pot, payments, members, payouts,
 }: LeagueDuesData) {
-    const myMember      = members.find(m => m.userId === currentUserId) ?? null;
-    const payoutTotal   = payouts.reduce((s, p) => s + p.amount, 0);
-    const fullPot       = pot?.full ?? 0;
+    const myMember       = members.find(m => m.userId === currentUserId) ?? null;
+    const payoutTotal    = payouts.reduce((s, p) => s + p.amount, 0);
+    const fullPot        = pot?.full ?? 0;
     const payoutBalanced = pot ? Math.abs(payoutTotal - fullPot) < 0.01 : false;
-    const potWhole      = pot ? pot.total >= pot.full && members.length >= (pot.paidCount + pot.unpaidCount) : false;
+    const potWhole       = pot ? pot.total >= pot.full && members.length >= (pot.paidCount + pot.unpaidCount) : false;
 
     return (
         <div className="space-y-6">
@@ -48,7 +48,7 @@ export default function LeagueDuesView({
                 {isCommissioner && duesId && (
                     <Link href={`/dashboard/commissioner/dues/${duesId}`}
                         className="shrink-0 bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-4 py-2 rounded-lg text-sm transition">
-                        Full Management →
+                        Manage Dues →
                     </Link>
                 )}
             </div>
@@ -156,13 +156,31 @@ export default function LeagueDuesView({
                                             <span className="text-xs text-gray-500">via {methodLabel(myMember.paymentMethod) ?? myMember.paymentMethod}</span>
                                         )}
                                     </div>
+                                    {myMember.teamName && <p className="text-gray-500 text-xs mt-2">{myMember.teamName}</p>}
                                 </div>
-                                <div className="text-right">
-                                    <p className="text-xs text-gray-500">Buy-in</p>
-                                    <p className="text-xl font-bold text-white">${buyInAmount.toFixed(2)}</p>
+                                <div className="flex flex-col items-end gap-2">
+                                    <div className="text-right">
+                                        <p className="text-xs text-gray-500">Buy-in</p>
+                                        <p className="text-xl font-bold text-white">${buyInAmount.toFixed(2)}</p>
+                                    </div>
+                                    {!isCommissioner && myMember.duesStatus !== 'paid' && (
+                                        <Link
+                                            href={`/dashboard/league/${league.id}/dues/pay`}
+                                            className="text-sm font-medium text-[#C8A951] hover:underline"
+                                        >
+                                            Pay Dues →
+                                        </Link>
+                                    )}
+                                    {isCommissioner && duesId && (
+                                        <Link
+                                            href={`/dashboard/commissioner/dues/${duesId}`}
+                                            className="text-sm font-medium text-[#C8A951] hover:underline"
+                                        >
+                                            Manage Dues →
+                                        </Link>
+                                    )}
                                 </div>
                             </div>
-                            {myMember.teamName && <p className="text-gray-500 text-xs mt-2">{myMember.teamName}</p>}
                         </div>
                     )}
 

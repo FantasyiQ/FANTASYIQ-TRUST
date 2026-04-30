@@ -34,12 +34,13 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
                 leagueName: true, season: true, status: true,
                 totalRosters: true, scoringType: true,
                 avatar: true, lastSyncedAt: true,
+                sleeperUserId: true,
             },
         }),
         session?.user?.id
             ? prisma.user.findUnique({
                 where:  { id: session.user.id },
-                select: { subscriptionTier: true },
+                select: { subscriptionTier: true, sleeperUserId: true },
             })
             : null,
     ]);
@@ -50,9 +51,13 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
         league.scoringType === 'ppr'      ? 'PPR'   :
         league.scoringType === 'half_ppr' ? '½ PPR' : 'Standard';
 
-    const tierStr  = dbUser?.subscriptionTier ?? 'FREE';
-    const badge    = tierBadgeProps(tierStr);
-    const isElite  = tierStr.includes('ELITE');
+    const tierStr       = dbUser?.subscriptionTier ?? 'FREE';
+    const badge         = tierBadgeProps(tierStr);
+    const isElite       = tierStr.includes('ELITE');
+    const isCommissioner =
+        !!league.sleeperUserId &&
+        !!dbUser?.sleeperUserId &&
+        String(league.sleeperUserId).trim() === String(dbUser.sleeperUserId).trim();
 
     return (
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 flex flex-col gap-4">
@@ -72,7 +77,11 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
                 )}
 
                 <div className="flex-1 min-w-0">
-                    <h1 className="text-2xl font-bold truncate">{league.leagueName}</h1>
+                    <h1 className="text-2xl font-bold truncate">
+                        <Link href={`/dashboard/league/${leagueId}/overview`} className="hover:text-yellow-400 transition">
+                            {league.leagueName}
+                        </Link>
+                    </h1>
                     <div className="flex items-center gap-2 mt-2 flex-wrap">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-800 border border-gray-700 text-xs font-semibold text-gray-300">
                             Sleeper
@@ -109,18 +118,27 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
                 </div>
             </div>
 
-            {/* Bottom row: sync (left) · Pay Dues (right) */}
+            {/* Bottom row: sync (left) · dues CTA (right) */}
             <div className="flex items-center justify-between">
                 <LeagueResyncButton
                     leagueId={leagueId}
                     lastSyncedAt={league.lastSyncedAt?.toISOString() ?? null}
                 />
-                <Link
-                    href={`/dashboard/league/${leagueId}/dues/pay`}
-                    className="text-sm font-medium text-[#C8A951] hover:underline"
-                >
-                    Pay Dues →
-                </Link>
+                {isCommissioner ? (
+                    <Link
+                        href={`/dashboard/league/${leagueId}/commissioner/dues`}
+                        className="text-sm font-medium text-[#C8A951] hover:underline"
+                    >
+                        Manage Dues →
+                    </Link>
+                ) : (
+                    <Link
+                        href={`/dashboard/league/${leagueId}/dues/pay`}
+                        className="text-sm font-medium text-[#C8A951] hover:underline"
+                    >
+                        Pay Dues →
+                    </Link>
+                )}
             </div>
         </div>
     );
