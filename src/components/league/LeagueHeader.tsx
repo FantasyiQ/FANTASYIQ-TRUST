@@ -1,5 +1,8 @@
 import Image from 'next/image';
+import Link from 'next/link';
+import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { tierBadgeProps } from '@/lib/tier-badge';
 import LeagueResyncButton from '@/app/dashboard/league/[id]/LeagueResyncButton';
 
 function statusBadge(status: string) {
@@ -22,14 +25,24 @@ function statusLabel(status: string) {
 }
 
 export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
-    const league = await prisma.league.findUnique({
-        where:  { id: leagueId },
-        select: {
-            leagueName: true, season: true, status: true,
-            totalRosters: true, scoringType: true,
-            avatar: true, lastSyncedAt: true,
-        },
-    });
+    const session = await auth();
+
+    const [league, dbUser] = await Promise.all([
+        prisma.league.findUnique({
+            where:  { id: leagueId },
+            select: {
+                leagueName: true, season: true, status: true,
+                totalRosters: true, scoringType: true,
+                avatar: true, lastSyncedAt: true,
+            },
+        }),
+        session?.user?.id
+            ? prisma.user.findUnique({
+                where:  { id: session.user.id },
+                select: { subscriptionTier: true },
+            })
+            : null,
+    ]);
 
     if (!league) return null;
 
@@ -37,8 +50,13 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
         league.scoringType === 'ppr'      ? 'PPR'   :
         league.scoringType === 'half_ppr' ? '½ PPR' : 'Standard';
 
+    const tierStr  = dbUser?.subscriptionTier ?? 'FREE';
+    const badge    = tierBadgeProps(tierStr);
+    const isElite  = tierStr.includes('ELITE');
+
     return (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 flex flex-col gap-4">
+            {/* Top row: avatar + league info (left) · tier badge (right) */}
             <div className="flex items-start gap-4">
                 {league.avatar ? (
                     <Image
@@ -71,12 +89,38 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
                     </div>
                 </div>
 
+                {/* Tier badge — top-right */}
                 <div className="shrink-0">
-                    <LeagueResyncButton
-                        leagueId={leagueId}
-                        lastSyncedAt={league.lastSyncedAt?.toISOString() ?? null}
-                    />
+                    {badge ? (
+                        isElite ? (
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${badge.className}`}>
+                                {badge.label}
+                            </span>
+                        ) : (
+                            <Link href="/pricing" className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border hover:opacity-80 transition ${badge.className}`}>
+                                {badge.label} ↑
+                            </Link>
+                        )
+                    ) : (
+                        <Link href="/pricing" className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border bg-gray-800 text-gray-400 border-gray-700 hover:opacity-80 transition">
+                            Upgrade ↑
+                        </Link>
+                    )}
                 </div>
+            </div>
+
+            {/* Bottom row: sync (left) · Pay Dues (right) */}
+            <div className="flex items-center justify-between">
+                <LeagueResyncButton
+                    leagueId={leagueId}
+                    lastSyncedAt={league.lastSyncedAt?.toISOString() ?? null}
+                />
+                <Link
+                    href={`/dashboard/league/${leagueId}/dues/pay`}
+                    className="text-sm font-medium text-[#C8A951] hover:underline"
+                >
+                    Pay Dues →
+                </Link>
             </div>
         </div>
     );
