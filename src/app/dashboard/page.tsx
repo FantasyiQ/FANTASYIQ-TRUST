@@ -83,6 +83,7 @@ export default async function DashboardPage() {
                     id: true, leagueId: true, leagueName: true, platform: true,
                     season: true, status: true, totalRosters: true, scoringType: true,
                     avatar: true, standings: true, lastSyncedAt: true,
+                    assignedPlanId: true, assignedPlanType: true,
                 },
             },
         },
@@ -213,12 +214,13 @@ export default async function DashboardPage() {
                                 )}
                             </div>
                             <div className="mt-4 pt-4 border-t border-gray-800 flex items-center justify-between gap-4 flex-wrap">
-                                <p className="text-gray-500 text-xs">
-                                    Upgrade anytime for the pro-rated cost of the year.
-                                </p>
+                                <Link href="/dashboard/plan/player"
+                                    className="text-[#C8A951]/70 hover:text-[#C8A951] text-sm font-medium transition shrink-0">
+                                    View Plan Details →
+                                </Link>
                                 <form action={createPortalSession}>
                                     <button type="submit"
-                                        className="text-[#C8A951]/70 hover:text-[#C8A951] text-sm font-medium transition shrink-0">
+                                        className="text-gray-500 hover:text-gray-300 text-sm font-medium transition shrink-0">
                                         Manage Subscription →
                                     </button>
                                 </form>
@@ -317,10 +319,14 @@ export default async function DashboardPage() {
                                             )
                                         )}
                                     </div>
-                                    <div className="flex justify-end mt-3">
+                                    <div className="flex justify-end items-center gap-4 mt-3">
+                                        <Link href={`/dashboard/plan/commissioner/${sub.id}`}
+                                            className="text-[#C8A951]/70 hover:text-[#C8A951] text-sm font-medium transition">
+                                            View Details →
+                                        </Link>
                                         <form action={createPortalSession}>
                                             <button type="submit"
-                                                className="text-[#C8A951]/70 hover:text-[#C8A951] text-sm font-medium transition">
+                                                className="text-gray-500 hover:text-gray-300 text-sm font-medium transition">
                                                 Manage →
                                             </button>
                                         </form>

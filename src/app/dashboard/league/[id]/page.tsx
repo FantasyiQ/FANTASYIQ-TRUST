@@ -20,8 +20,9 @@ import type { LeagueSettings, LeagueType } from '@/lib/trade-engine';
 import type { SubscriptionTier } from '@prisma/client';
 import type { TeamRosterData } from './RosterCards';
 import LeagueTradeEvaluator from './LeagueTradeEvaluator';
-import LeagueDetailTabs, { type StandingRow, type DuesData, type AnnouncementData, type SleeperSettings } from './LeagueDetailTabs';
+import { type StandingRow, type DuesData, type AnnouncementData, type SleeperSettings } from './LeagueDetailTabs';
 import LeagueResyncButton from './LeagueResyncButton';
+import LeagueOverviewCards from './LeagueOverviewCards';
 
 const BENCH_SLOTS = new Set(['BN', 'IR']);
 
@@ -91,7 +92,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
 
     if (!league || league.userId !== session.user.id) notFound();
 
-    const [sleeperLeague, members, rosters, allPlayers, tradedPicks, drafts, dbUser, leagueDuesRecord] = await Promise.all([
+    const [sleeperLeague, members, rosters, allPlayers, tradedPicks, drafts, dbUser, leagueDuesRecord, proBowlContest] = await Promise.all([
         getLeague(league.leagueId),
         getLeagueUsers(league.leagueId),
         getLeagueRosters(league.leagueId),
@@ -141,6 +142,12 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                     orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
                 },
             },
+        }),
+        // Active Pro Bowl contest for this league
+        prisma.proBowlContest.findFirst({
+            where:  { leagueId: league.id, isActive: true },
+            select: { id: true, name: true, openAt: true, lockAt: true, endAt: true },
+            orderBy: { createdAt: 'desc' },
         }),
     ]);
 
@@ -428,15 +435,15 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
         </div>
     );
 
+    const scoringDisplay = scoringLabel(league.scoringType ?? 'std');
+    const ownTierForBadge = playerTier !== 'FREE' ? playerTier : (isCommissioner ? (myOwnCommSub?.tier ?? 'FREE') : 'FREE');
+    const tb = tierBadgeProps(ownTierForBadge);
+
     return (
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
             <div className="max-w-5xl mx-auto space-y-6">
 
-                <Link href="/dashboard" className="text-gray-500 hover:text-gray-300 text-sm transition">
-                    ← My Leagues
-                </Link>
-
-                {/* League header */}
+                {/* ── League Header ──────────────────────────────────────── */}
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
                     <div className="flex items-start gap-4">
                         {/* Avatar */}
@@ -447,58 +454,57 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                             <div className="w-16 h-16 rounded-xl bg-gray-800 shrink-0 flex items-center justify-center text-2xl font-bold text-gray-600">FF</div>
                         )}
 
-                        {/* Name + subtitle — left column */}
                         <div className="flex-1 min-w-0">
+                            {/* League name */}
                             <h1 className="text-2xl font-bold truncate">{league.leagueName}</h1>
-                            <div className="flex items-center gap-3 mt-2 flex-wrap text-sm text-gray-400">
-                                <span>{league.season} Season</span>
-                                <span className="text-gray-700">·</span>
-                                <span>{scoringLabel(league.scoringType ?? 'std')}</span>
-                                <span className="text-gray-700">·</span>
-                                <span>{league.totalRosters} Teams</span>
+
+                            {/* Tag row: platform · scoring · sync status */}
+                            <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                {/* Platform tag */}
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-800 border border-gray-700 text-xs font-semibold text-gray-300">
+                                    <svg viewBox="0 0 14 14" className="w-3 h-3 shrink-0" fill="currentColor" aria-hidden="true">
+                                        <circle cx="7" cy="7" r="7" />
+                                    </svg>
+                                    Sleeper
+                                </span>
+                                {/* Scoring tag */}
+                                <span className="inline-flex items-center px-2 py-0.5 rounded bg-gray-800 border border-gray-700 text-xs font-semibold text-gray-300">
+                                    {scoringDisplay}
+                                </span>
+                                {/* League type */}
+                                {leagueType === 'Dynasty' && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded bg-purple-900/40 border border-purple-800 text-xs font-semibold text-purple-300">
+                                        Dynasty
+                                    </span>
+                                )}
+                                {/* Teams */}
+                                <span className="text-gray-500 text-xs">{league.totalRosters} teams · {league.season}</span>
+                                {/* Sync status badge */}
                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusBadge(league.status)}`}>
                                     {statusLabel(league.status)}
                                 </span>
+                                {/* Tier badge */}
+                                {tb && (
+                                    <Link href="/pricing"
+                                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border hover:opacity-80 transition whitespace-nowrap ${tb.className}`}>
+                                        {tb.label}
+                                    </Link>
+                                )}
                             </div>
                         </div>
 
-                        {/* Tier badge — right column */}
+                        {/* Re-sync button — top right */}
                         <div className="shrink-0">
-                            {(() => {
-                                const ownTier = playerTier !== 'FREE'
-                                    ? playerTier
-                                    : (isCommissioner ? (myOwnCommSub?.tier ?? 'FREE') : 'FREE');
-                                const tb = tierBadgeProps(ownTier);
-                                if (!tb) return null;
-                                return (
-                                    <Link href="/pricing" className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border hover:opacity-80 transition whitespace-nowrap ${tb.className}`}>
-                                        {tb.label}
-                                    </Link>
-                                );
-                            })()}
+                            <LeagueResyncButton
+                                leagueId={id}
+                                lastSyncedAt={league.lastSyncedAt?.toISOString() ?? null}
+                            />
                         </div>
-                    </div>
-                    {/* Bottom row: Re-Sync left, Manage Dues right */}
-                    <div className="flex justify-between items-center mt-4">
-                        <LeagueResyncButton
-                            leagueId={id}
-                            lastSyncedAt={league.lastSyncedAt?.toISOString() ?? null}
-                        />
-                        {isCommissioner && (
-                            <Link
-                                href={leagueDuesRecord
-                                    ? `/dashboard/commissioner/dues/${leagueDuesRecord.id}`
-                                    : '/dashboard/commissioner'}
-                                className="text-sm text-[#C8A951]/70 hover:text-[#C8A951] font-medium transition whitespace-nowrap"
-                            >
-                                Manage Dues →
-                            </Link>
-                        )}
                     </div>
                 </div>
 
-                {/* Tabbed content */}
-                <LeagueDetailTabs
+                {/* ── Card Grid ─────────────────────────────────────────── */}
+                <LeagueOverviewCards
                     leagueId={id}
                     leagueName={league.leagueName}
                     season={league.season}
@@ -516,13 +522,17 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                     sleeperSettings={sleeperSettings}
                     duesData={duesData}
                     announcements={announcements}
+                    proBowlContest={proBowlContest ? {
+                        id:       proBowlContest.id,
+                        name:     proBowlContest.name,
+                        openAt:   proBowlContest.openAt.toISOString(),
+                        lockAt:   proBowlContest.lockAt.toISOString(),
+                        endAt:    proBowlContest.endAt.toISOString(),
+                    } : null}
                     tradeEvaluatorContent={tradeEvaluatorContent}
                     isCommissioner={isCommissioner}
                     currentUserId={session.user.id}
                     canUsePlayerRankings={canUseTradeEvaluator}
-                    sleeperLeagueId={league.leagueId}
-                    sleeperMembers={sleeperMembers}
-                    mySleeperUserId={mySleeperUserId}
                 />
 
             </div>

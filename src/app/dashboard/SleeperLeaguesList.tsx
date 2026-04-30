@@ -17,6 +17,8 @@ interface League {
     avatar: string | null;
     standings: unknown;
     lastSyncedAt: Date | null;
+    assignedPlanId:   string | null;
+    assignedPlanType: string | null;
 }
 
 interface CommSub {
@@ -111,6 +113,11 @@ export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier
                                 {badge && (
                                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${badge.className}`}>
                                         {badge.label}
+                                    </span>
+                                )}
+                                {!league.assignedPlanId && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border bg-yellow-900/30 text-yellow-400 border-yellow-800">
+                                        Unassigned
                                     </span>
                                 )}
                                 <span className="text-[#C8A951] text-sm font-semibold whitespace-nowrap">View →</span>

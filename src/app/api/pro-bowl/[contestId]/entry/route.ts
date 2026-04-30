@@ -1,15 +1,18 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getLockedTeams, normalizeTeam } from '@/lib/nfl-schedule';
 
-interface LineupSlot {
-    position: string;
-    playerName: string;
-    nflTeam: string;
+interface SlotConfig {
+    position:         string;
+    allowedPositions: string[];
 }
-
-const DEFAULT_POSITIONS = ['QB', 'RB', 'RB', 'WR', 'WR', 'WR', 'TE', 'FLEX', 'K', 'DEF'];
+interface RosterConfig {
+    slots: SlotConfig[];
+}
+interface IncomingSlot {
+    position: string;
+    playerId: string;
+}
 
 export async function POST(
     request: NextRequest,
@@ -19,66 +22,79 @@ export async function POST(
     const session = await auth();
     if (!session?.user?.email) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const user = await prisma.user.findUnique({ where: { email: session.user.email }, select: { id: true } });
+    const user = await prisma.user.findUnique({
+        where:  { email: session.user.email },
+        select: { id: true },
+    });
     if (!user) return Response.json({ error: 'User not found.' }, { status: 404 });
 
     const contest = await prisma.proBowlContest.findUnique({
-        where: { id: contestId },
-        select: { id: true, status: true, season: true, week: true, scoringSettings: true },
+        where:  { id: contestId },
+        select: { id: true, openAt: true, lockAt: true, isActive: true, rosterConfigJson: true },
     });
     if (!contest) return Response.json({ error: 'Contest not found.' }, { status: 404 });
-    if (contest.status !== 'open') return Response.json({ error: 'Contest is not open for entries.' }, { status: 400 });
 
-    const settings = contest.scoringSettings as { rosterPositions?: string[] } | null;
-    const requiredPositions = settings?.rosterPositions ?? DEFAULT_POSITIONS;
+    // Validate contest is open
+    const now = new Date();
+    if (!contest.isActive)     return Response.json({ error: 'Contest is not active.' },        { status: 400 });
+    if (now < contest.openAt)  return Response.json({ error: 'Contest is not open yet.' },      { status: 400 });
+    if (now >= contest.lockAt) return Response.json({ error: 'Contest entries are locked.' },   { status: 400 });
 
-    const body = await request.json() as { lineup?: LineupSlot[] };
-    const { lineup } = body;
-    if (!lineup || !Array.isArray(lineup) || lineup.length !== requiredPositions.length) {
-        return Response.json({ error: `Lineup must have exactly ${requiredPositions.length} players.` }, { status: 400 });
+    const { slots: slotConfigs } = contest.rosterConfigJson as unknown as RosterConfig;
+
+    const body = await request.json() as { slots?: IncomingSlot[] };
+    const { slots } = body;
+
+    if (!slots || !Array.isArray(slots) || slots.length !== slotConfigs.length) {
+        return Response.json({ error: `Lineup must have exactly ${slotConfigs.length} slots.` }, { status: 400 });
     }
 
-    // Fetch which teams are locked (game started)
-    const lockedTeams = await getLockedTeams(contest.season, contest.week);
-
-    // Load existing entry (needed to preserve locked slots)
-    const existingEntry = await prisma.proBowlEntry.findUnique({
-        where: { contestId_userId: { contestId, userId: user.id } },
-        select: { lineup: true },
-    });
-    const savedSlots = (existingEntry?.lineup ?? []) as unknown as LineupSlot[];
-
-    // Build the final lineup: for locked slots keep the saved value, accept new value for unlocked
-    const finalLineup: LineupSlot[] = lineup.map((slot, i) => {
-        const abbrev = normalizeTeam(slot.nflTeam);
-        const isLocked = abbrev ? lockedTeams.has(abbrev) : false;
-        if (isLocked) {
-            // Preserve saved slot (or keep blank if no prior entry — they missed their window)
-            return savedSlots[i] ?? { position: slot.position, playerName: '', nflTeam: '' };
-        }
-        if (!slot.playerName?.trim() || !slot.nflTeam?.trim() || !slot.position) {
-            return { position: slot.position, playerName: '', nflTeam: '' }; // blank allowed for non-locked
-        }
-        return slot;
-    });
-
-    // Validate: all non-locked slots must be filled
-    for (const slot of finalLineup) {
-        if (!slot.playerName?.trim() || !slot.nflTeam?.trim()) {
-            const abbrev = normalizeTeam(slot.nflTeam ?? '');
-            const isLocked = abbrev ? lockedTeams.has(abbrev) : false;
-            if (!isLocked) {
-                return Response.json({ error: `Fill in the ${slot.position} slot or that game has not started.` }, { status: 400 });
-            }
+    // Validate position labels match roster order
+    for (let i = 0; i < slotConfigs.length; i++) {
+        if (slots[i].position !== slotConfigs[i].position) {
+            return Response.json({
+                error: `Slot ${i + 1} must be position ${slotConfigs[i].position}.`,
+            }, { status: 400 });
         }
     }
 
+    // Validate player IDs exist and their NFL position is eligible for the slot
+    const playerIds = slots.map(s => s.playerId);
+    const players   = await prisma.sleeperPlayer.findMany({
+        where:  { playerId: { in: playerIds } },
+        select: { playerId: true, position: true },
+    });
+    const playerMap = new Map(players.map(p => [p.playerId, p]));
+
+    for (let i = 0; i < slotConfigs.length; i++) {
+        const player = playerMap.get(slots[i].playerId);
+        if (!player) {
+            return Response.json({ error: `Player ${slots[i].playerId} not found.` }, { status: 400 });
+        }
+        if (!slotConfigs[i].allowedPositions.includes(player.position ?? '')) {
+            return Response.json({
+                error: `${player.position} is not eligible for the ${slotConfigs[i].position} slot.`,
+            }, { status: 400 });
+        }
+    }
+
+    // Upsert entry and replace slots
     const entry = await prisma.proBowlEntry.upsert({
-        where: { contestId_userId: { contestId, userId: user.id } },
-        create: { contestId, userId: user.id, lineup: finalLineup as unknown as import('@prisma/client').Prisma.JsonArray },
-        update: { lineup: finalLineup as unknown as import('@prisma/client').Prisma.JsonArray, updatedAt: new Date() },
+        where:  { contestId_userId: { contestId, userId: user.id } },
+        create: { contestId, userId: user.id },
+        update: { updatedAt: new Date() },
         select: { id: true },
     });
 
-    return Response.json({ id: entry.id, lockedCount: lockedTeams.size });
+    await prisma.proBowlEntrySlot.deleteMany({ where: { entryId: entry.id } });
+    await prisma.proBowlEntrySlot.createMany({
+        data: slots.map(s => ({
+            entryId:  entry.id,
+            position: s.position,
+            playerId: s.playerId,
+            salary:   0,
+        })),
+    });
+
+    return Response.json({ id: entry.id }, { status: 200 });
 }

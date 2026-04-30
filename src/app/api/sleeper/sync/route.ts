@@ -36,7 +36,7 @@ export async function POST(request: NextRequest): Promise<Response> {
             lastSyncedAt:   new Date(),
         });
 
-        await Promise.all([
+        const [, ...leagueResults] = await Promise.all([
             // Persist sleeperUserId so cron can find this user
             prisma.user.update({ where: { id: userId }, data: { sleeperUserId } }),
             // Upsert each league, handling season rollover via previous_league_id
@@ -53,6 +53,7 @@ export async function POST(request: NextRequest): Promise<Response> {
                         return prisma.league.update({
                             where: { id: prior.id },
                             data: sharedFields(league),
+                            select: { id: true, leagueName: true, totalRosters: true, scoringType: true, assignedPlanId: true },
                         });
                     }
                 }
@@ -60,11 +61,15 @@ export async function POST(request: NextRequest): Promise<Response> {
                     where: { userId_platform_leagueId: { userId, platform: 'sleeper', leagueId: league.league_id } },
                     create: { userId, platform: 'sleeper', ...sharedFields(league) },
                     update: sharedFields(league),
+                    select: { id: true, leagueName: true, totalRosters: true, scoringType: true, assignedPlanId: true },
                 });
             }),
         ]);
 
-        return Response.json({ synced: toSync.length });
+        return Response.json({
+            synced: toSync.length,
+            leagues: leagueResults,
+        });
     } catch (err) {
         const message = err instanceof Error ? err.message : 'Sync failed';
         return Response.json({ error: message }, { status: 500 });
