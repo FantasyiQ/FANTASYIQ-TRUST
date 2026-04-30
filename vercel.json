@@ -22,7 +22,7 @@
     },
     {
       "path": "/api/cron/power-rankings",
-      "schedule": "0 7 * * TUE"
+      "schedule": "0 7 * * 2"
     }
   ]
 }
