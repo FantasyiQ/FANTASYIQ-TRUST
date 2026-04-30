@@ -2,19 +2,31 @@ import Link from 'next/link';
 import type { LeagueData } from '@/lib/league/getLeagueData';
 
 export default function CommissionerHub({ league, dues, proBowlContest }: LeagueData) {
-    const TOOLS: { label: string; description: string; href: string; cta: string }[] = [
+    const TOOLS = [
         {
-            label:       'Dues & Payouts',
+            label:       'Dues Manager',
             description: dues
                 ? 'Manage buy-ins, mark payments, and set payout structure.'
                 : 'Set up dues tracking for this league.',
             href: dues
                 ? `/dashboard/commissioner/dues/${dues.id}`
-                : '/dashboard/commissioner/dues',
+                : '/dashboard/commissioner/dues/setup',
             cta: dues ? 'Manage Dues →' : 'Set Up Dues →',
         },
         {
-            label:       'Pro Bowl Contest',
+            label:       'Announcements Manager',
+            description: 'Post updates and pin important messages for your league.',
+            href:        '/dashboard/commissioner/announcements',
+            cta:         'Manage Announcements →',
+        },
+        {
+            label:       'Calendar Manager',
+            description: 'Add key dates — draft, trade deadline, playoffs, championship.',
+            href:        `/dashboard/commissioner/calendar/${league.id}`,
+            cta:         'Manage Calendar →',
+        },
+        {
+            label:       'Pro Bowl Manager',
             description: proBowlContest
                 ? `Active contest: ${proBowlContest.name}`
                 : 'Create a Pro Bowl fantasy contest for your league.',
@@ -24,16 +36,16 @@ export default function CommissionerHub({ league, dues, proBowlContest }: League
             cta: proBowlContest ? 'Manage Contest →' : 'Create Contest →',
         },
         {
-            label:       'Season Calendar',
-            description: 'Add key dates — draft, trade deadline, playoffs, championship.',
-            href:        `/dashboard/commissioner/calendar/${league.id}`,
-            cta:         'Manage Calendar →',
+            label:       'Invite Members',
+            description: 'Generate an invite link to bring league members into FantasyIQ.',
+            href:        `/dashboard/commissioner/settings`,
+            cta:         'Invite Members →',
         },
         {
-            label:       'Announcements',
-            description: 'Post updates and pin important messages for your league.',
-            href:        dues ? `/dashboard/commissioner/dues/${dues.id}` : '/dashboard/commissioner/dues',
-            cta:         dues ? 'Go to Announcements →' : 'Set Up Dues First →',
+            label:       'Commissioner Settings',
+            description: 'Review and manage league settings, scoring, and roster config.',
+            href:        '/dashboard/commissioner/settings',
+            cta:         'View Settings →',
         },
     ];
 

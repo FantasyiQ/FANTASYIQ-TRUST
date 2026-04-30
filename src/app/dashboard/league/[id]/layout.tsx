@@ -12,6 +12,7 @@ export default async function LeagueLayout({
     params:   Promise<{ id: string }>;
 }) {
     const { id } = await params;
+
     const session = await auth();
     if (!session?.user?.id) redirect('/sign-in');
 
@@ -25,20 +26,18 @@ export default async function LeagueLayout({
             select: { sleeperUserId: true },
         }),
     ]);
+
     if (!league || league.userId !== session.user.id) redirect('/dashboard');
 
-    // Commissioner = the Sleeper user who owns the league
-    const mySleeperUserId    = dbUser?.sleeperUserId ?? null;
-    const leagueSleeperOwner = league.sleeperUserId ?? null;
-    const isCommissioner     = !!mySleeperUserId && !!leagueSleeperOwner
-        && String(mySleeperUserId).trim() === String(leagueSleeperOwner).trim();
+    const isCommissioner = !!league.sleeperUserId && !!dbUser?.sleeperUserId
+        && String(league.sleeperUserId).trim() === String(dbUser.sleeperUserId).trim();
 
     return (
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
             <div className="flex flex-col gap-6 max-w-5xl mx-auto">
                 <LeagueHeader leagueId={id} />
                 <LeagueTabs leagueId={id} isCommissioner={isCommissioner} />
-                <div className="mt-4">
+                <div className="mt-6">
                     {children}
                 </div>
             </div>
