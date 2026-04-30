@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
-import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getCurrentUser } from '@/lib/auth';
+import { getLeagueById } from '@/lib/db/leagues';
 import LeagueHeader from '@/components/league/LeagueHeader';
 import LeagueTabs from '@/components/league/LeagueTabs';
 
@@ -13,30 +13,16 @@ export default async function LeagueLayout({
 }) {
     const { id } = await params;
 
-    const session = await auth();
-    if (!session?.user?.id) redirect('/sign-in');
+    const user   = await getCurrentUser();
+    const league = await getLeagueById(id, user.id);
 
-    const [league, dbUser] = await Promise.all([
-        prisma.league.findUnique({
-            where:  { id },
-            select: { userId: true, sleeperUserId: true },
-        }),
-        prisma.user.findUnique({
-            where:  { id: session.user.id },
-            select: { sleeperUserId: true },
-        }),
-    ]);
-
-    if (!league || league.userId !== session.user.id) redirect('/dashboard');
-
-    const isCommissioner = !!league.sleeperUserId && !!dbUser?.sleeperUserId
-        && String(league.sleeperUserId).trim() === String(dbUser.sleeperUserId).trim();
+    if (!league) redirect('/dashboard');
 
     return (
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
             <div className="flex flex-col gap-6 max-w-5xl mx-auto">
                 <LeagueHeader leagueId={id} />
-                <LeagueTabs leagueId={id} isCommissioner={isCommissioner} />
+                <LeagueTabs leagueId={id} isCommissioner={league.isCommissioner} />
                 <div className="mt-6">
                     {children}
                 </div>

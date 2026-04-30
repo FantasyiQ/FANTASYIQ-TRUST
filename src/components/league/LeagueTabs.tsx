@@ -25,7 +25,7 @@ export default function LeagueTabs({ leagueId, isCommissioner }: { leagueId: str
     return (
         <nav className="flex gap-4 border-b border-gray-800 pb-2">
             <Tab href={`/dashboard/league/${leagueId}/overview`}     label="Overview"  />
-            <Tab href={`/dashboard/league/${leagueId}/dues`}         label="Dues"      />
+            <Tab href={`/dashboard/league/${leagueId}/dues`}         label="Pay Dues"      />
             <Tab href={`/dashboard/league/${leagueId}/trade`}        label="Trades"    />
             <Tab href={`/dashboard/league/${leagueId}/rankings`}     label="Rankings"  />
 
