@@ -123,17 +123,12 @@ export default async function LeagueDuesPage({ params }: { params: Promise<{ id:
     const payoutBalanced = dues ? Math.abs(payoutTotal - fullPot) < 0.01 : false;
 
     return (
-        <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
-            <div className="max-w-3xl mx-auto space-y-6">
+        <div className="space-y-6">
 
                 {/* Header */}
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
-                        <Link href={`/dashboard/league/${id}`}
-                            className="text-gray-500 hover:text-gray-300 text-sm transition">
-                            ← {league.leagueName}
-                        </Link>
-                        <h1 className="text-2xl font-bold mt-3">League Dues &amp; Payouts</h1>
+                        <h1 className="text-2xl font-bold">League Dues &amp; Payouts</h1>
                         <p className="text-gray-400 text-sm mt-0.5">
                             {league.leagueName} · {league.season} Season
                         </p>
@@ -373,7 +368,6 @@ export default async function LeagueDuesPage({ params }: { params: Promise<{ id:
                     </>
                 )}
 
-            </div>
-        </main>
+        </div>
     );
 }

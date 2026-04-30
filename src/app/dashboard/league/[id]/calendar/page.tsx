@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -81,16 +80,11 @@ export default async function LeagueCalendarPage({
     const grouped = Array.from(monthMap.entries());
 
     return (
-        <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
-            <div className="max-w-2xl mx-auto space-y-6">
+        <div className="space-y-6">
 
                 {/* Header */}
                 <div>
-                    <Link href={`/dashboard/league/${id}`}
-                        className="text-gray-500 hover:text-gray-300 text-sm transition">
-                        ← {league.leagueName}
-                    </Link>
-                    <h1 className="text-2xl font-bold mt-3">Season Calendar</h1>
+                    <h1 className="text-2xl font-bold">Season Calendar</h1>
                     <p className="text-gray-400 text-sm mt-0.5">
                         {league.leagueName} · {league.season} Season
                     </p>
@@ -207,7 +201,6 @@ export default async function LeagueCalendarPage({
                     </>
                 )}
 
-            </div>
-        </main>
+        </div>
     );
 }
