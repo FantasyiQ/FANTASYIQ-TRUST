@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useState } from 'react';
 
 interface Props {
@@ -51,18 +50,6 @@ export default function InviteMembers({ leagueId, sleeperLeagueId, leagueName, s
 
     return (
         <div className="space-y-6">
-            <nav className="flex items-center gap-2 text-sm text-gray-500">
-                <Link href={`/dashboard/league/${leagueId}/overview`} className="hover:text-gray-300 transition">
-                    {leagueName.replace(/\s*\(\d{4}\)\s*$/, '')} ({season})
-                </Link>
-                <span>→</span>
-                <Link href={`/dashboard/league/${leagueId}/commissioner`} className="hover:text-gray-300 transition">
-                    Commissioner Hub
-                </Link>
-                <span>→</span>
-                <span className="text-white">Invite Members</span>
-            </nav>
-
             <div>
                 <h2 className="text-xl font-bold">Invite Members</h2>
                 <p className="text-gray-500 text-sm mt-0.5">{leagueName} · {season}</p>

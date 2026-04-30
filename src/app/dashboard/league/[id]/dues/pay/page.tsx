@@ -1,11 +1,11 @@
 export const dynamic = 'force-dynamic';
 
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth';
 import { getLeagueById } from '@/lib/db/leagues';
 import { prisma } from '@/lib/prisma';
 import { stripe } from '@/lib/stripe';
+import BackToOverview from '../../_components/BackToOverview';
 
 function appUrl() {
     return process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? 'http://localhost:3000';
@@ -26,10 +26,8 @@ export default async function PayDuesPage({ params }: { params: Promise<{ id: st
     if (!dues) {
         return (
             <div className="max-w-xl mx-auto mt-10 space-y-4">
+                <BackToOverview leagueId={id} />
                 <p className="text-gray-400">No dues have been set for this league yet.</p>
-                <Link href={`/dashboard/league/${id}/overview`} className="text-sm text-gray-500 hover:text-gray-300 transition">
-                    ← Back to Overview
-                </Link>
             </div>
         );
     }
@@ -46,18 +44,9 @@ export default async function PayDuesPage({ params }: { params: Promise<{ id: st
 
     if (member?.duesStatus === 'paid') {
         return (
-            <div className="max-w-xl mx-auto mt-10 space-y-6">
-                <nav className="flex items-center gap-2 text-sm text-gray-500">
-                    <Link href={`/dashboard/league/${id}/overview`} className="hover:text-gray-300 transition">
-                        {league.leagueName.replace(/\s*\(\d{4}\)\s*$/, '')} ({league.season})
-                    </Link>
-                    <span>→</span>
-                    <span className="text-white">Pay Dues</span>
-                </nav>
+            <div className="max-w-xl mx-auto mt-10 space-y-4">
+                <BackToOverview leagueId={id} />
                 <p className="text-green-400 font-medium">You have already paid your dues for this season.</p>
-                <Link href={`/dashboard/league/${id}/overview`} className="text-sm text-gray-500 hover:text-gray-300 transition">
-                    ← Back to Overview
-                </Link>
             </div>
         );
     }
@@ -65,12 +54,10 @@ export default async function PayDuesPage({ params }: { params: Promise<{ id: st
     if (!member) {
         return (
             <div className="max-w-xl mx-auto mt-10 space-y-4">
+                <BackToOverview leagueId={id} />
                 <p className="text-gray-400">
                     Your account isn&apos;t linked to a member slot in this league yet. Ask your commissioner to assign you.
                 </p>
-                <Link href={`/dashboard/league/${id}/overview`} className="text-sm text-gray-500 hover:text-gray-300 transition">
-                    ← Back to Overview
-                </Link>
             </div>
         );
     }
