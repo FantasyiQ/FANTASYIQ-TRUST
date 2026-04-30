@@ -208,7 +208,18 @@ function PowerRankingsTable({ rankings, preseason }: { rankings: PowerRankingRow
 
 // ── LeagueRankingsView — named export, state passed as props ──────────────────
 
-export function LeagueRankingsView(props: LeagueRankingsData & {
+export function LeagueRankingsView({
+    league,
+    playerRankings,
+    teamRankings,
+    powerRankings,
+    preseason,
+    search,
+    position,
+    onSearch,
+    onPosition,
+}: LeagueRankingsData & {
+    preseason:  boolean;
     search:     string;
     position:   string;
     onSearch:   (v: string) => void;
@@ -216,12 +227,10 @@ export function LeagueRankingsView(props: LeagueRankingsData & {
 }) {
     const [tab, setTab] = useState<Tab>('players');
 
-    const isPreseason = props.powerRankings.every(r => r.wins === 0 && r.losses === 0);
-
-    const tabs: { key: Tab; label: string }[] = [
-        { key: 'players', label: 'Players' },
-        { key: 'teams',   label: 'Teams' },
-        { key: 'power',   label: 'Power' },
+    const tabs = [
+        { key: 'players' as Tab, label: 'Players' },
+        { key: 'teams'   as Tab, label: 'Teams' },
+        { key: 'power'   as Tab, label: 'Power' },
     ];
 
     return (
@@ -249,18 +258,18 @@ export function LeagueRankingsView(props: LeagueRankingsData & {
 
             {tab === 'players' && (
                 <PlayerRankingsTable
-                    rankings={props.playerRankings}
-                    search={props.search}
-                    position={props.position}
-                    onSearch={props.onSearch}
-                    onPosition={props.onPosition}
+                    rankings={playerRankings}
+                    search={search}
+                    position={position}
+                    onSearch={onSearch}
+                    onPosition={onPosition}
                 />
             )}
             {tab === 'teams' && (
-                <TeamRankingsTable rankings={props.teamRankings} />
+                <TeamRankingsTable rankings={teamRankings} />
             )}
             {tab === 'power' && (
-                <PowerRankingsTable rankings={props.powerRankings} preseason={isPreseason} />
+                <PowerRankingsTable rankings={powerRankings} preseason={preseason} />
             )}
         </div>
     );
@@ -272,9 +281,12 @@ export default function LeagueRankingsClient(props: LeagueRankingsData) {
     const [search,   setSearch]   = useState('');
     const [position, setPosition] = useState('All');
 
+    const preseason = props.powerRankings.every(r => r.wins === 0 && r.losses === 0);
+
     return (
         <LeagueRankingsView
             {...props}
+            preseason={preseason}
             search={search}
             position={position}
             onSearch={setSearch}
