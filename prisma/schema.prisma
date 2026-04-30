@@ -486,6 +486,18 @@ model FantasyCalcValue {
     @@index([nameLower])
 }
 
+// Weekly snapshot of power rankings per league, written by the power-rankings cron.
+// Powers the historical trend view on the Rankings page.
+model PowerRankingSnapshot {
+    id        String   @id @default(cuid())
+    leagueId  String
+    week      Int
+    data      Json     // array of teams with powerScore, record, PF, PA, dtv
+    createdAt DateTime @default(now())
+
+    @@unique([leagueId, week])
+}
+
 // Daily snapshot of KTC values + Sleeper metadata, taken before each fantasycalc-sync run.
 // Powers the /api/players/delta endpoint (what changed since yesterday).
 // Retention: 7 days (older rows deleted by the cron).
