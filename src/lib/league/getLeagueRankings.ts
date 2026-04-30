@@ -232,64 +232,67 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
         if (!sleeperNormalized.has(normd)) sleeperNormalized.set(normd, val);
     }
 
-    // ── Build universe + DTV list ─────────────────────────────────────────────
+    // ── Build universe + DTV list, keyed by Sleeper playerId ─────────────────
     type UniverseEntry = { u: UniversePlayer; finalDtv: number; tier: string };
-    const universeEntries: UniverseEntry[] = ktcRows
-        .filter(r => SKILL_POSITIONS.has(r.position))
-        .map(r => {
-            const exact    = r.nameLower;
-            const normd    = normalizeName(r.nameLower);
-            const sl       = sleeperExact.get(exact) ?? sleeperNormalized.get(normd) ?? null;
-            const rawTeam  = sl?.team ?? null;
-            const team     = (rawTeam && rawTeam !== 'FA') ? rawTeam : null;
-            const age      = calculateAge(sl?.birthDate) ?? sl?.age ?? null;
-            const playerId = sl?.playerId ?? null;
+    const universeEntries: UniverseEntry[] = [];
+    // playerId → entry for O(1) team-roster lookup (avoids name-mismatch issues)
+    const dtvByPlayerId = new Map<string, UniverseEntry>();
 
-            const u: UniversePlayer = {
-                name:           r.playerName,
-                position:       r.position,
-                team,
-                age,
-                dynasty:        normalise(r.dynastyValue),
-                dynastySf:      normalise(r.dynastyValueSf),
-                redraft:        normalise(r.redraftValue),
-                redraftSf:      normalise(r.redraftValueSf),
-                trend:          null,
-                injuryStatus:   sl?.injuryStatus ?? null,
-                birthDate:      sl?.birthDate ?? null,
-                playerImageUrl: playerId ? `https://sleepercdn.com/content/nfl/players/${playerId}.jpg` : null,
-            };
+    for (const r of ktcRows) {
+        if (!SKILL_POSITIONS.has(r.position)) continue;
+        const exact    = r.nameLower;
+        const normd    = normalizeName(r.nameLower);
+        const sl       = sleeperExact.get(exact) ?? sleeperNormalized.get(normd) ?? null;
+        const rawTeam  = sl?.team ?? null;
+        const team     = (rawTeam && rawTeam !== 'FA') ? rawTeam : null;
+        const age      = calculateAge(sl?.birthDate) ?? sl?.age ?? null;
+        const playerId = sl?.playerId ?? null;
 
-            const baseValue = computePlayerBaseValue(u, r.position, {
-                leagueType, superflex, ppr, leagueSize,
-                passTd: leagueSettings.passTd, bonusRecTe: leagueSettings.bonusRecTe,
-            });
+        const u: UniversePlayer = {
+            name:           r.playerName,
+            position:       r.position,
+            team,
+            age,
+            dynasty:        normalise(r.dynastyValue),
+            dynastySf:      normalise(r.dynastyValueSf),
+            redraft:        normalise(r.redraftValue),
+            redraftSf:      normalise(r.redraftValueSf),
+            trend:          null,
+            injuryStatus:   sl?.injuryStatus ?? null,
+            birthDate:      sl?.birthDate ?? null,
+            playerImageUrl: playerId ? `https://sleepercdn.com/content/nfl/players/${playerId}.jpg` : null,
+        };
 
-            const p: Player = {
-                rank: 0, name: u.name, position: u.position, team: u.team ?? 'FA',
-                age: u.age ?? 0, baseValue, injuryStatus: u.injuryStatus,
-            };
-            const dtv = calcDtv(p, ppr, leagueType, undefined, leagueSettings);
+        const baseValue = computePlayerBaseValue(u, r.position, {
+            leagueType, superflex, ppr, leagueSize,
+            passTd: leagueSettings.passTd, bonusRecTe: leagueSettings.bonusRecTe,
+        });
 
-            return { u, finalDtv: dtv.finalDtv, tier: dtv.tier };
-        })
-        .sort((a, b) => b.finalDtv - a.finalDtv || a.u.name.localeCompare(b.u.name));
+        const p: Player = {
+            rank: 0, name: u.name, position: u.position, team: u.team ?? 'FA',
+            age: u.age ?? 0, baseValue, injuryStatus: u.injuryStatus,
+        };
+        const dtv = calcDtv(p, ppr, leagueType, undefined, leagueSettings);
+        const entry: UniverseEntry = { u, finalDtv: dtv.finalDtv, tier: dtv.tier };
+
+        universeEntries.push(entry);
+        if (playerId) dtvByPlayerId.set(playerId, entry);
+    }
+
+    universeEntries.sort((a, b) => b.finalDtv - a.finalDtv || a.u.name.localeCompare(b.u.name));
 
     // ── Player rankings (top 150) ─────────────────────────────────────────────
     const playerRankings: PlayerRankingRow[] = universeEntries.slice(0, 150).map((e, i) => ({
-        rank:          i + 1,
-        name:          e.u.name,
-        position:      e.u.position,
-        team:          e.u.team,
-        age:           e.u.age,
-        finalDtv:      e.finalDtv,
-        tier:          e.tier,
-        injuryStatus:  e.u.injuryStatus,
+        rank:           i + 1,
+        name:           e.u.name,
+        position:       e.u.position,
+        team:           e.u.team,
+        age:            e.u.age,
+        finalDtv:       e.finalDtv,
+        tier:           e.tier,
+        injuryStatus:   e.u.injuryStatus,
         playerImageUrl: e.u.playerImageUrl,
     }));
-
-    // ── Build DTV lookup by player name (lowercase) ───────────────────────────
-    const dtvByName = new Map(universeEntries.map(e => [e.u.name.toLowerCase(), e]));
 
     // ── Build display names from Sleeper users ────────────────────────────────
     const ownerDisplayName = new Map(members.map(m => [m.user_id, m.display_name ?? `Team ${m.user_id}`]));
@@ -300,13 +303,10 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
         const playerIds = r.players ?? [];
         const ownerName = r.owner_id ? (ownerDisplayName.get(r.owner_id) ?? `Team ${r.roster_id}`) : `Team ${r.roster_id}`;
 
-        // Build player list from Sleeper full_name lookup
+        // O(1) lookup by Sleeper playerId — no name-matching required
         const scoredPlayers = playerIds
             .map(pid => {
-                const sl = sleeperPlayers.find(p => p.playerId === pid);
-                if (!sl) return null;
-                const entry = dtvByName.get(sl.fullName.toLowerCase())
-                    ?? dtvByName.get(normalizeName(sl.fullName));
+                const entry = dtvByPlayerId.get(pid);
                 if (!entry) return null;
                 return { name: entry.u.name, position: entry.u.position, finalDtv: entry.finalDtv };
             })
