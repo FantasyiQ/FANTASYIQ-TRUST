@@ -61,7 +61,7 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
 
     return (
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 flex flex-col gap-4">
-            {/* Top row: avatar + league name (left) · tier badge (right) */}
+            {/* Top row: avatar + league name + info pills (left) · tier badge (right) */}
             <div className="flex items-start gap-4">
                 {league.avatar ? (
                     <Image
@@ -82,6 +82,20 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
                             {league.leagueName}
                         </Link>
                     </h1>
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-800 border border-gray-700 text-xs font-semibold text-gray-300">
+                            Sleeper
+                        </span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded bg-gray-800 border border-gray-700 text-xs font-semibold text-gray-300">
+                            {scoringDisplay}
+                        </span>
+                        <span className="text-gray-500 text-xs">
+                            {league.totalRosters} teams · {league.season}
+                        </span>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusBadge(league.status)}`}>
+                            {statusLabel(league.status)}
+                        </span>
+                    </div>
                 </div>
 
                 {/* Tier badge — top-right */}
@@ -104,8 +118,12 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
                 </div>
             </div>
 
-            {/* Middle row: Pay Dues pill (right-aligned) */}
-            <div className="flex items-center justify-end">
+            {/* Bottom row: sync (left) · Pay Dues pill (right) */}
+            <div className="flex items-center justify-between">
+                <LeagueResyncButton
+                    leagueId={leagueId}
+                    lastSyncedAt={league.lastSyncedAt?.toISOString() ?? null}
+                />
                 {isCommissioner ? (
                     <Link
                         href={`/dashboard/league/${leagueId}/commissioner/dues`}
@@ -121,28 +139,6 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
                         Pay Dues →
                     </Link>
                 )}
-            </div>
-
-            {/* Bottom row: sync (left) · league info pills (right) */}
-            <div className="flex items-center justify-between flex-wrap gap-2">
-                <LeagueResyncButton
-                    leagueId={leagueId}
-                    lastSyncedAt={league.lastSyncedAt?.toISOString() ?? null}
-                />
-                <div className="flex items-center gap-2 flex-wrap">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-800 border border-gray-700 text-xs font-semibold text-gray-300">
-                        Sleeper
-                    </span>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded bg-gray-800 border border-gray-700 text-xs font-semibold text-gray-300">
-                        {scoringDisplay}
-                    </span>
-                    <span className="text-gray-500 text-xs">
-                        {league.totalRosters} teams · {league.season}
-                    </span>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusBadge(league.status)}`}>
-                        {statusLabel(league.status)}
-                    </span>
-                </div>
             </div>
         </div>
     );
