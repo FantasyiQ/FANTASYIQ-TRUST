@@ -52,7 +52,7 @@ function PlayerRankingsTable({
             const q = search.toLowerCase();
             list = list.filter(p => p.name.toLowerCase().includes(q));
         }
-        return list.slice(0, 100);
+        return list;
     }, [rankings, position, search]);
 
     return (
@@ -112,11 +112,6 @@ function PlayerRankingsTable({
                     </tbody>
                 </table>
             </div>
-            {filtered.length >= 100 && (
-                <div className="px-6 py-3 border-t border-gray-800 text-center text-gray-600 text-xs">
-                    Showing top 100 — use the Trade Evaluator for full analysis.
-                </div>
-            )}
         </div>
     );
 }

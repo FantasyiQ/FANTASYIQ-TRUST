@@ -182,7 +182,7 @@ function PlayerRankingsCard({
             const q = search.toLowerCase();
             list = list.filter(({ p }) => p.name.toLowerCase().includes(q));
         }
-        return list.slice(0, 100);
+        return list;
     }, [ranked, posFilter, search]);
 
     return (
@@ -240,11 +240,6 @@ function PlayerRankingsCard({
                     </tbody>
                 </table>
             </div>
-            {filtered.length >= 100 && (
-                <div className="px-6 py-3 border-t border-gray-800 text-center text-gray-600 text-xs">
-                    Showing top 100 — use the Trade Evaluator tab for full rankings and trade analysis.
-                </div>
-            )}
         </>
     );
 }

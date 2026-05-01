@@ -281,8 +281,8 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
 
     universeEntries.sort((a, b) => b.finalDtv - a.finalDtv || a.u.name.localeCompare(b.u.name));
 
-    // ── Player rankings (top 150) ─────────────────────────────────────────────
-    const playerRankings: PlayerRankingRow[] = universeEntries.slice(0, 150).map((e, i) => ({
+    // ── Player rankings (full universe) ──────────────────────────────────────
+    const playerRankings: PlayerRankingRow[] = universeEntries.map((e, i) => ({
         rank:           i + 1,
         name:           e.u.name,
         position:       e.u.position,
