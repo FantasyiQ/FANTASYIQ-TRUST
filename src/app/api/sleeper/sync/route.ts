@@ -2,19 +2,24 @@ import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getSleeperLeagues, getNflState, deriveScoringType, type SleeperLeague } from '@/lib/sleeper';
+import { getLeagueLimit, tierToLimitKey } from '@/lib/league-limits';
 
-// POST /api/sleeper/sync — upsert selected leagues + persist sleeperUserId
+// POST /api/sleeper/sync — upsert selected leagues + persist sleeperUserId + auto-assign
 export async function POST(request: NextRequest): Promise<Response> {
     const session = await auth();
     if (!session?.user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
     const userId = session.user.id;
 
-    const body = await request.json() as { sleeperUserId?: string; leagues?: SleeperLeague[] };
+    const body = await request.json() as {
+        sleeperUserId?: string;
+        leagues?: SleeperLeague[];
+        inviteToken?: string;
+    };
     if (!body.sleeperUserId || !Array.isArray(body.leagues) || body.leagues.length === 0) {
         return Response.json({ error: 'sleeperUserId and leagues[] are required' }, { status: 400 });
     }
 
-    const { sleeperUserId, leagues } = body;
+    const { sleeperUserId, leagues, inviteToken } = body;
 
     try {
         const nflState = await getNflState();
@@ -24,16 +29,16 @@ export async function POST(request: NextRequest): Promise<Response> {
         if (toSync.length === 0) return Response.json({ error: 'No valid leagues to sync' }, { status: 400 });
 
         const sharedFields = (league: SleeperLeague) => ({
-            leagueId:       league.league_id,
-            leagueName:     league.name,
-            season:         league.season,
-            status:         league.status,
-            totalRosters:   league.total_rosters,
-            scoringType:    deriveScoringType(league),
-            avatar:         league.avatar,
+            leagueId:        league.league_id,
+            leagueName:      league.name,
+            season:          league.season,
+            status:          league.status,
+            totalRosters:    league.total_rosters,
+            scoringType:     deriveScoringType(league),
+            avatar:          league.avatar,
             rosterPositions: league.roster_positions,
             sleeperUserId,
-            lastSyncedAt:   new Date(),
+            lastSyncedAt:    new Date(),
         });
 
         const [, ...leagueResults] = await Promise.all([
@@ -41,34 +46,160 @@ export async function POST(request: NextRequest): Promise<Response> {
             prisma.user.update({ where: { id: userId }, data: { sleeperUserId } }),
             // Upsert each league, handling season rollover via previous_league_id
             ...toSync.map(async (league) => {
-                // Sleeper creates a new league_id each season and links it to last year's
-                // via previous_league_id. If we already have that prior-season record, update
-                // it in-place (preserving dues/announcements) rather than creating a duplicate.
                 if (league.previous_league_id) {
                     const prior = await prisma.league.findFirst({
-                        where: { userId, leagueId: league.previous_league_id },
+                        where:  { userId, leagueId: league.previous_league_id },
                         select: { id: true },
                     });
                     if (prior) {
                         return prisma.league.update({
-                            where: { id: prior.id },
-                            data: sharedFields(league),
-                            select: { id: true, leagueName: true, totalRosters: true, scoringType: true, assignedPlanId: true },
+                            where:  { id: prior.id },
+                            data:   sharedFields(league),
+                            select: { id: true, leagueId: true, leagueName: true, totalRosters: true, scoringType: true, assignedPlanId: true, assignedPlanType: true },
                         });
                     }
                 }
                 return prisma.league.upsert({
-                    where: { userId_platform_leagueId: { userId, platform: 'sleeper', leagueId: league.league_id } },
+                    where:  { userId_platform_leagueId: { userId, platform: 'sleeper', leagueId: league.league_id } },
                     create: { userId, platform: 'sleeper', ...sharedFields(league) },
                     update: sharedFields(league),
-                    select: { id: true, leagueName: true, totalRosters: true, scoringType: true, assignedPlanId: true },
+                    select: { id: true, leagueId: true, leagueName: true, totalRosters: true, scoringType: true, assignedPlanId: true, assignedPlanType: true },
                 });
             }),
         ]);
 
+        // ── Auto-assignment ───────────────────────────────────────────────────
+        const [dbUser, invite] = await Promise.all([
+            prisma.user.findUnique({
+                where:  { id: userId },
+                select: {
+                    subscriptions: {
+                        where:   { status: { in: ['active', 'trialing'] } },
+                        orderBy: { createdAt: 'desc' },
+                        select:  { id: true, type: true, tier: true, leagueName: true },
+                    },
+                    connectedLeagues: { select: { leagueExtId: true, leagueName: true } },
+                },
+            }),
+            inviteToken
+                ? prisma.leagueInvite.findUnique({
+                    where:  { token: inviteToken },
+                    select: { sleeperLeagueId: true, leagueName: true },
+                })
+                : null,
+        ]);
+
+        const playerSub   = dbUser?.subscriptions.find(s => s.type === 'player') ?? null;
+        const commSubs    = dbUser?.subscriptions.filter(s => s.type === 'commissioner') ?? [];
+        const existingCL  = dbUser?.connectedLeagues ?? [];
+        const connectedExtIds   = new Set(existingCL.map(cl => cl.leagueExtId).filter(Boolean));
+        const connectedNames    = new Set(existingCL.map(cl => cl.leagueName.toLowerCase().trim()));
+
+        // Track how many player plan slots are already consumed
+        let playerSlotsUsed = existingCL.length;
+
+        // For the invite path: check if the commissioner has paid for this Sleeper league
+        let inviteCommissionerPaid = false;
+        if (invite) {
+            const globalCommSub = await prisma.subscription.findFirst({
+                where: {
+                    type:       'commissioner',
+                    leagueName: { equals: invite.leagueName, mode: 'insensitive' },
+                    status:     { in: ['active', 'trialing'] },
+                },
+                select: { id: true },
+            });
+            inviteCommissionerPaid = !!globalCommSub;
+        }
+
+        let redirectTo: string | null = null;
+        let limitReachedLeagueId: string | null = null;
+
+        for (const lr of leagueResults) {
+            // Already assigned from a prior sync — skip
+            if (lr.assignedPlanId) continue;
+
+            const sleeperLeagueId = lr.leagueId; // Sleeper external ID
+            const alreadyConnected =
+                connectedExtIds.has(sleeperLeagueId) ||
+                connectedNames.has(lr.leagueName.toLowerCase().trim());
+
+            // ── Branch 1: invite + commissioner paid ──────────────────────────
+            if (invite && sleeperLeagueId === invite.sleeperLeagueId && inviteCommissionerPaid) {
+                if (!alreadyConnected) {
+                    await prisma.connectedLeague.create({
+                        data: {
+                            userId,
+                            leagueName:  lr.leagueName,
+                            platform:    'Sleeper',
+                            leagueExtId: sleeperLeagueId,
+                        },
+                    });
+                }
+                // assignedPlanType = 'commissioner' signals tier comes from the commissioner's plan
+                await prisma.league.update({
+                    where: { id: lr.id },
+                    data:  { assignedPlanType: 'commissioner' },
+                });
+                redirectTo ??= `/dashboard/league/${lr.id}`;
+                continue;
+            }
+
+            // ── Branch 2: user IS the commissioner (has matching commissioner sub) ──
+            const ownCommSub = commSubs.find(
+                s => s.leagueName?.toLowerCase().trim() === lr.leagueName.toLowerCase().trim()
+            );
+            if (ownCommSub) {
+                await prisma.league.update({
+                    where: { id: lr.id },
+                    data:  { assignedPlanId: ownCommSub.id, assignedPlanType: 'commissioner' },
+                });
+                redirectTo ??= `/dashboard/league/${lr.id}`;
+                continue;
+            }
+
+            // ── Branch 3: user has a player plan ─────────────────────────────
+            if (playerSub) {
+                const limitKey = tierToLimitKey(playerSub.tier);
+                const limit    = getLeagueLimit(limitKey);
+
+                if (playerSlotsUsed < limit) {
+                    if (!alreadyConnected) {
+                        await prisma.connectedLeague.create({
+                            data: {
+                                userId,
+                                leagueName:  lr.leagueName,
+                                platform:    'Sleeper',
+                                leagueExtId: sleeperLeagueId,
+                            },
+                        });
+                        playerSlotsUsed++;
+                    }
+                    await prisma.league.update({
+                        where: { id: lr.id },
+                        data:  { assignedPlanId: playerSub.id, assignedPlanType: 'player' },
+                    });
+                    redirectTo ??= `/dashboard/league/${lr.id}`;
+                } else {
+                    // Player plan slot limit reached
+                    limitReachedLeagueId ??= lr.id;
+                }
+                continue;
+            }
+
+            // ── Branch 4: no plans — redirect to league with plan modal ───────
+            redirectTo ??= `/dashboard/league/${lr.id}?showPlanModal=1`;
+        }
+
+        // If any leagues hit the player plan limit, redirect to upgrade
+        if (limitReachedLeagueId && !redirectTo) {
+            redirectTo = `/dashboard/upgrade?reason=player_plan_limit&leagueId=${limitReachedLeagueId}`;
+        }
+
         return Response.json({
-            synced: toSync.length,
-            leagues: leagueResults,
+            synced:     toSync.length,
+            leagues:    leagueResults,
+            redirectTo: redirectTo ?? '/dashboard',
         });
     } catch (err) {
         const message = err instanceof Error ? err.message : 'Sync failed';

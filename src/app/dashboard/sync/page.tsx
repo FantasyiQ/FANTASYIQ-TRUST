@@ -5,7 +5,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { SleeperLeague, SleeperUser } from '@/lib/sleeper';
-import LeagueAssignModal from './LeagueAssignModal';
 
 type Step = 'username' | 'select' | 'done';
 
@@ -13,21 +12,6 @@ interface LookupResult {
     user: SleeperUser;
     leagues: SleeperLeague[];
     season: string;
-}
-
-interface SyncedLeague {
-    id: string;
-    leagueName: string;
-    totalRosters: number;
-    scoringType: string | null;
-    assignedPlanId: string | null;
-}
-
-interface PlanOption {
-    id: string;
-    type: 'player' | 'commissioner';
-    tier: string;
-    leagueName: string | null;
 }
 
 function statusLabel(status: string) {
@@ -71,11 +55,6 @@ function SyncPageInner() {
     const [result, setResult]   = useState<LookupResult | null>(null);
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [synced, setSynced]   = useState(0);
-
-    // Assignment modal
-    const [showAssignModal, setShowAssignModal] = useState(false);
-    const [syncedLeagues, setSyncedLeagues]     = useState<SyncedLeague[]>([]);
-    const [availablePlans, setAvailablePlans]   = useState<PlanOption[]>([]);
 
     async function handleLookup(e: React.FormEvent) {
         e.preventDefault();
@@ -123,34 +102,24 @@ function SyncPageInner() {
         setLoading(true);
         const leaguesToSync = result.leagues.filter((l) => selected.has(l.league_id));
         try {
-            const [syncRes, plansRes] = await Promise.all([
-                fetch('/api/sleeper/sync', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sleeperUserId: result.user.user_id, leagues: leaguesToSync }),
+            const syncRes = await fetch('/api/sleeper/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sleeperUserId: result.user.user_id,
+                    leagues:       leaguesToSync,
+                    ...(inviteToken ? { inviteToken } : {}),
                 }),
-                fetch('/api/user/plans'),
-            ]);
-            const syncData  = await syncRes.json()  as { synced?: number; leagues?: SyncedLeague[]; error?: string };
-            const plansData = await plansRes.json() as PlanOption[] | { error?: string };
+            });
+            const syncData = await syncRes.json() as { synced?: number; redirectTo?: string; error?: string };
             if (!syncRes.ok) { setError(syncData.error ?? 'Sync failed'); return; }
 
             setSynced(syncData.synced ?? selected.size);
 
-            // If we came from an invite, loop back through the invite page.
-            if (fromInvite && inviteToken) {
-                router.replace(`/invite/${inviteToken}`);
+            // Auto-assignment is handled server-side — follow the redirect immediately
+            if (syncData.redirectTo) {
+                router.replace(syncData.redirectTo);
                 return;
-            }
-
-            // Show assignment modal if there are plans and unassigned leagues
-            const leagues  = syncData.leagues ?? [];
-            const plans    = Array.isArray(plansData) ? plansData : [];
-            const hasUnassigned = leagues.some(l => !l.assignedPlanId);
-            if (plans.length > 0 && hasUnassigned) {
-                setSyncedLeagues(leagues);
-                setAvailablePlans(plans);
-                setShowAssignModal(true);
             }
 
             setStep('done');
@@ -161,20 +130,7 @@ function SyncPageInner() {
         }
     }
 
-    function planLabel(p: PlanOption): string {
-        if (p.type === 'commissioner') return `Commissioner — ${p.tier.replace('COMMISSIONER_', '')}`;
-        return `Player — ${p.tier.replace('PLAYER_', '')}`;
-    }
-
     return (
-        <>
-        {showAssignModal && (
-            <LeagueAssignModal
-                leagues={syncedLeagues}
-                plans={availablePlans.map(p => ({ ...p, label: planLabel(p) }))}
-                onClose={() => setShowAssignModal(false)}
-            />
-        )}
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
             <div className="max-w-2xl mx-auto space-y-6">
 
@@ -345,7 +301,6 @@ function SyncPageInner() {
                 )}
             </div>
         </main>
-        </>
     );
 }
 

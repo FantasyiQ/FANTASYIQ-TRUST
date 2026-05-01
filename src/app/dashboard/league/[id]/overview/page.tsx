@@ -57,8 +57,16 @@ function buildLeagueSettings(
     };
 }
 
-export default async function LeagueOverviewPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function LeagueOverviewPage({
+    params,
+    searchParams,
+}: {
+    params:       Promise<{ id: string }>;
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
     const { id } = await params;
+    const sp = await searchParams;
+    const showPlanModal = sp.showPlanModal === '1';
     const session = await auth();
     if (!session?.user?.id) redirect('/sign-in');
 
@@ -377,6 +385,19 @@ export default async function LeagueOverviewPage({ params }: { params: Promise<{
 
     return (
         <>
+        {showPlanModal && (
+            <div className="rounded-xl bg-[#C8A951]/10 border border-[#C8A951]/30 px-5 py-4 mb-4 flex items-center justify-between gap-4">
+                <div>
+                    <p className="text-[#C8A951] font-semibold text-sm">League synced — add it to a plan to unlock features</p>
+                    <p className="text-gray-400 text-xs mt-0.5">
+                        Standings and rosters are always free. Trade evaluator, rankings, and dues management require a plan.
+                    </p>
+                </div>
+                <a href="/pricing?tab=player" className="shrink-0 bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-4 py-2 rounded-lg transition text-xs">
+                    View Plans
+                </a>
+            </div>
+        )}
         {isDrafting && (
             <div className="rounded-md bg-yellow-100 border border-yellow-300 p-3 text-yellow-900 mb-4 text-sm">
                 This league is currently drafting. Sleeper may return incomplete data — picks and team names are shown using fallback mode.
