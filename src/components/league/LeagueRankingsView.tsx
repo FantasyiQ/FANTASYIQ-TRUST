@@ -30,6 +30,16 @@ const POS_COLORS: Record<string, string> = {
 
 const POS_FILTER_OPTIONS = ['All', 'QB', 'RB', 'WR', 'TE'];
 
+function timeAgo(iso: string | null | undefined): string {
+    if (!iso) return 'unknown';
+    const diff = Date.now() - new Date(iso).getTime();
+    const h = Math.floor(diff / 3_600_000);
+    if (h < 1)  return 'just now';
+    if (h < 24) return `${h}h ago`;
+    const d = Math.floor(h / 24);
+    return `${d}d ago`;
+}
+
 // ── Sub-tables ────────────────────────────────────────────────────────────────
 
 function PlayerRankingsTable({
@@ -38,12 +48,14 @@ function PlayerRankingsTable({
     position,
     onSearch,
     onPosition,
+    ktcSyncedAt,
 }: {
-    rankings:   PlayerRankingRow[];
-    search:     string;
-    position:   string;
-    onSearch:   (v: string) => void;
-    onPosition: (v: string) => void;
+    rankings:    PlayerRankingRow[];
+    search:      string;
+    position:    string;
+    onSearch:    (v: string) => void;
+    onPosition:  (v: string) => void;
+    ktcSyncedAt: string | null;
 }) {
     const filtered = useMemo(() => {
         let list = rankings;
@@ -57,7 +69,14 @@ function PlayerRankingsTable({
 
     return (
         <div>
-            <div className="px-6 py-3 border-b border-gray-800 flex items-center justify-between flex-wrap gap-3">
+            <div className="px-6 py-3 border-b border-gray-800">
+                {ktcSyncedAt && (
+                    <p className="text-gray-500 text-xs mb-2">
+                        Values adjust for position scarcity, age curve, and PPR format.
+                        <span className="ml-2 text-gray-600">· KTC synced {timeAgo(ktcSyncedAt)}</span>
+                    </p>
+                )}
+            <div className="flex items-center justify-between flex-wrap gap-3">
                 <div className="flex gap-2 flex-wrap">
                     {POS_FILTER_OPTIONS.map(pos => (
                         <button key={pos} onClick={() => onPosition(pos)}
@@ -73,6 +92,7 @@ function PlayerRankingsTable({
                     onChange={e => onSearch(e.target.value)}
                     className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-gray-500 w-48"
                 />
+            </div>
             </div>
             <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -208,6 +228,7 @@ export function LeagueRankingsView({
     playerRankings,
     teamRankings,
     powerRankings,
+    ktcSyncedAt,
     preseason,
     search,
     position,
@@ -258,6 +279,7 @@ export function LeagueRankingsView({
                     position={position}
                     onSearch={onSearch}
                     onPosition={onPosition}
+                    ktcSyncedAt={ktcSyncedAt}
                 />
             )}
             {tab === 'teams' && (

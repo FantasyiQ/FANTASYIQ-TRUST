@@ -58,6 +58,7 @@ export type LeagueRankingsData = {
     playerRankings: PlayerRankingRow[];
     teamRankings:   TeamRankingRow[];
     powerRankings:  PowerRankingRow[];
+    ktcSyncedAt:    string | null;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -200,7 +201,7 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
     const leagueSize      = league.totalRosters;
 
     // ── Fetch data in parallel ────────────────────────────────────────────────
-    const [rosters, members, ktcRows, sleeperPlayers] = await Promise.all([
+    const [rosters, members, ktcRows, sleeperPlayers, latestSync] = await Promise.all([
         getLeagueRosters(league.leagueId),
         getLeagueUsers(league.leagueId),
         prisma.fantasyCalcValue.findMany({
@@ -217,6 +218,10 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
         prisma.sleeperPlayer.findMany({
             where:  { active: true, position: { in: ['QB', 'RB', 'WR', 'TE'] } },
             select: { playerId: true, fullName: true, team: true, injuryStatus: true, birthDate: true, age: true },
+        }),
+        prisma.fantasyCalcValue.findFirst({
+            orderBy: { updatedAt: 'desc' },
+            select:  { updatedAt: true },
         }),
     ]);
 
@@ -363,5 +368,6 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
         playerRankings,
         teamRankings,
         powerRankings,
+        ktcSyncedAt: latestSync?.updatedAt.toISOString() ?? null,
     };
 }
