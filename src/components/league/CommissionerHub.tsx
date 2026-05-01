@@ -37,7 +37,7 @@ export default function CommissionerHub({ league, dues, proBowlContest }: League
         },
         {
             label:       'Invite Members',
-            description: 'Generate an invite link to bring league members into FantasyIQ.',
+            description: 'Generate an invite link to bring league members into FantasyiQ Trust.',
             href:        `/dashboard/league/${league.id}/commissioner/invite`,
             cta:         'Invite Members →',
         },

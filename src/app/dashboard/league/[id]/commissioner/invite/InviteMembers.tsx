@@ -57,7 +57,7 @@ export default function InviteMembers({ leagueId, sleeperLeagueId, leagueName, s
 
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4 max-w-lg">
                 <p className="text-sm text-gray-400">
-                    Share this link with your league members so they can create a FantasyIQ account and join your league automatically.
+                    Share this link with your league members so they can create a FantasyiQ Trust account and join your league automatically.
                 </p>
 
                 {inviteUrl ? (

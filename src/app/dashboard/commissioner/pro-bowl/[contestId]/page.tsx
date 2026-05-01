@@ -190,7 +190,7 @@ export default async function ManageProBowlPage({ params }: { params: Promise<{ 
                     <div className="bg-[#C8A951]/10 border border-[#C8A951]/30 rounded-2xl p-5">
                         <p className="text-sm font-semibold text-[#C8A951] mb-1">Share Entry Link</p>
                         <p className="text-gray-400 text-xs mb-3">
-                            Send this to your league members. They need a FantasyiQ account to enter.
+                            Send this to your league members. They need a FantasyiQ Trust account to enter.
                         </p>
                         <code className="block bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-300 truncate">
                             {/* populated on client via copy button in ContestControls */}
