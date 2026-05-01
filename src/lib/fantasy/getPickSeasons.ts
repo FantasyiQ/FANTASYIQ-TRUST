@@ -21,12 +21,17 @@ export interface GetPickSeasonsArgs {
  * 'drafting' status for days/weeks while picks are still being traded — hiding them
  * would be wrong. isDrafting only gates the draftCompleted check in callers.
  *
- * - Draft does not exist OR is not completed → [season-1, season, season+1]
+ * - Draft does not exist OR is not completed → [season-1, season, season+1, season+2]
  * - Draft completed                          → [season, season+1, season+2]
+ *
+ * NOTE: The "not done" case returns 4 seasons so that dynasty leagues can always
+ * trade 2+ years of future picks (e.g. 2028 picks in a 2026-season league),
+ * while still preserving the season-1 window for picks that predate Sleeper's
+ * season advance.
  */
 export function getPickSeasons({ leagueSeason, hasDraft, draftCompleted }: GetPickSeasonsArgs): string[] {
     if (hasDraft && draftCompleted) {
         return [String(leagueSeason), String(leagueSeason + 1), String(leagueSeason + 2)];
     }
-    return [String(leagueSeason - 1), String(leagueSeason), String(leagueSeason + 1)];
+    return [String(leagueSeason - 1), String(leagueSeason), String(leagueSeason + 1), String(leagueSeason + 2)];
 }

@@ -294,8 +294,13 @@ export function getDraftPicks(leagueSize: number, draftRounds = 5, seasons?: str
         ? seasons.map(Number)
         : futurePickYears();
 
-    for (const [i, year] of years.entries()) {
-        const discount = YEAR_DISCOUNTS[i] ?? 0.60;
+    // Anchor discounts to the calendar base year so that a season-1 entry and a
+    // season+2 entry both get the correct multiplier regardless of array position.
+    const [baseYear] = futurePickYears();
+
+    for (const year of years) {
+        const offset   = Math.max(0, year - baseYear); // past/current → 0, +1, +2 …
+        const discount = YEAR_DISCOUNTS[offset] ?? 0.60;
         for (let round = 1; round <= draftRounds; round++) {
             const [hi, lo] = ROUND_ANCHORS[round - 1] ?? [6, 3]; // rounds beyond 5 get minimal value
             for (let pick = 1; pick <= leagueSize; pick++) {
