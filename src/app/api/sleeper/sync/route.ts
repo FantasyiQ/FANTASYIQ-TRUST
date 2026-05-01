@@ -158,7 +158,23 @@ export async function POST(request: NextRequest): Promise<Response> {
                 continue;
             }
 
-            // ── Branch 3: user has a player plan ─────────────────────────────
+            // ── Branch 3: user is the Sleeper commissioner but has no plan yet ──
+            // Match the syncing user's Sleeper ID against the league's commissioner_id.
+            // We need the original SleeperLeague to read settings.commissioner_id.
+            const sleeperLeague = toSync.find(l => l.league_id === sleeperLeagueId);
+            const isSleeperCommissioner =
+                !!sleeperUserId &&
+                !!sleeperLeague?.settings?.commissioner_id &&
+                String(sleeperLeague.settings.commissioner_id).trim() === String(sleeperUserId).trim();
+
+            if (isSleeperCommissioner) {
+                // Do NOT assign to any player plan slot. Leave unassigned until they
+                // choose a commissioner plan. Redirect with a plan-selection modal.
+                redirectTo ??= `/dashboard/league/${lr.id}?showCommissionerPlanModal=1`;
+                continue;
+            }
+
+            // ── Branch 4: user has a player plan ─────────────────────────────
             if (playerSub) {
                 const limitKey = tierToLimitKey(playerSub.tier);
                 const limit    = getLeagueLimit(limitKey);
@@ -187,7 +203,7 @@ export async function POST(request: NextRequest): Promise<Response> {
                 continue;
             }
 
-            // ── Branch 4: no plans — redirect to league with plan modal ───────
+            // ── Branch 5: no plans — redirect to league with plan modal ───────
             redirectTo ??= `/dashboard/league/${lr.id}?showPlanModal=1`;
         }
 

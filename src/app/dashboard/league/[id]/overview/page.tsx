@@ -66,7 +66,8 @@ export default async function LeagueOverviewPage({
 }) {
     const { id } = await params;
     const sp = await searchParams;
-    const showPlanModal = sp.showPlanModal === '1';
+    const showPlanModal             = sp.showPlanModal === '1';
+    const showCommissionerPlanModal = sp.showCommissionerPlanModal === '1';
     const session = await auth();
     if (!session?.user?.id) redirect('/sign-in');
 
@@ -385,6 +386,19 @@ export default async function LeagueOverviewPage({
 
     return (
         <>
+        {showCommissionerPlanModal && (
+            <div className="rounded-xl bg-[#C8A951]/10 border border-[#C8A951]/30 px-5 py-4 mb-4 flex items-center justify-between gap-4">
+                <div>
+                    <p className="text-[#C8A951] font-semibold text-sm">You&apos;re the commissioner — choose a plan to unlock the full toolkit</p>
+                    <p className="text-gray-400 text-xs mt-0.5">
+                        Dues management, member invites, announcements, and payouts are included with a commissioner plan.
+                    </p>
+                </div>
+                <a href={`/pricing?tab=commissioner`} className="shrink-0 bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-4 py-2 rounded-lg transition text-xs whitespace-nowrap">
+                    View Commissioner Plans
+                </a>
+            </div>
+        )}
         {showPlanModal && (
             <div className="rounded-xl bg-[#C8A951]/10 border border-[#C8A951]/30 px-5 py-4 mb-4 flex items-center justify-between gap-4">
                 <div>

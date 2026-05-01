@@ -15,10 +15,11 @@ export interface SleeperLeague {
     total_rosters: number;
     avatar: string | null;
     settings: {
-        type: number;           // 0 = redraft, 2 = dynasty
-        draft_rounds?: number;  // number of rounds in the rookie/startup draft
+        type: number;             // 0 = redraft, 2 = dynasty
+        draft_rounds?: number;    // number of rounds in the rookie/startup draft
         playoff_teams?: number;
         trade_deadline?: number;
+        commissioner_id?: string; // Sleeper user_id of the league commissioner
     };
     scoring_settings: {
         rec?:              number;   // PPR value (0 / 0.5 / 1)
