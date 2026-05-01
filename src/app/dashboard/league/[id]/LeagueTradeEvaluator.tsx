@@ -117,7 +117,16 @@ export default function LeagueTradeEvaluator({
     const projectedLabel = draftOrderProjected ? ' · Projected Order' : '';
     const label     = `${leagueName} — ${scoringLabel(scoringType)} · ${totalRosters} Teams · ${leagueType}${sfLabel}${passTdLabel}${tePremLabel}${projectedLabel}`;
 
-    const allPicks   = useMemo(() => getDraftPicks(leagueSize, draftRounds), [leagueSize, draftRounds]);
+    // Derive which seasons are actually referenced by owned picks so the lookup map
+    // always covers them — regardless of what the calendar says.
+    const ownedPickSeasons = useMemo(() => {
+        const s = new Set<string>();
+        if (myTeamData) for (const p of myTeamData.ownedPicks) s.add(p.season);
+        for (const t of otherTeamsData) for (const p of t.ownedPicks) s.add(p.season);
+        return s.size > 0 ? [...s] : undefined;
+    }, [myTeamData, otherTeamsData]);
+
+    const allPicks   = useMemo(() => getDraftPicks(leagueSize, draftRounds, ownedPickSeasons), [leagueSize, draftRounds, ownedPickSeasons]);
     const pickByName = useMemo(() => new Map(allPicks.map(p => [p.name, p])), [allPicks]);
 
     // Depth base values for unranked / non-skill-position players
@@ -149,7 +158,7 @@ export default function LeagueTradeEvaluator({
                 const key = op.slot !== undefined
                     ? `${op.season} ${op.round}.${op.slot.toString().padStart(2, '0')}`
                     : op.tier
-                        ? `${op.season} Round ${op.round} ${op.tier} ${roundOrdinal(op.round)}`  // "2027 Round 1 Early 1st"
+                        ? `${op.season} ${op.tier} ${roundOrdinal(op.round)}`  // "2027 Early 1st"
                         : undefined;
                 if (!key) return undefined;
                 const base = pickByName.get(key);

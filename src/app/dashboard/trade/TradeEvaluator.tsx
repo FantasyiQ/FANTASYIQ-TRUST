@@ -10,16 +10,15 @@ import { calculateAge } from '@/lib/calculateAge';
 const LEAGUE_SIZES = [8, 10, 12, 14, 16, 32] as const;
 type LeagueSize = typeof LEAGUE_SIZES[number];
 
-// Dynamic pick years: before ~April 25 current year is still tradeable; after, shift forward
+// Dynasty rookie drafts run April–August; only advance the base year after September 1
+// when all rookie drafts are complete. Must stay in sync with futurePickYears() in trade-engine.ts.
 function pickYears(): [number, number, number] {
-    const now = new Date();
-    const m = now.getMonth() + 1;
-    const d = now.getDate();
-    const pastDraft = m > 4 || (m === 4 && d >= 25);
-    const base = pastDraft ? now.getFullYear() + 1 : now.getFullYear();
+    const now  = new Date();
+    const base = (now.getMonth() + 1) >= 9 ? now.getFullYear() + 1 : now.getFullYear();
     return [base, base + 1, base + 2];
 }
 const PICK_YEARS = pickYears();
+
 
 const TIER_COLORS: Record<string, string> = {
     Elite:   'text-[#C8A951]',
@@ -144,16 +143,27 @@ function PlayerPill({ result, onRemove, leagueSize }: { result: DtvResult; onRem
 
 const POS_ORDER: Record<string, number> = { QB: 0, RB: 1, WR: 2, TE: 3, K: 4, DEF: 5 };
 
-// Future picks (year > current draft year) show as "Early/Mid/Late Nth" — exact slot unknown until standings lock
+// Display label for a pick pill / search result.
+// - Exact slot current year "2026 1.04"  → "1.04"
+// - Exact slot future year  "2027 1.04"  → "2027 Early 1st" (tier-converted)
+// - Tier pick               "2027 Early 1st" → "Early 1st" (year stripped)
 function pickLabel(name: string, leagueSize: number): string {
-    const m = name.match(/^(\d{4}) (\d+)\.(\d+)$/);
+    // Tier pick: "YYYY Early 1st" → strip year
+    const tierM = name.match(/^\d{4} ((?:Early|Mid|Late) \w+)$/);
+    if (tierM) return tierM[1];
+
+    // Exact slot: "YYYY R.SS"
+    const m = name.match(/^(\d{4}) (\d+\.\d+)$/);
     if (!m) return name;
-    const year  = parseInt(m[1]);
-    if (year <= PICK_YEARS[0]) return name; // current year: draft order is known
-    const round = parseInt(m[2]);
-    const slot  = parseInt(m[3]);
+    const year = parseInt(m[1]);
+    const slot = m[2]; // e.g. "1.04"
+    if (year <= PICK_YEARS[0]) return slot;
+    // Future exact slot → convert to tier label
+    const [roundStr, pickStr] = slot.split('.');
+    const round = parseInt(roundStr);
+    const pick  = parseInt(pickStr);
     const third = Math.ceil(leagueSize / 3);
-    const tier  = slot <= third ? 'Early' : slot <= third * 2 ? 'Mid' : 'Late';
+    const tier  = pick <= third ? 'Early' : pick <= third * 2 ? 'Mid' : 'Late';
     const ord   = ['1st','2nd','3rd','4th','5th'][round - 1] ?? `${round}th`;
     return `${year} ${tier} ${ord}`;
 }
@@ -184,43 +194,45 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, leagu
         [players, ppr, leagueType, settings]
     );
 
-    // Extract round number from either "YYYY R.SS" or "YYYY Round N ..." format
-    const pickRound = (name: string): number => {
-        const exact = name.match(/^\d{4} (\d+)\./);
-        if (exact) return parseInt(exact[1], 10);
-        const tier = name.match(/^\d{4} Round (\d+)/i);
-        if (tier) return parseInt(tier[1], 10);
-        return 1;
+    // Round from exact-slot pick "YYYY R.SS" → R (real draft round number).
+    const getSlotRound = (name: string): number => {
+        const m = name.match(/^\d{4} (\d+)\./);
+        return m ? parseInt(m[1], 10) : 0;
     };
-    // Sort order within a round: exact picks by slot, tier picks by Early→Mid→Late
-    const pickSlotOrder = (name: string): number => {
-        const slot = name.match(/\d+\.(\d+)/);
-        if (slot) return parseInt(slot[1], 10);
+    // Round from tier pick "YYYY Early 1st" → extracts leading digits of ordinal (1st→1, 39th→39).
+    const getTierRound = (name: string): number => {
+        const m = name.match(/^\d{4} (?:Early|Mid|Late) (\d+)/);
+        return m ? parseInt(m[1], 10) : 0;
+    };
+    const pickTierOrder = (name: string): number => {
         if (name.includes('Early')) return 1;
-        if (name.includes('Mid'))   return 50;
-        if (name.includes('Late'))  return 99;
-        return 50;
+        if (name.includes('Mid'))   return 2;
+        if (name.includes('Late'))  return 3;
+        return 2;
     };
 
-    const yearPicks = useMemo(() => {
-        const result = picks
-            .filter(p => p.team === String(pickYear))
-            .sort((a, b) => {
-                const ar = pickRound(a.name), br = pickRound(b.name);
-                return ar !== br ? ar - br : pickSlotOrder(a.name) - pickSlotOrder(b.name);
-            });
-        return result;
-    }, [picks, pickYear]);
-
-    const rounds = useMemo(() => {
+    // Slot picks grouped by round for the non-future (current-year) path.
+    const slotRounds = useMemo(() => {
         const map = new Map<number, Player[]>();
-        for (const p of yearPicks) {
-            const round = pickRound(p.name);
-            if (!map.has(round)) map.set(round, []);
-            map.get(round)!.push(p);
+        for (const p of picks) {
+            if (p.team !== String(pickYear)) continue;
+            const r = getSlotRound(p.name);
+            if (!r) continue; // skip tier picks
+            if (!map.has(r)) map.set(r, []);
+            map.get(r)!.push(p);
         }
         return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
-    }, [yearPicks]);
+    }, [picks, pickYear]);
+
+    // Tier picks sorted by round then tier for the future path.
+    const tierPicksSorted = useMemo(() => (
+        picks
+            .filter(p => p.team === String(pickYear) && !getSlotRound(p.name))
+            .sort((a, b) => {
+                const ra = getTierRound(a.name), rb = getTierRound(b.name);
+                return ra !== rb ? ra - rb : pickTierOrder(a.name) - pickTierOrder(b.name);
+            })
+    ), [picks, pickYear]);
 
     const tabBtn = (id: 'roster' | 'picks', label: string) => (
         <button type="button" onClick={() => setTab(id)}
@@ -280,64 +292,61 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, leagu
                             </button>
                         ))}
                     </div>
-                    {/* Picks by round */}
+                    {/* Picks: future = flat tier list (no round headers); current = round-grouped slots */}
                     <div className="space-y-1.5">
-                        {rounds.map(([round, roundPicks]) => {
-                            const isFuture = pickYear > PICK_YEARS[0];
-                            const ord = ['1st','2nd','3rd','4th','5th'][round - 1] ?? `${round}th`;
-                            const third = Math.ceil(leagueSize / 3);
-                            const tierOf = (slot: number) => slot <= third ? 'Early' : slot <= third * 2 ? 'Mid' : 'Late';
-                            return (
-                                <div key={round} className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-gray-600 text-[10px] font-semibold w-8 shrink-0">Rd {round}</span>
-                                    {isFuture
-                                        ? roundPicks
-                                            // Exact-slot picks (e.g. "2027 1.04") are hypothetical for future years;
-                                            // only show tier picks ("2027 Round 1 Early 1st") which come from
-                                            // buildPickOwnerMap. Exact picks only appear if draft_order is set early.
-                                            .filter(p => !p.name.match(/^\d{4} \d+\./))
-                                            .map((p, i) => {
-                                            const used = excluded.includes(p.name);
-                                            const dtv  = calcDtv(p, ppr, leagueType, undefined, settings);
-                                            const slotM = p.name.match(/\d+\.(\d+)/);
-                                            const tierLabel = slotM
-                                                ? tierOf(parseInt(slotM[1]))
-                                                : p.name.includes('Early') ? 'Early'
-                                                : p.name.includes('Late')  ? 'Late' : 'Mid';
-                                            return (
-                                                <button key={`${p.name}-${i}`} type="button" disabled={used}
-                                                    onClick={() => onAdd(p)}
-                                                    title={`${p.name} — DTV ${dtv.finalDtv}`}
-                                                    className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] font-medium transition ${
-                                                        used
-                                                            ? 'border-gray-800 text-gray-700 cursor-not-allowed'
-                                                            : 'border-indigo-800/60 text-indigo-300 hover:border-indigo-500 hover:text-white'
-                                                    }`}>
-                                                    {tierLabel} {ord}
-                                                    <span className="text-gray-600">{dtv.finalDtv}</span>
-                                                </button>
-                                            );
-                                        })
-                                        : roundPicks.map(p => {
-                                            const used = excluded.includes(p.name);
-                                            const dtv  = calcDtv(p, ppr, leagueType, undefined, settings);
-                                            return (
-                                                <button key={p.name} type="button" disabled={used} onClick={() => onAdd(p)}
-                                                    title={`${p.name} — DTV ${dtv.finalDtv}`}
-                                                    className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] font-medium transition ${
-                                                        used
-                                                            ? 'border-gray-800 text-gray-700 cursor-not-allowed'
-                                                            : 'border-indigo-800/60 text-indigo-300 hover:border-indigo-500 hover:text-white'
-                                                    }`}>
-                                                    {p.name.split(' ')[1]}
-                                                    <span className="text-gray-600">{dtv.finalDtv}</span>
-                                                </button>
-                                            );
-                                        })
-                                    }
-                                </div>
-                            );
-                        })}
+                        {pickYear > PICK_YEARS[0]
+                            ? /* Future picks: "Early 1st", "Mid 1st", "Late 1st", "Early 2nd" … — no "Rd X" */
+                              <div className="flex flex-wrap gap-1.5">
+                                  {tierPicksSorted.map((p, i) => {
+                                      const used = excluded.includes(p.name);
+                                      const dtv  = calcDtv(p, ppr, leagueType, undefined, settings);
+                                      // Name is "YYYY Early 1st" — strip year for button
+                                      const label = p.name.split(' ').slice(1).join(' ');
+                                      return (
+                                          <button key={`${p.name}-${i}`} type="button" disabled={used}
+                                              onClick={() => onAdd(p)}
+                                              title={`${p.name} — DTV ${dtv.finalDtv}`}
+                                              className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] font-medium transition ${
+                                                  used
+                                                      ? 'border-gray-800 text-gray-700 cursor-not-allowed'
+                                                      : 'border-indigo-800/60 text-indigo-300 hover:border-indigo-500 hover:text-white'
+                                              }`}>
+                                              {label}
+                                              <span className="text-gray-600">{dtv.finalDtv}</span>
+                                          </button>
+                                      );
+                                  })}
+                              </div>
+                            : /* Current-year picks: grouped by real round, "R.SS" slot notation */
+                              slotRounds.map(([round, roundPicks]) => (
+                                  <div key={round} className="flex items-center gap-2 flex-wrap">
+                                      <span className="text-gray-600 text-[10px] font-semibold w-8 shrink-0">Rd {round}</span>
+                                      {roundPicks
+                                          .sort((a, b) => {
+                                              const as_ = parseInt(a.name.split('.')[1] ?? '99');
+                                              const bs_ = parseInt(b.name.split('.')[1] ?? '99');
+                                              return as_ - bs_;
+                                          })
+                                          .map(p => {
+                                              const used = excluded.includes(p.name);
+                                              const dtv  = calcDtv(p, ppr, leagueType, undefined, settings);
+                                              const label = p.name.split(' ')[1] ?? p.name; // e.g. "1.05"
+                                              return (
+                                                  <button key={p.name} type="button" disabled={used} onClick={() => onAdd(p)}
+                                                      title={`${p.name} — DTV ${dtv.finalDtv}`}
+                                                      className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] font-medium transition ${
+                                                          used
+                                                              ? 'border-gray-800 text-gray-700 cursor-not-allowed'
+                                                              : 'border-indigo-800/60 text-indigo-300 hover:border-indigo-500 hover:text-white'
+                                                      }`}>
+                                                      {label}
+                                                      <span className="text-gray-600">{dtv.finalDtv}</span>
+                                                  </button>
+                                              );
+                                          })}
+                                  </div>
+                              ))
+                        }
                     </div>
                 </div>
             )}
@@ -983,9 +992,9 @@ export default function TradeEvaluator({
                             const roundPicks = draftPicks.filter(p => {
                                 if (p.team !== String(pickYear)) return false;
                                 if (isFutureChart) {
-                                    // Future years: tier picks only ("2027 Round 1 Early 1st")
-                                    const tierMatch = p.name.match(/^(\d{4}) Round (\d+) /);
-                                    return !!tierMatch && parseInt(tierMatch[2]) === round;
+                                    // Tier pick "2027 Early 1st" — extract leading digits of ordinal (1st→1, 2nd→2)
+                                    const tierMatch = p.name.match(/^\d{4} (?:Early|Mid|Late) (\d+)/);
+                                    return !!tierMatch && parseInt(tierMatch[1]) === round;
                                 }
                                 // Current year: exact-slot picks only ("2026 1.04")
                                 return p.name.startsWith(`${pickYear} ${round}.`);

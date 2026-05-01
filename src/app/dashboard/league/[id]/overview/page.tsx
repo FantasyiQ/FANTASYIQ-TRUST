@@ -5,8 +5,8 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import {
-    getLeague, getLeagueUsers, getLeagueRosters, getPlayers, getTradedPicks,
-    getLeagueDrafts, buildPickOwnerMap, buildRosterSlotMap,
+    getSafeSleeperLeague, getLeagueRosters, getPlayers, getTradedPicks,
+    getDraftPickCount, buildPickOwnerMap, buildRosterSlotMap,
     summariseRosterPositions,
     type SleeperLeagueMember, type SleeperRoster,
 } from '@/lib/sleeper';
@@ -20,6 +20,7 @@ import LeagueTradeEvaluator from '../LeagueTradeEvaluator';
 import { type StandingRow, type AnnouncementData, type SleeperSettings } from '../LeagueDetailTabs';
 import type { DuesManagerData } from '../DuesManager';
 import LeagueOverviewCards from '../LeagueOverviewCards';
+import { getPickSeasons } from '@/lib/fantasy/getPickSeasons';
 
 const BENCH_SLOTS = new Set(['BN', 'IR']);
 
@@ -72,13 +73,10 @@ export default async function LeagueOverviewPage({ params }: { params: Promise<{
 
     if (!league || league.userId !== session.user.id) notFound();
 
-    const [sleeperLeague, members, rosters, allPlayers, tradedPicks, drafts, dbUser, leagueDuesRecord, proBowlContest] = await Promise.all([
-        getLeague(league.leagueId),
-        getLeagueUsers(league.leagueId),
-        getLeagueRosters(league.leagueId),
+    const safeLeagueP = getSafeSleeperLeague(league.leagueId);
+    const [allPlayers, tradedPicks, dbUser, leagueDuesRecord, proBowlContest] = await Promise.all([
         getPlayers(),
         getTradedPicks(league.leagueId),
-        getLeagueDrafts(league.leagueId),
         prisma.user.findUnique({
             where:  { id: session.user.id },
             select: {
@@ -128,6 +126,11 @@ export default async function LeagueOverviewPage({ params }: { params: Promise<{
             orderBy: { createdAt: 'desc' },
         }),
     ]);
+    const sleeperLeague = await safeLeagueP;
+    const rosters       = sleeperLeague.rosters;
+    const members       = sleeperLeague.users;
+    const drafts        = sleeperLeague.drafts;
+    const isDrafting    = sleeperLeague.isDrafting;
 
     // ── Commissioner tier lookup ───────────────────────────────────────────────
     let commSubForLeague: { tier: string } | null = null;
@@ -208,11 +211,19 @@ export default async function LeagueOverviewPage({ params }: { params: Promise<{
     const players: Record<string, typeof allPlayers[string]> = {};
     for (const pid of neededIds) { if (allPlayers[pid]) players[pid] = allPlayers[pid]; }
 
-    const _now       = new Date();
-    const _pastDraft = _now.getMonth() + 1 > 4 || (_now.getMonth() + 1 === 4 && _now.getDate() >= 25);
-    const _base      = _pastDraft ? _now.getFullYear() + 1 : _now.getFullYear();
-    const FUTURE_SEASONS = [String(_base), String(_base + 1), String(_base + 2)];
-    const draftRounds    = sleeperLeague.settings?.draft_rounds ?? 5;
+    const leagueSeason = Number(sleeperLeague.season);
+    const currentDraft = drafts.find(d => d.season === sleeperLeague.season) ?? null;
+    const hasDraft     = currentDraft !== null;
+    // A draft is only "complete" if Sleeper reports it complete AND it has real picks.
+    // Placeholder future drafts (auto-created by Sleeper) can have status "complete" with 0 picks.
+    // Never treat a draft as complete while it is actively in progress (blackout protection).
+    const draftCompleted = !isDrafting
+        && !!currentDraft
+        && leagueSeason <= new Date().getFullYear()
+        && currentDraft.status === 'complete'
+        && (await getDraftPickCount(currentDraft.draft_id)) > 0;
+    const FUTURE_SEASONS = getPickSeasons({ leagueSeason, hasDraft, draftCompleted, isDrafting });
+    const draftRounds    = sleeperLeague.settings.draft_rounds;
     const ROUNDS         = Array.from({ length: draftRounds }, (_, i) => i + 1);
     const rosterIds      = rosters.map(r => r.roster_id);
 
@@ -365,6 +376,12 @@ export default async function LeagueOverviewPage({ params }: { params: Promise<{
     );
 
     return (
+        <>
+        {isDrafting && (
+            <div className="rounded-md bg-yellow-100 border border-yellow-300 p-3 text-yellow-900 mb-4 text-sm">
+                This league is currently drafting. Sleeper may return incomplete data — picks and team names are shown using fallback mode.
+            </div>
+        )}
         <LeagueOverviewCards
             leagueId={id}
             leagueName={league.leagueName}
@@ -395,5 +412,6 @@ export default async function LeagueOverviewPage({ params }: { params: Promise<{
             currentUserId={session.user.id}
             canUsePlayerRankings={canUseTradeEvaluator}
         />
+        </>
     );
 }

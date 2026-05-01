@@ -273,25 +273,28 @@ const ROUND_ANCHORS: [number, number][] = [
 
 const YEAR_DISCOUNTS = [1.00, 0.83, 0.69]; // nearest, +1, +2 year multipliers
 
-// NFL draft is typically ~April 24. Before that date 2026 picks still trade freely;
-// after that they've been used so futures start at 2027.
+// Dynasty rookie drafts run after the NFL draft (late April) through August.
+// Only advance the pick year after September 1 when all rookie drafts are complete.
 function futurePickYears(): [number, number, number] {
     const now   = new Date();
     const year  = now.getFullYear();
     const month = now.getMonth() + 1; // 1-based
-    const day   = now.getDate();
-    const pastDraft = month > 4 || (month === 4 && day >= 25);
-    const base  = pastDraft ? year + 1 : year;
+    const base  = month >= 9 ? year + 1 : year;
     return [base, base + 1, base + 2];
 }
 
-// Generates individual draft picks (1.01 … {rounds}.{leagueSize}) for the next 3 draft years.
-// Age is kept at 22 for dynasty age-curve logic; it is not shown in the UI.
-export function getDraftPicks(leagueSize: number, draftRounds = 5): Player[] {
+// Generates individual draft picks (1.01 … {rounds}.{leagueSize}) for the given seasons.
+// Pass explicit `seasons` (e.g. from getPickSeasons) to stay in sync with league state;
+// omit to fall back to the calendar-based futurePickYears().
+export function getDraftPicks(leagueSize: number, draftRounds = 5, seasons?: string[]): Player[] {
     const picks: Player[] = [];
     let rank = 500;
 
-    for (const [i, year] of futurePickYears().entries()) {
+    const years = seasons && seasons.length > 0
+        ? seasons.map(Number)
+        : futurePickYears();
+
+    for (const [i, year] of years.entries()) {
         const discount = YEAR_DISCOUNTS[i] ?? 0.60;
         for (let round = 1; round <= draftRounds; round++) {
             const [hi, lo] = ROUND_ANCHORS[round - 1] ?? [6, 3]; // rounds beyond 5 get minimal value
@@ -314,7 +317,7 @@ export function getDraftPicks(leagueSize: number, draftRounds = 5): Player[] {
                 const value = Math.round((hi + t * (lo - hi)) * discount * 10) / 10;
                 picks.push({
                     rank: rank++,
-                    name: `${year} Round ${round} ${tier} ${roundOrdinal(round)}`,  // e.g. "2027 Round 1 Early 1st"
+                    name: `${year} ${tier} ${roundOrdinal(round)}`,  // e.g. "2027 Early 1st"
                     position: 'PICK',
                     team: String(year),
                     age: 23,

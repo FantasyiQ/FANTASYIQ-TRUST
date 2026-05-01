@@ -2,22 +2,13 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getLeague, getLeagueRosters, getTradedPicks, getLeagueDrafts, buildPickOwnerMap } from '@/lib/sleeper';
-import type { SleeperRoster, SleeperTradedPick } from '@/lib/sleeper';
+import { getSafeSleeperLeague, getLeagueRosters, getTradedPicks, getDraftPickCount, buildPickOwnerMap } from '@/lib/sleeper';
 import { getDraftPicks, roundOrdinal } from '@/lib/trade-engine';
 import type { Player } from '@/lib/trade-engine';
 import TradeEvaluator from './TradeEvaluator';
+import { getPickSeasons } from '@/lib/fantasy/getPickSeasons';
 
 export const maxDuration = 30;
-
-function futureSeasons(): string[] {
-    const now = new Date();
-    const m = now.getMonth() + 1;
-    const d = now.getDate();
-    const pastDraft = m > 4 || (m === 4 && d >= 25);
-    const base = pastDraft ? now.getFullYear() + 1 : now.getFullYear();
-    return [String(base), String(base + 1), String(base + 2)];
-}
 
 function rounds(n: number) { return Array.from({ length: n }, (_, i) => i + 1); }
 
@@ -37,37 +28,47 @@ export default async function TradePage() {
     let allLeaguePicks: Player[] = [];
 
     if (dbUser?.sleeperUserId && dbUser.leagues.length > 0) {
-        const FUTURE = futureSeasons();
         const results = await Promise.allSettled(
             dbUser.leagues.map(async league => {
-                const [sleeperLeague, rosters, tradedPicks, drafts] = await Promise.all([
-                    getLeague(league.leagueId),
-                    getLeagueRosters(league.leagueId),
+                const [sleeperLeague, tradedPicks] = await Promise.all([
+                    getSafeSleeperLeague(league.leagueId),
                     getTradedPicks(league.leagueId),
-                    getLeagueDrafts(league.leagueId),
                 ]);
-                const draftRounds = sleeperLeague.settings?.draft_rounds ?? 5;
+                const safeRosters = sleeperLeague.rosters;
+                const drafts      = sleeperLeague.drafts;
+                const isDrafting  = sleeperLeague.isDrafting;
+                const draftRounds = sleeperLeague.settings.draft_rounds;
+
+                const leagueSeason   = Number(sleeperLeague.season);
+                const currentDraft   = drafts.find(d => d.season === sleeperLeague.season) ?? null;
+                const hasDraft       = currentDraft !== null;
+                const draftCompleted = !isDrafting
+                    && !!currentDraft
+                    && leagueSeason <= new Date().getFullYear()
+                    && currentDraft.status === 'complete'
+                    && (await getDraftPickCount(currentDraft.draft_id)) > 0;
+                const PICK_SEASONS   = getPickSeasons({ leagueSeason, hasDraft, draftCompleted, isDrafting });
 
                 // Use previous season's final standings for tier computation when current
                 // season has no data yet (all 0-0 = pre_draft or season hasn't started).
-                const currentAllZero = rosters.every(
+                const currentAllZero = safeRosters.every(
                     r => (r.settings?.wins ?? 0) === 0 && (r.settings?.losses ?? 0) === 0
                 );
                 const prevSeasonRosters = (currentAllZero && sleeperLeague.previous_league_id)
                     ? await getLeagueRosters(sleeperLeague.previous_league_id)
                     : undefined;
 
-                const rosterIds    = rosters.map(r => r.roster_id);
-                const pickGrid     = getDraftPicks(league.totalRosters, draftRounds);
+                const rosterIds    = safeRosters.map(r => r.roster_id);
+                const pickGrid     = getDraftPicks(league.totalRosters, draftRounds, PICK_SEASONS);
                 const pickByName   = new Map(pickGrid.map(p => [p.name, p]));
                 const pickOwnerMap = buildPickOwnerMap(
-                    rosters, tradedPicks, FUTURE, drafts, draftRounds, prevSeasonRosters,
+                    safeRosters, tradedPicks, PICK_SEASONS, drafts, draftRounds, prevSeasonRosters,
                 );
                 const ROUNDS       = rounds(draftRounds);
 
                 const picks: Player[] = [];
-                for (const roster of rosters) {
-                    for (const season of FUTURE) {
+                for (const roster of safeRosters) {
+                    for (const season of PICK_SEASONS) {
                         for (const round of ROUNDS) {
                             for (const origId of rosterIds) {
                                 const key   = `${season}-${round}-${origId}`;
@@ -77,7 +78,7 @@ export default async function TradePage() {
                                 if (entry.slot !== undefined) {
                                     pick = pickByName.get(`${season} ${round}.${entry.slot.toString().padStart(2, '0')}`);
                                 } else if (entry.tier) {
-                                    pick = pickByName.get(`${season} Round ${round} ${entry.tier} ${roundOrdinal(round)}`);
+                                    pick = pickByName.get(`${season} ${entry.tier} ${roundOrdinal(round)}`);
                                 }
                                 if (pick) picks.push(pick);
                             }

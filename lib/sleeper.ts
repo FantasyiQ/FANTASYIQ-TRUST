@@ -110,6 +110,53 @@ export async function getLeagueRosters(leagueId: string): Promise<SleeperRoster[
     return sleeperFetch<SleeperRoster[]>(`/league/${leagueId}/rosters`, 0);
 }
 
+export type SafeSleeperLeague = SleeperLeague & {
+    settings: NonNullable<SleeperLeague['settings']> & { draft_rounds: number };
+    rosters:    SleeperRoster[];
+    users:      SleeperLeagueMember[];
+    drafts:     SleeperDraft[];
+    isDrafting: boolean;
+};
+
+/**
+ * Fetches league, rosters, users, and drafts in parallel and applies defensive fallbacks.
+ * Guarantees: rosters is non-empty, users is an array, settings.draft_rounds is a number.
+ * Sets isDrafting=true when any draft is currently in_progress (blackout protection).
+ */
+export async function getSafeSleeperLeague(leagueId: string): Promise<SafeSleeperLeague> {
+    const [sleeperLeague, rosters, users, drafts] = await Promise.all([
+        getLeague(leagueId),
+        getLeagueRosters(leagueId),
+        getLeagueUsers(leagueId),
+        getLeagueDrafts(leagueId),
+    ]);
+
+    const safeRosters: SleeperRoster[] =
+        Array.isArray(rosters) && rosters.length > 0
+            ? rosters
+            : Array.from({ length: sleeperLeague.total_rosters ?? 12 }, (_, i) => ({
+                  roster_id: i + 1, owner_id: null, players: null, starters: null,
+                  settings: { wins: 0, losses: 0, fpts: 0 },
+              }) as SleeperRoster);
+
+    const safeUsers: SleeperLeagueMember[] = Array.isArray(users) ? users : [];
+    const safeDrafts: SleeperDraft[]       = Array.isArray(drafts) ? drafts : [];
+    const isDrafting                        = safeDrafts.some(d => d.status === 'drafting');
+
+    const draftRounds = (sleeperLeague.settings?.draft_rounds && sleeperLeague.settings.draft_rounds > 0)
+        ? sleeperLeague.settings.draft_rounds
+        : 5;
+
+    return {
+        ...sleeperLeague,
+        settings:   { ...(sleeperLeague.settings ?? {}), draft_rounds: draftRounds },
+        rosters:    safeRosters,
+        users:      safeUsers,
+        drafts:     safeDrafts,
+        isDrafting,
+    };
+}
+
 export async function getLeagueMatchups(leagueId: string, week: number): Promise<SleeperMatchup[]> {
     return sleeperFetch<SleeperMatchup[]>(`/league/${leagueId}/matchups/${week}`, 0);
 }
@@ -131,6 +178,16 @@ export interface SleeperDraft {
 
 export async function getLeagueDrafts(leagueId: string): Promise<SleeperDraft[]> {
     return sleeperFetch<SleeperDraft[]>(`/league/${leagueId}/drafts`, 0);
+}
+
+/**
+ * Returns individual picks for a draft. Empty array when no picks have been made
+ * (e.g. a placeholder future draft Sleeper auto-creates with status "complete").
+ * Use this to guard against treating empty placeholder drafts as completed.
+ */
+export async function getDraftPickCount(draftId: string): Promise<number> {
+    const picks = await sleeperFetch<unknown[]>(`/draft/${draftId}/picks`, 0);
+    return Array.isArray(picks) ? picks.length : 0;
 }
 
 /**
@@ -271,12 +328,27 @@ export interface PickOwnerEntry {
 export function buildPickOwnerMap(
     rosters:          SleeperRoster[],
     tradedPicks:      SleeperTradedPick[],
-    futureSeasons:    string[],
+    pickSeasons:      string[],
     drafts:           SleeperDraft[],
     draftRounds:      number,
     standingsRosters?: SleeperRoster[], // previous-season rosters for tier computation
 ): Map<string, PickOwnerEntry> {
-    const rosterIds = rosters.map(r => r.roster_id);
+    // Guard: Sleeper sometimes returns 0 or omits draft_rounds in the off-season.
+    const safeRounds = (draftRounds && draftRounds > 0) ? draftRounds : 5;
+
+    // Guard: Sleeper can return empty rosters during maintenance / league transition.
+    // Synthesise placeholder rosters so pick enumeration doesn't silently produce nothing.
+    const effectiveRosters = (rosters && rosters.length > 0)
+        ? rosters
+        : Array.from({ length: 12 }, (_, i) => ({
+              roster_id: i + 1,
+              owner_id:  null,
+              players:   null,
+              starters:  null,
+              settings:  { wins: 0, losses: 0, fpts: 0 },
+          }) as SleeperRoster);
+
+    const rosterIds = effectiveRosters.map(r => r.roster_id);
 
     // ── Step 1: Raw ownership ─────────────────────────────────────────────────
     const ownerMap = new Map<string, number>();
@@ -284,7 +356,7 @@ export function buildPickOwnerMap(
     if (anyHasDraftPicks) {
         for (const roster of rosters) {
             for (const dp of roster.draft_picks ?? []) {
-                if (!futureSeasons.includes(dp.season)) continue;
+                if (!pickSeasons.includes(dp.season)) continue;
                 ownerMap.set(`${dp.season}-${Number(dp.round)}-${Number(dp.roster_id)}`, Number(roster.roster_id));
             }
         }
@@ -310,7 +382,7 @@ export function buildPickOwnerMap(
     // ── Step 2: Season → slotMap (draft_order known) ─────────────────────────
     const seasonSlotMap = new Map<string, Map<number, number>>();
     for (const draft of drafts) {
-        if (!draft.draft_order || !futureSeasons.includes(draft.season)) continue;
+        if (!draft.draft_order || !pickSeasons.includes(draft.season)) continue;
         const slotMap = new Map<number, number>();
         for (const roster of rosters) {
             if (!roster.owner_id) continue;
@@ -352,15 +424,21 @@ export function buildPickOwnerMap(
 
     // ── Step 4: Enumerate every season × round × origId ──────────────────────
     const result  = new Map<string, PickOwnerEntry>();
-    const rounds  = Array.from({ length: draftRounds }, (_, i) => i + 1);
-    for (const season of futureSeasons) {
+    const rounds  = Array.from({ length: safeRounds }, (_, i) => i + 1);
+    for (const season of pickSeasons) {
         const slotMap = seasonSlotMap.get(season);
         for (const round of rounds) {
             for (const origId of rosterIds) {
                 const key   = `${season}-${round}-${origId}`;
                 const owner = ownerMap.get(key) ?? origId;
                 if (slotMap) {
-                    result.set(key, { owner, slot: slotMap.get(origId) });
+                    const slot = slotMap.get(origId);
+                    if (slot !== undefined) {
+                        result.set(key, { owner, slot });
+                    } else {
+                        // Roster not in draft_order (vacant/expansion team) — fall back to tier
+                        result.set(key, { owner, tier: tierMap.get(origId) ?? 'Mid', tierProjected: true });
+                    }
                 } else {
                     result.set(key, { owner, tier: tierMap.get(origId) ?? 'Mid', tierProjected: allZero });
                 }

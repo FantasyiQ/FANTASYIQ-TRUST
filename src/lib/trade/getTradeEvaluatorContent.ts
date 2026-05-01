@@ -2,9 +2,10 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import {
-    getLeague, getLeagueRosters, getPlayers, getTradedPicks,
-    getLeagueDrafts, buildPickOwnerMap, buildRosterSlotMap,
+    getSafeSleeperLeague, getLeagueRosters, getPlayers, getTradedPicks,
+    getDraftPickCount, buildPickOwnerMap, buildRosterSlotMap,
 } from '@/lib/sleeper';
+import { getPickSeasons } from '@/lib/fantasy/getPickSeasons';
 import { effectiveTierForLeague, tierLevel } from '@/lib/league-limits';
 import { stripe, priceIdToTier } from '@/lib/stripe';
 import type { SubscriptionTier } from '@prisma/client';
@@ -43,12 +44,10 @@ export async function getTradeEvaluatorContent(id: string): Promise<TradeEvaluat
     });
     if (!league || league.userId !== session.user.id) notFound();
 
-    const [sleeperLeague, rosters, allPlayers, tradedPicks, drafts, dbUser] = await Promise.all([
-        getLeague(league.leagueId),
-        getLeagueRosters(league.leagueId),
+    const safeLeagueP = getSafeSleeperLeague(league.leagueId);
+    const [allPlayers, tradedPicks, dbUser] = await Promise.all([
         getPlayers(),
         getTradedPicks(league.leagueId),
-        getLeagueDrafts(league.leagueId),
         prisma.user.findUnique({
             where:  { id: session.user.id },
             select: {
@@ -63,6 +62,12 @@ export async function getTradeEvaluatorContent(id: string): Promise<TradeEvaluat
             },
         }),
     ]);
+    const sleeperLeague = await safeLeagueP;
+    const safeRosters   = sleeperLeague.rosters;
+    const members       = sleeperLeague.users;
+    const drafts        = sleeperLeague.drafts;
+    const isDrafting    = sleeperLeague.isDrafting;
+    const memberMap     = new Map(members.map(m => [m.user_id, m]));
 
     // ── Tier gate ─────────────────────────────────────────────────────────────
     const activePlayerSub = dbUser?.subscriptions.find(s => s.type === 'player') ?? null;
@@ -102,33 +107,40 @@ export async function getTradeEvaluatorContent(id: string): Promise<TradeEvaluat
     const mySleeperUserId = dbUser?.sleeperUserId ?? league.sleeperUserId ?? null;
     const rosterPositions = (league.rosterPositions as string[]) ?? sleeperLeague.roster_positions ?? [];
     const leagueType: LeagueType = sleeperLeague.settings?.type === 2 ? 'Dynasty' : 'Redraft';
-    const draftRounds    = sleeperLeague.settings?.draft_rounds ?? 5;
+    const draftRounds    = sleeperLeague.settings.draft_rounds;
 
-    const _now       = new Date();
-    const _pastDraft = _now.getMonth() + 1 > 4 || (_now.getMonth() + 1 === 4 && _now.getDate() >= 25);
-    const _base      = _pastDraft ? _now.getFullYear() + 1 : _now.getFullYear();
-    const FUTURE_SEASONS = [String(_base), String(_base + 1), String(_base + 2)];
+    const leagueSeason   = Number(sleeperLeague.season);
+    const currentDraft   = drafts.find(d => d.season === sleeperLeague.season) ?? null;
+    const hasDraft       = currentDraft !== null;
+    const draftCompleted = !isDrafting
+        && !!currentDraft
+        && leagueSeason <= new Date().getFullYear()
+        && currentDraft.status === 'complete'
+        && (await getDraftPickCount(currentDraft.draft_id)) > 0;
+    const FUTURE_SEASONS = getPickSeasons({ leagueSeason, hasDraft, draftCompleted, isDrafting });
     const ROUNDS         = Array.from({ length: draftRounds }, (_, i) => i + 1);
-    const rosterIds      = rosters.map(r => r.roster_id);
+    const rosterIds      = safeRosters.map(r => r.roster_id);
 
-    const rows = rosters
+    const rows = safeRosters
         .map(r => {
-            const fpts = (r.settings?.fpts ?? 0) + (r.settings?.fpts_decimal ?? 0) / 100;
-            return { roster: r, teamName: `Team ${r.roster_id}`, wins: r.settings?.wins ?? 0, fpts };
+            const fpts   = (r.settings?.fpts ?? 0) + (r.settings?.fpts_decimal ?? 0) / 100;
+            const member = r.owner_id ? memberMap.get(r.owner_id) : undefined;
+            const teamName = member?.metadata?.team_name || member?.display_name || `Team ${r.roster_id}`;
+            return { roster: r, teamName, wins: r.settings?.wins ?? 0, fpts };
         })
         .sort((a, b) => b.wins - a.wins || b.fpts - a.fpts)
         .map((row, i) => ({ ...row, rank: i + 1 }));
 
     const standingsRank = new Map(rows.map(row => [row.roster.roster_id, row.rank]));
     const draft         = drafts[0] ?? null;
-    const { projected: draftOrderProjected } = buildRosterSlotMap(rosters, draft, standingsRank, league.totalRosters);
+    const { projected: draftOrderProjected } = buildRosterSlotMap(safeRosters, draft, standingsRank, league.totalRosters);
 
-    const currentAllZero    = rosters.every(r => (r.settings?.wins ?? 0) === 0 && (r.settings?.losses ?? 0) === 0);
+    const currentAllZero    = safeRosters.every(r => (r.settings?.wins ?? 0) === 0 && (r.settings?.losses ?? 0) === 0);
     const prevSeasonRosters = (currentAllZero && sleeperLeague.previous_league_id)
         ? await getLeagueRosters(sleeperLeague.previous_league_id)
         : undefined;
 
-    const pickOwnerMap = buildPickOwnerMap(rosters, tradedPicks, FUTURE_SEASONS, drafts, draftRounds, prevSeasonRosters);
+    const pickOwnerMap = buildPickOwnerMap(safeRosters, tradedPicks, FUTURE_SEASONS, drafts, draftRounds, prevSeasonRosters);
 
     function computeOwnedPicks(rosterId: number) {
         const owned: { season: string; round: number; slot?: number; tier?: string; tierProjected?: boolean; origTeamName?: string }[] = [];
@@ -157,7 +169,7 @@ export async function getTradeEvaluatorContent(id: string): Promise<TradeEvaluat
     }));
 
     const myTeamData     = mySleeperUserId
-        ? teamTradeData.find(t => rosters.find(r => r.roster_id === t.rosterId)?.owner_id === mySleeperUserId)
+        ? teamTradeData.find(t => safeRosters.find(r => r.roster_id === t.rosterId)?.owner_id === mySleeperUserId)
         : undefined;
     const otherTeamsData = teamTradeData.filter(t => t.rosterId !== myTeamData?.rosterId);
 
