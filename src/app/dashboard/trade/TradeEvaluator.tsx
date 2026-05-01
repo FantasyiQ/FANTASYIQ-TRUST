@@ -473,6 +473,7 @@ interface TradeEvaluatorProps {
     myPicks?:               Player[];       // user's owned picks from all synced leagues
     allLeaguePicks?:        Player[];       // all picks from all teams in all synced leagues
     hideQuickPick?:         boolean;        // suppress roster/pick quick-add panels (search-only mode)
+    lockSettings?:          boolean;        // hide format/type/size controls (league-synced mode)
     myTeam?:                TradeTeam;
     otherTeams?:            TradeTeam[];
 }
@@ -487,6 +488,7 @@ export default function TradeEvaluator({
     myPicks               = [],
     allLeaguePicks        = [],
     hideQuickPick         = false,
+    lockSettings          = false,
     myTeam,
     otherTeams            = [],
 }: TradeEvaluatorProps = {}) {
@@ -679,45 +681,47 @@ export default function TradeEvaluator({
                 </div>
             )}
 
-            {/* Settings row */}
-            <div className="flex flex-wrap gap-4 items-center">
-                <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-gray-400 text-sm font-medium">Format:</span>
-                    {([
-                        [0,         'Std'],
-                        [0.5,       '½ PPR'],
-                        [1,         'Full PPR'],
-                        ['te_prem', 'TE Prem'],
-                    ] as [PprFormat, string][]).map(([v, label]) => (
-                        <button key={String(v)} onClick={() => setPpr(v)}
-                            className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${ppr === v ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
-                            {label}
+            {/* Settings row — hidden in league-synced mode (settings locked to league) */}
+            {!lockSettings && (
+                <div className="flex flex-wrap gap-4 items-center">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-gray-400 text-sm font-medium">Format:</span>
+                        {([
+                            [0,         'Std'],
+                            [0.5,       '½ PPR'],
+                            [1,         'Full PPR'],
+                            ['te_prem', 'TE Prem'],
+                        ] as [PprFormat, string][]).map(([v, label]) => (
+                            <button key={String(v)} onClick={() => setPpr(v)}
+                                className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${ppr === v ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
+                                {label}
+                            </button>
+                        ))}
+                        <button onClick={() => setLeagueSettings(s => ({ ...s, sfSlots: s.sfSlots > 0 ? 0 : 1 }))}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${superflex ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
+                            SFLX
                         </button>
-                    ))}
-                    <button onClick={() => setLeagueSettings(s => ({ ...s, sfSlots: s.sfSlots > 0 ? 0 : 1 }))}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${superflex ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
-                        SFLX
-                    </button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-gray-400 text-sm font-medium">Type:</span>
+                        {(['Redraft', 'Dynasty'] as LeagueType[]).map(t => (
+                            <button key={t} onClick={() => setLeagueType(t)}
+                                className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${leagueType === t ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
+                                {t}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-gray-400 text-sm font-medium">League Size:</span>
+                        {LEAGUE_SIZES.map(s => (
+                            <button key={s} onClick={() => setLeagueSize(s)}
+                                className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${leagueSize === s ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
+                                {s}
+                            </button>
+                        ))}
+                    </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <span className="text-gray-400 text-sm font-medium">Type:</span>
-                    {(['Redraft', 'Dynasty'] as LeagueType[]).map(t => (
-                        <button key={t} onClick={() => setLeagueType(t)}
-                            className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${leagueType === t ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
-                            {t}
-                        </button>
-                    ))}
-                </div>
-                <div className="flex items-center gap-2">
-                    <span className="text-gray-400 text-sm font-medium">League Size:</span>
-                    {LEAGUE_SIZES.map(s => (
-                        <button key={s} onClick={() => setLeagueSize(s)}
-                            className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${leagueSize === s ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
-                            {s}
-                        </button>
-                    ))}
-                </div>
-            </div>
+            )}
 
             {/* 3-way toggle */}
             <div className="flex items-center gap-3">

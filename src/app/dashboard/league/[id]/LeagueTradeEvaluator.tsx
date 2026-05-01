@@ -191,6 +191,7 @@ export default function LeagueTradeEvaluator({
             initialLeagueType={leagueType}
             initialLeagueSettings={leagueSettings}
             leagueLabel={label}
+            lockSettings
             myTeam={myTeam}
             otherTeams={otherTeams}
         />
