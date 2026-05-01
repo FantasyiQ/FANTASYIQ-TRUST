@@ -132,7 +132,13 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
             success_url: `${appUrl()}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
             cancel_url:  `${appUrl()}/pricing?tab=${info.type === 'commissioner' ? 'commissioner' : 'player'}`,
             metadata: sharedMeta,
-            subscription_data: { metadata: sharedMeta },
+            subscription_data: {
+                metadata: sharedMeta,
+                // description appears on Stripe invoices/receipts — disambiguates multiple subs
+                description: leagueName
+                    ? `${info.type === 'commissioner' ? 'Commissioner' : 'Player'} Plan — ${leagueName}`
+                    : undefined,
+            },
         });
         checkoutUrl = cs.url!;
     } catch (err) {
