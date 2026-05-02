@@ -10,6 +10,7 @@ interface League {
     id: string;
     leagueId: string;
     leagueName: string;
+    platform: string;
     season: string;
     status: string;
     totalRosters: number;
@@ -30,6 +31,7 @@ interface Props {
     leagues: League[];
     playerTier: string;
     commSubs: CommSub[];
+    platform?: 'sleeper' | 'espn';
 }
 
 function statusBadgeClass(status: string) {
@@ -55,17 +57,20 @@ function formatSyncTime(date: Date | null): string {
     return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier, commSubs }: Props) {
+export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier, commSubs, platform = 'sleeper' }: Props) {
     const [leagues] = useState<League[]>(initialLeagues);
 
     if (leagues.length === 0) {
+        const isEspn = platform === 'espn';
         return (
             <div className="px-6 py-14 text-center">
                 <p className="text-gray-400 mb-1">No leagues synced yet.</p>
-                <p className="text-gray-600 text-sm mb-4">Connect your Sleeper account to get started.</p>
-                <Link href="/dashboard/sync"
+                <p className="text-gray-600 text-sm mb-4">
+                    {isEspn ? 'Connect your ESPN league to get started.' : 'Connect your Sleeper account to get started.'}
+                </p>
+                <Link href={isEspn ? '/dashboard/sync/espn' : '/dashboard/sync'}
                     className="inline-block bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-5 py-2.5 rounded-lg transition text-sm">
-                    Sync a Sleeper League
+                    {isEspn ? 'Sync an ESPN League' : 'Sync a Sleeper League'}
                 </Link>
             </div>
         );
@@ -86,13 +91,15 @@ export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier
                             href={`/dashboard/league/${league.id}`}
                             className="flex items-center gap-4 flex-1 min-w-0 text-left"
                         >
-                            {league.avatar ? (
+                            {league.avatar && league.platform !== 'espn' ? (
                                 <Image
                                     src={`https://sleepercdn.com/avatars/thumbs/${league.avatar}`}
                                     alt={league.leagueName} width={40} height={40}
                                     className="rounded-lg shrink-0" />
                             ) : (
-                                <div className="w-10 h-10 rounded-lg bg-gray-800 shrink-0 flex items-center justify-center text-gray-600 text-xs font-bold">FF</div>
+                                <div className="w-10 h-10 rounded-lg bg-gray-800 shrink-0 flex items-center justify-center text-gray-600 text-xs font-bold">
+                                    {league.platform === 'espn' ? 'ESPN' : 'FF'}
+                                </div>
                             )}
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 min-w-0">
@@ -123,7 +130,7 @@ export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier
                                 <span className="text-[#C8A951] text-sm font-semibold whitespace-nowrap">View →</span>
                             </div>
                         </Link>
-                        <form action={unsyncLeague.bind(null, league.leagueId)}>
+                        <form action={unsyncLeague.bind(null, league.leagueId, league.platform)}>
                             <button type="submit" title="Unsync"
                                 className="text-gray-600 hover:text-red-400 transition text-sm px-2 py-1 rounded">
                                 ✕

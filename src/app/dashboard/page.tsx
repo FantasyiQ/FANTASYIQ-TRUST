@@ -354,24 +354,50 @@ export default async function DashboardPage({
                 </div>
 
                 {/* ── Synced Leagues ────────────────────────────────────── */}
-                <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
-                        <div>
-                            <h2 className="font-semibold text-lg">Sleeper Leagues</h2>
-                            <p className="text-gray-500 text-sm">{leagues.length} league{leagues.length !== 1 ? 's' : ''} · syncs hourly</p>
-                        </div>
-                        <Link href="/dashboard/sync"
-                            className="text-sm bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold px-4 py-2 rounded-lg transition">
-                            + Sync League
-                        </Link>
-                    </div>
+                {(() => {
+                    const sleeperLeagues = leagues.filter(l => l.platform === 'sleeper');
+                    const espnLeagues    = leagues.filter(l => l.platform === 'espn');
+                    return (
+                        <>
+                            <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+                                <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+                                    <div>
+                                        <h2 className="font-semibold text-lg">Sleeper Leagues</h2>
+                                        <p className="text-gray-500 text-sm">{sleeperLeagues.length} league{sleeperLeagues.length !== 1 ? 's' : ''} · syncs hourly</p>
+                                    </div>
+                                    <Link href="/dashboard/sync"
+                                        className="text-sm bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold px-4 py-2 rounded-lg transition">
+                                        + Sync League
+                                    </Link>
+                                </div>
+                                <SleeperLeaguesList
+                                    leagues={sleeperLeagues}
+                                    playerTier={playerSubTier}
+                                    commSubs={commSubs.map(s => ({ leagueName: s.leagueName, tier: s.tier }))}
+                                />
+                            </div>
 
-                    <SleeperLeaguesList
-                        leagues={leagues}
-                        playerTier={playerSubTier}
-                        commSubs={commSubs.map(s => ({ leagueName: s.leagueName, tier: s.tier }))}
-                    />
-                </div>
+                            <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+                                <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+                                    <div>
+                                        <h2 className="font-semibold text-lg">ESPN Leagues</h2>
+                                        <p className="text-gray-500 text-sm">{espnLeagues.length} league{espnLeagues.length !== 1 ? 's' : ''} · syncs hourly</p>
+                                    </div>
+                                    <Link href="/dashboard/sync/espn"
+                                        className="text-sm bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold px-4 py-2 rounded-lg transition">
+                                        + Sync League
+                                    </Link>
+                                </div>
+                                <SleeperLeaguesList
+                                    leagues={espnLeagues}
+                                    playerTier={playerSubTier}
+                                    commSubs={commSubs.map(s => ({ leagueName: s.leagueName, tier: s.tier }))}
+                                    platform="espn"
+                                />
+                            </div>
+                        </>
+                    );
+                })()}
 
                 {/* ── Quick actions ─────────────────────────────────────── */}
                 <div>

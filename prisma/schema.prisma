@@ -28,6 +28,8 @@ model User {
     subscriptionTier SubscriptionTier @default(FREE)
     stripeCustomerId String?          @unique
     sleeperUserId    String?          @unique
+    espnS2           String?          // ESPN espn_s2 session cookie
+    swid             String?          // ESPN SWID cookie
     createdAt        DateTime         @default(now())
     updatedAt        DateTime         @updatedAt
 
@@ -46,7 +48,7 @@ model User {
 model League {
     id              String    @id @default(cuid())
     userId          String
-    platform        String    // "sleeper"
+    platform        String    // "sleeper" | "espn"
     leagueId        String    // external platform ID
     leagueName      String
     season          String
