@@ -30,7 +30,6 @@ interface Props {
     proBowlContest:         { id: string; name: string; openAt: string; lockAt: string; endAt: string } | null;
     isCommissioner:         boolean;
     currentUserId:          string;
-    leaguePayouts:          { rank: number; amount: number; teamName: string; paidAt: string | null }[] | null;
 }
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
@@ -66,309 +65,28 @@ function CollapsibleCard({ title, defaultOpen = false, children }: { title: stri
     );
 }
 
-// ── Card 1: League Dues & Payouts ─────────────────────────────────────────────
+// ── Card 1: Dues & Payouts nav card ──────────────────────────────────────────
 
-function DuesCard({
-    leagueId,
-    duesData,
-    isCommissioner,
-    currentUserId,
-}: {
-    leagueId:       string;
-    duesData:       DuesManagerData | null;
-    isCommissioner: boolean;
-    currentUserId:  string;
-}) {
-    const myMember = duesData?.members.find(m => m.userId === currentUserId) ?? null;
-    const amountLabel = duesData ? `$${duesData.buyInAmount}` : '';
-
+function DuesNavCard({ leagueId }: { leagueId: string }) {
     return (
-        <div className="group rounded-xl border border-[#CBA135] bg-[#0A0A0A] p-5 md:p-7 transition-all duration-200 hover:border-[#E2B857] hover:bg-[#111111]">
-
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4">
+        <Link
+            href={`/dashboard/league/${leagueId}/dues`}
+            className="group block rounded-xl border border-[#CBA135] bg-[#0A0A0A] p-5 md:p-7 transition-all duration-200 hover:border-[#E2B857] hover:bg-[#111111]"
+        >
+            <div className="flex items-center justify-between mb-2">
                 <h2 className="text-lg font-semibold text-[#CBA135] transition-colors duration-200 group-hover:text-[#E2B857]">
-                    League Dues &amp; Payouts
+                    Dues &amp; Payouts
                 </h2>
                 <span className="text-[28px] leading-none transition-transform duration-200 group-hover:scale-105 select-none">💰</span>
             </div>
-
-            {/* No dues set up yet */}
-            {!duesData && (
-                isCommissioner ? (
-                    <div>
-                        <p className="text-[15px] text-[#E5E5E5] leading-relaxed mb-6">
-                            Track buy-ins, pot totals, and payouts for your league.
-                        </p>
-                        <Link
-                            href="/dashboard/commissioner/dues"
-                            className="text-sm font-semibold text-[#CBA135] hover:text-[#E2B857] transition-colors duration-200"
-                        >
-                            Set up dues →
-                        </Link>
-                    </div>
-                ) : (
-                    <p className="text-[15px] text-[#E5E5E5]/60 leading-relaxed">
-                        No dues tracking for this league yet.
-                    </p>
-                )
-            )}
-
-            {/* Dues exist */}
-            {duesData && (
-                <div>
-                    {/* Stats row — always shown */}
-                    <div className="grid grid-cols-3 gap-3 mb-5">
-                        {[
-                            { label: 'Buy-In',    value: `$${duesData.buyInAmount}` },
-                            { label: 'Pot Total', value: `$${duesData.potTotal.toFixed(0)}` },
-                            { label: 'Paid',      value: `${duesData.members.filter(m => m.duesStatus === 'paid').length}/${duesData.teamCount}` },
-                        ].map(stat => (
-                            <div key={stat.label} className="rounded-lg border border-[#CBA135]/25 bg-[#CBA135]/5 p-3 text-center">
-                                <p className="text-[11px] text-[#A1A1A1] mb-1 uppercase tracking-wider">{stat.label}</p>
-                                <p className="text-white font-bold text-base">{stat.value}</p>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Payout spots */}
-                    {duesData.payoutSpots.length > 0 && (
-                        <div className="mb-5 space-y-1.5">
-                            <p className="text-[11px] text-[#A1A1A1] font-semibold uppercase tracking-wider mb-2">Payouts</p>
-                            {duesData.payoutSpots.map((spot, i) => (
-                                <div key={i} className="flex items-center justify-between text-sm">
-                                    <span className="text-[#E5E5E5]/70">{spot.label}</span>
-                                    <span className="text-[#E5E5E5] font-medium">${spot.amount.toFixed(0)}</span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Commissioner action */}
-                    {isCommissioner && (
-                        <Link
-                            href={`/dashboard/league/${leagueId}/dues`}
-                            className="text-sm font-semibold text-[#CBA135] hover:text-[#E2B857] transition-colors duration-200"
-                        >
-                            Manage dues →
-                        </Link>
-                    )}
-
-                    {/* Member: unpaid */}
-                    {!isCommissioner && myMember && myMember.duesStatus !== 'paid' && (
-                        <div>
-                            <p className="text-[15px] text-[#E5E5E5] leading-relaxed mb-4">
-                                Your league buy-in is <span className="font-semibold text-white">{amountLabel}</span>.
-                            </p>
-                            <Link
-                                href={`/dashboard/league/${leagueId}/dues/pay`}
-                                className="inline-flex flex-col items-center rounded-lg border border-[#CBA135] bg-[#CBA135] px-5 py-3 text-sm font-semibold text-black transition-all duration-200 hover:border-[#E2B857] hover:bg-[#E2B857] hover:-translate-y-px"
-                            >
-                                Pay Dues — {amountLabel}
-                                <span className="mt-0.5 text-[11px] font-normal text-black/70">
-                                    Secure · Instant · ZERO FEES
-                                </span>
-                            </Link>
-                        </div>
-                    )}
-
-                    {/* Member: paid */}
-                    {!isCommissioner && myMember?.duesStatus === 'paid' && (
-                        <div>
-                            <p className="flex items-center gap-2 text-[15px] text-emerald-300 font-medium mb-3">
-                                <span>✓</span> Dues paid — you&apos;re all set!
-                            </p>
-                            {myMember.receiptUrl && (
-                                <a
-                                    href={myMember.receiptUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-sm font-semibold text-[#CBA135] hover:text-[#E2B857] transition-colors duration-200"
-                                >
-                                    View receipt →
-                                </a>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Member: not in dues tracker yet */}
-                    {!isCommissioner && !myMember && (
-                        <p className="text-[15px] text-[#E5E5E5]/60 leading-relaxed">
-                            You haven&apos;t been added to the dues tracker yet. Ask your commissioner.
-                        </p>
-                    )}
-                </div>
-            )}
-        </div>
+            <p className="text-gray-500 text-sm">
+                View dues, pot totals, payouts, and payment history.
+            </p>
+        </Link>
     );
 }
 
-// ── Card 2: Payouts ───────────────────────────────────────────────────────────
-
-function PayoutsCard({
-    leagueId,
-    duesData,
-    isCommissioner,
-    leaguePayouts,
-}: {
-    leagueId:      string;
-    duesData:      DuesManagerData;
-    isCommissioner: boolean;
-    leaguePayouts: { rank: number; amount: number; teamName: string; paidAt: string | null }[] | null;
-}) {
-    // Prefer new LeaguePayout data; fall back to old payoutSpots structure
-    const hasNewPayouts  = !!leaguePayouts && leaguePayouts.length > 0;
-    const hasSpots       = duesData.payoutSpots.length > 0;
-
-    if (!hasNewPayouts && !hasSpots) return null;
-
-    // ── Local optimistic state for mark-as-paid ───────────────────────────────
-    const [localPaidAt, setLocalPaidAt] = useState<Record<number, string>>(() => {
-        const m: Record<number, string> = {};
-        leaguePayouts?.forEach(p => { if (p.paidAt) m[p.rank] = p.paidAt; });
-        return m;
-    });
-    const [markingRank, setMarkingRank] = useState<number | null>(null);
-
-    async function handleMarkPaid(rank: number) {
-        setMarkingRank(rank);
-        try {
-            const res = await fetch(`/api/leagues/${leagueId}/payouts/mark-paid`, {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ rank }),
-            });
-            if (res.ok) setLocalPaidAt(prev => ({ ...prev, [rank]: new Date().toISOString() }));
-        } finally {
-            setMarkingRank(null);
-        }
-    }
-
-    // ── Derived ───────────────────────────────────────────────────────────────
-    const allPaidOut = hasNewPayouts && leaguePayouts!.every(p => localPaidAt[p.rank] ?? p.paidAt);
-    const winnerByRank = new Map(duesData.winners.map(w => [w.rank, w]));
-
-    return (
-        <div className="group rounded-xl border border-[#CBA135] bg-[#0A0A0A] p-5 md:p-7 transition-all duration-200 hover:border-[#E2B857] hover:bg-[#111111]">
-
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-[#CBA135] transition-colors duration-200 group-hover:text-[#E2B857]">
-                    Payouts
-                </h2>
-                <span className="text-[28px] leading-none transition-transform duration-200 group-hover:scale-105 select-none">🏆</span>
-            </div>
-
-            {/* Total Pot */}
-            <div className="mb-4">
-                <div className="rounded-lg border border-[#CBA135]/25 bg-[#CBA135]/5 px-4 py-3 flex items-center justify-between">
-                    <span className="text-[11px] text-[#A1A1A1] uppercase tracking-wider font-semibold">Total Pot</span>
-                    <span className="text-white font-bold text-base">${duesData.potTotal.toFixed(0)}</span>
-                </div>
-            </div>
-
-            {/* New-model payouts rows: winner names + paid status */}
-            {hasNewPayouts ? (
-                <div className="mb-5 space-y-1.5">
-                    {leaguePayouts!.map(p => {
-                        const paidAt = localPaidAt[p.rank] ?? p.paidAt;
-                        const isPaid = !!paidAt;
-                        return (
-                            <div key={p.rank} className="flex items-center justify-between bg-[#111111] border border-[#CBA135]/10 rounded-lg px-4 py-2.5 gap-3">
-                                <div className="min-w-0 flex-1">
-                                    <span className="text-[#E5E5E5]/70 text-sm">
-                                        {['1st', '2nd', '3rd', '4th', '5th'][p.rank - 1] ?? `#${p.rank}`}
-                                    </span>
-                                    {p.teamName && (
-                                        <span className="ml-2 text-[#E5E5E5] text-sm font-medium">— {p.teamName}</span>
-                                    )}
-                                </div>
-                                <div className="flex items-center gap-3 shrink-0">
-                                    <span className="text-[#E5E5E5] font-medium text-sm">${p.amount.toFixed(0)}</span>
-                                    {isPaid ? (
-                                        <span className="inline-flex items-center gap-1 bg-[#0F3D2E] border border-emerald-500/40 text-emerald-400 text-xs font-semibold px-2 py-0.5 rounded-full">
-                                            ✓ Paid
-                                        </span>
-                                    ) : isCommissioner ? (
-                                        <button
-                                            type="button"
-                                            disabled={markingRank === p.rank}
-                                            onClick={() => { void handleMarkPaid(p.rank); }}
-                                            className="text-[#CBA135] hover:text-[#E2B857] text-xs font-semibold transition-colors disabled:opacity-50 whitespace-nowrap"
-                                        >
-                                            {markingRank === p.rank ? '…' : 'Mark paid →'}
-                                        </button>
-                                    ) : (
-                                        <span className="text-amber-400 text-xs">Pending</span>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            ) : (
-                /* Fallback: old payoutSpots structure without winners */
-                <div className="mb-5 space-y-1.5">
-                    {duesData.payoutSpots
-                        .slice()
-                        .sort((a, b) => a.sortOrder - b.sortOrder)
-                        .map((spot, i) => {
-                            const winner = winnerByRank.get(i + 1);
-                            return (
-                                <div key={i} className="flex items-center justify-between bg-[#111111] border border-[#CBA135]/10 rounded-lg px-4 py-2.5 gap-3">
-                                    <div className="min-w-0 flex-1">
-                                        <span className="text-[#E5E5E5]/70 text-sm">{spot.label}</span>
-                                        {winner && (
-                                            <span className="ml-2 text-[#E5E5E5] text-sm font-medium">
-                                                — {winner.teamName}
-                                                {winner.displayName && <span className="text-[#A1A1A1] text-xs ml-1">({winner.displayName})</span>}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <span className="text-[#E5E5E5] font-medium text-sm shrink-0">${spot.amount.toFixed(0)}</span>
-                                </div>
-                            );
-                        })}
-                </div>
-            )}
-
-            {/* Status banner */}
-            {allPaidOut ? (
-                <div className="rounded-lg bg-[#0F3D2E] border border-emerald-500/40 px-4 py-2.5 mb-4">
-                    <p className="text-emerald-400 text-sm font-medium">Payouts completed — all winners have been paid.</p>
-                </div>
-            ) : hasNewPayouts ? (
-                <div className="rounded-lg bg-[#3D2F0F] border border-amber-500/40 px-4 py-2.5 mb-4">
-                    <p className="text-amber-400 text-sm font-medium">Payouts recorded — pending distribution.</p>
-                </div>
-            ) : (
-                <div className="rounded-lg bg-yellow-900/20 border border-yellow-800/40 px-4 py-2.5 mb-4">
-                    <p className="text-yellow-400 text-sm font-medium">Payouts pending — season results not yet recorded.</p>
-                </div>
-            )}
-
-            {/* Commissioner links */}
-            {isCommissioner && (
-                <div className="flex items-center justify-between gap-4">
-                    <Link
-                        href={`/dashboard/league/${leagueId}/payouts`}
-                        className="text-sm font-semibold text-[#CBA135] hover:text-[#E2B857] transition-colors duration-200"
-                    >
-                        {hasNewPayouts ? 'Manage payouts →' : 'Record payouts →'}
-                    </Link>
-                    <Link
-                        href={`/dashboard/league/${leagueId}/payouts/history`}
-                        className="text-xs text-gray-500 hover:text-[#CBA135] transition-colors duration-200"
-                    >
-                        View history →
-                    </Link>
-                </div>
-            )}
-        </div>
-    );
-}
-
-// ── Card 3: League Announcements ──────────────────────────────────────────────
+// ── Card 2: League Announcements ─────────────────────────────────────────────
 
 function AnnouncementsCard({
     initialAnnouncements,
@@ -569,31 +287,15 @@ export default function LeagueOverviewCards({
     proBowlContest,
     isCommissioner,
     currentUserId,
-    leaguePayouts,
 }: Props) {
 
     return (
         <div className="space-y-4">
 
-            {/* Card 1: Dues & Payouts */}
-            <DuesCard
-                leagueId={leagueId}
-                duesData={duesData}
-                isCommissioner={isCommissioner}
-                currentUserId={currentUserId}
-            />
+            {/* Dues & Payouts nav card */}
+            <DuesNavCard leagueId={leagueId} />
 
-            {/* Card 2: Payouts */}
-            {duesData && (duesData.payoutSpots.length > 0 || (leaguePayouts && leaguePayouts.length > 0)) && (
-                <PayoutsCard
-                    leagueId={leagueId}
-                    duesData={duesData}
-                    isCommissioner={isCommissioner}
-                    leaguePayouts={leaguePayouts ?? null}
-                />
-            )}
-
-            {/* Card 3: Announcements */}
+            {/* Announcements */}
             <AnnouncementsCard
                 initialAnnouncements={announcements}
                 duesId={duesData?.id ?? null}

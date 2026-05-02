@@ -52,7 +52,7 @@ export default async function LeagueOverviewPage({
     if (!league || league.userId !== session.user.id) notFound();
 
     const safeLeagueP = getSafeSleeperLeague(league.leagueId);
-    const [allPlayers, dbUser, leagueDuesRecord, proBowlContest, leaguePayoutsRaw, leaguePayoutWinnersRaw] = await Promise.all([
+    const [allPlayers, dbUser, leagueDuesRecord, proBowlContest] = await Promise.all([
         getPlayers(),
         prisma.user.findUnique({
             where:  { id: session.user.id },
@@ -96,14 +96,6 @@ export default async function LeagueOverviewPage({
             where:   { leagueId: league.id, isActive: true },
             select:  { id: true, name: true, openAt: true, lockAt: true, endAt: true },
             orderBy: { createdAt: 'desc' },
-        }),
-        prisma.leaguePayout.findMany({
-            where:   { leagueId: id },
-            orderBy: { rank: 'asc' },
-        }),
-        prisma.leaguePayoutWinner.findMany({
-            where:   { leagueId: id },
-            orderBy: { rank: 'asc' },
         }),
     ]);
 
@@ -205,17 +197,6 @@ export default async function LeagueOverviewPage({
             paidAt:      w.paidAt?.toISOString() ?? null,
         })),
     } : null;
-
-    // ── Merge new LeaguePayout + LeaguePayoutWinner records ──────────────────
-    const payoutWinnerByRank = new Map(leaguePayoutWinnersRaw.map(w => [w.rank, w]));
-    const leaguePayoutsData = leaguePayoutsRaw.length > 0
-        ? leaguePayoutsRaw.map(p => ({
-            rank:     p.rank,
-            amount:   p.amount,
-            teamName: payoutWinnerByRank.get(p.rank)?.teamName ?? '',
-            paidAt:   p.paidAt?.toISOString() ?? null,
-        }))
-        : null;
 
     const announcements: AnnouncementData[] = (leagueDuesRecord?.announcements ?? []).map(a => ({
         id:         a.id,
@@ -320,7 +301,6 @@ export default async function LeagueOverviewPage({
             } : null}
             isCommissioner={isCommissioner}
             currentUserId={session.user.id}
-            leaguePayouts={leaguePayoutsData}
         />
         </>
     );

@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 
 const TABS = [
     { label: 'Overview',  href: (id: string) => `/dashboard/league/${id}/overview`  },
-    { label: 'Dues',      href: (id: string) => `/dashboard/league/${id}/dues`      },
+    { label: 'Dues & Payouts', href: (id: string) => `/dashboard/league/${id}/dues` },
     { label: 'Calendar',  href: (id: string) => `/dashboard/league/${id}/calendar`  },
 ];
 
