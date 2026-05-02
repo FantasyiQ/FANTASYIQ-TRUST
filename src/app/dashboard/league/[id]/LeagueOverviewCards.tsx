@@ -202,7 +202,97 @@ function DuesCard({
     );
 }
 
-// ── Card 2: League Announcements ──────────────────────────────────────────────
+// ── Card 2: Payouts ───────────────────────────────────────────────────────────
+
+function PayoutsCard({
+    leagueId,
+    duesData,
+    isCommissioner,
+}: {
+    leagueId:       string;
+    duesData:       DuesManagerData;
+    isCommissioner: boolean;
+}) {
+    if (!duesData.payoutSpots.length) return null;
+
+    const payoutsCompleted = duesData.winners.length > 0 && duesData.winners.every(w => w.paidOut);
+    const winnersExist     = duesData.winners.length > 0;
+
+    // Build a rank→winner map for quick lookup
+    const winnerByRank = new Map(duesData.winners.map(w => [w.rank, w]));
+
+    return (
+        <div className="group rounded-xl border border-[#CBA135] bg-[#0A0A0A] p-5 md:p-7 transition-all duration-200 hover:border-[#E2B857] hover:bg-[#111111]">
+
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-[#CBA135] transition-colors duration-200 group-hover:text-[#E2B857]">
+                    Payouts
+                </h2>
+                <span className="text-[28px] leading-none transition-transform duration-200 group-hover:scale-105 select-none">🏆</span>
+            </div>
+
+            {/* Total Pot */}
+            <div className="mb-4">
+                <div className="rounded-lg border border-[#CBA135]/25 bg-[#CBA135]/5 px-4 py-3 flex items-center justify-between">
+                    <span className="text-[11px] text-[#A1A1A1] uppercase tracking-wider font-semibold">Total Pot</span>
+                    <span className="text-white font-bold text-base">${duesData.potTotal.toFixed(0)}</span>
+                </div>
+            </div>
+
+            {/* Payout structure rows */}
+            <div className="mb-5 space-y-1.5">
+                {duesData.payoutSpots
+                    .slice()
+                    .sort((a, b) => a.sortOrder - b.sortOrder)
+                    .map((spot, i) => {
+                        const winner = winnerByRank.get(i + 1);
+                        return (
+                            <div key={i} className="flex items-center justify-between bg-[#111111] border border-[#CBA135]/10 rounded-lg px-4 py-2.5 gap-3">
+                                <div className="min-w-0 flex-1">
+                                    <span className="text-[#E5E5E5]/70 text-sm">{spot.label}</span>
+                                    {winner && (
+                                        <span className="ml-2 text-[#E5E5E5] text-sm font-medium">
+                                            — {winner.teamName}
+                                            {winner.displayName && <span className="text-[#A1A1A1] text-xs ml-1">({winner.displayName})</span>}
+                                        </span>
+                                    )}
+                                </div>
+                                <span className="text-[#E5E5E5] font-medium text-sm shrink-0">${spot.amount.toFixed(0)}</span>
+                            </div>
+                        );
+                    })}
+            </div>
+
+            {/* Status banner */}
+            {payoutsCompleted ? (
+                <div className="rounded-lg bg-green-900/20 border border-green-800/40 px-4 py-2.5 mb-4">
+                    <p className="text-green-400 text-sm font-medium">Payouts completed — winners have been paid.</p>
+                </div>
+            ) : winnersExist ? (
+                <div className="rounded-lg bg-yellow-900/20 border border-yellow-800/40 px-4 py-2.5 mb-4">
+                    <p className="text-yellow-400 text-sm font-medium">Payouts pending — commissioner will distribute winnings.</p>
+                </div>
+            ) : (
+                <div className="rounded-lg bg-yellow-900/20 border border-yellow-800/40 px-4 py-2.5 mb-4">
+                    <p className="text-yellow-400 text-sm font-medium">Payouts pending — season results not yet recorded.</p>
+                </div>
+            )}
+
+            {/* Commissioner action */}
+            {isCommissioner && (
+                <Link
+                    href={`/dashboard/league/${leagueId}/payouts`}
+                    className="text-sm font-semibold text-[#CBA135] hover:text-[#E2B857] transition-colors duration-200"
+                >
+                    Record payouts →
+                </Link>
+            )}
+        </div>
+    );
+}
+
+// ── Card 3: League Announcements ──────────────────────────────────────────────
 
 function AnnouncementsCard({
     initialAnnouncements,
@@ -416,7 +506,16 @@ export default function LeagueOverviewCards({
                 currentUserId={currentUserId}
             />
 
-            {/* Card 2: Announcements */}
+            {/* Card 2: Payouts */}
+            {duesData && duesData.payoutSpots.length > 0 && (
+                <PayoutsCard
+                    leagueId={leagueId}
+                    duesData={duesData}
+                    isCommissioner={isCommissioner}
+                />
+            )}
+
+            {/* Card 3: Announcements */}
             <AnnouncementsCard
                 initialAnnouncements={announcements}
                 duesId={duesData?.id ?? null}

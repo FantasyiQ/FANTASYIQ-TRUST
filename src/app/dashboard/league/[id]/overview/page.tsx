@@ -72,6 +72,10 @@ export default async function LeagueOverviewPage({
                     select:  { label: true, amount: true, sortOrder: true },
                     orderBy: { sortOrder: 'asc' },
                 },
+                winners: {
+                    select:  { rank: true, teamName: true, displayName: true, amount: true, paidOut: true, paidAt: true },
+                    orderBy: { rank: 'asc' },
+                },
                 members: {
                     select:  { id: true, userId: true, displayName: true, teamName: true, duesStatus: true, paymentMethod: true, stripeReceiptUrl: true },
                     orderBy: { displayName: 'asc' },
@@ -180,6 +184,14 @@ export default async function LeagueOverviewPage({
             duesStatus:    m.duesStatus,
             paymentMethod: m.paymentMethod ?? null,
             receiptUrl:    m.stripeReceiptUrl ?? null,
+        })),
+        winners: leagueDuesRecord.winners.map(w => ({
+            rank:        w.rank,
+            teamName:    w.teamName,
+            displayName: w.displayName ?? null,
+            amount:      w.amount,
+            paidOut:     w.paidOut,
+            paidAt:      w.paidAt?.toISOString() ?? null,
         })),
     } : null;
 

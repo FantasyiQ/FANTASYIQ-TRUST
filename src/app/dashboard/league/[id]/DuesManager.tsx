@@ -16,6 +16,15 @@ export interface DuesMemberRow {
     receiptUrl?: string | null;
 }
 
+export interface LeagueWinnerRow {
+    rank:        number;
+    teamName:    string;
+    displayName: string | null;
+    amount:      number;
+    paidOut:     boolean;
+    paidAt:      string | null;
+}
+
 export interface DuesManagerData {
     id: string;
     buyInAmount: number;
@@ -25,6 +34,7 @@ export interface DuesManagerData {
     teamCount: number;
     payoutSpots: { label: string; amount: number; sortOrder: number }[];
     members: DuesMemberRow[];
+    winners: LeagueWinnerRow[];
 }
 
 export interface SleeperMember {

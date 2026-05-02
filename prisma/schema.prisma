@@ -196,8 +196,28 @@ model LeagueDues {
     documents            LeagueDocument[]
     futureDues           FutureDuesObligation[]
     announcements        Announcement[]
+    winners              LeagueWinner[]
 
     @@index([commissionerId])
+}
+
+model LeagueWinner {
+    id           String    @id @default(cuid())
+    leagueDuesId String
+    rank         Int       // 1=1st, 2=2nd, 3=3rd, etc.
+    teamName     String
+    displayName  String?   // roster owner display name
+    amount       Float     // payout amount for this rank
+    paidOut      Boolean   @default(false)
+    paidAt       DateTime?
+    paidByUserId String?
+    createdAt    DateTime  @default(now())
+    updatedAt    DateTime  @updatedAt
+
+    leagueDues   LeagueDues @relation(fields: [leagueDuesId], references: [id], onDelete: Cascade)
+
+    @@unique([leagueDuesId, rank])
+    @@index([leagueDuesId])
 }
 
 // One row per league member (roster player).
