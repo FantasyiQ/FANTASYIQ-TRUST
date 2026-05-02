@@ -1,4 +1,7 @@
-const BASE = 'https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl';
+import https from 'https';
+
+const BASE_HOST = 'lm-api-reads.fantasy.espn.com';
+const BASE_PATH = '/apis/v3/games/ffl';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -63,24 +66,49 @@ export interface EspnTeamResponse {
 }
 
 // ─── Fetch helper ─────────────────────────────────────────────────────────────
+// Uses Node.js https directly to avoid the Fetch spec's forbidden-header
+// restriction which silently strips the Cookie header in some runtimes.
 
-async function espnFetch<T>(path: string, espnS2: string, swid: string): Promise<T> {
-    const res = await fetch(`${BASE}${path}`, {
-        headers: {
-            Cookie: `espn_s2=${espnS2}; SWID=${swid};`,
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            Accept: 'application/json',
-            Referer: 'https://fantasy.espn.com/',
-        },
-        cache: 'no-store',
+function espnFetch<T>(path: string, espnS2: string, swid: string): Promise<T> {
+    // Auto-decode in case the user pasted a URL-encoded value (e.g. %2B instead of +)
+    const decodedS2 = espnS2.includes('%') ? decodeURIComponent(espnS2) : espnS2;
+
+    return new Promise((resolve, reject) => {
+        const options: https.RequestOptions = {
+            hostname: BASE_HOST,
+            path:     `${BASE_PATH}${path}`,
+            method:   'GET',
+            headers: {
+                Cookie:     `espn_s2=${decodedS2}; SWID=${swid};`,
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                Accept:     'application/json',
+                Referer:    'https://fantasy.espn.com/',
+            },
+        };
+
+        const req = https.request(options, (res) => {
+            let data = '';
+            res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+            res.on('end', () => {
+                if (data.trim() === 'Redirecting') {
+                    reject(new Error('ESPN credentials invalid or expired. Please refresh your espn_s2 and SWID cookies from your browser.'));
+                    return;
+                }
+                if ((res.statusCode ?? 0) >= 400) {
+                    reject(new Error(`ESPN API ${res.statusCode}: ${path}`));
+                    return;
+                }
+                try {
+                    resolve(JSON.parse(data) as T);
+                } catch {
+                    reject(new Error(`ESPN API returned non-JSON response: ${data.slice(0, 100)}`));
+                }
+            });
+        });
+
+        req.on('error', reject);
+        req.end();
     });
-
-    if (!res.ok) throw new Error(`ESPN API ${res.status}: ${path}`);
-    const text = await res.text();
-    if (text.trim() === 'Redirecting') {
-        throw new Error('ESPN credentials invalid or expired. Please refresh your espn_s2 and SWID cookies from your browser.');
-    }
-    return JSON.parse(text) as T;
 }
 
 // ─── Season detection ─────────────────────────────────────────────────────────
