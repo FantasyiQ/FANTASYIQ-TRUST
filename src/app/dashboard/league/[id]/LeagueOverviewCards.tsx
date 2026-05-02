@@ -84,12 +84,14 @@ function DuesCard({
         <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between gap-4">
                 <h2 className="font-semibold text-lg">League Dues &amp; Payouts</h2>
-                <Link
-                    href={`/dashboard/league/${leagueId}/dues`}
-                    className="text-sm text-[#C8A951]/70 hover:text-[#C8A951] font-medium transition"
-                >
-                    View details →
-                </Link>
+                {isCommissioner && duesData && (
+                    <Link
+                        href={`/dashboard/league/${leagueId}/dues`}
+                        className="text-sm text-[#C8A951]/70 hover:text-[#C8A951] font-medium transition"
+                    >
+                        Manage →
+                    </Link>
+                )}
             </div>
 
             <div className="px-6 py-5">
@@ -129,15 +131,24 @@ function DuesCard({
                         </div>
 
                         {!isCommissioner && myMember && (
-                            <div className={`flex items-center justify-between rounded-xl px-4 py-3 border ${
-                                myMember.duesStatus === 'paid'
-                                    ? 'bg-green-900/20 border-green-800'
-                                    : 'bg-yellow-900/20 border-yellow-800'
-                            }`}>
-                                <p className={`text-sm font-medium ${myMember.duesStatus === 'paid' ? 'text-green-400' : 'text-yellow-400'}`}>
-                                    Your status: <span className="font-bold capitalize">{myMember.duesStatus.replace('_', ' ')}</span>
-                                </p>
-                            </div>
+                            myMember.duesStatus === 'paid' ? (
+                                <div className="flex items-center gap-3 rounded-xl px-4 py-3 border bg-green-900/20 border-green-800">
+                                    <span className="text-green-400 text-base">✓</span>
+                                    <p className="text-green-400 text-sm font-semibold">Dues paid — you&apos;re all set!</p>
+                                </div>
+                            ) : (
+                                <div className="flex items-center justify-between rounded-xl px-4 py-3 border bg-yellow-900/20 border-yellow-800 gap-4">
+                                    <p className="text-yellow-400 text-sm font-medium">
+                                        Your status: <span className="font-bold capitalize">{myMember.duesStatus.replace('_', ' ')}</span>
+                                    </p>
+                                    <Link
+                                        href={`/dashboard/league/${leagueId}/dues/pay`}
+                                        className="shrink-0 bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-4 py-1.5 rounded-lg transition text-xs whitespace-nowrap"
+                                    >
+                                        Pay Dues →
+                                    </Link>
+                                </div>
+                            )
                         )}
 
                         {duesData.payoutSpots.length > 0 && (

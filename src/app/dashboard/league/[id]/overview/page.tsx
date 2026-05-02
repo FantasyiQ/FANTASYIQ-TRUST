@@ -31,6 +31,8 @@ export default async function LeagueOverviewPage({
     const sp = await searchParams;
     const showPlanModal             = sp.showPlanModal === '1';
     const showCommissionerPlanModal = sp.showCommissionerPlanModal === '1';
+    const duesPaid                  = sp.dues_paid === 'true';
+    const duesCancelled             = sp.dues_cancelled === 'true';
 
     const session = await auth();
     if (!session?.user?.id) redirect('/sign-in');
@@ -215,6 +217,21 @@ export default async function LeagueOverviewPage({
                 <a href="/pricing?tab=player" className="shrink-0 bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-4 py-2 rounded-lg transition text-xs">
                     View Plans
                 </a>
+            </div>
+        )}
+        {duesPaid && (
+            <div className="rounded-xl bg-green-900/20 border border-green-700/50 px-5 py-4 mb-4 flex items-center gap-3">
+                <span className="text-green-400 text-lg">✓</span>
+                <div>
+                    <p className="text-green-400 font-semibold text-sm">Dues paid — you&apos;re all set!</p>
+                    <p className="text-gray-400 text-xs mt-0.5">Your payment was received and your status has been updated.</p>
+                </div>
+            </div>
+        )}
+        {duesCancelled && (
+            <div className="rounded-xl bg-gray-800/60 border border-gray-700 px-5 py-4 mb-4 flex items-center gap-3">
+                <span className="text-gray-400 text-lg">✕</span>
+                <p className="text-gray-400 text-sm">Payment cancelled — no charge was made. You can pay when you&apos;re ready.</p>
             </div>
         )}
         {isDrafting && (
