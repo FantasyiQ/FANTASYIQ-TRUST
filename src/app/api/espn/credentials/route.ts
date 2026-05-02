@@ -16,9 +16,9 @@ export async function PATCH(request: NextRequest): Promise<Response> {
     const userId = session.user.id;
 
     const body = await request.json() as { leagueDbId?: string; espnS2?: string; swid?: string };
-    const leagueDbId = body.leagueDbId?.trim();
-    const espnS2     = body.espnS2?.trim();
-    const swid       = body.swid?.trim();
+    const leagueDbId = body.leagueDbId?.replace(/\s/g, '');
+    const espnS2     = body.espnS2?.replace(/\s/g, '');
+    const swid       = body.swid?.replace(/\s/g, '');
 
     if (!leagueDbId || !espnS2 || !swid) {
         return Response.json({ error: 'leagueDbId, espnS2, and swid are required' }, { status: 400 });

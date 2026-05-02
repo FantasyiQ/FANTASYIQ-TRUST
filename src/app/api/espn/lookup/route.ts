@@ -14,9 +14,9 @@ export async function POST(request: NextRequest): Promise<Response> {
     if (!session?.user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json() as { leagueId?: string; espnS2?: string; swid?: string };
-    const leagueId = body.leagueId?.trim();
-    const espnS2   = body.espnS2?.trim();
-    const swid     = body.swid?.trim();
+    const leagueId = body.leagueId?.replace(/\s/g, '');
+    const espnS2   = body.espnS2?.replace(/\s/g, '');
+    const swid     = body.swid?.replace(/\s/g, '');
 
     if (!leagueId || !espnS2 || !swid) {
         return Response.json({ error: 'leagueId, espnS2, and swid are required' }, { status: 400 });
