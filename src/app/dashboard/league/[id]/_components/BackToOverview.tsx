@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useEffect, useRef } from 'react';
 
 interface Props {
     leagueId:   string;
@@ -8,10 +9,15 @@ interface Props {
 }
 
 export default function BackToOverview({ leagueId, className = '' }: Props) {
-    const router = useRouter();
+    const router     = useRouter();
+    const hasHistory = useRef(false);
+
+    useEffect(() => {
+        hasHistory.current = window.history.length > 1;
+    }, []);
 
     const handleBack = () => {
-        if (typeof window !== 'undefined' && window.history.length > 1) {
+        if (hasHistory.current) {
             router.back();
         } else {
             router.push(`/dashboard/league/${leagueId}/overview`);
