@@ -29,10 +29,12 @@ export default async function LeagueOverviewPage({
 }) {
     const { id } = await params;
     const sp = await searchParams;
-    const showPlanModal             = sp.showPlanModal === '1';
-    const showCommissionerPlanModal = sp.showCommissionerPlanModal === '1';
-    const duesPaid                  = sp.dues_paid === 'true';
-    const duesCancelled             = sp.dues_cancelled === 'true';
+    const showPlanModal                = sp.showPlanModal === '1';
+    const showCommissionerPlanModal    = sp.showCommissionerPlanModal === '1';
+    const duesPaid                     = sp.dues_paid === 'true';
+    const duesCancelled                = sp.dues_cancelled === 'true';
+    const payoutsRecorded              = sp.payouts_recorded === 'true';
+    const noPermissionManagePayouts    = sp.no_permission_manage_payouts === 'true';
 
     const session = await auth();
     if (!session?.user?.id) redirect('/sign-in');
@@ -245,6 +247,21 @@ export default async function LeagueOverviewPage({
             <div className="rounded-xl bg-gray-800/60 border border-gray-700 px-5 py-4 mb-4 flex items-center gap-3">
                 <span className="text-gray-400 text-lg">✕</span>
                 <p className="text-gray-400 text-sm">Payment cancelled — no charge was made. You can pay when you&apos;re ready.</p>
+            </div>
+        )}
+        {payoutsRecorded && (
+            <div className="rounded-xl bg-[#0F3D2E] border border-emerald-700/50 px-5 py-4 mb-4 flex items-center gap-3">
+                <span className="text-emerald-400 text-lg">🏆</span>
+                <div>
+                    <p className="text-emerald-400 font-semibold text-sm">Payouts recorded — winners will be paid.</p>
+                    <p className="text-gray-400 text-xs mt-0.5">The payout breakdown is now visible to all league members.</p>
+                </div>
+            </div>
+        )}
+        {noPermissionManagePayouts && (
+            <div className="rounded-xl bg-gray-800/60 border border-gray-700 px-5 py-4 mb-4 flex items-center gap-3">
+                <span className="text-gray-400 text-lg">🔒</span>
+                <p className="text-gray-400 text-sm">Only the league commissioner can manage payouts.</p>
             </div>
         )}
         {isDrafting && (

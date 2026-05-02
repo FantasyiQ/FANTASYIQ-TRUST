@@ -69,6 +69,8 @@ model League {
     user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
     calendarEvents   LeagueCalendarEvent[]
     proBowlContests  ProBowlContest[]
+    leaguePayouts    LeaguePayout[]
+    leaguePayoutWinners LeaguePayoutWinner[]
 
     @@unique([userId, platform, leagueId])
     @@index([userId])
@@ -536,4 +538,38 @@ model FantasyCalcSnapshot {
 
     @@index([nameLower])
     @@index([takenAt])
+}
+
+// ── League Payouts ────────────────────────────────────────────────────────────
+// Records the payout amounts the commissioner commits to per rank.
+
+model LeaguePayout {
+    id        String    @id @default(cuid())
+    leagueId  String
+    rank      Int       // 1 = 1st place, 2 = 2nd, 3 = 3rd, etc.
+    amount    Float
+    paidAt    DateTime?
+    paidBy    String    // commissioner userId
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+
+    league    League    @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+
+    @@unique([leagueId, rank])
+    @@index([leagueId])
+}
+
+// Records the winning teams per rank (team selected from Sleeper rosters).
+
+model LeaguePayoutWinner {
+    id       String @id @default(cuid())
+    leagueId String
+    rank     Int
+    teamId   String  // Sleeper roster_id as string
+    teamName String
+
+    league   League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+
+    @@unique([leagueId, rank])
+    @@index([leagueId])
 }

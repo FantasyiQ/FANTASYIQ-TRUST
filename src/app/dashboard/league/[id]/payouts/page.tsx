@@ -3,7 +3,8 @@ export const dynamic = 'force-dynamic';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import PayoutsManager from './PayoutsManager';
+import { getSafeSleeperLeague } from '@/lib/sleeper';
+import PayoutsManagerForm from './PayoutsManagerForm';
 
 export default async function PayoutsPage({
     params,
@@ -15,80 +16,116 @@ export default async function PayoutsPage({
     const session = await auth();
     if (!session?.user?.id) redirect('/sign-in');
 
-    // Find the synced league record to get leagueName + season
     const league = await prisma.league.findUnique({
         where:  { id },
-        select: { id: true, userId: true, leagueName: true, season: true },
-    });
-    if (!league || league.userId !== session.user.id) {
-        return (
-            <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center p-8">
-                <p className="text-gray-400">League not found.</p>
-            </div>
-        );
-    }
-
-    const dues = await prisma.leagueDues.findFirst({
-        where: {
-            leagueName: { equals: league.leagueName, mode: 'insensitive' },
-            season:     league.season,
-        },
         select: {
             id:            true,
-            commissionerId: true,
-            payoutSpots: {
-                select:  { label: true, amount: true, sortOrder: true },
-                orderBy: { sortOrder: 'asc' },
-            },
-            winners: {
-                select:  { rank: true, teamName: true, displayName: true, amount: true, paidOut: true, paidAt: true },
-                orderBy: { rank: 'asc' },
-            },
+            userId:        true,
+            leagueId:      true,
+            leagueName:    true,
+            season:        true,
+            sleeperUserId: true,
         },
     });
 
-    if (!dues) {
-        return (
-            <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center p-8">
-                <p className="text-gray-400">No dues tracker found for this league.</p>
-            </div>
-        );
+    if (!league || league.userId !== session.user.id) {
+        redirect(`/dashboard/league/${id}/overview?no_permission_manage_payouts=true`);
     }
 
-    if (dues.commissionerId !== session.user.id) {
-        return (
-            <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center p-8">
-                <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 max-w-sm text-center space-y-3">
-                    <p className="text-2xl">🔒</p>
-                    <p className="font-semibold text-white">Commissioner Access Only</p>
-                    <p className="text-gray-400 text-sm">Only the league commissioner can record payouts.</p>
-                </div>
-            </div>
-        );
+    // ── Fetch Sleeper data + DB data in parallel ──────────────────────────────
+    const [sleeperLeague, dbUser, leagueDues, existingPayouts, existingWinners] =
+        await Promise.all([
+            getSafeSleeperLeague(league.leagueId),
+            prisma.user.findUnique({
+                where:  { id: session.user.id },
+                select: { sleeperUserId: true },
+            }),
+            prisma.leagueDues.findFirst({
+                where: {
+                    leagueName: { equals: league.leagueName, mode: 'insensitive' },
+                    season:     league.season,
+                },
+                select: {
+                    potTotal:    true,
+                    payoutSpots: {
+                        select:  { label: true, amount: true, sortOrder: true },
+                        orderBy: { sortOrder: 'asc' },
+                    },
+                },
+            }),
+            prisma.leaguePayout.findMany({
+                where:   { leagueId: id },
+                orderBy: { rank: 'asc' },
+            }),
+            prisma.leaguePayoutWinner.findMany({
+                where:   { leagueId: id },
+                orderBy: { rank: 'asc' },
+            }),
+        ]);
+
+    // ── Commissioner check via Sleeper is_owner ───────────────────────────────
+    const mySleeperUserId       = dbUser?.sleeperUserId ?? league.sleeperUserId;
+    const commissionerSleeperId = sleeperLeague.users.find(m => m.is_owner)?.user_id;
+    const isCommissioner        =
+        !!commissionerSleeperId && !!mySleeperUserId &&
+        String(commissionerSleeperId).trim() === String(mySleeperUserId).trim();
+
+    if (!isCommissioner) {
+        redirect(`/dashboard/league/${id}/overview?no_permission_manage_payouts=true`);
     }
 
-    const payoutSpots = dues.payoutSpots.map(s => ({
-        label:     s.label,
-        amount:    s.amount,
-        sortOrder: s.sortOrder,
-    }));
+    // ── Build teams list from Sleeper rosters ─────────────────────────────────
+    const memberMap = new Map(sleeperLeague.users.map(m => [m.user_id, m]));
+    const teams = sleeperLeague.rosters
+        .filter(r => r.owner_id)
+        .map(r => {
+            const member = r.owner_id ? memberMap.get(r.owner_id) : undefined;
+            return {
+                id:   String(r.roster_id),
+                name: member?.metadata?.team_name || member?.display_name || `Team ${r.roster_id}`,
+            };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
 
-    const existingWinners = dues.winners.map(w => ({
-        rank:        w.rank,
-        teamName:    w.teamName,
-        displayName: w.displayName ?? null,
-        amount:      w.amount,
-        paidOut:     w.paidOut,
-        paidAt:      w.paidAt?.toISOString() ?? null,
-    }));
+    // ── Default payout spots (from LeagueDues or fallback 3-place) ────────────
+    const defaultSpots: { rank: number; label: string; amount: number }[] =
+        leagueDues && leagueDues.payoutSpots.length > 0
+            ? leagueDues.payoutSpots.map((s, i) => ({
+                rank:   i + 1,
+                label:  s.label,
+                amount: s.amount,
+            }))
+            : [
+                { rank: 1, label: '1st Place', amount: 0 },
+                { rank: 2, label: '2nd Place', amount: 0 },
+                { rank: 3, label: '3rd Place', amount: 0 },
+            ];
+
+    const potTotal = leagueDues?.potTotal ?? 0;
+
+    // ── Merge existing payouts + winners ──────────────────────────────────────
+    const winnerByRank  = new Map(existingWinners.map(w => [w.rank, w]));
+    const existingCombined = existingPayouts.length > 0
+        ? existingPayouts.map(p => ({
+            rank:     p.rank,
+            amount:   p.amount,
+            teamId:   winnerByRank.get(p.rank)?.teamId   ?? '',
+            teamName: winnerByRank.get(p.rank)?.teamName ?? '',
+            paidAt:   p.paidAt?.toISOString() ?? null,
+        }))
+        : null;
+
+    const seasonComplete = league.season !== String(new Date().getFullYear());
 
     return (
-        <PayoutsManager
-            duesId={dues.id}
+        <PayoutsManagerForm
             leagueId={id}
-            payoutSpots={payoutSpots}
-            existingWinners={existingWinners}
             leagueName={league.leagueName}
+            potTotal={potTotal}
+            teams={teams}
+            defaultSpots={defaultSpots}
+            existingPayouts={existingCombined}
+            seasonComplete={seasonComplete}
         />
     );
 }
