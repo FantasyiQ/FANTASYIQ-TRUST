@@ -81,8 +81,8 @@ export default function Home() {
             <h2 className="text-[44px] leading-tight font-bold text-[#CBA135] mb-3">
               Why Commissioners Trust Us
             </h2>
-            <p className="text-[21px] text-[#A1A1A1] max-w-2xl mx-auto leading-relaxed">
-              Built by a commissioner who wanted a cleaner, fairer system — with absolutely <span className="text-[#CBA135] font-semibold">zero fees.</span>
+            <p className="text-[21px] text-[#A1A1A1] max-w-3xl mx-auto leading-relaxed">
+              Built by a commissioner who wanted to streamline league dues and payouts with <span className="text-[#CBA135] font-semibold">ZERO FEES</span> and the ability to sync all your fantasy leagues into one clean, unified place.
             </p>
           </div>
 
