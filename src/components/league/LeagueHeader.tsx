@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { tierBadgeProps } from '@/lib/tier-badge';
 import LeagueResyncButton from '@/app/dashboard/league/[id]/LeagueResyncButton';
+import EspnRefreshButton from '@/app/dashboard/league/[id]/EspnRefreshButton';
 
 function statusBadge(status: string) {
     switch (status) {
@@ -34,7 +35,7 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
                 leagueName: true, season: true, status: true,
                 totalRosters: true, scoringType: true,
                 avatar: true, lastSyncedAt: true,
-                sleeperUserId: true,
+                sleeperUserId: true, platform: true,
             },
         }),
         session?.user?.id
@@ -63,7 +64,7 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 flex flex-col gap-4">
             {/* Top row: avatar + league name + info pills (left) · tier badge (right) */}
             <div className="flex items-start gap-4">
-                {league.avatar ? (
+                {league.avatar && league.platform !== 'espn' ? (
                     <Image
                         src={`https://sleepercdn.com/avatars/thumbs/${league.avatar}`}
                         alt={league.leagueName}
@@ -72,7 +73,7 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
                     />
                 ) : (
                     <div className="w-16 h-16 rounded-xl bg-gray-800 shrink-0 flex items-center justify-center text-2xl font-bold text-gray-600">
-                        FF
+                        {league.platform === 'espn' ? 'ESPN' : 'FF'}
                     </div>
                 )}
 
@@ -84,7 +85,7 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
                     </h1>
                     <div className="flex items-center gap-2 mt-2 flex-wrap">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-800 border border-gray-700 text-xs font-semibold text-gray-300">
-                            Sleeper
+                            {league.platform === 'espn' ? 'ESPN' : 'Sleeper'}
                         </span>
                         <span className="inline-flex items-center px-2 py-0.5 rounded bg-gray-800 border border-gray-700 text-xs font-semibold text-gray-300">
                             {scoringDisplay}
@@ -120,10 +121,14 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
 
             {/* Bottom row: sync (left) · Pay Dues pill (right) */}
             <div className="flex items-center justify-between">
-                <LeagueResyncButton
-                    leagueId={leagueId}
-                    lastSyncedAt={league.lastSyncedAt?.toISOString() ?? null}
-                />
+                {league.platform === 'espn' ? (
+                    <EspnRefreshButton leagueDbId={leagueId} />
+                ) : (
+                    <LeagueResyncButton
+                        leagueId={leagueId}
+                        lastSyncedAt={league.lastSyncedAt?.toISOString() ?? null}
+                    />
+                )}
                 {isCommissioner ? (
                     <Link
                         href={`/dashboard/league/${leagueId}/commissioner/dues`}
