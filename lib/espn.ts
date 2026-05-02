@@ -1,4 +1,4 @@
-const BASE = 'https://fantasy.espn.com/apis/v3/games/ffl';
+const BASE = 'https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
