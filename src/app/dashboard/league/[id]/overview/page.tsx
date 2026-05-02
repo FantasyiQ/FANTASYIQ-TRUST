@@ -34,6 +34,7 @@ export default async function LeagueOverviewPage({
     const duesPaid                     = sp.dues_paid === 'true';
     const duesCancelled                = sp.dues_cancelled === 'true';
     const payoutsRecorded              = sp.payouts_recorded === 'true';
+    const payoutMarkedPaid             = sp.payout_marked_paid === 'true';
     const noPermissionManagePayouts    = sp.no_permission_manage_payouts === 'true';
 
     const session = await auth();
@@ -51,7 +52,7 @@ export default async function LeagueOverviewPage({
     if (!league || league.userId !== session.user.id) notFound();
 
     const safeLeagueP = getSafeSleeperLeague(league.leagueId);
-    const [allPlayers, dbUser, leagueDuesRecord, proBowlContest] = await Promise.all([
+    const [allPlayers, dbUser, leagueDuesRecord, proBowlContest, leaguePayoutsRaw, leaguePayoutWinnersRaw] = await Promise.all([
         getPlayers(),
         prisma.user.findUnique({
             where:  { id: session.user.id },
@@ -95,6 +96,14 @@ export default async function LeagueOverviewPage({
             where:   { leagueId: league.id, isActive: true },
             select:  { id: true, name: true, openAt: true, lockAt: true, endAt: true },
             orderBy: { createdAt: 'desc' },
+        }),
+        prisma.leaguePayout.findMany({
+            where:   { leagueId: id },
+            orderBy: { rank: 'asc' },
+        }),
+        prisma.leaguePayoutWinner.findMany({
+            where:   { leagueId: id },
+            orderBy: { rank: 'asc' },
         }),
     ]);
 
@@ -197,6 +206,17 @@ export default async function LeagueOverviewPage({
         })),
     } : null;
 
+    // ── Merge new LeaguePayout + LeaguePayoutWinner records ──────────────────
+    const payoutWinnerByRank = new Map(leaguePayoutWinnersRaw.map(w => [w.rank, w]));
+    const leaguePayoutsData = leaguePayoutsRaw.length > 0
+        ? leaguePayoutsRaw.map(p => ({
+            rank:     p.rank,
+            amount:   p.amount,
+            teamName: payoutWinnerByRank.get(p.rank)?.teamName ?? '',
+            paidAt:   p.paidAt?.toISOString() ?? null,
+        }))
+        : null;
+
     const announcements: AnnouncementData[] = (leagueDuesRecord?.announcements ?? []).map(a => ({
         id:         a.id,
         body:       a.body,
@@ -258,6 +278,12 @@ export default async function LeagueOverviewPage({
                 </div>
             </div>
         )}
+        {payoutMarkedPaid && (
+            <div className="rounded-xl bg-[#0F3D2E] border border-emerald-700/50 px-5 py-4 mb-4 flex items-center gap-3">
+                <span className="text-emerald-400 text-lg">✓</span>
+                <p className="text-emerald-400 font-semibold text-sm">Payout marked as paid.</p>
+            </div>
+        )}
         {noPermissionManagePayouts && (
             <div className="rounded-xl bg-gray-800/60 border border-gray-700 px-5 py-4 mb-4 flex items-center gap-3">
                 <span className="text-gray-400 text-lg">🔒</span>
@@ -294,6 +320,7 @@ export default async function LeagueOverviewPage({
             } : null}
             isCommissioner={isCommissioner}
             currentUserId={session.user.id}
+            leaguePayouts={leaguePayoutsData}
         />
         </>
     );

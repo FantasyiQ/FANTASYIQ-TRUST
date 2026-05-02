@@ -30,6 +30,7 @@ interface Props {
     proBowlContest:         { id: string; name: string; openAt: string; lockAt: string; endAt: string } | null;
     isCommissioner:         boolean;
     currentUserId:          string;
+    leaguePayouts:          { rank: number; amount: number; teamName: string; paidAt: string | null }[] | null;
 }
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
@@ -208,17 +209,43 @@ function PayoutsCard({
     leagueId,
     duesData,
     isCommissioner,
+    leaguePayouts,
 }: {
-    leagueId:       string;
-    duesData:       DuesManagerData;
+    leagueId:      string;
+    duesData:      DuesManagerData;
     isCommissioner: boolean;
+    leaguePayouts: { rank: number; amount: number; teamName: string; paidAt: string | null }[] | null;
 }) {
-    if (!duesData.payoutSpots.length) return null;
+    // Prefer new LeaguePayout data; fall back to old payoutSpots structure
+    const hasNewPayouts  = !!leaguePayouts && leaguePayouts.length > 0;
+    const hasSpots       = duesData.payoutSpots.length > 0;
 
-    const payoutsCompleted = duesData.winners.length > 0 && duesData.winners.every(w => w.paidOut);
-    const winnersExist     = duesData.winners.length > 0;
+    if (!hasNewPayouts && !hasSpots) return null;
 
-    // Build a rank→winner map for quick lookup
+    // ── Local optimistic state for mark-as-paid ───────────────────────────────
+    const [localPaidAt, setLocalPaidAt] = useState<Record<number, string>>(() => {
+        const m: Record<number, string> = {};
+        leaguePayouts?.forEach(p => { if (p.paidAt) m[p.rank] = p.paidAt; });
+        return m;
+    });
+    const [markingRank, setMarkingRank] = useState<number | null>(null);
+
+    async function handleMarkPaid(rank: number) {
+        setMarkingRank(rank);
+        try {
+            const res = await fetch(`/api/leagues/${leagueId}/payouts/mark-paid`, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ rank }),
+            });
+            if (res.ok) setLocalPaidAt(prev => ({ ...prev, [rank]: new Date().toISOString() }));
+        } finally {
+            setMarkingRank(null);
+        }
+    }
+
+    // ── Derived ───────────────────────────────────────────────────────────────
+    const allPaidOut = hasNewPayouts && leaguePayouts!.every(p => localPaidAt[p.rank] ?? p.paidAt);
     const winnerByRank = new Map(duesData.winners.map(w => [w.rank, w]));
 
     return (
@@ -240,38 +267,79 @@ function PayoutsCard({
                 </div>
             </div>
 
-            {/* Payout structure rows */}
-            <div className="mb-5 space-y-1.5">
-                {duesData.payoutSpots
-                    .slice()
-                    .sort((a, b) => a.sortOrder - b.sortOrder)
-                    .map((spot, i) => {
-                        const winner = winnerByRank.get(i + 1);
+            {/* New-model payouts rows: winner names + paid status */}
+            {hasNewPayouts ? (
+                <div className="mb-5 space-y-1.5">
+                    {leaguePayouts!.map(p => {
+                        const paidAt = localPaidAt[p.rank] ?? p.paidAt;
+                        const isPaid = !!paidAt;
                         return (
-                            <div key={i} className="flex items-center justify-between bg-[#111111] border border-[#CBA135]/10 rounded-lg px-4 py-2.5 gap-3">
+                            <div key={p.rank} className="flex items-center justify-between bg-[#111111] border border-[#CBA135]/10 rounded-lg px-4 py-2.5 gap-3">
                                 <div className="min-w-0 flex-1">
-                                    <span className="text-[#E5E5E5]/70 text-sm">{spot.label}</span>
-                                    {winner && (
-                                        <span className="ml-2 text-[#E5E5E5] text-sm font-medium">
-                                            — {winner.teamName}
-                                            {winner.displayName && <span className="text-[#A1A1A1] text-xs ml-1">({winner.displayName})</span>}
-                                        </span>
+                                    <span className="text-[#E5E5E5]/70 text-sm">
+                                        {['1st', '2nd', '3rd', '4th', '5th'][p.rank - 1] ?? `#${p.rank}`}
+                                    </span>
+                                    {p.teamName && (
+                                        <span className="ml-2 text-[#E5E5E5] text-sm font-medium">— {p.teamName}</span>
                                     )}
                                 </div>
-                                <span className="text-[#E5E5E5] font-medium text-sm shrink-0">${spot.amount.toFixed(0)}</span>
+                                <div className="flex items-center gap-3 shrink-0">
+                                    <span className="text-[#E5E5E5] font-medium text-sm">${p.amount.toFixed(0)}</span>
+                                    {isPaid ? (
+                                        <span className="inline-flex items-center gap-1 bg-[#0F3D2E] border border-emerald-500/40 text-emerald-400 text-xs font-semibold px-2 py-0.5 rounded-full">
+                                            ✓ Paid
+                                        </span>
+                                    ) : isCommissioner ? (
+                                        <button
+                                            type="button"
+                                            disabled={markingRank === p.rank}
+                                            onClick={() => { void handleMarkPaid(p.rank); }}
+                                            className="text-[#CBA135] hover:text-[#E2B857] text-xs font-semibold transition-colors disabled:opacity-50 whitespace-nowrap"
+                                        >
+                                            {markingRank === p.rank ? '…' : 'Mark paid →'}
+                                        </button>
+                                    ) : (
+                                        <span className="text-amber-400 text-xs">Pending</span>
+                                    )}
+                                </div>
                             </div>
                         );
                     })}
-            </div>
+                </div>
+            ) : (
+                /* Fallback: old payoutSpots structure without winners */
+                <div className="mb-5 space-y-1.5">
+                    {duesData.payoutSpots
+                        .slice()
+                        .sort((a, b) => a.sortOrder - b.sortOrder)
+                        .map((spot, i) => {
+                            const winner = winnerByRank.get(i + 1);
+                            return (
+                                <div key={i} className="flex items-center justify-between bg-[#111111] border border-[#CBA135]/10 rounded-lg px-4 py-2.5 gap-3">
+                                    <div className="min-w-0 flex-1">
+                                        <span className="text-[#E5E5E5]/70 text-sm">{spot.label}</span>
+                                        {winner && (
+                                            <span className="ml-2 text-[#E5E5E5] text-sm font-medium">
+                                                — {winner.teamName}
+                                                {winner.displayName && <span className="text-[#A1A1A1] text-xs ml-1">({winner.displayName})</span>}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <span className="text-[#E5E5E5] font-medium text-sm shrink-0">${spot.amount.toFixed(0)}</span>
+                                </div>
+                            );
+                        })}
+                </div>
+            )}
 
             {/* Status banner */}
-            {payoutsCompleted ? (
-                <div className="rounded-lg bg-green-900/20 border border-green-800/40 px-4 py-2.5 mb-4">
-                    <p className="text-green-400 text-sm font-medium">Payouts completed — winners have been paid.</p>
+            {allPaidOut ? (
+                <div className="rounded-lg bg-[#0F3D2E] border border-emerald-500/40 px-4 py-2.5 mb-4">
+                    <p className="text-emerald-400 text-sm font-medium">Payouts completed — all winners have been paid.</p>
                 </div>
-            ) : winnersExist ? (
-                <div className="rounded-lg bg-yellow-900/20 border border-yellow-800/40 px-4 py-2.5 mb-4">
-                    <p className="text-yellow-400 text-sm font-medium">Payouts pending — commissioner will distribute winnings.</p>
+            ) : hasNewPayouts ? (
+                <div className="rounded-lg bg-[#3D2F0F] border border-amber-500/40 px-4 py-2.5 mb-4">
+                    <p className="text-amber-400 text-sm font-medium">Payouts recorded — pending distribution.</p>
                 </div>
             ) : (
                 <div className="rounded-lg bg-yellow-900/20 border border-yellow-800/40 px-4 py-2.5 mb-4">
@@ -279,14 +347,22 @@ function PayoutsCard({
                 </div>
             )}
 
-            {/* Commissioner action */}
+            {/* Commissioner links */}
             {isCommissioner && (
-                <Link
-                    href={`/dashboard/league/${leagueId}/payouts`}
-                    className="text-sm font-semibold text-[#CBA135] hover:text-[#E2B857] transition-colors duration-200"
-                >
-                    Record payouts →
-                </Link>
+                <div className="flex items-center justify-between gap-4">
+                    <Link
+                        href={`/dashboard/league/${leagueId}/payouts`}
+                        className="text-sm font-semibold text-[#CBA135] hover:text-[#E2B857] transition-colors duration-200"
+                    >
+                        {hasNewPayouts ? 'Manage payouts →' : 'Record payouts →'}
+                    </Link>
+                    <Link
+                        href={`/dashboard/league/${leagueId}/payouts/history`}
+                        className="text-xs text-gray-500 hover:text-[#CBA135] transition-colors duration-200"
+                    >
+                        View history →
+                    </Link>
+                </div>
             )}
         </div>
     );
@@ -493,6 +569,7 @@ export default function LeagueOverviewCards({
     proBowlContest,
     isCommissioner,
     currentUserId,
+    leaguePayouts,
 }: Props) {
 
     return (
@@ -507,11 +584,12 @@ export default function LeagueOverviewCards({
             />
 
             {/* Card 2: Payouts */}
-            {duesData && duesData.payoutSpots.length > 0 && (
+            {duesData && (duesData.payoutSpots.length > 0 || (leaguePayouts && leaguePayouts.length > 0)) && (
                 <PayoutsCard
                     leagueId={leagueId}
                     duesData={duesData}
                     isCommissioner={isCommissioner}
+                    leaguePayouts={leaguePayouts ?? null}
                 />
             )}
 
