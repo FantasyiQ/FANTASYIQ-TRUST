@@ -73,7 +73,7 @@ export default async function LeagueOverviewPage({
                     orderBy: { sortOrder: 'asc' },
                 },
                 members: {
-                    select:  { id: true, userId: true, displayName: true, teamName: true, duesStatus: true, paymentMethod: true },
+                    select:  { id: true, userId: true, displayName: true, teamName: true, duesStatus: true, paymentMethod: true, stripeReceiptUrl: true },
                     orderBy: { displayName: 'asc' },
                 },
                 announcements: {
@@ -179,6 +179,7 @@ export default async function LeagueOverviewPage({
             teamName:      m.teamName ?? null,
             duesStatus:    m.duesStatus,
             paymentMethod: m.paymentMethod ?? null,
+            receiptUrl:    m.stripeReceiptUrl ?? null,
         })),
     } : null;
 

@@ -13,6 +13,7 @@ export interface DuesMemberRow {
     teamName?: string | null;
     duesStatus: string;
     paymentMethod?: string | null;
+    receiptUrl?: string | null;
 }
 
 export interface DuesManagerData {

@@ -21,12 +21,23 @@ export async function GET(
     if (!sessionId || !memberId) redirect(fallback);
 
     try {
-        const cs = await stripe.checkout.sessions.retrieve(sessionId);
+        const cs = await stripe.checkout.sessions.retrieve(sessionId, {
+            expand: ['payment_intent.latest_charge'],
+        });
         if (cs.payment_status === 'paid') {
             const member = await prisma.duesMember.findUnique({
                 where: { id: memberId },
                 select: { duesStatus: true, leagueDuesId: true },
             });
+
+            // Pull receipt URL from the expanded charge
+            let receiptUrl: string | null = null;
+            try {
+                const pi = cs.payment_intent as import('stripe').Stripe.PaymentIntent & {
+                    latest_charge?: import('stripe').Stripe.Charge | null;
+                } | null;
+                receiptUrl = pi?.latest_charge?.receipt_url ?? null;
+            } catch { /* non-fatal */ }
 
             // Idempotent: only write if not already paid (webhook may have been first)
             if (member && member.leagueDuesId === duesId && member.duesStatus !== 'paid') {
@@ -39,10 +50,11 @@ export async function GET(
                         prisma.duesMember.update({
                             where: { id: memberId },
                             data: {
-                                duesStatus:     'paid',
-                                paidAt:         new Date(),
-                                paymentMethod:  'stripe_direct',
+                                duesStatus:      'paid',
+                                paidAt:          new Date(),
+                                paymentMethod:   'stripe_direct',
                                 stripePaymentId: typeof cs.payment_intent === 'string' ? cs.payment_intent : null,
+                                stripeReceiptUrl: receiptUrl,
                             },
                         }),
                         prisma.leagueDues.update({
@@ -54,6 +66,12 @@ export async function GET(
                         }),
                     ]);
                 }
+            } else if (member?.duesStatus === 'paid' && receiptUrl) {
+                // Already paid (webhook was first) — still save receipt URL if missing
+                await prisma.duesMember.updateMany({
+                    where: { id: memberId, stripeReceiptUrl: null },
+                    data:  { stripeReceiptUrl: receiptUrl },
+                });
             }
         }
     } catch { /* non-fatal — member stays pending, can retry */ }

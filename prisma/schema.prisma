@@ -212,8 +212,9 @@ model DuesMember {
     duesStatus      String    @default("unpaid")
     paidAt          DateTime?
     paymentMethod   String?   // "stripe_direct" | "stripe_on_behalf" | null
-    stripePaymentId String?   // Stripe payment intent or checkout session ID
-    createdAt       DateTime  @default(now())
+    stripePaymentId  String?   // Stripe payment intent or checkout session ID
+    stripeReceiptUrl String?   // Stripe hosted receipt URL — surfaced to paid member
+    createdAt        DateTime  @default(now())
     updatedAt       DateTime  @updatedAt
 
     leagueDues      LeagueDues  @relation(fields: [leagueDuesId], references: [id], onDelete: Cascade)

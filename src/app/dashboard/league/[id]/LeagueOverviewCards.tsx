@@ -73,100 +73,131 @@ function DuesCard({
     isCommissioner,
     currentUserId,
 }: {
-    leagueId: string;
-    duesData: DuesManagerData | null;
+    leagueId:       string;
+    duesData:       DuesManagerData | null;
     isCommissioner: boolean;
-    currentUserId: string;
+    currentUserId:  string;
 }) {
     const myMember = duesData?.members.find(m => m.userId === currentUserId) ?? null;
+    const amountLabel = duesData ? `$${duesData.buyInAmount}` : '';
 
     return (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between gap-4">
-                <h2 className="font-semibold text-lg">League Dues &amp; Payouts</h2>
-                {isCommissioner && duesData && (
-                    <Link
-                        href={`/dashboard/league/${leagueId}/dues`}
-                        className="text-sm text-[#C8A951]/70 hover:text-[#C8A951] font-medium transition"
-                    >
-                        Manage →
-                    </Link>
-                )}
+        <div className="group rounded-xl border border-[#CBA135] bg-[#0A0A0A] p-5 md:p-7 transition-all duration-200 hover:border-[#E2B857] hover:bg-[#111111]">
+
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-[#CBA135] transition-colors duration-200 group-hover:text-[#E2B857]">
+                    League Dues &amp; Payouts
+                </h2>
+                <span className="text-[28px] leading-none transition-transform duration-200 group-hover:scale-105 select-none">💰</span>
             </div>
 
-            <div className="px-6 py-5">
-                {!duesData ? (
-                    isCommissioner ? (
-                        <div className="flex items-center justify-between gap-4 flex-wrap">
-                            <div>
-                                <p className="text-gray-300 text-sm font-medium">No dues tracker set up yet.</p>
-                                <p className="text-gray-500 text-xs mt-0.5">Track buy-ins, pot totals, and payouts for your league.</p>
-                            </div>
-                            <Link
-                                href="/dashboard/commissioner/dues"
-                                className="shrink-0 text-sm border border-[#C8A951]/40 hover:border-[#C8A951] text-[#C8A951] font-semibold px-4 py-1.5 rounded-lg transition"
-                            >
-                                Set up dues →
-                            </Link>
-                        </div>
-                    ) : (
-                        <p className="text-gray-500 text-sm">No dues tracking for this league.</p>
-                    )
+            {/* No dues set up yet */}
+            {!duesData && (
+                isCommissioner ? (
+                    <div>
+                        <p className="text-[15px] text-[#E5E5E5] leading-relaxed mb-6">
+                            Track buy-ins, pot totals, and payouts for your league.
+                        </p>
+                        <Link
+                            href="/dashboard/commissioner/dues"
+                            className="text-sm font-semibold text-[#CBA135] hover:text-[#E2B857] transition-colors duration-200"
+                        >
+                            Set up dues →
+                        </Link>
+                    </div>
                 ) : (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-3 gap-3">
-                            {[
-                                { label: 'Buy-In',    value: `$${duesData.buyInAmount}` },
-                                { label: 'Pot Total', value: `$${duesData.potTotal.toFixed(0)}` },
-                                {
-                                    label: 'Paid',
-                                    value: `${duesData.members.filter(m => m.duesStatus === 'paid').length}/${duesData.teamCount}`,
-                                },
-                            ].map(stat => (
-                                <div key={stat.label} className="bg-gray-800/50 rounded-xl p-3 text-center border border-gray-800">
-                                    <p className="text-xs text-gray-500 mb-1">{stat.label}</p>
-                                    <p className="text-white font-bold text-lg">{stat.value}</p>
+                    <p className="text-[15px] text-[#E5E5E5]/60 leading-relaxed">
+                        No dues tracking for this league yet.
+                    </p>
+                )
+            )}
+
+            {/* Dues exist */}
+            {duesData && (
+                <div>
+                    {/* Stats row — always shown */}
+                    <div className="grid grid-cols-3 gap-3 mb-5">
+                        {[
+                            { label: 'Buy-In',    value: `$${duesData.buyInAmount}` },
+                            { label: 'Pot Total', value: `$${duesData.potTotal.toFixed(0)}` },
+                            { label: 'Paid',      value: `${duesData.members.filter(m => m.duesStatus === 'paid').length}/${duesData.teamCount}` },
+                        ].map(stat => (
+                            <div key={stat.label} className="rounded-lg border border-[#CBA135]/25 bg-[#CBA135]/5 p-3 text-center">
+                                <p className="text-[11px] text-[#A1A1A1] mb-1 uppercase tracking-wider">{stat.label}</p>
+                                <p className="text-white font-bold text-base">{stat.value}</p>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Payout spots */}
+                    {duesData.payoutSpots.length > 0 && (
+                        <div className="mb-5 space-y-1.5">
+                            <p className="text-[11px] text-[#A1A1A1] font-semibold uppercase tracking-wider mb-2">Payouts</p>
+                            {duesData.payoutSpots.map((spot, i) => (
+                                <div key={i} className="flex items-center justify-between text-sm">
+                                    <span className="text-[#E5E5E5]/70">{spot.label}</span>
+                                    <span className="text-[#E5E5E5] font-medium">${spot.amount.toFixed(0)}</span>
                                 </div>
                             ))}
                         </div>
+                    )}
 
-                        {!isCommissioner && myMember && (
-                            myMember.duesStatus === 'paid' ? (
-                                <div className="flex items-center gap-3 rounded-xl px-4 py-3 border bg-green-900/20 border-green-800">
-                                    <span className="text-green-400 text-base">✓</span>
-                                    <p className="text-green-400 text-sm font-semibold">Dues paid — you&apos;re all set!</p>
-                                </div>
-                            ) : (
-                                <div className="flex items-center justify-between rounded-xl px-4 py-3 border bg-yellow-900/20 border-yellow-800 gap-4">
-                                    <p className="text-yellow-400 text-sm font-medium">
-                                        Your status: <span className="font-bold capitalize">{myMember.duesStatus.replace('_', ' ')}</span>
-                                    </p>
-                                    <Link
-                                        href={`/dashboard/league/${leagueId}/dues/pay`}
-                                        className="shrink-0 bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-4 py-1.5 rounded-lg transition text-xs whitespace-nowrap"
-                                    >
-                                        Pay Dues →
-                                    </Link>
-                                </div>
-                            )
-                        )}
+                    {/* Commissioner action */}
+                    {isCommissioner && (
+                        <Link
+                            href={`/dashboard/league/${leagueId}/dues`}
+                            className="text-sm font-semibold text-[#CBA135] hover:text-[#E2B857] transition-colors duration-200"
+                        >
+                            Manage dues →
+                        </Link>
+                    )}
 
-                        {duesData.payoutSpots.length > 0 && (
-                            <div>
-                                <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-2">Payouts</p>
-                                <div className="space-y-1">
-                                    {duesData.payoutSpots.map((spot, i) => (
-                                        <div key={i} className="flex items-center justify-between text-sm">
-                                            <span className="text-gray-400">{spot.label}</span>
-                                            <span className="text-white font-medium">${spot.amount.toFixed(0)}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
+                    {/* Member: unpaid */}
+                    {!isCommissioner && myMember && myMember.duesStatus !== 'paid' && (
+                        <div>
+                            <p className="text-[15px] text-[#E5E5E5] leading-relaxed mb-4">
+                                Your league buy-in is <span className="font-semibold text-white">{amountLabel}</span>.
+                            </p>
+                            <Link
+                                href={`/dashboard/league/${leagueId}/dues/pay`}
+                                className="inline-flex flex-col items-center rounded-lg border border-[#CBA135] bg-[#CBA135] px-5 py-3 text-sm font-semibold text-black transition-all duration-200 hover:border-[#E2B857] hover:bg-[#E2B857] hover:-translate-y-px"
+                            >
+                                Pay Dues — {amountLabel}
+                                <span className="mt-0.5 text-[11px] font-normal text-black/70">
+                                    Secure · Instant · ZERO FEES
+                                </span>
+                            </Link>
+                        </div>
+                    )}
+
+                    {/* Member: paid */}
+                    {!isCommissioner && myMember?.duesStatus === 'paid' && (
+                        <div>
+                            <p className="flex items-center gap-2 text-[15px] text-emerald-300 font-medium mb-3">
+                                <span>✓</span> Dues paid — you&apos;re all set!
+                            </p>
+                            {myMember.receiptUrl && (
+                                <a
+                                    href={myMember.receiptUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-sm font-semibold text-[#CBA135] hover:text-[#E2B857] transition-colors duration-200"
+                                >
+                                    View receipt →
+                                </a>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Member: not in dues tracker yet */}
+                    {!isCommissioner && !myMember && (
+                        <p className="text-[15px] text-[#E5E5E5]/60 leading-relaxed">
+                            You haven&apos;t been added to the dues tracker yet. Ask your commissioner.
+                        </p>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
