@@ -50,7 +50,12 @@ function periodLabel(sub: { cancelAtPeriodEnd: boolean; currentPeriodEnd: Date |
     return `Cancels ${date}`;
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+    searchParams,
+}: {
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+    const params  = await searchParams;
     const session = await auth();
     if (!session?.user?.email) redirect('/sign-in');
 
@@ -151,9 +156,20 @@ export default async function DashboardPage() {
     const leagueLimit    = getLeagueLimit(leagueLimitKey);
     const nextTier       = nextTierName(displayTier);
 
+    const testDataReset = params.test_data_reset === 'true';
+
     return (
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
             <div className="max-w-5xl mx-auto space-y-8">
+
+                {/* Test data reset banner */}
+                {testDataReset && (
+                    <div className="rounded-xl bg-[#0F3D2E] border border-emerald-500/40 px-5 py-3.5">
+                        <p className="text-emerald-400 font-medium text-sm">
+                            Test data reset — your account is now clean.
+                        </p>
+                    </div>
+                )}
 
                 {/* Welcome header */}
                 <div className="flex items-center justify-between gap-4 flex-wrap">
