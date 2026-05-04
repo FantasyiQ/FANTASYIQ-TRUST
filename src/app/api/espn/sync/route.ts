@@ -3,15 +3,14 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import {
     detectEspnSeason,
-    getEspnLeagueSettings,
-    getEspnTeams,
-    deriveEspnScoringType,
+    getEspnFullSync,
+    normalizeEspnLeague,
     deriveEspnRosterPositions,
     deriveEspnStatus,
-    buildEspnStandings,
+    deriveEspnScoringType,
 } from '@/lib/espn';
 
-// POST /api/espn/sync — upsert an ESPN league and persist credentials
+// POST /api/espn/sync — full sync: settings + teams + rosters + matchups
 export async function POST(request: NextRequest): Promise<Response> {
     const session = await auth();
     if (!session?.user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -27,34 +26,47 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
 
     try {
-        const season = await detectEspnSeason(leagueId, espnS2, swid);
-        const [settings, teamsData] = await Promise.all([
-            getEspnLeagueSettings(leagueId, season, espnS2, swid),
-            getEspnTeams(leagueId, season, espnS2, swid),
-        ]);
+        const season  = await detectEspnSeason(leagueId, espnS2, swid);
+        const rawData = await getEspnFullSync(leagueId, season, espnS2, swid);
+        const data    = normalizeEspnLeague(rawData, leagueId);
 
-        const standings = buildEspnStandings(teamsData.teams ?? []);
+        // Current week matchups only (reduces noise in stored data)
+        const currentWeekMatchups = data.matchups.filter(m => m.week === data.currentWeek);
 
-        const leagueData = {
+        const leagueRecord = {
             leagueId,
-            leagueName:      settings.settings.name,
-            season:          String(season),
-            status:          deriveEspnStatus(settings),
-            totalRosters:    settings.settings.size,
-            scoringType:     deriveEspnScoringType(settings.settings),
-            rosterPositions: deriveEspnRosterPositions(settings.settings),
-            standings,
-            lastSyncedAt:    new Date(),
+            leagueName:      data.leagueName,
+            season:          String(data.season),
+            status:          deriveEspnStatus(rawData),
+            totalRosters:    data.totalTeams,
+            scoringType:     deriveEspnScoringType(rawData.settings),
+            rosterPositions: deriveEspnRosterPositions(rawData.settings),
+            standings:       data.teams.map(t => ({
+                teamId:       t.teamId,
+                name:         t.name,
+                abbrev:       t.abbrev,
+                ownerId:      t.ownerId,
+                wins:         t.wins,
+                losses:       t.losses,
+                ties:         t.ties,
+                fpts:         t.pointsFor,
+                fptsAgainst:  t.pointsAgainst,
+                rosterSize:   t.roster.length,
+            })),
+            currentMatchup: currentWeekMatchups.length > 0 ? JSON.parse(JSON.stringify({
+                week:     data.currentWeek,
+                matchups: currentWeekMatchups,
+            })) : null,
+            lastSyncedAt: new Date(),
         };
 
         const [league] = await Promise.all([
             prisma.league.upsert({
                 where:  { userId_platform_leagueId: { userId, platform: 'espn', leagueId } },
-                create: { userId, platform: 'espn', ...leagueData },
-                update: leagueData,
-                select: { id: true, leagueId: true, leagueName: true, totalRosters: true, scoringType: true, assignedPlanId: true },
+                create: { userId, platform: 'espn', ...leagueRecord, standings: JSON.parse(JSON.stringify(leagueRecord.standings)) },
+                update: { ...leagueRecord, standings: JSON.parse(JSON.stringify(leagueRecord.standings)) },
+                select: { id: true, leagueId: true, leagueName: true },
             }),
-            // Store ESPN credentials on the user for cron refreshes
             prisma.user.update({
                 where: { id: userId },
                 data:  { espnS2, swid },
@@ -64,11 +76,17 @@ export async function POST(request: NextRequest): Promise<Response> {
         return Response.json({
             synced:     1,
             leagueDbId: league.id,
+            summary: {
+                teams:    data.teams.length,
+                matchups: currentWeekMatchups.length,
+                week:     data.currentWeek,
+            },
             redirectTo: `/dashboard/league/${league.id}`,
         });
     } catch (err) {
         const message = err instanceof Error ? err.message : 'Sync failed';
-        return Response.json({ error: message }, { status: 500 });
+        const status  = message.includes('credentials') ? 401 : 500;
+        return Response.json({ error: message }, { status });
     }
 }
 
