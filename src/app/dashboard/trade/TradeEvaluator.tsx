@@ -6,6 +6,8 @@ import type { Player, PprFormat, LeagueType, DtvResult, LeagueSettings } from '@
 import type { UniversePlayer, UniverseResponse, UniverseMeta, DeltaEntry, DeltaResponse } from '@/lib/player-universe';
 import { computePlayerBaseValue, playerVolatility } from '@/lib/player-universe';
 import { calculateAge } from '@/lib/calculateAge';
+import { evaluateUnifiedTrade } from '@/lib/rankings/unifiedTradeEvaluator';
+import type { DefenseValues } from '@/lib/rankings/unifiedTradeEvaluator';
 
 const LEAGUE_SIZES = [8, 10, 12, 14, 16, 32] as const;
 type LeagueSize = typeof LEAGUE_SIZES[number];
@@ -21,7 +23,7 @@ const PICK_YEARS = pickYears();
 
 
 const TIER_COLORS: Record<string, string> = {
-    Elite:   'text-[#C8A951]',
+    Elite:   'text-[#D4AF37]',
     Star:    'text-green-400',
     Starter: 'text-blue-400',
     Flex:    'text-gray-300',
@@ -41,14 +43,11 @@ const POS_COLORS: Record<string, string> = {
 
 function verdictColor(v: string) {
     switch (v) {
-        case 'Slam Dunk':  return 'text-[#C8A951]';
-        case 'Strong Win': return 'text-green-400';
-        case 'Slight Edge':return 'text-green-300';
-        case 'Fair Trade': return 'text-gray-300';
-        case 'Slight Loss':return 'text-orange-400';
-        case 'Bad Deal':   return 'text-red-400';
-        case 'Robbery':    return 'text-red-600';
-        default:           return 'text-gray-400';
+        case 'Very Fair':    return 'text-gray-300';
+        case 'Slight Edge':  return 'text-green-300';
+        case 'Clear Winner': return 'text-[#D4AF37]';
+        case 'Lopsided':     return 'text-red-400';
+        default:             return 'text-gray-400';
     }
 }
 
@@ -65,7 +64,7 @@ function timeAgo(iso: string | null | undefined): string {
 
 function FactorBar({ label, value, max = 1.30 }: { label: string; value: number; max?: number }) {
     const pct = Math.min(100, Math.round((value / max) * 100));
-    const color = value >= 1.10 ? 'bg-[#C8A951]' : value >= 0.98 ? 'bg-green-500' : value >= 0.88 ? 'bg-orange-500' : 'bg-red-500';
+    const color = value >= 1.10 ? 'bg-[#D4AF37]' : value >= 0.98 ? 'bg-green-500' : value >= 0.88 ? 'bg-orange-500' : 'bg-red-500';
     return (
         <div className="flex items-center gap-2">
             <span className="text-gray-600 text-[10px] w-16 shrink-0">{label}</span>
@@ -238,7 +237,7 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, leagu
         <button type="button" onClick={() => setTab(id)}
             className={`px-3 py-1 rounded-lg text-xs font-semibold transition border ${
                 tab === id
-                    ? 'bg-[#C8A951] text-black border-[#C8A951]'
+                    ? 'bg-[#D4AF37] text-black border-[#D4AF37]'
                     : 'bg-gray-800 text-gray-500 border-gray-700 hover:border-gray-500'
             }`}>
             {label}
@@ -263,7 +262,7 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, leagu
                                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium transition ${
                                     used
                                         ? 'border-gray-800 text-gray-700 cursor-not-allowed'
-                                        : 'border-gray-700 text-gray-300 hover:border-[#C8A951]/60 hover:text-white'
+                                        : 'border-gray-700 text-gray-300 hover:border-[#D4AF37]/60 hover:text-white'
                                 }`}>
                                 <span className={`font-bold ${POS_COLORS[p.position] ?? ''} px-1 rounded text-[10px]`}>
                                     {p.position}
@@ -412,7 +411,7 @@ function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEA
                     value={query}
                     onChange={handleInput}
                     placeholder="Search any player or pick (e.g. 1.04, 2026)…"
-                    className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/60"
+                    className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/60"
                 />
                 {loading && (
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 text-xs">…</span>
@@ -476,6 +475,13 @@ interface TradeEvaluatorProps {
     lockSettings?:          boolean;        // hide format/type/size controls (league-synced mode)
     myTeam?:                TradeTeam;
     otherTeams?:            TradeTeam[];
+    /**
+     * Pre-computed defensive value scores (0–100) from the defensive ranking engine,
+     * keyed by player name (same key space as the offensive lookup).
+     * When present, defensive positions (DL/LB/DB/IDP/K/DEF) in a trade use these
+     * values instead of DTV. Offensive positions are never affected.
+     */
+    defenseValues?:         DefenseValues;
 }
 
 export default function TradeEvaluator({
@@ -491,6 +497,7 @@ export default function TradeEvaluator({
     lockSettings          = false,
     myTeam,
     otherTeams            = [],
+    defenseValues         = {},
 }: TradeEvaluatorProps = {}) {
     const [ppr, setPpr]                         = useState<PprFormat>(initialPpr);
     const [leagueType, setLeagueType]           = useState<LeagueType>(initialLeagueType);
@@ -533,6 +540,13 @@ export default function TradeEvaluator({
     // whose names come from Sleeper and may already be Player-shaped objects).
     const patchPlayer = useCallback((p: Player): Player => {
         if (p.position === 'PICK') return p;
+        // IDP/K/DEF: use defensive engine score, not KTC universe (which is offense-only).
+        // This must run before the KTC lookup so IDP players not in KTC are handled correctly.
+        const IDP_POSITIONS = new Set(['DL','LB','DB','DE','DT','NT','OLB','ILB','MLB','EDGE','CB','S','SS','FS','K','DEF']);
+        if (IDP_POSITIONS.has(p.position)) {
+            const defScore = p.id ? defenseValues[p.id] : undefined;
+            return defScore !== undefined ? { ...p, baseValue: defScore } : p;
+        }
         const u = universeMap.get(p.name.toLowerCase());
         if (!u) return p;
         const resolvedImageUrl = u.playerImageUrl ?? p.playerImageUrl ?? null;
@@ -546,7 +560,7 @@ export default function TradeEvaluator({
             playerImageUrl:  resolvedImageUrl,
             image:           resolvedImageUrl,
         };
-    }, [universeMap, leagueType, superflex, ppr, leagueSize, leagueSettings]);
+    }, [universeMap, leagueType, superflex, ppr, leagueSize, leagueSettings, defenseValues]);
 
     const allExcluded = [...sideA.map(p => p.name), ...sideB.map(p => p.name), ...sideC.map(p => p.name)];
 
@@ -615,6 +629,29 @@ export default function TradeEvaluator({
         return evaluateTrade(sideA, sideB, ppr, leagueType, [], [], leagueSettings);
     }, [sideA, sideB, ppr, leagueType, leagueSettings]);
 
+    // Unified result: only computed when defenseValues has entries.
+    // Uses the offensive DTV as the raw offense map (defense-first lookup guarantees
+    // no offensive values are overwritten). Never touches the DTV table.
+    const unifiedResult = useMemo(() => {
+        const hasDefense = Object.keys(defenseValues).length > 0;
+        const hasTrade   = sideA.length > 0 || sideB.length > 0;
+        if (!hasDefense || !hasTrade) return null;
+
+        // Build raw offenseValues from current DTV for every player in the universe.
+        // These are raw finalDtv numbers — the unified evaluator normalizes them internally.
+        const offenseValues: Record<string, number> = {};
+        for (const p of allPlayers) {
+            offenseValues[p.name] = calcDtv(p, ppr, leagueType, undefined, leagueSettings).finalDtv;
+        }
+
+        return evaluateUnifiedTrade(
+            sideA.map(p => ({ id: p.id ?? p.name, name: p.name })),
+            sideB.map(p => ({ id: p.id ?? p.name, name: p.name })),
+            offenseValues,
+            defenseValues,
+        );
+    }, [sideA, sideB, allPlayers, ppr, leagueType, leagueSettings, defenseValues]);
+
     const totalC = useMemo(() =>
         Math.round(sideC.reduce((s, p) => s + calcDtv(p, ppr, leagueType, undefined, leagueSettings).finalDtv, 0) * 10) / 10,
         [sideC, ppr, leagueType, leagueSettings]
@@ -675,9 +712,9 @@ export default function TradeEvaluator({
         <div className="space-y-6">
             {/* League badge */}
             {leagueLabel && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-[#C8A951]/10 border border-[#C8A951]/30 rounded-xl w-fit">
-                    <span className="text-[#C8A951] text-xs font-semibold">⚙ Configured for:</span>
-                    <span className="text-[#C8A951]/80 text-xs">{leagueLabel}</span>
+                <div className="flex items-center gap-2 px-3 py-2 bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-xl w-fit">
+                    <span className="text-[#D4AF37] text-xs font-semibold">⚙ Configured for:</span>
+                    <span className="text-[#D4AF37]/80 text-xs">{leagueLabel}</span>
                 </div>
             )}
 
@@ -693,12 +730,12 @@ export default function TradeEvaluator({
                             ['te_prem', 'TE Prem'],
                         ] as [PprFormat, string][]).map(([v, label]) => (
                             <button key={String(v)} onClick={() => setPpr(v)}
-                                className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${ppr === v ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
+                                className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${ppr === v ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
                                 {label}
                             </button>
                         ))}
                         <button onClick={() => setLeagueSettings(s => ({ ...s, sfSlots: s.sfSlots > 0 ? 0 : 1 }))}
-                            className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${superflex ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
+                            className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${superflex ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
                             SFLX
                         </button>
                     </div>
@@ -706,7 +743,7 @@ export default function TradeEvaluator({
                         <span className="text-gray-400 text-sm font-medium">Type:</span>
                         {(['Redraft', 'Dynasty'] as LeagueType[]).map(t => (
                             <button key={t} onClick={() => setLeagueType(t)}
-                                className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${leagueType === t ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
+                                className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${leagueType === t ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
                                 {t}
                             </button>
                         ))}
@@ -715,7 +752,7 @@ export default function TradeEvaluator({
                         <span className="text-gray-400 text-sm font-medium">League Size:</span>
                         {LEAGUE_SIZES.map(s => (
                             <button key={s} onClick={() => setLeagueSize(s)}
-                                className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${leagueSize === s ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
+                                className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${leagueSize === s ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
                                 {s}
                             </button>
                         ))}
@@ -727,7 +764,7 @@ export default function TradeEvaluator({
             <div className="flex items-center gap-3">
                 <button
                     onClick={() => { setThreeWay(v => !v); if (threeWay) setSideC([]); }}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${threeWay ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
+                    className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition border ${threeWay ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
                     {threeWay ? '✕ Remove 3rd Team' : '+ 3-Way Trade'}
                 </button>
             </div>
@@ -781,7 +818,7 @@ export default function TradeEvaluator({
                             <select
                                 value={selectedTeamId ?? ''}
                                 onChange={e => setSelectedTeamId(Number(e.target.value))}
-                                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C8A951]/60">
+                                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#D4AF37]/60">
                                 {otherTeams.map(t => (
                                     <option key={t.rosterId} value={t.rosterId}>{t.teamName}</option>
                                 ))}
@@ -823,7 +860,7 @@ export default function TradeEvaluator({
                                 <select
                                     value={selectedTeamCId ?? ''}
                                     onChange={e => setSelectedTeamCId(Number(e.target.value))}
-                                    className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C8A951]/60">
+                                    className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#D4AF37]/60">
                                     <option value="">Select a team</option>
                                     {allTeamsForC.map(t => (
                                         <option key={t.rosterId} value={t.rosterId}>{t.teamName}</option>
@@ -871,7 +908,7 @@ export default function TradeEvaluator({
                                     return (
                                         <div key={label}>
                                             <p className="text-gray-500 text-xs mb-1">{label}</p>
-                                            <p className={`text-3xl font-extrabold ${isWinner ? 'text-[#C8A951]' : 'text-white'}`}>{total}</p>
+                                            <p className={`text-3xl font-extrabold ${isWinner ? 'text-[#D4AF37]' : 'text-white'}`}>{total}</p>
                                             <p className="text-gray-500 text-xs mt-1">DTV{isWinner ? ' 🏆' : ''}</p>
                                         </div>
                                     );
@@ -937,7 +974,7 @@ export default function TradeEvaluator({
                                 </div>
                             </div>
                             <div className="text-xs text-gray-600 text-center">
-                                0–14 Robbery · 15–29 Bad Deal · 30–44 Slight Loss · 45–55 Fair Trade · 56–74 Slight Edge · 75–89 Strong Win · 90–100 Slam Dunk
+                                Score = weaker side ÷ stronger side · 90–100 Very Fair · 80–89 Slight Edge · 70–79 Clear Winner · &lt;70 Lopsided
                             </div>
                             {tradeInsight && (
                                 <div className={`flex items-start gap-2 px-4 py-3 rounded-xl border text-sm ${
@@ -947,6 +984,71 @@ export default function TradeEvaluator({
                                 }`}>
                                     <span className="text-base shrink-0">{tradeInsight.type === 'warn' ? '⚠️' : '📈'}</span>
                                     <span>{tradeInsight.text}</span>
+                                </div>
+                            )}
+
+                            {/* Unified defensive analysis — only shown when league uses IDP/K/DEF */}
+                            {unifiedResult && (
+                                <div className="border border-[#D4AF37]/30 bg-[#D4AF37]/5 rounded-xl px-5 py-4 space-y-3">
+                                    <p className="text-[#D4AF37] text-xs font-semibold uppercase tracking-wider">
+                                        League-Aware Analysis · Defensive Positions Included
+                                    </p>
+                                    <div className="grid grid-cols-3 gap-3 text-center">
+                                        <div>
+                                            <p className="text-gray-500 text-xs mb-1">Team 1</p>
+                                            <p className="text-xl font-extrabold text-white">{unifiedResult.teamAValue}</p>
+                                            <p className="text-gray-600 text-xs">value score</p>
+                                        </div>
+                                        <div className="flex flex-col items-center justify-center">
+                                            <p className={`text-base font-extrabold ${
+                                                unifiedResult.verdict === 'teamA wins' ? 'text-green-400' :
+                                                unifiedResult.verdict === 'teamB wins' ? 'text-red-400' :
+                                                'text-gray-300'
+                                            }`}>
+                                                {unifiedResult.verdict === 'teamA wins' ? 'Team 1 wins' :
+                                                 unifiedResult.verdict === 'teamB wins' ? 'Team 2 wins' :
+                                                 'Fair Trade'}
+                                            </p>
+                                            <p className="text-gray-600 text-xs mt-0.5">
+                                                diff {unifiedResult.difference > 0 ? '+' : ''}{unifiedResult.difference}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-gray-500 text-xs mb-1">Team 2</p>
+                                            <p className="text-xl font-extrabold text-white">{unifiedResult.teamBValue}</p>
+                                            <p className="text-gray-600 text-xs">value score</p>
+                                        </div>
+                                    </div>
+                                    {/* Per-player breakdown */}
+                                    <div className="grid sm:grid-cols-2 gap-3 pt-1">
+                                        {([
+                                            ['Team 1', unifiedResult.details.teamAPlayers],
+                                            ['Team 2', unifiedResult.details.teamBPlayers],
+                                        ] as const).map(([label, players]) => (
+                                            <div key={label}>
+                                                <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-wider mb-1.5">{label}</p>
+                                                <div className="space-y-1">
+                                                    {players.map(p => (
+                                                        <div key={p.id} className="flex items-center justify-between text-xs">
+                                                            <span className="text-gray-300 truncate mr-2">{p.name}</span>
+                                                            <span className="flex items-center gap-1.5 shrink-0">
+                                                                <span className={`font-bold ${
+                                                                    p.source === 'defense' ? 'text-[#D4AF37]' : 'text-gray-400'
+                                                                }`}>{p.value}</span>
+                                                                {p.source === 'defense' && (
+                                                                    <span className="text-[9px] font-bold px-1 py-px rounded bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/30">DEF</span>
+                                                                )}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <p className="text-gray-600 text-[10px]">
+                                        Defensive scores (0–100) from league-aware projection engine. Offensive scores normalized to same scale.
+                                        Gold badge = defensive engine value used.
+                                    </p>
                                 </div>
                             )}
                         </>
@@ -960,16 +1062,18 @@ export default function TradeEvaluator({
                     <div>
                         <h2 className="font-bold">Player Rankings</h2>
                         <p className="text-gray-500 text-xs mt-0.5">
-                            Values adjust for position scarcity, age curve ({leagueType}), and PPR format.
+                            {leagueType === 'Dynasty'
+                                ? 'Values adjust for age curve, position scarcity, and your league\'s scoring format.'
+                                : 'Values adjust for position scarcity and your league\'s scoring format.'}
                             {universeMeta?.ktcSyncedAt && (
-                                <span className="ml-2 text-gray-600">· KTC synced {timeAgo(universeMeta.ktcSyncedAt)}</span>
+                                <span className="ml-2 text-gray-600">· Updated {timeAgo(universeMeta.ktcSyncedAt)}</span>
                             )}
                         </p>
                     </div>
                     <div className="flex gap-2 flex-wrap">
                         {positions.map(pos => (
                             <button key={pos} onClick={() => setPosFilter(pos)}
-                                className={`px-3 py-1 rounded-lg text-xs font-semibold transition border ${posFilter === pos ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-500 border-gray-700 hover:border-gray-500'}`}>
+                                className={`px-3 py-1 rounded-lg text-xs font-semibold transition border ${posFilter === pos ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : 'bg-gray-800 text-gray-500 border-gray-700 hover:border-gray-500'}`}>
                                 {pos}
                             </button>
                         ))}
@@ -983,7 +1087,7 @@ export default function TradeEvaluator({
                         <div className="flex gap-2">
                             {PICK_YEARS.map(y => (
                                 <button key={y} onClick={() => setPickYear(y)}
-                                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition border ${pickYear === y ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
+                                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition border ${pickYear === y ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
                                     {y}
                                 </button>
                             ))}
@@ -1059,7 +1163,7 @@ export default function TradeEvaluator({
                             <div className="text-center py-10 text-gray-600">
                                 <p className="text-2xl mb-2">📊</p>
                                 <p className="text-sm font-medium text-gray-500">No delta data yet</p>
-                                <p className="text-xs text-gray-600 mt-1">Available after the next daily KTC sync (runs at 7 AM UTC)</p>
+                                <p className="text-xs text-gray-600 mt-1">Available after the next daily sync (runs at 7 AM UTC)</p>
                             </div>
                         ) : (
                             <>
@@ -1106,7 +1210,7 @@ export default function TradeEvaluator({
                                     {/* New players */}
                                     {deltaEntries.some(e => e.isNew) && (
                                         <div>
-                                            <h3 className="text-[#C8A951] font-bold text-sm mb-3">✨ New to Universe</h3>
+                                            <h3 className="text-[#D4AF37] font-bold text-sm mb-3">✨ New to Universe</h3>
                                             <div className="space-y-1.5">
                                                 {deltaEntries.filter(e => e.isNew).map(e => (
                                                     <div key={e.name} className="flex items-center justify-between px-3 py-2 bg-gray-800/60 rounded-lg">
@@ -1114,7 +1218,7 @@ export default function TradeEvaluator({
                                                             <span className={`text-[10px] font-bold px-1 py-0.5 rounded border shrink-0 ${POS_COLORS[e.position] ?? 'bg-gray-800 text-gray-400 border-gray-700'}`}>{e.position}</span>
                                                             <span className="text-white text-sm font-medium truncate">{e.name}</span>
                                                         </div>
-                                                        <span className="text-[#C8A951] font-bold text-xs">NEW</span>
+                                                        <span className="text-[#D4AF37] font-bold text-xs">NEW</span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -1170,7 +1274,7 @@ export default function TradeEvaluator({
                                                 <div className="flex items-center gap-1.5">
                                                     <span className="text-white font-medium">{p.name}</span>
                                                     {vol === 'volatile' && <span className="text-[9px] font-bold px-1 py-px rounded bg-orange-900/40 text-orange-400 border border-orange-800/50 shrink-0">HOT</span>}
-                                                    {de?.isNew && <span className="text-[9px] font-bold px-1 py-px rounded bg-[#C8A951]/10 text-[#C8A951] border border-[#C8A951]/30 shrink-0">NEW</span>}
+                                                    {de?.isNew && <span className="text-[9px] font-bold px-1 py-px rounded bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/30 shrink-0">NEW</span>}
                                                     {de?.team && <span className="text-[9px] font-bold px-1 py-px rounded bg-blue-900/30 text-blue-400 border border-blue-800/40 shrink-0" title={`Traded: ${de.team.prev ?? 'FA'} → ${de.team.current ?? 'FA'}`}>TRADED</span>}
                                                 </div>
                                             </td>

@@ -1,6 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { notify } from '@/lib/notifications/service';
+import { NotificationType } from '@/lib/notifications/types';
 
 export async function PATCH(
     request: NextRequest,
@@ -18,7 +20,7 @@ export async function PATCH(
 
     const dues = await prisma.leagueDues.findUnique({
         where: { id: duesId },
-        select: { commissionerId: true, buyInAmount: true, collectedAmount: true },
+        select: { commissionerId: true, buyInAmount: true, collectedAmount: true, leagueName: true },
     });
     if (!dues) return Response.json({ error: 'Not found.' }, { status: 404 });
     if (dues.commissionerId !== user.id) return Response.json({ error: 'Forbidden.' }, { status: 403 });
@@ -31,7 +33,7 @@ export async function PATCH(
 
     const member = await prisma.duesMember.findUnique({
         where: { id: memberId },
-        select: { leagueDuesId: true, duesStatus: true },
+        select: { leagueDuesId: true, duesStatus: true, userId: true, displayName: true },
     });
     if (!member || member.leagueDuesId !== duesId) {
         return Response.json({ error: 'Member not found.' }, { status: 404 });
@@ -75,6 +77,41 @@ export async function PATCH(
                     : { decrement: dues.buyInAmount },
             },
         });
+    }
+
+    // Fire notifications for manual payment recording
+    if (nowPaid && !wasAlreadyPaid) {
+        // Notify member if they have a FantasyIQ account
+        if (member.userId) {
+            notify({
+                userId: member.userId,
+                type:   NotificationType.DUES_PAYMENT_MANUAL,
+                title:  `Payment recorded — ${dues.leagueName ?? duesId}`,
+                body:   `Your commissioner has recorded your payment of $${dues.buyInAmount} for ${dues.leagueName ?? 'your league'}.`,
+                data: {
+                    leagueId:   duesId,
+                    leagueName: dues.leagueName,
+                    duesId,
+                    amount:     dues.buyInAmount,
+                },
+            }).catch(err => console.error('[member-status] notify member failed', err));
+        }
+
+        // Notify commissioner for their own records (in-app only, no email)
+        notify({
+            userId: user.id,
+            type:   NotificationType.DUES_PAYMENT_MANUAL,
+            title:  `Payment recorded — ${member.displayName}`,
+            body:   `You recorded a manual payment of $${dues.buyInAmount} for ${member.displayName} in ${dues.leagueName ?? 'your league'}.`,
+            data: {
+                leagueId:   duesId,
+                leagueName: dues.leagueName,
+                duesId,
+                amount:     dues.buyInAmount,
+                payer:      member.displayName,
+            },
+            email: false,
+        }).catch(err => console.error('[member-status] notify commissioner failed', err));
     }
 
     return Response.json({ ok: true });

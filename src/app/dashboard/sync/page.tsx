@@ -144,10 +144,10 @@ function SyncPageInner() {
 
                 {/* Invite context banner */}
                 {fromInvite && inviteLeagueName && (
-                    <div className="bg-[#C8A951]/10 border border-[#C8A951]/30 rounded-xl px-4 py-3 flex items-start gap-3">
+                    <div className="bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-xl px-4 py-3 flex items-start gap-3">
                         <span className="text-xl shrink-0">🏆</span>
                         <div>
-                            <p className="text-[#C8A951] font-semibold text-sm">
+                            <p className="text-[#D4AF37] font-semibold text-sm">
                                 You were invited to {inviteLeagueName}
                             </p>
                             <p className="text-gray-400 text-xs mt-0.5">
@@ -162,7 +162,7 @@ function SyncPageInner() {
                     {(['username', 'select', 'done'] as Step[]).map((s, i) => (
                         <span key={s} className="flex items-center gap-2">
                             <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border ${
-                                step === s ? 'border-[#C8A951] bg-[#C8A951]/20 text-[#C8A951]'
+                                step === s ? 'border-[#D4AF37] bg-[#D4AF37]/20 text-[#D4AF37]'
                                 : (step === 'select' && s === 'username') || step === 'done'
                                     ? 'border-green-700 bg-green-900/30 text-green-400'
                                     : 'border-gray-700 text-gray-600'
@@ -192,10 +192,10 @@ function SyncPageInner() {
                                 onChange={(e) => setUsername(e.target.value)}
                                 placeholder="e.g. russ_ff"
                                 required
-                                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-[#C8A951] transition"
+                                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-[#D4AF37] transition"
                             />
                             <button type="submit" disabled={loading || !username.trim()}
-                                className="w-full bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-50 disabled:cursor-not-allowed text-gray-950 font-bold py-2.5 rounded-lg transition">
+                                className="w-full bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-50 disabled:cursor-not-allowed text-gray-950 font-bold py-2.5 rounded-lg transition">
                                 {loading ? 'Looking up…' : 'Find My Leagues'}
                             </button>
                         </form>
@@ -225,7 +225,7 @@ function SyncPageInner() {
                                 <h2 className="font-semibold">Select leagues to sync</h2>
                                 <button type="button" onClick={() => setSelected(
                                     selected.size === result.leagues.length ? new Set() : new Set(result.leagues.map((l) => l.league_id))
-                                )} className="text-sm text-[#C8A951] hover:text-[#b8992f] transition">
+                                )} className="text-sm text-[#D4AF37] hover:text-[#BF9D2F] transition">
                                     {selected.size === result.leagues.length ? 'Deselect all' : 'Select all'}
                                 </button>
                             </div>
@@ -237,11 +237,11 @@ function SyncPageInner() {
                                         const isInvited = fromInvite && league.league_id === inviteLeagueId;
                                         return (
                                             <li key={league.league_id} onClick={() => toggleLeague(league.league_id)}
-                                                className={`flex items-center gap-4 px-5 py-4 cursor-pointer transition ${isInvited ? 'bg-[#C8A951]/5 hover:bg-[#C8A951]/10' : 'hover:bg-gray-800/30'}`}>
+                                                className={`flex items-center gap-4 px-5 py-4 cursor-pointer transition ${isInvited ? 'bg-[#D4AF37]/5 hover:bg-[#D4AF37]/10' : 'hover:bg-gray-800/30'}`}>
                                                 <input type="checkbox" checked={selected.has(league.league_id)}
                                                     onChange={() => toggleLeague(league.league_id)}
                                                     onClick={(e) => e.stopPropagation()}
-                                                    className="w-4 h-4 rounded accent-[#C8A951]" />
+                                                    className="w-4 h-4 rounded accent-[#D4AF37]" />
                                                 {league.avatar ? (
                                                     <Image src={`https://sleepercdn.com/avatars/thumbs/${league.avatar}`}
                                                         alt={league.name} width={36} height={36} className="rounded-lg shrink-0" />
@@ -254,7 +254,7 @@ function SyncPageInner() {
                                                 </div>
                                                 <div className="shrink-0 flex items-center gap-2">
                                                     {isInvited && (
-                                                        <span className="text-xs font-semibold text-[#C8A951] bg-[#C8A951]/10 border border-[#C8A951]/30 px-2 py-0.5 rounded-full">
+                                                        <span className="text-xs font-semibold text-[#D4AF37] bg-[#D4AF37]/10 border border-[#D4AF37]/30 px-2 py-0.5 rounded-full">
                                                             Invited
                                                         </span>
                                                     )}
@@ -275,7 +275,7 @@ function SyncPageInner() {
                                 Back
                             </button>
                             <button type="button" onClick={() => { void handleSync(); }} disabled={loading || selected.size === 0}
-                                className="flex-1 bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-50 disabled:cursor-not-allowed text-gray-950 font-bold py-2.5 rounded-lg transition text-sm">
+                                className="flex-1 bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-50 disabled:cursor-not-allowed text-gray-950 font-bold py-2.5 rounded-lg transition text-sm">
                                 {loading ? 'Syncing…' : `Sync ${selected.size} League${selected.size !== 1 ? 's' : ''}`}
                             </button>
                         </div>
@@ -289,7 +289,7 @@ function SyncPageInner() {
                         <h2 className="text-xl font-bold">{synced} league{synced !== 1 ? 's' : ''} synced!</h2>
                         <p className="text-gray-400 text-sm">Standings will refresh hourly. Live scores update every 3 minutes on game days.</p>
                         <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-                            <Link href="/dashboard" className="bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-6 py-2.5 rounded-lg transition text-sm">
+                            <Link href="/dashboard" className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-6 py-2.5 rounded-lg transition text-sm">
                                 Go to Dashboard
                             </Link>
                             <button type="button" onClick={() => { setStep('username'); setUsername(''); setResult(null); setSelected(new Set()); setError(''); }}

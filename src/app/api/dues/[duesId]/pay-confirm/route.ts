@@ -2,6 +2,8 @@ import type { NextRequest } from 'next/server';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { stripe } from '@/lib/stripe';
+import { notify } from '@/lib/notifications/service';
+import { NotificationType } from '@/lib/notifications/types';
 
 // GET /api/dues/[duesId]/pay-confirm
 // Belt-and-suspenders fulfillment after Stripe Checkout. The webhook handles
@@ -27,7 +29,7 @@ export async function GET(
         if (cs.payment_status === 'paid') {
             const member = await prisma.duesMember.findUnique({
                 where: { id: memberId },
-                select: { duesStatus: true, leagueDuesId: true },
+                select: { duesStatus: true, leagueDuesId: true, userId: true, displayName: true },
             });
 
             // Pull receipt URL from the expanded charge
@@ -43,7 +45,7 @@ export async function GET(
             if (member && member.leagueDuesId === duesId && member.duesStatus !== 'paid') {
                 const dues = await prisma.leagueDues.findUnique({
                     where: { id: duesId },
-                    select: { buyInAmount: true },
+                    select: { buyInAmount: true, leagueName: true, commissionerId: true },
                 });
                 if (dues) {
                     await prisma.$transaction([
@@ -65,6 +67,37 @@ export async function GET(
                             },
                         }),
                     ]);
+
+                    // Notify member (if they have a userId)
+                    if (member.userId) {
+                        notify({
+                            userId: member.userId,
+                            type:   NotificationType.DUES_PAYMENT_CONFIRMED,
+                            title:  `Payment confirmed — ${dues.leagueName}`,
+                            body:   `Your dues payment of $${dues.buyInAmount} for ${dues.leagueName} has been confirmed.`,
+                            data: {
+                                leagueId:   duesId,
+                                leagueName: dues.leagueName,
+                                duesId,
+                                amount:     dues.buyInAmount,
+                            },
+                        }).catch(err => console.error('[pay-confirm] notify member failed', err));
+                    }
+
+                    // Notify commissioner
+                    notify({
+                        userId: dues.commissionerId,
+                        type:   NotificationType.DUES_PAYMENT_CONFIRMED,
+                        title:  `Payment received — ${dues.leagueName}`,
+                        body:   `${member.displayName} has paid their dues of $${dues.buyInAmount} for ${dues.leagueName}.`,
+                        data: {
+                            leagueId:   duesId,
+                            leagueName: dues.leagueName,
+                            duesId,
+                            amount:     dues.buyInAmount,
+                            payer:      member.displayName,
+                        },
+                    }).catch(err => console.error('[pay-confirm] notify commissioner failed', err));
                 }
             } else if (member?.duesStatus === 'paid' && receiptUrl) {
                 // Already paid (webhook was first) — still save receipt URL if missing

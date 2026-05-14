@@ -108,7 +108,7 @@ export default function ProposalPage() {
                         <div key={item.id} className="px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
                             <div>
                                 <p className="font-semibold text-white">{item.payoutSpot.label}</p>
-                                <p className="text-[#C8A951] text-sm font-bold">${item.amount.toFixed(2)}</p>
+                                <p className="text-[#D4AF37] text-sm font-bold">${item.amount.toFixed(2)}</p>
                             </div>
                             {isApproved || isPoll ? (
                                 <span className="text-gray-300 text-sm">{item.member.displayName}</span>
@@ -116,7 +116,7 @@ export default function ProposalPage() {
                                 <select
                                     value={assignments[item.id] ?? ''}
                                     onChange={e => setAssignments(prev => ({ ...prev, [item.id]: e.target.value }))}
-                                    className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-[#C8A951]/60 min-w-[180px]">
+                                    className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-[#D4AF37]/60 min-w-[180px]">
                                     <option value="">— Select Winner —</option>
                                     {data?.members.map(m => (
                                         <option key={m.id} value={m.id}>{m.displayName}{m.teamName ? ` (${m.teamName})` : ''}</option>
@@ -132,7 +132,7 @@ export default function ProposalPage() {
                         <button
                             onClick={handleApprove}
                             disabled={saving}
-                            className="flex-1 bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-50 text-black font-bold py-3 rounded-xl transition text-sm">
+                            className="flex-1 bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-50 text-black font-bold py-3 rounded-xl transition text-sm">
                             {saving ? 'Processing...' : 'Approve & Send Payment Links'}
                         </button>
                         <button

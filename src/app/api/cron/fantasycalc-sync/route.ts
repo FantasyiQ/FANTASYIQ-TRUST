@@ -133,10 +133,21 @@ export async function GET(request: Request): Promise<Response> {
     // Also update fcId so it reflects the current KTC ID.
     for (let i = 0; i < entries.length; i += BATCH) {
         const batch = entries.slice(i, i + BATCH);
-        await Promise.all(batch.map(p => {
+        await Promise.all(batch.map(async p => {
             const nameLower      = p.playerName.toLowerCase();
+            const normdLower     = normalizeName(nameLower);
             const redraftValue   = redraftMap.get(nameLower)   ?? 0;
             const redraftValueSf = redraftSfMap.get(nameLower) ?? 0;
+
+            // If the canonical name has punctuation (e.g. "d.j. moore"), delete any
+            // stale de-punctuated duplicate (e.g. "dj moore") so it can't shadow the
+            // real entry in name-matching lookups.
+            if (normdLower !== nameLower) {
+                await prisma.fantasyCalcValue.deleteMany({
+                    where: { nameLower: normdLower },
+                }).catch(() => null);
+            }
+
             return prisma.fantasyCalcValue.upsert({
                 where:  { nameLower },
                 create: {

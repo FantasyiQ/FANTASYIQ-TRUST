@@ -162,7 +162,7 @@ export default function FutureDuesClient({ duesId, currentSeason, buyInAmount, m
                                     <button
                                         onClick={() => { void handleCreateTracker(s); }}
                                         disabled={isPending || trackerCreating === s}
-                                        className="px-5 py-2.5 rounded-xl text-sm font-semibold border bg-gray-800 border-gray-700 hover:border-[#C8A951]/50 text-gray-300 disabled:opacity-50 transition">
+                                        className="px-5 py-2.5 rounded-xl text-sm font-semibold border bg-gray-800 border-gray-700 hover:border-[#D4AF37]/50 text-gray-300 disabled:opacity-50 transition">
                                         {trackerCreating === s ? 'Creating…' : `+ Create ${s} Tracker`}
                                     </button>
                                 )}
@@ -180,7 +180,7 @@ export default function FutureDuesClient({ duesId, currentSeason, buyInAmount, m
                     const pendingAmt  = seasonObs.filter(o => o.status === 'pending').reduce((acc, o) => acc + o.amount, 0);
                     return (
                         <button key={s} type="button" onClick={() => setTab(s)}
-                            className={`bg-gray-900 border rounded-2xl p-4 text-left transition ${tab === s ? 'border-[#C8A951]/50' : 'border-gray-800 hover:border-gray-700'}`}>
+                            className={`bg-gray-900 border rounded-2xl p-4 text-left transition ${tab === s ? 'border-[#D4AF37]/50' : 'border-gray-800 hover:border-gray-700'}`}>
                             <p className="text-gray-400 text-xs font-semibold mb-1">{s} Season</p>
                             <p className="text-white font-bold text-lg">{seasonObs.length} <span className="text-gray-500 text-sm font-normal">obligations</span></p>
                             <div className="mt-1 text-xs space-x-2">
@@ -199,7 +199,7 @@ export default function FutureDuesClient({ duesId, currentSeason, buyInAmount, m
                     <h2 className="font-bold">{tab} Future Dues</h2>
                     <button
                         onClick={() => { setShowForm(v => !v); setError(''); }}
-                        className="text-sm border border-gray-700 hover:border-[#C8A951]/50 text-gray-300 font-semibold px-3 py-1.5 rounded-lg transition">
+                        className="text-sm border border-gray-700 hover:border-[#D4AF37]/50 text-gray-300 font-semibold px-3 py-1.5 rounded-lg transition">
                         {showForm ? 'Cancel' : '+ Add Obligation'}
                     </button>
                 </div>
@@ -214,7 +214,7 @@ export default function FutureDuesClient({ duesId, currentSeason, buyInAmount, m
                             <div className="sm:col-span-2">
                                 <label className="text-gray-500 text-xs block mb-1">Team</label>
                                 <select value={memberId} onChange={e => setMemberId(e.target.value)}
-                                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C8A951]/60">
+                                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#D4AF37]/60">
                                     <option value="">Select team…</option>
                                     {members.map(m => (
                                         <option key={m.id} value={m.id}>
@@ -226,7 +226,7 @@ export default function FutureDuesClient({ duesId, currentSeason, buyInAmount, m
                             <div>
                                 <label className="text-gray-500 text-xs block mb-1">Season</label>
                                 <select value={season} onChange={e => setSeason(e.target.value)}
-                                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C8A951]/60">
+                                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#D4AF37]/60">
                                     {SEASONS.map(s => <option key={s} value={s}>{s}</option>)}
                                 </select>
                             </div>
@@ -234,20 +234,20 @@ export default function FutureDuesClient({ duesId, currentSeason, buyInAmount, m
                                 <label className="text-gray-500 text-xs block mb-1">Amount ($)</label>
                                 <input type="number" step="0.01" min="0" value={amount}
                                     onChange={e => setAmount(e.target.value)}
-                                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C8A951]/60" />
+                                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#D4AF37]/60" />
                             </div>
                         </div>
                         <div>
                             <label className="text-gray-500 text-xs block mb-1">Notes <span className="text-gray-700">(optional — e.g. "Has 2027 1st round pick from Team A")</span></label>
                             <input type="text" value={notes} onChange={e => setNotes(e.target.value)}
                                 maxLength={200} placeholder="Reason for future dues obligation…"
-                                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/60" />
+                                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/60" />
                         </div>
                         {error && <p className="text-red-400 text-xs">{error}</p>}
                         <div className="flex gap-2">
                             <button onClick={() => { void handleAdd(); }}
                                 disabled={isPending || !memberId || !season || !amount}
-                                className="bg-[#C8A951] hover:bg-[#b8992f] text-black font-bold px-4 py-2 rounded-lg text-sm transition disabled:opacity-50">
+                                className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-black font-bold px-4 py-2 rounded-lg text-sm transition disabled:opacity-50">
                                 {isPending ? 'Adding…' : 'Add Obligation'}
                             </button>
                             <button onClick={reset} className="text-gray-500 hover:text-gray-300 text-sm px-3 py-2 rounded-lg transition">

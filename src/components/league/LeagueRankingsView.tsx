@@ -6,7 +6,7 @@ import type { LeagueRankingsData, PlayerRankingRow, TeamRankingRow, PowerRanking
 type Tab = 'players' | 'teams' | 'power';
 
 const TIER_COLORS: Record<string, string> = {
-    Elite:   'text-[#C8A951]',
+    Elite:   'text-[#D4AF37]',
     Star:    'text-green-400',
     Starter: 'text-blue-400',
     Flex:    'text-gray-300',
@@ -15,7 +15,7 @@ const TIER_COLORS: Record<string, string> = {
 };
 
 const ROSTER_TIER_COLORS: Record<string, string> = {
-    Elite:       'text-[#C8A951]',
+    Elite:       'text-[#D4AF37]',
     Contender:   'text-green-400',
     Competitive: 'text-blue-400',
     Rebuilding:  'text-gray-500',
@@ -49,6 +49,7 @@ function PlayerRankingsTable({
     onSearch,
     onPosition,
     ktcSyncedAt,
+    leagueType,
 }: {
     rankings:    PlayerRankingRow[];
     search:      string;
@@ -56,6 +57,7 @@ function PlayerRankingsTable({
     onSearch:    (v: string) => void;
     onPosition:  (v: string) => void;
     ktcSyncedAt: string | null;
+    leagueType:  string;
 }) {
     const filtered = useMemo(() => {
         let list = rankings;
@@ -72,15 +74,17 @@ function PlayerRankingsTable({
             <div className="px-6 py-3 border-b border-gray-800">
                 {ktcSyncedAt && (
                     <p className="text-gray-500 text-xs mb-2">
-                        Values adjust for position scarcity, age curve, and PPR format.
-                        <span className="ml-2 text-gray-600">· KTC synced {timeAgo(ktcSyncedAt)}</span>
+                        {leagueType === 'Dynasty'
+                            ? 'Values adjust for age curve, position scarcity, and your league\'s scoring format.'
+                            : 'Values adjust for position scarcity and your league\'s scoring format.'}
+                        <span className="ml-2 text-gray-600">· Updated {timeAgo(ktcSyncedAt)}</span>
                     </p>
                 )}
             <div className="flex items-center justify-between flex-wrap gap-3">
                 <div className="flex gap-2 flex-wrap">
                     {POS_FILTER_OPTIONS.map(pos => (
                         <button key={pos} onClick={() => onPosition(pos)}
-                            className={`px-3 py-1 rounded-lg text-xs font-semibold transition border ${position === pos ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-500 border-gray-700 hover:border-gray-500'}`}>
+                            className={`px-3 py-1 rounded-lg text-xs font-semibold transition border ${position === pos ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : 'bg-gray-800 text-gray-500 border-gray-700 hover:border-gray-500'}`}>
                             {pos}
                         </button>
                     ))}
@@ -262,7 +266,7 @@ export function LeagueRankingsView({
                             onClick={() => setTab(t.key)}
                             className={
                                 active
-                                    ? 'font-semibold text-[#C8A951] border-b-2 border-[#C8A951] pb-1 text-sm transition'
+                                    ? 'font-semibold text-[#D4AF37] border-b-2 border-[#D4AF37] pb-1 text-sm transition'
                                     : 'text-gray-500 hover:text-white text-sm transition pb-1'
                             }
                         >
@@ -280,6 +284,7 @@ export function LeagueRankingsView({
                     onSearch={onSearch}
                     onPosition={onPosition}
                     ktcSyncedAt={ktcSyncedAt}
+                    leagueType={league.leagueType}
                 />
             )}
             {tab === 'teams' && (

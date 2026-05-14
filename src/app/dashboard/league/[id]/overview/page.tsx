@@ -46,13 +46,102 @@ export default async function LeagueOverviewPage({
             id: true, userId: true, leagueId: true, leagueName: true,
             season: true, totalRosters: true, scoringType: true,
             rosterPositions: true, sleeperUserId: true,
+            platform: true, standings: true, currentMatchup: true,
         },
     });
 
     if (!league || league.userId !== session.user.id) notFound();
 
+    // ESPN leagues use stored DB data — skip all Sleeper API calls
+    if (league.platform === 'espn') {
+        type EspnStandingRow = { teamId: number; name: string; abbrev: string; ownerId: string | null; wins: number; losses: number; ties: number; fpts: number; fptsAgainst: number; rosterSize: number };
+        const espnTeams = (league.standings as EspnStandingRow[] | null) ?? [];
+        const rosterPositions = (league.rosterPositions as string[]) ?? [];
+
+        const standingRows: StandingRow[] = espnTeams.map((t, i) => ({
+            rosterId: t.teamId,
+            rank:     i + 1,
+            teamName: t.name,
+            username: undefined,
+            avatar:   null,
+            wins:     t.wins,
+            losses:   t.losses,
+            ties:     t.ties,
+            fpts:     t.fpts,
+        }));
+
+        const teamRosters: TeamRosterData[] = espnTeams.map((t, i) => ({
+            rosterId:    t.teamId,
+            rank:        i + 1,
+            teamName:    t.name,
+            username:    undefined,
+            avatar:      undefined,
+            wins:        t.wins,
+            losses:      t.losses,
+            ties:        t.ties ?? 0,
+            fpts:        t.fpts,
+            starters:    [],
+            bench:       [],
+            starterSlots: rosterPositions.filter(p => !BENCH_SLOTS.has(p)),
+        }));
+
+        const [leagueDuesRecord, leagueAnnouncements] = await Promise.all([
+            prisma.leagueDues.findFirst({
+                where: { leagueName: { equals: league.leagueName, mode: 'insensitive' }, season: league.season },
+                select: {
+                    id: true, commissionerId: true, buyInAmount: true, collectedAmount: true,
+                    potTotal: true, status: true, teamCount: true,
+                    payoutSpots: { select: { label: true, amount: true, sortOrder: true }, orderBy: { sortOrder: 'asc' } },
+                    winners: { select: { rank: true, teamName: true, displayName: true, amount: true, paidOut: true, paidAt: true }, orderBy: { rank: 'asc' } },
+                    members: { select: { id: true, userId: true, displayName: true, teamName: true, duesStatus: true, paymentMethod: true, stripeReceiptUrl: true }, orderBy: { displayName: 'asc' } },
+                },
+            }),
+            prisma.announcement.findMany({
+                where:   { leagueId: league.id },
+                orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
+                select:  { id: true, body: true, mediaUrl: true, pinned: true, createdAt: true, author: { select: { name: true } } },
+            }),
+        ]);
+
+        const duesData: DuesManagerData | null = leagueDuesRecord ? {
+            id: leagueDuesRecord.id, buyInAmount: leagueDuesRecord.buyInAmount,
+            collectedAmount: leagueDuesRecord.collectedAmount, potTotal: leagueDuesRecord.potTotal,
+            status: leagueDuesRecord.status, teamCount: leagueDuesRecord.teamCount,
+            payoutSpots: leagueDuesRecord.payoutSpots,
+            members: leagueDuesRecord.members.map(m => ({ id: m.id, userId: m.userId ?? null, displayName: m.displayName, teamName: m.teamName ?? null, duesStatus: m.duesStatus, paymentMethod: m.paymentMethod ?? null, receiptUrl: m.stripeReceiptUrl ?? null })),
+            winners: leagueDuesRecord.winners.map(w => ({ rank: w.rank, teamName: w.teamName, displayName: w.displayName ?? null, amount: w.amount, paidOut: w.paidOut, paidAt: w.paidAt?.toISOString() ?? null })),
+        } : null;
+
+        const announcements: AnnouncementData[] = leagueAnnouncements.map(a => ({
+            id: a.id, body: a.body, mediaUrl: a.mediaUrl ?? null, pinned: a.pinned,
+            createdAt: a.createdAt.toISOString(), authorName: a.author.name ?? null,
+        }));
+
+        return (
+            <LeagueOverviewCards
+                leagueId={id}
+                leagueName={league.leagueName}
+                season={league.season}
+                scoringType={league.scoringType ?? null}
+                totalRosters={league.totalRosters}
+                standingRows={standingRows}
+                hasTies={espnTeams.some(t => (t.ties ?? 0) > 0)}
+                hasPA={espnTeams.some(t => t.fpts > 0)}
+                teamRosters={teamRosters}
+                players={{}}
+                rosterPositions={rosterPositions}
+                rosterPositionsSummary={summariseRosterPositions(rosterPositions)}
+                sleeperSettings={{}}
+                duesData={duesData}
+                announcements={announcements}
+                isCommissioner={league.userId === session.user.id}
+                currentUserId={session.user.id}
+            />
+        );
+    }
+
     const safeLeagueP = getSafeSleeperLeague(league.leagueId);
-    const [allPlayers, dbUser, leagueDuesRecord, proBowlContest] = await Promise.all([
+    const [allPlayers, dbUser, leagueDuesRecord, leagueAnnouncements] = await Promise.all([
         getPlayers(),
         prisma.user.findUnique({
             where:  { id: session.user.id },
@@ -83,19 +172,12 @@ export default async function LeagueOverviewPage({
                     select:  { id: true, userId: true, displayName: true, teamName: true, duesStatus: true, paymentMethod: true, stripeReceiptUrl: true },
                     orderBy: { displayName: 'asc' },
                 },
-                announcements: {
-                    select: {
-                        id: true, body: true, mediaUrl: true, pinned: true, createdAt: true,
-                        author: { select: { name: true } },
-                    },
-                    orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
-                },
             },
         }),
-        prisma.proBowlContest.findFirst({
-            where:   { leagueId: league.id, isActive: true },
-            select:  { id: true, name: true, openAt: true, lockAt: true, endAt: true },
-            orderBy: { createdAt: 'desc' },
+        prisma.announcement.findMany({
+            where:   { leagueId: league.id },
+            orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
+            select:  { id: true, body: true, mediaUrl: true, pinned: true, createdAt: true, author: { select: { name: true } } },
         }),
     ]);
 
@@ -198,7 +280,7 @@ export default async function LeagueOverviewPage({
         })),
     } : null;
 
-    const announcements: AnnouncementData[] = (leagueDuesRecord?.announcements ?? []).map(a => ({
+    const announcements: AnnouncementData[] = leagueAnnouncements.map(a => ({
         id:         a.id,
         body:       a.body,
         mediaUrl:   a.mediaUrl ?? null,
@@ -210,27 +292,27 @@ export default async function LeagueOverviewPage({
     return (
         <>
         {showCommissionerPlanModal && (
-            <div className="rounded-xl bg-[#C8A951]/10 border border-[#C8A951]/30 px-5 py-4 mb-4 flex items-center justify-between gap-4">
+            <div className="rounded-xl bg-[#D4AF37]/10 border border-[#D4AF37]/30 px-5 py-4 mb-4 flex items-center justify-between gap-4">
                 <div>
-                    <p className="text-[#C8A951] font-semibold text-sm">You&apos;re the commissioner — choose a plan to unlock the full toolkit</p>
+                    <p className="text-[#D4AF37] font-semibold text-sm">You&apos;re the commissioner — choose a plan to unlock the full toolkit</p>
                     <p className="text-gray-400 text-xs mt-0.5">
                         Dues management, member invites, announcements, and payouts are included with a commissioner plan.
                     </p>
                 </div>
-                <a href="/pricing?tab=commissioner" className="shrink-0 bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-4 py-2 rounded-lg transition text-xs whitespace-nowrap">
+                <a href="/pricing?tab=commissioner" className="shrink-0 bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-4 py-2 rounded-lg transition text-xs whitespace-nowrap">
                     View Commissioner Plans
                 </a>
             </div>
         )}
         {showPlanModal && (
-            <div className="rounded-xl bg-[#C8A951]/10 border border-[#C8A951]/30 px-5 py-4 mb-4 flex items-center justify-between gap-4">
+            <div className="rounded-xl bg-[#D4AF37]/10 border border-[#D4AF37]/30 px-5 py-4 mb-4 flex items-center justify-between gap-4">
                 <div>
-                    <p className="text-[#C8A951] font-semibold text-sm">League synced — add it to a plan to unlock features</p>
+                    <p className="text-[#D4AF37] font-semibold text-sm">League synced — add it to a plan to unlock features</p>
                     <p className="text-gray-400 text-xs mt-0.5">
                         Standings and rosters are always free. Trade evaluator, rankings, and dues management require a plan.
                     </p>
                 </div>
-                <a href="/pricing?tab=player" className="shrink-0 bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-4 py-2 rounded-lg transition text-xs">
+                <a href="/pricing?tab=player" className="shrink-0 bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-4 py-2 rounded-lg transition text-xs">
                     View Plans
                 </a>
             </div>
@@ -292,13 +374,6 @@ export default async function LeagueOverviewPage({
             sleeperSettings={sleeperSettings}
             duesData={duesData}
             announcements={announcements}
-            proBowlContest={proBowlContest ? {
-                id:     proBowlContest.id,
-                name:   proBowlContest.name,
-                openAt: proBowlContest.openAt.toISOString(),
-                lockAt: proBowlContest.lockAt.toISOString(),
-                endAt:  proBowlContest.endAt.toISOString(),
-            } : null}
             isCommissioner={isCommissioner}
             currentUserId={session.user.id}
         />

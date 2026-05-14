@@ -106,7 +106,7 @@ export default function LeagueAssignModal({ leagues, plans, onClose }: Props) {
                                 <select
                                     value={assignments[league.id] ?? ''}
                                     onChange={e => setAssignments(prev => ({ ...prev, [league.id]: e.target.value }))}
-                                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C8A951] transition"
+                                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#D4AF37] transition"
                                 >
                                     <option value="">— Skip for now —</option>
                                     {playerPlans.length > 0 && (
@@ -150,7 +150,7 @@ export default function LeagueAssignModal({ leagues, plans, onClose }: Props) {
                         type="button"
                         onClick={() => { void handleSave(); }}
                         disabled={saving || !hasAnyChoice}
-                        className="bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-50 disabled:cursor-not-allowed text-gray-950 font-bold px-5 py-2 rounded-lg transition text-sm"
+                        className="bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-50 disabled:cursor-not-allowed text-gray-950 font-bold px-5 py-2 rounded-lg transition text-sm"
                     >
                         {saving ? 'Saving…' : 'Save Assignments'}
                     </button>

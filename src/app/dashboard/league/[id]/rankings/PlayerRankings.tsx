@@ -9,7 +9,7 @@ import { computePlayerBaseValue, playerVolatility } from '@/lib/player-universe'
 const POS_FILTER_OPTIONS = ['ALL', 'QB', 'RB', 'WR', 'TE', 'PICK'];
 
 const TIER_COLORS: Record<string, string> = {
-    Elite:   'text-[#C8A951]',
+    Elite:   'text-[#D4AF37]',
     Star:    'text-green-400',
     Starter: 'text-blue-400',
     Flex:    'text-gray-300',
@@ -117,9 +117,11 @@ export default function PlayerRankings({
                 <div>
                     <h2 className="font-bold">Player Rankings</h2>
                     <p className="text-gray-500 text-xs mt-0.5">
-                        Values adjust for position scarcity, age curve ({leagueType}), and PPR format.
+                        {leagueType === 'Dynasty'
+                            ? 'Values adjust for age curve, position scarcity, and your league\'s scoring format.'
+                            : 'Values adjust for position scarcity and your league\'s scoring format.'}
                         {universeMeta?.ktcSyncedAt && (
-                            <span className="ml-2 text-gray-600">· KTC synced {timeAgo(universeMeta.ktcSyncedAt)}</span>
+                            <span className="ml-2 text-gray-600">· Updated {timeAgo(universeMeta.ktcSyncedAt)}</span>
                         )}
                     </p>
                 </div>
@@ -127,7 +129,7 @@ export default function PlayerRankings({
                     <div className="flex gap-2 flex-wrap">
                         {POS_FILTER_OPTIONS.map(pos => (
                             <button key={pos} onClick={() => setPosFilter(pos)}
-                                className={`px-3 py-1 rounded-lg text-xs font-semibold transition border ${posFilter === pos ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-500 border-gray-700 hover:border-gray-500'}`}>
+                                className={`px-3 py-1 rounded-lg text-xs font-semibold transition border ${posFilter === pos ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : 'bg-gray-800 text-gray-500 border-gray-700 hover:border-gray-500'}`}>
                                 {pos}
                             </button>
                         ))}
@@ -167,7 +169,7 @@ export default function PlayerRankings({
                                         <div className="flex items-center gap-1.5">
                                             <span className="text-white font-medium">{p.name}</span>
                                             {vol === 'volatile' && <span className="text-[9px] font-bold px-1 py-px rounded bg-orange-900/40 text-orange-400 border border-orange-800/50 shrink-0">HOT</span>}
-                                            {de?.isNew && <span className="text-[9px] font-bold px-1 py-px rounded bg-[#C8A951]/10 text-[#C8A951] border border-[#C8A951]/30 shrink-0">NEW</span>}
+                                            {de?.isNew && <span className="text-[9px] font-bold px-1 py-px rounded bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/30 shrink-0">NEW</span>}
                                             {de?.team && <span className="text-[9px] font-bold px-1 py-px rounded bg-blue-900/30 text-blue-400 border border-blue-800/40 shrink-0" title={`Traded: ${de.team.prev ?? 'FA'} → ${de.team.current ?? 'FA'}`}>TRADED</span>}
                                         </div>
                                     </td>

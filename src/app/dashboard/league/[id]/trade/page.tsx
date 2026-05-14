@@ -4,6 +4,7 @@ export const maxDuration = 60;
 import Link from 'next/link';
 import { getTradeEvaluatorContent } from '@/lib/trade/getTradeEvaluatorContent';
 import TradeEvaluator from '@/components/league/TradeEvaluator';
+import TradePartnersPanel from '../TradePartnersPanel';
 import { getUserSubscriptionTier } from '@/lib/user/getUserSubscriptionTier';
 import BackToOverview from '../_components/BackToOverview';
 
@@ -16,9 +17,9 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
             <div className="space-y-4">
                 <BackToOverview leagueId={id} />
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-10 text-center space-y-3">
-                    <p className="text-[#C8A951] font-semibold text-lg">Unlock Trade Evaluator</p>
+                    <p className="text-[#D4AF37] font-semibold text-lg">Unlock Trade Evaluator</p>
                     <p className="text-gray-400 text-sm max-w-sm mx-auto">Trade Evaluator requires an All-Pro plan or higher.</p>
-                    <Link href="/pricing" className="inline-block bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-6 py-2.5 rounded-lg transition text-sm mt-2">
+                    <Link href="/pricing" className="inline-block bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-6 py-2.5 rounded-lg transition text-sm mt-2">
                         View Plans
                     </Link>
                 </div>
@@ -30,6 +31,10 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
     return (
         <div className="space-y-4">
             <BackToOverview leagueId={id} />
+            <TradePartnersPanel
+                sleeperLeagueId={content.sleeperLeagueId}
+                mySleeperUserId={content.mySleeperUserId}
+            />
             <TradeEvaluator content={content} />
         </div>
     );

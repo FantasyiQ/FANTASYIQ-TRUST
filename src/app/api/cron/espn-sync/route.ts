@@ -46,6 +46,7 @@ export async function GET(request: Request): Promise<Response> {
                             ownerId: t.ownerId, wins: t.wins, losses: t.losses,
                             ties: t.ties, fpts: t.pointsFor, fptsAgainst: t.pointsAgainst,
                             rosterSize: t.roster.length,
+                            players: t.roster.map(p => ({ name: p.fullName, position: p.position })),
                         })),
                         currentMatchup: currentWeekMatchups.length > 0
                             ? JSON.parse(JSON.stringify({ week: data.currentWeek, matchups: currentWeekMatchups }))

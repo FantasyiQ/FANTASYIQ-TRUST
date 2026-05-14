@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getLeague, getLeagueRosters, deriveScoringType } from '@/lib/sleeper';
+import { getLeague, getLeagueRosters, getLeagueDrafts, deriveScoringType, resolveDraftType } from '@/lib/sleeper';
 
 // POST /api/sleeper/leagues/[leagueId]/refresh
 // Re-fetches a single league from Sleeper and updates the DB record.
@@ -36,10 +36,21 @@ export async function POST(
     }
 
     try {
-        const [sleeperLeague, rosters] = await Promise.all([
+        const [sleeperLeague, rosters, drafts] = await Promise.all([
             getLeague(league.leagueId),
             getLeagueRosters(league.leagueId),
+            getLeagueDrafts(league.leagueId),
         ]);
+
+        // Resolve draft info using the league's own draft_id pointer.
+        // Fall back to snake defaults if the league has no draft_id or no match.
+        const safeDrafts   = Array.isArray(drafts) ? drafts : [];
+        const currentDraft = sleeperLeague.draft_id
+            ? safeDrafts.find(d => d.draft_id === sleeperLeague.draft_id) ?? null
+            : null;
+        const draftStartTime = currentDraft?.start_time ? BigInt(currentDraft.start_time) : null;
+        const draftStatus    = currentDraft?.status ?? null;
+        const draftType      = resolveDraftType(currentDraft);
 
         const standings = rosters
             .map(r => ({
@@ -63,6 +74,9 @@ export async function POST(
                 avatar:          sleeperLeague.avatar ?? null,
                 rosterPositions: sleeperLeague.roster_positions,
                 standings,
+                draftStartTime,
+                draftStatus,
+                draftType,
                 lastSyncedAt:    new Date(),
             },
             select: {

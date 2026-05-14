@@ -120,7 +120,7 @@ export default async function PlayerPlanPage() {
                     <div className="flex items-start justify-between gap-4 flex-wrap">
                         <div>
                             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Player Plan</p>
-                            <p className="text-2xl font-bold text-[#C8A951]">{formatTier(tier)}</p>
+                            <p className="text-2xl font-bold text-[#D4AF37]">{formatTier(tier)}</p>
                             <div className="flex items-center gap-2 mt-2 flex-wrap">
                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${STATUS_STYLES[sub.status] ?? STATUS_STYLES.inactive}`}>
                                     {sub.status.replace('_', ' ')}
@@ -144,7 +144,7 @@ export default async function PlayerPlanPage() {
                     <div className="pt-3 border-t border-gray-800">
                         <form action={createPortalSession}>
                             <button type="submit"
-                                className="text-[#C8A951]/70 hover:text-[#C8A951] text-sm font-medium transition">
+                                className="text-[#D4AF37]/70 hover:text-[#D4AF37] text-sm font-medium transition">
                                 Manage Subscription →
                             </button>
                         </form>
@@ -199,7 +199,7 @@ export default async function PlayerPlanPage() {
                                     )}
                                     <div className="flex-1 min-w-0">
                                         <Link href={`/dashboard/league/${league.id}`}
-                                            className="font-medium text-white hover:text-[#C8A951] transition truncate block">
+                                            className="font-medium text-white hover:text-[#D4AF37] transition truncate block">
                                             {league.leagueName}
                                         </Link>
                                         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -257,7 +257,7 @@ export default async function PlayerPlanPage() {
                                     )}
                                     <div className="flex-1 min-w-0">
                                         <Link href={`/dashboard/league/${league.id}`}
-                                            className="font-medium text-white hover:text-[#C8A951] transition truncate block">
+                                            className="font-medium text-white hover:text-[#D4AF37] transition truncate block">
                                             {league.leagueName}
                                         </Link>
                                         <div className="flex items-center gap-2 mt-0.5">
@@ -292,18 +292,18 @@ export default async function PlayerPlanPage() {
                                         <p className="text-gray-500 text-xs mt-0.5">Up to 5 assigned leagues · Full trade analytics</p>
                                     </div>
                                     <Link href="/pricing?tab=player"
-                                        className="shrink-0 border border-gray-600 hover:border-[#C8A951]/60 text-gray-300 font-semibold px-4 py-2 rounded-lg transition text-sm">
+                                        className="shrink-0 border border-gray-600 hover:border-[#D4AF37]/60 text-gray-300 font-semibold px-4 py-2 rounded-lg transition text-sm">
                                         Upgrade →
                                     </Link>
                                 </div>
                             )}
-                            <div className="flex items-center justify-between gap-4 p-4 bg-[#C8A951]/5 rounded-xl border border-[#C8A951]/20">
+                            <div className="flex items-center justify-between gap-4 p-4 bg-[#D4AF37]/5 rounded-xl border border-[#D4AF37]/20">
                                 <div>
-                                    <p className="font-medium text-[#C8A951] text-sm">Player Elite ✦</p>
+                                    <p className="font-medium text-[#D4AF37] text-sm">Player Elite ✦</p>
                                     <p className="text-gray-500 text-xs mt-0.5">Unlimited leagues · Priority data · All features</p>
                                 </div>
                                 <Link href="/pricing?tab=player"
-                                    className="shrink-0 bg-[#C8A951]/15 border border-[#C8A951]/50 text-[#C8A951] font-bold px-4 py-2 rounded-lg transition text-sm hover:bg-[#C8A951]/25">
+                                    className="shrink-0 bg-[#D4AF37]/15 border border-[#D4AF37]/50 text-[#D4AF37] font-bold px-4 py-2 rounded-lg transition text-sm hover:bg-[#D4AF37]/25">
                                     {isAllPro ? 'Upgrade →' : 'View Plans →'}
                                 </Link>
                             </div>

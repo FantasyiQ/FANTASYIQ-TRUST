@@ -47,7 +47,7 @@ export default function LeagueDuesView({
                 </div>
                 {isCommissioner && duesId && (
                     <Link href={`/dashboard/commissioner/dues/${duesId}`}
-                        className="shrink-0 bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-4 py-2 rounded-lg text-sm transition">
+                        className="shrink-0 bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-4 py-2 rounded-lg text-sm transition">
                         Manage Dues →
                     </Link>
                 )}
@@ -64,7 +64,7 @@ export default function LeagueDuesView({
                                 Set up dues tracking to monitor buy-ins, pot totals, and payout results.
                             </p>
                             <Link href="/dashboard/commissioner/dues"
-                                className="inline-block bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-6 py-2.5 rounded-lg transition text-sm mt-2">
+                                className="inline-block bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-6 py-2.5 rounded-lg transition text-sm mt-2">
                                 Set Up Dues
                             </Link>
                         </>
@@ -91,7 +91,7 @@ export default function LeagueDuesView({
                             <span className="text-gray-500 text-lg mb-0.5">/ ${pot.full.toFixed(2)}</span>
                         </div>
                         <div className="w-full bg-gray-800 rounded-full h-3 overflow-hidden">
-                            <div className="bg-[#C8A951] h-3 rounded-full transition-all duration-500" style={{ width: `${pot.progress}%` }} />
+                            <div className="bg-[#D4AF37] h-3 rounded-full transition-all duration-500" style={{ width: `${pot.progress}%` }} />
                         </div>
                         <div className="grid grid-cols-3 gap-4">
                             <div className="text-center bg-gray-800/40 rounded-xl py-3 border border-gray-800">
@@ -166,7 +166,7 @@ export default function LeagueDuesView({
                                     {!isCommissioner && myMember.duesStatus !== 'paid' && (
                                         <Link
                                             href={`/dashboard/league/${league.id}/dues/pay`}
-                                            className="text-sm font-medium text-[#C8A951] hover:underline"
+                                            className="text-sm font-medium text-[#D4AF37] hover:underline"
                                         >
                                             Pay Dues →
                                         </Link>
@@ -174,7 +174,7 @@ export default function LeagueDuesView({
                                     {isCommissioner && duesId && (
                                         <Link
                                             href={`/dashboard/commissioner/dues/${duesId}`}
-                                            className="text-sm font-medium text-[#C8A951] hover:underline"
+                                            className="text-sm font-medium text-[#D4AF37] hover:underline"
                                         >
                                             Manage Dues →
                                         </Link>
@@ -218,7 +218,7 @@ export default function LeagueDuesView({
                         {isCommissioner && duesId && (
                             <div className="px-6 py-3 border-t border-gray-800 flex justify-end">
                                 <Link href={`/dashboard/commissioner/dues/${duesId}`}
-                                    className="text-sm text-[#C8A951]/70 hover:text-[#C8A951] font-medium transition">
+                                    className="text-sm text-[#D4AF37]/70 hover:text-[#D4AF37] font-medium transition">
                                     Manage roster &amp; payments →
                                 </Link>
                             </div>
@@ -259,7 +259,7 @@ export default function LeagueDuesView({
                             {isCommissioner && duesId && (
                                 <div className="px-6 py-3 border-t border-gray-800 flex justify-end">
                                     <Link href={`/dashboard/commissioner/dues/${duesId}/payouts`}
-                                        className="text-sm text-[#C8A951]/70 hover:text-[#C8A951] font-medium transition">
+                                        className="text-sm text-[#D4AF37]/70 hover:text-[#D4AF37] font-medium transition">
                                         Edit payout spots →
                                     </Link>
                                 </div>

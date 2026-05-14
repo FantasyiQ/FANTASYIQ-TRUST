@@ -35,19 +35,19 @@ export default function PayoutsHistory({ leagueId, leagueName, season, rows }: P
             <BackToOverview leagueId={leagueId} />
 
             <div>
-                <h1 className="text-2xl font-bold text-[#CBA135]">Payout History</h1>
+                <h1 className="text-2xl font-bold text-[#D4AF37]">Payout History</h1>
                 <p className="text-gray-400 text-sm mt-1">{leagueName} · {season} season</p>
             </div>
 
             {rows.length === 0 ? (
                 /* Empty state */
-                <div className="bg-[#CBA135]/10 border border-[#CBA135]/30 rounded-xl px-6 py-10 text-center">
-                    <p className="text-[#CBA135] font-semibold mb-1">No payout history yet for this league.</p>
+                <div className="bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-xl px-6 py-10 text-center">
+                    <p className="text-[#D4AF37] font-semibold mb-1">No payout history yet for this league.</p>
                     <p className="text-gray-500 text-sm">
                         Record payouts from the{' '}
                         <a
                             href={`/dashboard/league/${leagueId}/payouts`}
-                            className="text-[#CBA135] hover:text-[#E2B857] underline underline-offset-2"
+                            className="text-[#D4AF37] hover:text-[#D4AF37] underline underline-offset-2"
                         >
                             Payouts Manager
                         </a>
@@ -55,7 +55,7 @@ export default function PayoutsHistory({ leagueId, leagueName, season, rows }: P
                     </p>
                 </div>
             ) : (
-                <div className="bg-[#0A0A0A] border border-[#CBA135] hover:border-[#E2B857] rounded-xl overflow-hidden transition-colors">
+                <div className="bg-[#0A0A0A] border border-[#D4AF37] hover:border-[#D4AF37] rounded-xl overflow-hidden transition-colors">
 
                     {/* Table header */}
                     <div className="grid grid-cols-[auto_1fr_auto_auto] gap-4 px-5 py-3 border-b border-white/10 bg-black/30">
@@ -74,14 +74,14 @@ export default function PayoutsHistory({ leagueId, leagueName, season, rows }: P
                                 {/* Season + rank */}
                                 <div className="text-sm">
                                     <span className="text-gray-400">{row.season}</span>
-                                    <span className="ml-2 text-[#CBA135] font-semibold text-xs">{rankLabel(row.rank)}</span>
+                                    <span className="ml-2 text-[#D4AF37] font-semibold text-xs">{rankLabel(row.rank)}</span>
                                 </div>
 
                                 {/* Team name */}
                                 <span className="text-white text-sm font-medium truncate">{row.teamName}</span>
 
                                 {/* Amount */}
-                                <span className="text-[#CBA135] font-bold text-sm text-right">{fmt(row.amount)}</span>
+                                <span className="text-[#D4AF37] font-bold text-sm text-right">{fmt(row.amount)}</span>
 
                                 {/* Status */}
                                 <div className="text-right">
@@ -114,7 +114,7 @@ export default function PayoutsHistory({ leagueId, leagueName, season, rows }: P
 
             <a
                 href={`/dashboard/league/${leagueId}/payouts`}
-                className="block text-center text-sm text-gray-500 hover:text-[#CBA135] transition-colors"
+                className="block text-center text-sm text-gray-500 hover:text-[#D4AF37] transition-colors"
             >
                 ← Back to Payouts Manager
             </a>

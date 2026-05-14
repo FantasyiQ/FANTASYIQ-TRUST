@@ -65,7 +65,7 @@ export async function POST(_req: NextRequest) {
     // Also wipe DuesMember rows where this user appears as a *member* (not commissioner)
     await prisma.duesMember.deleteMany({ where: { userId } });
 
-    // --- League tree (LeaguePayout, LeaguePayoutWinner, ProBowlContest, LeagueCalendarEvent all cascade) ---
+    // --- League tree (LeaguePayout, LeaguePayoutWinner, LeagueCalendarEvent all cascade) ---
     if (dbLeagueIds.length > 0) {
         await prisma.league.deleteMany({ where: { id: { in: dbLeagueIds } } });
     }

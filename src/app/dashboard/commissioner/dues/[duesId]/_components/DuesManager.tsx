@@ -11,6 +11,7 @@ import InviteLinkButton from '@/components/InviteLinkButton';
 
 export interface DuesMember {
     id: string;
+    userId: string | null;
     displayName: string;
     teamName: string | null;
     email: string | null;
@@ -37,6 +38,11 @@ export interface DuesManagerProps {
     payoutSpots: PayoutSpot[];
     hasProposal: boolean;
     sleeperLeagueId: string | null;
+    platform: string;
+    leagueDbId: string | null;
+    currentUserId: string;
+    currentUserEmail: string | null;
+    currentUserName: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -63,7 +69,15 @@ export default function DuesManager({
     payoutSpots,
     hasProposal,
     sleeperLeagueId,
+    platform,
+    leagueDbId,
+    currentUserId,
+    currentUserEmail,
+    currentUserName,
 }: DuesManagerProps) {
+    const platformLabel = platform === 'espn' ? 'ESPN' : 'Fantasy';
+    const backHref  = leagueDbId ? `/dashboard/league/${leagueDbId}/commissioner` : '/dashboard/commissioner/dues';
+    const backLabel = leagueDbId ? '← Back to Commissioner Hub' : '← Back to Dues Tracker';
     const router = useRouter();
 
     // Per-member loading / modal state
@@ -181,7 +195,7 @@ export default function DuesManager({
             } else if ((data.added ?? 0) === 0) {
                 setSyncMessage(data.message ?? 'All members already synced.');
             } else {
-                setSyncMessage(`✓ Added ${data.added} member${data.added === 1 ? '' : 's'} from Sleeper.`);
+                setSyncMessage(`✓ Added ${data.added} member${data.added === 1 ? '' : 's'} from ${platformLabel}.`);
                 router.refresh();
             }
         } catch {
@@ -202,9 +216,9 @@ export default function DuesManager({
                 {/* ── Header ─────────────────────────────────────────────── */}
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
-                        <Link href="/dashboard/commissioner/dues"
+                        <Link href={backHref}
                             className="text-gray-500 hover:text-gray-300 text-sm transition">
-                            ← Back to Dues Tracker
+                            {backLabel}
                         </Link>
                         <h1 className="text-2xl font-bold mt-3">{leagueName}</h1>
                         <p className="text-gray-400 text-sm mt-0.5">
@@ -213,16 +227,16 @@ export default function DuesManager({
                     </div>
                     <div className="flex gap-2 flex-wrap">
                         <Link href={`/dashboard/commissioner/dues/${duesId}/future-dues`}
-                            className="border border-gray-700 hover:border-[#C8A951]/50 text-gray-300 font-semibold px-4 py-2 rounded-lg text-sm transition">
+                            className="border border-gray-700 hover:border-[#D4AF37]/50 text-gray-300 font-semibold px-4 py-2 rounded-lg text-sm transition">
                             Future Dues
                         </Link>
                         <Link href={`/dashboard/commissioner/dues/${duesId}/payouts`}
-                            className="border border-gray-700 hover:border-[#C8A951]/50 text-gray-300 font-semibold px-4 py-2 rounded-lg text-sm transition">
+                            className="border border-gray-700 hover:border-[#D4AF37]/50 text-gray-300 font-semibold px-4 py-2 rounded-lg text-sm transition">
                             Payout Spots
                         </Link>
                         {hasProposal && (
                             <Link href={`/dashboard/commissioner/dues/${duesId}/proposal`}
-                                className="bg-[#C8A951] hover:bg-[#b8992f] text-black font-bold px-4 py-2 rounded-lg text-sm transition">
+                                className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-black font-bold px-4 py-2 rounded-lg text-sm transition">
                                 Review Proposal
                             </Link>
                         )}
@@ -242,7 +256,7 @@ export default function DuesManager({
                         <span className="text-gray-500 text-lg mb-1">/ ${fullPot.toFixed(2)}</span>
                     </div>
                     <div className="w-full bg-gray-800 rounded-full h-3">
-                        <div className="bg-[#C8A951] h-3 rounded-full transition-all" style={{ width: `${progress}%` }} />
+                        <div className="bg-[#D4AF37] h-3 rounded-full transition-all" style={{ width: `${progress}%` }} />
                     </div>
                     <div className="grid grid-cols-3 gap-4 pt-1">
                         <div className="text-center">
@@ -305,8 +319,8 @@ export default function DuesManager({
                                 <button
                                     onClick={syncMembers}
                                     disabled={syncing}
-                                    className="border border-gray-700 hover:border-[#C8A951]/50 disabled:opacity-50 text-gray-300 font-semibold px-3 py-1.5 rounded-lg text-sm transition">
-                                    {syncing ? 'Syncing…' : 'Sync from Sleeper'}
+                                    className="border border-gray-700 hover:border-[#D4AF37]/50 disabled:opacity-50 text-gray-300 font-semibold px-3 py-1.5 rounded-lg text-sm transition">
+                                    {syncing ? 'Syncing…' : `Sync from ${platformLabel}`}
                                 </button>
                                 {syncMessage && <p className="text-green-400 text-xs">{syncMessage}</p>}
                                 {syncError   && <p className="text-red-400 text-xs max-w-xs text-right">{syncError}</p>}
@@ -318,13 +332,13 @@ export default function DuesManager({
                         <div className="px-6 py-12 flex flex-col items-center gap-3 text-center">
                             <p className="text-gray-400 text-sm">No members added yet.</p>
                             <p className="text-gray-600 text-xs max-w-xs">
-                                Your Sleeper league is connected — sync your roster to import members automatically.
+                                Your {platformLabel} league is connected — sync your roster to import members automatically.
                             </p>
                             <button
                                 onClick={syncMembers}
                                 disabled={syncing}
-                                className="bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-50 text-gray-950 font-bold px-5 py-2.5 rounded-xl transition text-sm">
-                                {syncing ? 'Syncing…' : 'Sync Roster from Sleeper'}
+                                className="bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-50 text-gray-950 font-bold px-5 py-2.5 rounded-xl transition text-sm">
+                                {syncing ? 'Syncing…' : `Sync Roster from ${platformLabel}`}
                             </button>
                             {syncError && <p className="text-red-400 text-xs max-w-xs text-center">{syncError}</p>}
                         </div>
@@ -337,6 +351,15 @@ export default function DuesManager({
                                 const isLoading = loadingMemberId === member.id;
                                 const err       = memberError[member.id];
 
+                                // userId may be null if the member row wasn't linked to a FantasyIQ
+                                // account at sync time — fall back to email then name matching.
+                                const isOwnRow =
+                                    (member.userId != null && member.userId === currentUserId) ||
+                                    (member.email  != null && currentUserEmail != null &&
+                                        member.email.toLowerCase() === currentUserEmail.toLowerCase()) ||
+                                    (member.userId == null && member.email == null && currentUserName != null &&
+                                        member.displayName.toLowerCase() === currentUserName.toLowerCase());
+
                                 return (
                                     <li key={member.id} className="px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
                                         <div className="min-w-0">
@@ -346,7 +369,8 @@ export default function DuesManager({
                                             {err             && <p className="text-red-400 text-xs mt-1">{err}</p>}
                                         </div>
 
-                                        <div className="flex items-center gap-3 shrink-0 flex-wrap">
+                                                        <div className="flex items-center gap-3 shrink-0 flex-wrap">
+                                            {/* ── Paid state: same for everyone ── */}
                                             {isPaid ? (
                                                 <div className="text-right space-y-0.5">
                                                     {isStripe && (
@@ -371,32 +395,53 @@ export default function DuesManager({
                                                         </p>
                                                     )}
                                                 </div>
-                                            ) : (
-                                                <div className="flex items-center gap-2">
+                                            ) : isOwnRow ? (
+                                                /* ── Own row (commissioner viewing themselves) ── */
+                                                <>
                                                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-900/30 text-red-400 border border-red-900">
                                                         Unpaid
                                                     </span>
+                                                    {leagueDbId && (
+                                                        <a
+                                                            href={`/dashboard/league/${leagueDbId}/dues/pay`}
+                                                            className="text-xs bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/30 font-semibold px-3 py-1.5 rounded-lg transition">
+                                                            Pay Dues →
+                                                        </a>
+                                                    )}
                                                     <button
-                                                        onClick={() => payOnBehalf(member)}
+                                                        onClick={() => removeMember(member)}
                                                         disabled={isLoading}
-                                                        className="text-xs bg-[#C8A951]/10 hover:bg-[#C8A951]/20 text-[#C8A951] border border-[#C8A951]/30 font-semibold px-3 py-1.5 rounded-lg transition disabled:opacity-50">
-                                                        {isLoading ? '…' : 'Pay on Behalf →'}
+                                                        className="text-gray-700 hover:text-red-400 text-xs transition disabled:opacity-50">
+                                                        ✕
                                                     </button>
+                                                </>
+                                            ) : (
+                                                /* ── Someone else's row (commissioner managing others) ── */
+                                                <>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-900/30 text-red-400 border border-red-900">
+                                                            Unpaid
+                                                        </span>
+                                                        <button
+                                                            onClick={() => payOnBehalf(member)}
+                                                            disabled={isLoading}
+                                                            className="text-xs bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/30 font-semibold px-3 py-1.5 rounded-lg transition disabled:opacity-50">
+                                                            {isLoading ? '…' : 'Pay on Behalf →'}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setManualModalId(member.id)}
+                                                            disabled={isLoading}
+                                                            className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-500 border border-gray-700 font-medium px-2.5 py-1.5 rounded-lg transition disabled:opacity-50">
+                                                            Record Manual
+                                                        </button>
+                                                    </div>
                                                     <button
-                                                        onClick={() => setManualModalId(member.id)}
+                                                        onClick={() => removeMember(member)}
                                                         disabled={isLoading}
-                                                        className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-500 border border-gray-700 font-medium px-2.5 py-1.5 rounded-lg transition disabled:opacity-50">
-                                                        Record Manual
+                                                        className="text-gray-700 hover:text-red-400 text-xs transition disabled:opacity-50">
+                                                        ✕
                                                     </button>
-                                                </div>
-                                            )}
-                                            {!isPaid && (
-                                                <button
-                                                    onClick={() => removeMember(member)}
-                                                    disabled={isLoading}
-                                                    className="text-gray-700 hover:text-red-400 text-xs transition disabled:opacity-50">
-                                                    ✕
-                                                </button>
+                                                </>
                                             )}
                                         </div>
 
@@ -420,7 +465,7 @@ export default function DuesManager({
                                                     <div className="flex gap-3 pt-1">
                                                         <button
                                                             onClick={() => setManualModalId(null)}
-                                                            className="flex-1 bg-[#C8A951] hover:bg-[#b8992f] text-black font-bold py-2.5 rounded-xl text-sm transition">
+                                                            className="flex-1 bg-[#D4AF37] hover:bg-[#BF9D2F] text-black font-bold py-2.5 rounded-xl text-sm transition">
                                                             Cancel
                                                         </button>
                                                         <button
@@ -448,7 +493,7 @@ export default function DuesManager({
                             <p className="text-gray-500 text-xs mt-0.5">Where the pot goes at season end</p>
                         </div>
                         <Link href={`/dashboard/commissioner/dues/${duesId}/payouts`}
-                            className="text-[#C8A951]/70 hover:text-[#C8A951] text-sm font-medium transition">
+                            className="text-[#D4AF37]/70 hover:text-[#D4AF37] text-sm font-medium transition">
                             {payoutSpots.length > 0 ? 'Edit →' : 'Set up →'}
                         </Link>
                     </div>
@@ -460,7 +505,7 @@ export default function DuesManager({
                                 Define where the pot goes — 1st place, 2nd, survivor, etc.
                             </p>
                             <Link href={`/dashboard/commissioner/dues/${duesId}/payouts`}
-                                className="border border-gray-700 hover:border-[#C8A951]/50 text-gray-300 font-semibold px-4 py-2 rounded-lg text-sm transition">
+                                className="border border-gray-700 hover:border-[#D4AF37]/50 text-gray-300 font-semibold px-4 py-2 rounded-lg text-sm transition">
                                 Set Up Payout Spots
                             </Link>
                         </div>

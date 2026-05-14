@@ -53,7 +53,7 @@ export default async function UpgradePage({
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <Link
                         href="/pricing?tab=player"
-                        className="bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-6 py-3 rounded-xl transition text-sm"
+                        className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-6 py-3 rounded-xl transition text-sm"
                     >
                         View Player Plans →
                     </Link>

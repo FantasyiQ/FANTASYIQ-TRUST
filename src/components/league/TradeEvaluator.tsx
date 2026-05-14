@@ -14,6 +14,7 @@ export default function TradeEvaluator({ content }: { content: TradeEvaluatorCon
             scoringSettings={content.scoringSettings}
             myTeamData={content.myTeamData}
             otherTeamsData={content.otherTeamsData}
+            defenseValues={content.defenseValues}
         />
     );
 }

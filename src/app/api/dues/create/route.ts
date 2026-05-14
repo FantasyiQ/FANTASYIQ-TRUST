@@ -18,7 +18,10 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     const { subscriptionId, leagueName, seasons, buyInAmount, teamCount } = body;
 
-    if (!subscriptionId || !leagueName || !seasons?.length || !buyInAmount || !teamCount) {
+    // subscriptionId is optional — omitted when creating from Commissioner Hub without a plan link
+    const subId = subscriptionId || null;
+
+    if (!leagueName || !seasons?.length || !buyInAmount || !teamCount) {
         return Response.json({ error: 'All fields are required.' }, { status: 400 });
     }
     if (buyInAmount <= 0 || teamCount < 2) {
@@ -31,16 +34,18 @@ export async function POST(request: NextRequest): Promise<Response> {
     });
     if (!user) return Response.json({ error: 'User not found.' }, { status: 404 });
 
-    const sub = await prisma.subscription.findUnique({
-        where: { id: subscriptionId },
-        select: { id: true, userId: true, type: true, status: true, leagueDues: { select: { id: true } } },
-    });
-
-    if (!sub) return Response.json({ error: 'Subscription not found.' }, { status: 404 });
-    if (sub.userId !== user.id) return Response.json({ error: 'Forbidden.' }, { status: 403 });
-    if (sub.type !== 'commissioner') return Response.json({ error: 'Only commissioner plans can use the dues tracker.' }, { status: 400 });
-    if (sub.status !== 'active' && sub.status !== 'trialing') return Response.json({ error: 'Subscription is not active.' }, { status: 400 });
-    if (sub.leagueDues) return Response.json({ error: 'A tracker already exists for this league.' }, { status: 400 });
+    // Only validate subscription if one was provided
+    if (subId) {
+        const sub = await prisma.subscription.findUnique({
+            where:  { id: subId },
+            select: { id: true, userId: true, type: true, status: true, leagueDues: { select: { id: true } } },
+        });
+        if (!sub) return Response.json({ error: 'Subscription not found.' }, { status: 404 });
+        if (sub.userId !== user.id) return Response.json({ error: 'Forbidden.' }, { status: 403 });
+        if (sub.type !== 'commissioner') return Response.json({ error: 'Only commissioner plans can use the dues tracker.' }, { status: 400 });
+        if (sub.status !== 'active' && sub.status !== 'trialing') return Response.json({ error: 'Subscription is not active.' }, { status: 400 });
+        if (sub.leagueDues) return Response.json({ error: 'A tracker already exists for this league.' }, { status: 400 });
+    }
 
     // Create one tracker per season. First season links to the subscription;
     // additional seasons are standalone (commissionerId only).
@@ -48,7 +53,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     const primary = await prisma.leagueDues.create({
         data: {
-            subscriptionId,
+            ...(subId ? { subscriptionId: subId } : {}),
             commissionerId: user.id,
             leagueName,
             season: primarySeason,

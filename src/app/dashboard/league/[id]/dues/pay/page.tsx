@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { getCurrentUser } from '@/lib/auth';
 import { getLeagueById } from '@/lib/db/leagues';
 import { prisma } from '@/lib/prisma';
@@ -11,8 +12,15 @@ function appUrl() {
     return process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? 'http://localhost:3000';
 }
 
-export default async function PayDuesPage({ params }: { params: Promise<{ id: string }> }) {
-    const { id } = await params;
+export default async function PayDuesPage({
+    params,
+    searchParams,
+}: {
+    params:       Promise<{ id: string }>;
+    searchParams: Promise<{ memberId?: string }>;
+}) {
+    const { id }       = await params;
+    const { memberId: pickedMemberId } = await searchParams;
 
     const user   = await getCurrentUser();
     const league = await getLeagueById(id, user.id);
@@ -32,15 +40,38 @@ export default async function PayDuesPage({ params }: { params: Promise<{ id: st
         );
     }
 
-    // Commissioners use Record Cash Received — send them to the dues manager instead
-    if (dues.commissionerId === user.id) {
-        redirect(`/dashboard/commissioner/dues/${dues.id}`);
-    }
-
-    const member = await prisma.duesMember.findFirst({
-        where:  { leagueDuesId: dues.id, userId: user.id },
-        select: { id: true, duesStatus: true, displayName: true },
+    const dbUser = await prisma.user.findUnique({
+        where:  { id: user.id },
+        select: { id: true, email: true, name: true, stripeCustomerId: true },
     });
+    if (!dbUser) redirect('/dashboard');
+
+    const allMembers = await prisma.duesMember.findMany({
+        where:  { leagueDuesId: dues.id },
+        select: { id: true, duesStatus: true, displayName: true, userId: true, email: true },
+    });
+
+    // Three-tier auto-match: userId → email → displayName
+    let member = allMembers.find(m =>
+        (m.userId != null && m.userId === user.id) ||
+        (m.email  != null && dbUser.email != null &&
+            m.email.toLowerCase() === dbUser.email.toLowerCase()) ||
+        (m.userId == null && m.email == null && dbUser.name != null &&
+            m.displayName.toLowerCase() === dbUser.name.toLowerCase())
+    ) ?? null;
+
+    // If user manually picked their slot via the picker, use that
+    if (!member && pickedMemberId) {
+        const picked = allMembers.find(m => m.id === pickedMemberId);
+        if (picked && picked.duesStatus !== 'paid') {
+            member = picked;
+            // Persist the link so future visits auto-match
+            await prisma.duesMember.update({
+                where: { id: picked.id },
+                data:  { userId: user.id },
+            });
+        }
+    }
 
     if (member?.duesStatus === 'paid') {
         return (
@@ -51,24 +82,42 @@ export default async function PayDuesPage({ params }: { params: Promise<{ id: st
         );
     }
 
+    // No auto-match and no pick yet — show slot picker
     if (!member) {
+        const unpaid = allMembers.filter(m => m.duesStatus !== 'paid');
         return (
-            <div className="max-w-xl mx-auto mt-10 space-y-4">
+            <div className="max-w-xl mx-auto mt-10 space-y-6">
                 <BackToOverview leagueId={id} />
-                <p className="text-gray-400">
-                    Your account isn&apos;t linked to a member slot in this league yet. Ask your commissioner to assign you.
-                </p>
+                <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
+                    <h2 className="text-lg font-semibold">Which team are you?</h2>
+                    <p className="text-sm text-gray-400">
+                        We couldn&apos;t automatically match your account to a member slot.
+                        Select your team below to continue to payment.
+                    </p>
+                    {unpaid.length === 0 ? (
+                        <p className="text-sm text-gray-500">All members have already paid.</p>
+                    ) : (
+                        <div className="flex flex-col gap-2">
+                            {unpaid.map(m => (
+                                <Link
+                                    key={m.id}
+                                    href={`/dashboard/league/${id}/dues/pay?memberId=${m.id}`}
+                                    className="flex items-center justify-between px-4 py-3 rounded-xl bg-gray-800 border border-gray-700 hover:border-[#D4AF37]/50 hover:bg-gray-800/80 transition group"
+                                >
+                                    <span className="font-medium text-sm">{m.displayName}</span>
+                                    <span className="text-xs text-[#D4AF37] opacity-0 group-hover:opacity-100 transition">
+                                        Pay dues →
+                                    </span>
+                                </Link>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
         );
     }
 
     // Get or create Stripe customer
-    const dbUser = await prisma.user.findUnique({
-        where:  { id: user.id },
-        select: { id: true, email: true, name: true, stripeCustomerId: true },
-    });
-    if (!dbUser) redirect('/dashboard');
-
     let customerId = dbUser.stripeCustomerId;
     if (!customerId) {
         const customer = await stripe.customers.create({

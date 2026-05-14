@@ -107,7 +107,7 @@ export default async function TradePage() {
                     </Link>
                     <h1 className="text-2xl font-bold mt-3">Dynamic Trade Values</h1>
                     <p className="text-gray-400 text-sm mt-1">
-                        Values adjust for position scarcity, age curve, and your PPR format. Search players to evaluate any trade.
+                        Values adjust for position scarcity and your scoring format. Search players to evaluate any trade.
                     </p>
                 </div>
                 <TradeEvaluator allLeaguePicks={allLeaguePicks} />

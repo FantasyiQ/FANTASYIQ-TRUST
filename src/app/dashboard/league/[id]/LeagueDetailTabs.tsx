@@ -125,7 +125,7 @@ function CollapsibleCard({ title, children }: { title: string; children: React.R
 const POS_FILTER_OPTIONS = ['All', 'QB', 'RB', 'WR', 'TE', 'PICK'];
 
 const TIER_COLORS: Record<string, string> = {
-    Elite:   'text-[#C8A951]',
+    Elite:   'text-[#D4AF37]',
     Star:    'text-green-400',
     Starter: 'text-blue-400',
     Flex:    'text-gray-300',
@@ -192,7 +192,7 @@ function PlayerRankingsCard({
                 <div className="flex gap-2 flex-wrap">
                     {POS_FILTER_OPTIONS.map(pos => (
                         <button key={pos} onClick={() => setPosFilter(pos)}
-                            className={`px-3 py-1 rounded-lg text-xs font-semibold transition border ${posFilter === pos ? 'bg-[#C8A951] text-black border-[#C8A951]' : 'bg-gray-800 text-gray-500 border-gray-700 hover:border-gray-500'}`}>
+                            className={`px-3 py-1 rounded-lg text-xs font-semibold transition border ${posFilter === pos ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : 'bg-gray-800 text-gray-500 border-gray-700 hover:border-gray-500'}`}>
                             {pos}
                         </button>
                     ))}
@@ -319,19 +319,19 @@ function AnnouncementsSection({
                         onChange={e => setBody(e.target.value)}
                         placeholder="Write an announcement for your league…"
                         rows={3}
-                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/50 resize-none"
+                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/50 resize-none"
                     />
                     <input
                         value={mediaUrl}
                         onChange={e => setMediaUrl(e.target.value)}
                         placeholder="Image / GIF URL (optional)"
-                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/50"
+                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/50"
                     />
                     {postError && <p className="text-red-400 text-xs">{postError}</p>}
                     <button
                         onClick={handlePost}
                         disabled={posting || !body.trim()}
-                        className="bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-50 disabled:cursor-not-allowed text-gray-950 font-semibold px-4 py-2 rounded-lg text-sm transition"
+                        className="bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-50 disabled:cursor-not-allowed text-gray-950 font-semibold px-4 py-2 rounded-lg text-sm transition"
                     >
                         {posting ? 'Posting…' : '+ Post Announcement'}
                     </button>
@@ -343,7 +343,7 @@ function AnnouncementsSection({
                     {items.map(a => (
                         <div key={a.id} className="bg-gray-800/40 rounded-xl p-4">
                             {a.pinned && (
-                                <span className="text-xs font-semibold text-[#C8A951] mb-1 block">📌 Pinned</span>
+                                <span className="text-xs font-semibold text-[#D4AF37] mb-1 block">📌 Pinned</span>
                             )}
                             <p className="text-gray-200 text-sm leading-relaxed">{a.body}</p>
                             {a.mediaUrl && (
@@ -360,7 +360,7 @@ function AnnouncementsSection({
                                     <div className="flex items-center gap-3">
                                         <button
                                             onClick={() => handleTogglePin(a.id)}
-                                            className="text-xs text-gray-500 hover:text-[#C8A951] transition"
+                                            className="text-xs text-gray-500 hover:text-[#D4AF37] transition"
                                         >
                                             {a.pinned ? 'Unpin' : 'Pin'}
                                         </button>
@@ -425,7 +425,7 @@ export default function LeagueDetailTabs({
                         onClick={() => setActiveTab(tab.id)}
                         className={`px-4 py-2.5 text-sm font-medium rounded-t-lg whitespace-nowrap transition border-b-2 -mb-px ${
                             activeTab === tab.id
-                                ? 'text-[#C8A951] border-[#C8A951]'
+                                ? 'text-[#D4AF37] border-[#D4AF37]'
                                 : 'text-gray-400 hover:text-white border-transparent'
                         }`}
                     >
@@ -505,7 +505,7 @@ export default function LeagueDetailTabs({
                                                 <span key={i} className={`px-2 py-0.5 rounded text-xs font-semibold ${
                                                     pos === 'BN' ? 'bg-gray-800 text-gray-500' :
                                                     pos === 'IR' ? 'bg-red-900/30 text-red-500' :
-                                                    'bg-[#C8A951]/10 text-[#C8A951]'
+                                                    'bg-[#D4AF37]/10 text-[#D4AF37]'
                                                 }`}>{pos}</span>
                                             ))}
                                         </div>
@@ -524,7 +524,7 @@ export default function LeagueDetailTabs({
                                     {[
                                         ['Scoring',      scoringType === 'ppr' ? 'PPR' : scoringType === 'half_ppr' ? '½ PPR' : 'Standard'],
                                         ['Type',         sleeperSettings.type === 2 ? 'Dynasty' : 'Redraft'],
-                                        ['Platform',     'Sleeper'],
+                                        ['Platform',     'Fantasy'],
                                         ['Roster Size',  rosterPositions.length > 0 ? String(rosterPositions.length) : '—'],
                                         ...(sleeperSettings.playoff_teams != null ? [['Playoff Teams', String(sleeperSettings.playoff_teams)]] : []),
                                         ...(sleeperSettings.trade_deadline != null ? [['Trade Deadline', `Week ${sleeperSettings.trade_deadline}`]] : []),
@@ -546,7 +546,7 @@ export default function LeagueDetailTabs({
                             <h2 className="font-semibold text-lg">Trade Evaluator</h2>
                             <button
                                 onClick={() => setActiveTab('trade')}
-                                className="text-xs text-[#C8A951]/70 hover:text-[#C8A951] font-medium transition"
+                                className="text-xs text-[#D4AF37]/70 hover:text-[#D4AF37] font-medium transition"
                             >
                                 Open full view →
                             </button>
@@ -570,7 +570,7 @@ export default function LeagueDetailTabs({
                                 Upgrade your player plan, or the commissioner can upgrade their league plan —{' '}
                                 and connect this league to your player plan to unlock it.
                             </p>
-                            <a href="/pricing" className="inline-block bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-5 py-2.5 rounded-lg transition text-sm">
+                            <a href="/pricing" className="inline-block bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-5 py-2.5 rounded-lg transition text-sm">
                                 View Plans
                             </a>
                         </div>
@@ -617,15 +617,6 @@ export default function LeagueDetailTabs({
                         <h3 className="font-semibold text-base">Season Calendar</h3>
                         <p className="text-gray-500 text-sm max-w-sm mx-auto">
                             Key dates, trade deadlines, and playoff schedules — coming soon.
-                        </p>
-                    </div>
-
-                    {/* Pro Bowl Contest placeholder */}
-                    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center space-y-3">
-                        <div className="text-3xl">🏆</div>
-                        <h3 className="font-semibold text-base">Pro Bowl Contest</h3>
-                        <p className="text-gray-500 text-sm max-w-sm mx-auto">
-                            Week 18 DK-style free contest for your league — coming soon.
                         </p>
                     </div>
 

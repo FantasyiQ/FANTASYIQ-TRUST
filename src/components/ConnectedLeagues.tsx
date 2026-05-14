@@ -8,7 +8,9 @@ interface ConnectedLeague {
     leagueName: string;
     platform: string | null;
     createdAt: string | Date;
-    syncedLeagueId?: string; // League.id — set immediately on add, so link appears without name-matching
+    syncedLeagueId?: string;   // League.id — set immediately on add, so link appears without name-matching
+    isCommissioner?: boolean;  // true when user has a commissioner plan assigned to this league
+    isAutoIncluded?: boolean;  // true for Elite: synced leagues auto-added without an explicit ConnectedLeague record
 }
 
 interface SyncedLeague {
@@ -154,8 +156,8 @@ export default function ConnectedLeagues({ leagues: initial, syncedLeagues = [],
                                 key={sl.id}
                                 onClick={() => { void handleAddSynced(sl); }}
                                 disabled={isPending}
-                                className="w-full text-left px-4 py-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-[#C8A951]/50 rounded-xl transition group disabled:opacity-50">
-                                <p className="text-white font-semibold text-sm group-hover:text-[#C8A951] transition">{sl.leagueName}</p>
+                                className="w-full text-left px-4 py-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-[#D4AF37]/50 rounded-xl transition group disabled:opacity-50">
+                                <p className="text-white font-semibold text-sm group-hover:text-[#D4AF37] transition">{sl.leagueName}</p>
                                 <p className="text-gray-500 text-xs mt-0.5">{sl.totalRosters} teams · {sl.season}</p>
                             </button>
                         ))}
@@ -183,7 +185,7 @@ export default function ConnectedLeagues({ leagues: initial, syncedLeagues = [],
                         <p className="text-yellow-500/80 text-xs mb-1">You&apos;ve maxed your leagues</p>
                         {nextTier && (
                             <Link href="/pricing"
-                                className="text-xs font-semibold text-[#C8A951] hover:underline">
+                                className="text-xs font-semibold text-[#D4AF37] hover:underline">
                                 Upgrade to Player {nextTier} →
                             </Link>
                         )}
@@ -193,13 +195,13 @@ export default function ConnectedLeagues({ leagues: initial, syncedLeagues = [],
                         {availableSynced.length > 0 && (
                             <button
                                 onClick={() => { setShowSyncedPicker(true); setError(null); }}
-                                className="text-sm border border-[#C8A951]/40 hover:border-[#C8A951] text-[#C8A951] font-semibold px-3 py-1.5 rounded-lg transition">
+                                className="text-sm border border-[#D4AF37]/40 hover:border-[#D4AF37] text-[#D4AF37] font-semibold px-3 py-1.5 rounded-lg transition">
                                 + Synced League
                             </button>
                         )}
                         <button
                             onClick={() => { setShowForm(v => !v); setError(null); }}
-                            className="text-sm border border-gray-700 hover:border-[#C8A951]/50 text-gray-300 font-semibold px-3 py-1.5 rounded-lg transition">
+                            className="text-sm border border-gray-700 hover:border-[#D4AF37]/50 text-gray-300 font-semibold px-3 py-1.5 rounded-lg transition">
                             {showForm ? 'Cancel' : '+ Add League'}
                         </button>
                     </div>
@@ -225,8 +227,8 @@ export default function ConnectedLeagues({ leagues: initial, syncedLeagues = [],
                                         onClick={() => selectSynced(sl)}
                                         className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
                                             leagueName === sl.leagueName && platform === 'Sleeper'
-                                                ? 'border-[#C8A951] bg-[#C8A951]/10 text-[#C8A951]'
-                                                : 'border-gray-700 text-gray-300 hover:border-[#C8A951]/50'
+                                                ? 'border-[#D4AF37] bg-[#D4AF37]/10 text-[#D4AF37]'
+                                                : 'border-gray-700 text-gray-300 hover:border-[#D4AF37]/50'
                                         }`}
                                     >
                                         {sl.leagueName}
@@ -251,20 +253,20 @@ export default function ConnectedLeagues({ leagues: initial, syncedLeagues = [],
                                 onChange={e => setLeagueName(e.target.value)}
                                 maxLength={80}
                                 onKeyDown={e => { if (e.key === 'Enter') void handleAdd(); }}
-                                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/60"
+                                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/60"
                             />
                         </div>
                         <select
                             value={platform}
                             onChange={e => setPlatform(e.target.value)}
-                            className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-[#C8A951]/60">
+                            className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-[#D4AF37]/60">
                             <option value="">Platform (optional)</option>
                             {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
                         </select>
                         <button
                             onClick={() => { void handleAdd(); }}
                             disabled={isPending || !leagueName.trim()}
-                            className="bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-4 py-2 rounded-lg transition text-sm disabled:opacity-50 disabled:cursor-not-allowed shrink-0">
+                            className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-4 py-2 rounded-lg transition text-sm disabled:opacity-50 disabled:cursor-not-allowed shrink-0">
                             {isPending ? 'Adding…' : 'Add'}
                         </button>
                     </div>
@@ -279,43 +281,52 @@ export default function ConnectedLeagues({ leagues: initial, syncedLeagues = [],
             {leagues.length > 0 && (
                 <ul className="space-y-1.5">
                     {leagues.map(l => {
-                        const locked = isLocked(l.createdAt);
+                        const locked   = !l.isAutoIncluded && isLocked(l.createdAt);
                         const syncedId = l.syncedLeagueId ?? syncedIdByName.get(l.leagueName.toLowerCase());
+                        const leagueHref = syncedId
+                            ? (l.isCommissioner
+                                ? `/dashboard/league/${syncedId}/commissioner`
+                                : `/dashboard/league/${syncedId}`)
+                            : null;
+                        const actionLabel = l.isCommissioner ? 'Manage League →' : 'View League →';
+
                         return (
                             <li key={l.id} className="flex items-center justify-between gap-3 px-3 py-2 bg-gray-800/50 rounded-lg">
                                 <div className="min-w-0 flex-1">
-                                    {syncedId ? (
-                                        <Link
-                                            href={`/dashboard/league/${syncedId}`}
-                                            className="text-sm text-[#C8A951] font-medium truncate block hover:underline">
-                                            {l.leagueName} →
-                                        </Link>
-                                    ) : (
-                                        <span className="text-sm text-white font-medium truncate block">{l.leagueName}</span>
-                                    )}
+                                    <span className="text-sm text-white font-medium truncate block">{l.leagueName}</span>
                                     <span className="text-gray-500 text-xs">
                                         {l.platform ? `${l.platform} · ` : ''}
-                                        {locked
-                                            ? `Locked until ${lockLabel(l.createdAt)}`
-                                            : 'Removable'}
+                                        {l.isAutoIncluded
+                                            ? 'Included with Elite'
+                                            : locked
+                                                ? <>🔒 Locked until {lockLabel(l.createdAt)}</>
+                                                : 'Removable'}
                                     </span>
                                 </div>
-                                {locked ? (
-                                    <span
-                                        title={`Locked until ${lockLabel(l.createdAt)}`}
-                                        className="shrink-0 text-gray-600 text-sm px-1.5 py-0.5 rounded cursor-default select-none"
-                                        aria-label="League slot locked">
-                                        🔒
-                                    </span>
-                                ) : (
-                                    <button
-                                        onClick={() => { void handleRemove(l.id); }}
-                                        disabled={isPending}
-                                        className="shrink-0 text-gray-600 hover:text-red-400 transition text-sm px-1.5 py-0.5 rounded disabled:opacity-50"
-                                        title="Remove">
-                                        ✕
-                                    </button>
-                                )}
+                                <div className="flex items-center gap-2 shrink-0">
+                                    {leagueHref ? (
+                                        <Link
+                                            href={leagueHref}
+                                            className="text-xs font-medium text-[#D4AF37] hover:underline whitespace-nowrap">
+                                            {actionLabel}
+                                        </Link>
+                                    ) : (
+                                        <Link
+                                            href="/dashboard/sync"
+                                            className="text-xs font-medium text-gray-500 hover:text-gray-300 whitespace-nowrap transition">
+                                            Sync to access →
+                                        </Link>
+                                    )}
+                                    {!l.isAutoIncluded && !locked && (
+                                        <button
+                                            onClick={() => { void handleRemove(l.id); }}
+                                            disabled={isPending}
+                                            className="text-gray-600 hover:text-red-400 transition text-sm px-1.5 py-0.5 rounded disabled:opacity-50"
+                                            title="Remove">
+                                            ✕
+                                        </button>
+                                    )}
+                                </div>
                             </li>
                         );
                     })}

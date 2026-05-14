@@ -29,38 +29,50 @@ export async function POST(
     if (!dues) return Response.json({ error: 'Not found.' }, { status: 404 });
     if (dues.commissionerId !== user.id) return Response.json({ error: 'Forbidden.' }, { status: 403 });
 
-    // Find a synced League record that matches this dues record
+    // Find the synced League record that matches this dues record
     const league = await prisma.league.findFirst({
         where: {
             userId: user.id,
             leagueName: { equals: dues.leagueName, mode: 'insensitive' },
             season: dues.season,
         },
-        select: { leagueId: true },
+        select: { leagueId: true, platform: true, standings: true },
     });
 
     if (!league) {
         return Response.json(
-            { error: 'No synced Sleeper league found matching this dues record. Make sure the league name and season match exactly.' },
+            { error: 'No synced league found matching this dues record. Make sure the league name and season match exactly.' },
             { status: 404 },
         );
     }
 
-    // Fetch roster + member data from Sleeper
-    const [members, rosters] = await Promise.all([
-        getLeagueUsers(league.leagueId),
-        getLeagueRosters(league.leagueId),
-    ]);
+    let teams: { displayName: string; teamName: string | null }[] = [];
 
-    const memberMap = new Map(members.map(m => [m.user_id, m]));
-
-    // Build team list from rosters
-    const teams = rosters.map(roster => {
-        const member = roster.owner_id ? memberMap.get(roster.owner_id) : undefined;
-        const displayName = member?.display_name ?? `Team ${roster.roster_id}`;
-        const teamName    = member?.metadata?.team_name ?? displayName;
-        return { displayName, teamName };
-    });
+    if (league.platform === 'espn') {
+        // ESPN: build team list from stored standings JSON
+        type EspnTeam = { teamId: number; name: string; abbrev?: string };
+        const espnTeams = (league.standings as EspnTeam[] | null) ?? [];
+        if (espnTeams.length === 0) {
+            return Response.json(
+                { error: 'ESPN standings not yet synced. Please re-sync your ESPN league first.' },
+                { status: 404 },
+            );
+        }
+        teams = espnTeams.map(t => ({ displayName: t.name, teamName: t.abbrev ?? null }));
+    } else {
+        // Sleeper: fetch live roster + member data
+        const [members, rosters] = await Promise.all([
+            getLeagueUsers(league.leagueId),
+            getLeagueRosters(league.leagueId),
+        ]);
+        const memberMap = new Map(members.map(m => [m.user_id, m]));
+        teams = rosters.map(roster => {
+            const member      = roster.owner_id ? memberMap.get(roster.owner_id) : undefined;
+            const displayName = member?.display_name ?? `Team ${roster.roster_id}`;
+            const teamName    = member?.metadata?.team_name ?? displayName;
+            return { displayName, teamName: teamName !== displayName ? teamName : null };
+        });
+    }
 
     // Skip teams already in the dues record (match by displayName, case-insensitive)
     const existingNames = new Set(dues.members.map(m => m.displayName.toLowerCase()));
@@ -74,7 +86,7 @@ export async function POST(
         data: toAdd.map(t => ({
             leagueDuesId: duesId,
             displayName:  t.displayName,
-            teamName:     t.teamName !== t.displayName ? t.teamName : null,
+            teamName:     t.teamName ?? null,
             duesStatus:   'unpaid',
         })),
     });

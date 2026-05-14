@@ -139,7 +139,7 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
             select: {
                 id: true, userId: true, leagueId: true, leagueName: true,
                 leagueType: true, scoringType: true, scoringSettings: true,
-                rosterPositions: true, totalRosters: true,
+                rosterPositions: true, totalRosters: true, platform: true, standings: true,
             },
         }),
         prisma.user.findUnique({
@@ -158,7 +158,7 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
 
     if (!league || league.userId !== session.user.id) notFound();
 
-    // ── Tier gate ─────────────────────────────────────────────────────────────
+    // ── Tier gate (same for all platforms) ───────────────────────────────────
     const activePlayerSub = dbUser?.subscriptions.find(s => s.type === 'player') ?? null;
     let playerTier = activePlayerSub?.tier ?? 'FREE';
     if (activePlayerSub?.stripeSubscriptionId) {
@@ -200,10 +200,8 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
     const superflex       = leagueSettings.sfSlots > 0;
     const leagueSize      = league.totalRosters;
 
-    // ── Fetch data in parallel ────────────────────────────────────────────────
-    const [rosters, members, ktcRows, sleeperPlayers, latestSync] = await Promise.all([
-        getLeagueRosters(league.leagueId),
-        getLeagueUsers(league.leagueId),
+    // ── Fetch shared DB data (no Sleeper API yet) ─────────────────────────────
+    const [ktcRows, sleeperPlayers, latestSync] = await Promise.all([
         prisma.fantasyCalcValue.findMany({
             where: {
                 position: { in: ['QB', 'RB', 'WR', 'TE'] },
@@ -225,7 +223,7 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
         }),
     ]);
 
-    // ── Build Sleeper lookup ──────────────────────────────────────────────────
+    // ── Build Sleeper player lookup (name → metadata) ─────────────────────────
     type SleeperInfo = { playerId: string; team: string | null; injuryStatus: string | null; birthDate: string | null; age: number | null };
     const sleeperExact      = new Map<string, SleeperInfo>();
     const sleeperNormalized = new Map<string, SleeperInfo>();
@@ -237,11 +235,12 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
         if (!sleeperNormalized.has(normd)) sleeperNormalized.set(normd, val);
     }
 
-    // ── Build universe + DTV list, keyed by Sleeper playerId ─────────────────
+    // ── Build player universe + DTV ───────────────────────────────────────────
     type UniverseEntry = { u: UniversePlayer; finalDtv: number; tier: string };
     const universeEntries: UniverseEntry[] = [];
-    // playerId → entry for O(1) team-roster lookup (avoids name-mismatch issues)
-    const dtvByPlayerId = new Map<string, UniverseEntry>();
+    const dtvByPlayerId  = new Map<string, UniverseEntry>(); // Sleeper player ID → entry
+    const dtvByExactName = new Map<string, UniverseEntry>(); // lowercase name → entry (ESPN name matching)
+    const dtvByNormName  = new Map<string, UniverseEntry>(); // normalized name → entry (ESPN name matching)
 
     for (const r of ktcRows) {
         if (!SKILL_POSITIONS.has(r.position)) continue;
@@ -277,16 +276,22 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
             rank: 0, name: u.name, position: u.position, team: u.team ?? 'FA',
             age: u.age ?? 0, baseValue, injuryStatus: u.injuryStatus,
         };
-        const dtv = calcDtv(p, ppr, leagueType, undefined, leagueSettings);
+        const dtv   = calcDtv(p, ppr, leagueType, undefined, leagueSettings);
         const entry: UniverseEntry = { u, finalDtv: dtv.finalDtv, tier: dtv.tier };
 
         universeEntries.push(entry);
         if (playerId) dtvByPlayerId.set(playerId, entry);
+        // Index by name for ESPN (name-based matching) — prefer higher value so stale
+        // de-punctuated duplicates (e.g. "dj moore" value 0) never shadow the real entry.
+        const existingExact = dtvByExactName.get(exact);
+        const existingNormd = dtvByNormName.get(normd);
+        if (!existingExact || dtv.finalDtv > existingExact.finalDtv) dtvByExactName.set(exact, entry);
+        if (!existingNormd || dtv.finalDtv > existingNormd.finalDtv) dtvByNormName.set(normd, entry);
     }
 
     universeEntries.sort((a, b) => b.finalDtv - a.finalDtv || a.u.name.localeCompare(b.u.name));
 
-    // ── Player rankings (full universe) ──────────────────────────────────────
+    // ── Player rankings (same for all platforms — full universe) ──────────────
     const playerRankings: PlayerRankingRow[] = universeEntries.map((e, i) => ({
         rank:           i + 1,
         name:           e.u.name,
@@ -299,6 +304,77 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
         playerImageUrl: e.u.playerImageUrl,
     }));
 
+    const leagueResult = {
+        id:          league.id,
+        leagueName:  league.leagueName,
+        leagueType,
+        scoringType: league.scoringType ?? null,
+    };
+
+    // ── ESPN branch: use stored standings — no Sleeper API calls ──────────────
+    if (league.platform === 'espn') {
+        type EspnPlayer = { name: string; position: string };
+        type EspnTeam = {
+            teamId: number; name: string;
+            wins: number; losses: number; ties: number; fpts: number;
+            players?: EspnPlayer[];
+        };
+        const espnTeams = (league.standings as EspnTeam[] | null) ?? [];
+
+        const rosterDtvList = espnTeams.map(team => {
+            const skillPlayers = (team.players ?? []).filter(p => SKILL_POSITIONS.has(p.position));
+            const scoredPlayers = skillPlayers
+                .map(p => {
+                    const entry = dtvByExactName.get(p.name.toLowerCase()) ?? dtvByNormName.get(normalizeName(p.name));
+                    if (!entry) return null;
+                    return { name: entry.u.name, position: entry.u.position, finalDtv: entry.finalDtv };
+                })
+                .filter((p): p is { name: string; position: string; finalDtv: number } => p !== null)
+                .sort((a, b) => b.finalDtv - a.finalDtv);
+
+            const totalDtv  = Math.round(scoredPlayers.reduce((s, p) => s + p.finalDtv, 0) * 10) / 10;
+            const topPlayer = scoredPlayers[0] ?? null;
+            return { team, totalDtv, topPlayer, playerCount: skillPlayers.length };
+        }).sort((a, b) => b.totalDtv - a.totalDtv);
+
+        const teamRankings: TeamRankingRow[] = rosterDtvList.map((e, i) => ({
+            rank:        i + 1,
+            rosterId:    e.team.teamId,
+            teamName:    e.team.name,
+            ownerName:   e.team.name,
+            totalDtv:    e.totalDtv,
+            playerCount: e.playerCount,
+            topPlayer:   e.topPlayer,
+            tier:        rosterTier(i + 1, rosterDtvList.length),
+        }));
+
+        const rosterDtvById = new Map(rosterDtvList.map(e => [e.team.teamId, e.totalDtv]));
+        const maxPf  = Math.max(...espnTeams.map(t => t.fpts), 1);
+        const maxDtv = Math.max(...rosterDtvList.map(e => e.totalDtv), 1);
+
+        const powerRankings: PowerRankingRow[] = espnTeams
+            .map(team => ({
+                rosterId:   team.teamId,
+                teamName:   team.name,
+                ownerName:  team.name,
+                wins:       team.wins,
+                losses:     team.losses,
+                pf:         team.fpts,
+                rosterDtv:  rosterDtvById.get(team.teamId) ?? 0,
+                powerScore: computePowerScore(team.wins, team.losses, team.fpts, rosterDtvById.get(team.teamId) ?? 0, maxPf, maxDtv),
+            }))
+            .sort((a, b) => b.powerScore - a.powerScore || b.rosterDtv - a.rosterDtv)
+            .map((r, i) => ({ ...r, rank: i + 1 }));
+
+        return { league: leagueResult, playerRankings, teamRankings, powerRankings, ktcSyncedAt: latestSync?.updatedAt.toISOString() ?? null };
+    }
+
+    // ── Sleeper branch: fetch live rosters + members ──────────────────────────
+    const [rosters, members] = await Promise.all([
+        getLeagueRosters(league.leagueId),
+        getLeagueUsers(league.leagueId),
+    ]);
+
     // ── Build display names from Sleeper users ────────────────────────────────
     const ownerDisplayName = new Map(members.map(m => [m.user_id, m.display_name ?? `Team ${m.user_id}`]));
 
@@ -308,7 +384,6 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
         const playerIds = r.players ?? [];
         const ownerName = r.owner_id ? (ownerDisplayName.get(r.owner_id) ?? `Team ${r.roster_id}`) : `Team ${r.roster_id}`;
 
-        // O(1) lookup by Sleeper playerId — no name-matching required
         const scoredPlayers = playerIds
             .map(pid => {
                 const entry = dtvByPlayerId.get(pid);
@@ -358,16 +433,5 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
         .sort((a, b) => b.powerScore - a.powerScore || b.rosterDtv - a.rosterDtv)
         .map((r, i) => ({ ...r, rank: i + 1 }));
 
-    return {
-        league: {
-            id:          league.id,
-            leagueName:  league.leagueName,
-            leagueType,
-            scoringType: league.scoringType ?? null,
-        },
-        playerRankings,
-        teamRankings,
-        powerRankings,
-        ktcSyncedAt: latestSync?.updatedAt.toISOString() ?? null,
-    };
+    return { league: leagueResult, playerRankings, teamRankings, powerRankings, ktcSyncedAt: latestSync?.updatedAt.toISOString() ?? null };
 }

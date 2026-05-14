@@ -1,0 +1,154 @@
+import type { NotificationType, NotificationPayload } from './types';
+
+const appUrl = process.env.NEXTAUTH_URL ?? 'https://fantasyiq.app';
+
+interface TemplateContext {
+  title: string;
+  body:  string;
+  data?: NotificationPayload;
+}
+
+function baseLayout(title: string, bodyHtml: string, ctaHtml?: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(title)}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#0a0a0a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0a0a0a;min-height:100vh;">
+    <tr>
+      <td align="center" style="padding:40px 16px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+          <!-- Header bar -->
+          <tr>
+            <td style="background-color:#D4AF37;padding:16px 32px;border-radius:12px 12px 0 0;">
+              <span style="color:#0a0a0a;font-size:18px;font-weight:700;letter-spacing:-0.5px;">
+                Fantasy<span style="font-style:italic;">i</span>Q Trust
+              </span>
+            </td>
+          </tr>
+          <!-- Card body -->
+          <tr>
+            <td style="background-color:#111111;border:1px solid #1f1f1f;border-top:none;padding:32px;border-radius:0 0 12px 12px;">
+              <h1 style="color:#ffffff;font-size:22px;font-weight:700;margin:0 0 16px;line-height:1.3;">${escapeHtml(title)}</h1>
+              <div style="color:#a1a1aa;font-size:15px;line-height:1.6;">
+                ${bodyHtml}
+              </div>
+              ${ctaHtml ?? ''}
+              <hr style="border:none;border-top:1px solid #1f1f1f;margin:28px 0 20px;" />
+              <p style="color:#52525b;font-size:12px;margin:0;line-height:1.5;">
+                You received this email because you have an account on FantasyIQ Trust.<br />
+                To manage your notification preferences, visit your
+                <a href="${appUrl}/dashboard/notifications" style="color:#D4AF37;text-decoration:none;">notification settings</a>.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+function ctaButton(label: string, href: string): string {
+  return `<div style="margin:24px 0 8px;">
+    <a href="${escapeHtml(href)}" style="display:inline-block;background-color:#D4AF37;color:#0a0a0a;font-weight:700;font-size:14px;text-decoration:none;padding:12px 28px;border-radius:8px;">${escapeHtml(label)}</a>
+  </div>`;
+}
+
+function escapeHtml(str: string): string {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function fmt$(n?: number): string {
+  if (n == null) return '';
+  return `$${n.toFixed(2).replace(/\.00$/, '')}`;
+}
+
+export function renderTemplate(type: NotificationType | string, ctx: TemplateContext): string {
+  const { title, body, data } = ctx;
+  const leagueHref = data?.leagueId ? `${appUrl}/dashboard/league/${data.leagueId}` : `${appUrl}/dashboard`;
+
+  switch (type) {
+    // ── Payment confirmed (Stripe) ──────────────────────────────────────────
+    case 'dues.payment.confirmed': {
+      const amount = data?.amount ? fmt$(data.amount) : '';
+      const league = data?.leagueName ? ` for <strong style="color:#fff;">${escapeHtml(data.leagueName)}</strong>` : '';
+      const bodyHtml = `<p style="margin:0 0 8px;">Your dues payment${amount ? ` of <strong style="color:#fff;">${amount}</strong>` : ''}${league} has been confirmed. You&#39;re all set!</p>`;
+      return baseLayout(title, bodyHtml, ctaButton('View League', leagueHref));
+    }
+
+    // ── Manual payment recorded ──────────────────────────────────────────────
+    case 'dues.payment.manual_recorded': {
+      const amount = data?.amount ? fmt$(data.amount) : '';
+      const bodyHtml = `<p style="margin:0 0 8px;">Your commissioner has manually recorded your payment${amount ? ` of <strong style="color:#fff;">${amount}</strong>` : ''}. Your dues are now marked as paid.</p>`;
+      return baseLayout(title, bodyHtml, ctaButton('View League', leagueHref));
+    }
+
+    // ── Dues reminders ───────────────────────────────────────────────────────
+    case 'dues.reminder.weekly':
+    case 'dues.reminder.three_per_week':
+    case 'dues.reminder.daily':
+    case 'dues.reminder.final_hours': {
+      const amount   = data?.amount   ? fmt$(data.amount)   : '';
+      const league   = data?.leagueName ?? '';
+      const deadline = data?.deadline  ? new Date(data.deadline).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : '';
+      const payHref  = data?.leagueId && data?.duesId
+        ? `${appUrl}/dashboard/league/${data.leagueId}/dues/pay`
+        : leagueHref;
+      const urgency = type === 'dues.reminder.final_hours'
+        ? '<p style="margin:0 0 12px;color:#ef4444;font-weight:600;">⚠️ Your dues are due very soon!</p>'
+        : '';
+      const bodyHtml = `${urgency}<p style="margin:0 0 8px;">Your league dues${amount ? ` of <strong style="color:#fff;">${amount}</strong>` : ''}${league ? ` for <strong style="color:#fff;">${escapeHtml(league)}</strong>` : ''} ${deadline ? `are due <strong style="color:#fff;">${escapeHtml(deadline)}</strong>` : 'are due soon'}.  Please pay before the deadline to stay in good standing.</p>`;
+      return baseLayout(title, bodyHtml, ctaButton('Pay Now', payHref));
+    }
+
+    // ── Dues updated ─────────────────────────────────────────────────────────
+    case 'dues.updated': {
+      const bodyHtml = `<p style="margin:0 0 8px;">Your commissioner has updated the dues details for ${data?.leagueName ? `<strong style="color:#fff;">${escapeHtml(data.leagueName)}</strong>` : 'your league'}. Please review the latest information.</p>`;
+      return baseLayout(title, bodyHtml, ctaButton('View Dues', leagueHref));
+    }
+
+    // ── Member joined league ─────────────────────────────────────────────────
+    case 'member.joined_league': {
+      const memberName = data?.memberName ?? 'A new member';
+      const bodyHtml = `<p style="margin:0 0 8px;"><strong style="color:#fff;">${escapeHtml(memberName)}</strong> has joined your league${data?.leagueName ? ` <strong style="color:#fff;">${escapeHtml(data.leagueName)}</strong>` : ''} on FantasyIQ Trust.</p>`;
+      return baseLayout(title, bodyHtml, ctaButton('View League', leagueHref));
+    }
+
+    // ── Payouts released ─────────────────────────────────────────────────────
+    case 'payouts.released': {
+      const bodyHtml = `<p style="margin:0 0 8px;">Your commissioner has completed and released payouts for ${data?.leagueName ? `<strong style="color:#fff;">${escapeHtml(data.leagueName)}</strong>` : 'your league'}. Check your winnings!</p>`;
+      return baseLayout(title, bodyHtml, ctaButton('View Payouts', `${leagueHref}#payouts`));
+    }
+
+    // ── Commissioner unpaid digest ────────────────────────────────────────────
+    case 'commissioner.alert.unpaid_members_digest': {
+      const names = data?.unpaidNames ?? [];
+      const listHtml = names.length > 0
+        ? `<ul style="margin:12px 0;padding-left:20px;">${names.map(n => `<li style="margin-bottom:4px;color:#a1a1aa;">${escapeHtml(n)}</li>`).join('')}</ul>`
+        : '';
+      const bodyHtml = `<p style="margin:0 0 8px;">The following <strong style="color:#fff;">${names.length} member${names.length !== 1 ? 's' : ''}</strong>${data?.leagueName ? ` in <strong style="color:#fff;">${escapeHtml(data.leagueName)}</strong>` : ''} still haven&#39;t paid their dues:</p>${listHtml}`;
+      return baseLayout(title, bodyHtml, ctaButton('View Dues Manager', leagueHref));
+    }
+
+    // ── Weekly league digest ─────────────────────────────────────────────────
+    case 'league.digest.weekly': {
+      const bodyHtml = `<p style="margin:0 0 8px;">${escapeHtml(body)}</p>`;
+      return baseLayout(title, bodyHtml, ctaButton('View League', leagueHref));
+    }
+
+    // ── Generic fallback ─────────────────────────────────────────────────────
+    default: {
+      const bodyHtml = `<p style="margin:0 0 8px;">${escapeHtml(body)}</p>`;
+      return baseLayout(title, bodyHtml, ctaButton('Go to FantasyIQ', `${appUrl}/dashboard`));
+    }
+  }
+}

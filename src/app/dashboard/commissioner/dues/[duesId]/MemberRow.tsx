@@ -134,7 +134,7 @@ export default function MemberRow({ member, duesId, buyInAmount }: Props) {
                             <button
                                 onClick={payOnBehalf}
                                 disabled={loading}
-                                className="text-xs bg-[#C8A951]/10 hover:bg-[#C8A951]/20 text-[#C8A951] border border-[#C8A951]/30 font-semibold px-3 py-1.5 rounded-lg transition disabled:opacity-50">
+                                className="text-xs bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/30 font-semibold px-3 py-1.5 rounded-lg transition disabled:opacity-50">
                                 {loading ? '...' : 'Pay on Behalf →'}
                             </button>
                             {/* Record manual (secondary, less prominent) */}
@@ -176,7 +176,7 @@ export default function MemberRow({ member, duesId, buyInAmount }: Props) {
                         <div className="flex gap-3 pt-1">
                             <button
                                 onClick={() => setShowModal(false)}
-                                className="flex-1 bg-[#C8A951] hover:bg-[#b8992f] text-black font-bold py-2.5 rounded-xl text-sm transition"
+                                className="flex-1 bg-[#D4AF37] hover:bg-[#BF9D2F] text-black font-bold py-2.5 rounded-xl text-sm transition"
                             >
                                 Cancel
                             </button>

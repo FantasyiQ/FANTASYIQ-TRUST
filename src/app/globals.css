@@ -1,5 +1,65 @@
 @import "tailwindcss";
 
+/* ── Premium Gold Design System ─────────────────────────────────────────────
+ *
+ * Primary:  #D4AF37  — classic premium gold (base)
+ * Light:    #E8C96B  — champagne highlight, hover states
+ * Dark:     #A8872B  — rich antique gold, active / pressed states
+ *
+ * Scale built from HSL(46°, ~60%, L%) so every shade stays metallic, never
+ * brown or neon. Opacity variants (e.g. text-gold-500/70) come for free.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+@theme {
+  /* ── Full scale ── */
+  --color-gold-50:   #FBF5D8;   /* near-white tint — subtle page backgrounds */
+  --color-gold-100:  #F4E49C;   /* very light — tag backgrounds, faint fills  */
+  --color-gold-200:  #EDD368;   /* light highlight — badge accents             */
+  --color-gold-300:  #E8C96B;   /* GOLD LIGHT — hover states, highlighted text */
+  --color-gold-400:  #DDB94A;   /* mid-light — icon tints                      */
+  --color-gold-500:  #D4AF37;   /* PRIMARY GOLD — buttons, borders, headings   */
+  --color-gold-600:  #BF9D2F;   /* press / active tint on gold buttons         */
+  --color-gold-700:  #A8872B;   /* GOLD DARK  — active states, depth shadows   */
+  --color-gold-800:  #8A6D20;   /* deep anchor — rarely needed                 */
+  --color-gold-900:  #6B5218;   /* near-black gold — extreme contrast only     */
+
+  /* ── Named semantic aliases (use these in components) ── */
+  --color-gold:        var(--color-gold-500);
+  --color-gold-light:  var(--color-gold-300);
+  --color-gold-dark:   var(--color-gold-700);
+  --color-gold-hover:  var(--color-gold-600);   /* standard dark-hover on gold buttons */
+
+  /* ── Gradient ── */
+  --background-image-gold-gradient: linear-gradient(135deg, #D4AF37 0%, #E8C96B 100%);
+  --background-image-gold-gradient-r: linear-gradient(135deg, #E8C96B 0%, #D4AF37 100%);
+
+  /* ── Shadow ── */
+  --shadow-gold-sm:  0 2px 8px  rgba(212, 175, 55, 0.18);
+  --shadow-gold:     0 4px 20px rgba(212, 175, 55, 0.22);
+  --shadow-gold-lg:  0 8px 40px rgba(212, 175, 55, 0.28);
+}
+
+/* ── Raw CSS custom properties (usable outside Tailwind) ─────────────────── */
+:root {
+  --gold:              #D4AF37;
+  --gold-light:        #E8C96B;
+  --gold-dark:         #A8872B;
+  --gold-hover:        #BF9D2F;
+  --gold-gradient:     linear-gradient(135deg, #D4AF37 0%, #E8C96B 100%);
+  --gold-shadow-sm:    0 2px 8px  rgba(212, 175, 55, 0.18);
+  --gold-shadow:       0 4px 20px rgba(212, 175, 55, 0.22);
+  --gold-shadow-lg:    0 8px 40px rgba(212, 175, 55, 0.28);
+}
+
 html {
   scroll-behavior: smooth;
+}
+
+/* Hide scrollbar track on nav overflow containers while keeping scroll functional */
+nav [style*="overflow"] {
+  scrollbar-width: none;        /* Firefox */
+  -ms-overflow-style: none;     /* IE/Edge */
+}
+nav [style*="overflow"]::-webkit-scrollbar {
+  display: none;                /* Chrome/Safari/WebKit */
 }

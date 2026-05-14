@@ -12,7 +12,7 @@ export default async function DuesTrackerPage({ params }: { params: Promise<{ du
 
     const user = await prisma.user.findUnique({
         where: { email: session.user.email },
-        select: { id: true },
+        select: { id: true, email: true, name: true },
     });
     if (!user) redirect('/sign-in');
 
@@ -34,7 +34,7 @@ export default async function DuesTrackerPage({ params }: { params: Promise<{ du
             leagueName: { equals: dues.leagueName, mode: 'insensitive' },
             season: dues.season,
         },
-        select: { leagueId: true },
+        select: { id: true, leagueId: true, platform: true },
     });
 
     return (
@@ -52,6 +52,11 @@ export default async function DuesTrackerPage({ params }: { params: Promise<{ du
             payoutSpots={dues.payoutSpots}
             hasProposal={dues.proposals.length > 0}
             sleeperLeagueId={matchedLeague?.leagueId ?? null}
+            platform={matchedLeague?.platform ?? 'sleeper'}
+            leagueDbId={matchedLeague?.id ?? null}
+            currentUserId={user.id}
+            currentUserEmail={user.email ?? null}
+            currentUserName={user.name ?? null}
         />
     );
 }

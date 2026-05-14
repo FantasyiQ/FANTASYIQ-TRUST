@@ -13,7 +13,7 @@ export default function SignInForm({ redirect }: { redirect: string }) {
                 {/* Brand */}
                 <div className="text-center mb-8">
                     <Link href="/" className="text-2xl font-bold text-white">
-                        Fantasy<span className="text-[#C8A951]">i</span>Q Trust
+                        Fantasy<span className="text-[#D4AF37]">i</span>Q Trust
                     </Link>
                 </div>
 
@@ -60,7 +60,7 @@ export default function SignInForm({ redirect }: { redirect: string }) {
                                 type="email"
                                 autoComplete="email"
                                 required
-                                className="w-full bg-gray-800 border border-gray-700 text-white placeholder-gray-500 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#C8A951] transition"
+                                className="w-full bg-gray-800 border border-gray-700 text-white placeholder-gray-500 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#D4AF37] transition"
                                 placeholder="you@example.com"
                             />
                         </div>
@@ -75,7 +75,7 @@ export default function SignInForm({ redirect }: { redirect: string }) {
                                 type="password"
                                 autoComplete="current-password"
                                 required
-                                className="w-full bg-gray-800 border border-gray-700 text-white placeholder-gray-500 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#C8A951] transition"
+                                className="w-full bg-gray-800 border border-gray-700 text-white placeholder-gray-500 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#D4AF37] transition"
                                 placeholder="Your password"
                             />
                         </div>
@@ -83,7 +83,7 @@ export default function SignInForm({ redirect }: { redirect: string }) {
                         <button
                             type="submit"
                             disabled={pending}
-                            className="w-full bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-60 disabled:cursor-not-allowed text-gray-950 font-bold py-2.5 rounded-lg transition"
+                            className="w-full bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-60 disabled:cursor-not-allowed text-gray-950 font-bold py-2.5 rounded-lg transition"
                         >
                             {pending ? 'Signing in…' : 'Sign in'}
                         </button>
@@ -93,7 +93,7 @@ export default function SignInForm({ redirect }: { redirect: string }) {
                 {/* Footer link */}
                 <p className="text-center text-gray-500 text-sm mt-6">
                     Don&apos;t have an account?{' '}
-                    <Link href={`/sign-up?redirect=${encodeURIComponent(redirect)}`} className="text-[#C8A951] hover:underline font-medium">
+                    <Link href={`/sign-up?redirect=${encodeURIComponent(redirect)}`} className="text-[#D4AF37] hover:underline font-medium">
                         Sign up
                     </Link>
                 </p>

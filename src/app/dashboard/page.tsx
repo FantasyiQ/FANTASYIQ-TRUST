@@ -38,8 +38,8 @@ const STATUS_STYLES: Record<string, string> = {
 
 const COMM_TIER_BADGE: Record<string, { label: string; className: string }> = {
     COMMISSIONER_PRO:     { label: 'PRO',      className: 'bg-gray-800 text-gray-300 border-gray-600' },
-    COMMISSIONER_ALL_PRO: { label: 'ALL-PRO',  className: 'bg-[#C8A951] text-black border-[#C8A951]' },
-    COMMISSIONER_ELITE:   { label: 'ELITE ✦',  className: 'bg-[#C8A951]/25 text-[#C8A951] border-[#C8A951]/60' },
+    COMMISSIONER_ALL_PRO: { label: 'ALL-PRO',  className: 'bg-[#D4AF37] text-black border-[#D4AF37]' },
+    COMMISSIONER_ELITE:   { label: 'ELITE ✦',  className: 'bg-[#D4AF37]/25 text-[#D4AF37] border-[#D4AF37]/60' },
 };
 
 function periodLabel(sub: { cancelAtPeriodEnd: boolean; currentPeriodEnd: Date | null } | undefined) {
@@ -100,10 +100,17 @@ export default async function DashboardPage({
 
     // Enrich connected leagues with the matching League.id so links always work
     const syncedIdByNameServer = new Map(leagues.map(l => [l.leagueName.toLowerCase().trim(), l.id]));
-    const connectedLeagues = user.connectedLeagues.map(cl => ({
-        ...cl,
-        syncedLeagueId: syncedIdByNameServer.get(cl.leagueName.toLowerCase().trim()),
-    }));
+    const commissionerLeagueIds = new Set(
+        leagues.filter(l => l.assignedPlanType === 'commissioner').map(l => l.id)
+    );
+    const connectedLeagues = user.connectedLeagues.map(cl => {
+        const syncedLeagueId = syncedIdByNameServer.get(cl.leagueName.toLowerCase().trim());
+        return {
+            ...cl,
+            syncedLeagueId,
+            isCommissioner: !!syncedLeagueId && commissionerLeagueIds.has(syncedLeagueId),
+        };
+    });
     const displayName = (name ?? session.user.email ?? '').split(' ')[0];
 
     const activeSubs = subscriptions.filter(
@@ -156,6 +163,46 @@ export default async function DashboardPage({
     const leagueLimit    = getLeagueLimit(leagueLimitKey);
     const nextTier       = nextTierName(displayTier);
 
+    // Elite = unlimited: rebuild list entirely from synced leagues so every entry has a link.
+    // Overlay existing connectedLeague records (by name) to preserve lock / createdAt info.
+    // Any connected-but-not-synced entries appear at the end (no link — they have no League.id).
+    const effectiveConnectedLeagues = leagueLimit === Infinity
+        ? (() => {
+            const connectedByName = new Map(
+                user.connectedLeagues.map(cl => [cl.leagueName.toLowerCase().trim(), cl])
+            );
+            const syncedLeagueNames = new Set(leagues.map(l => l.leagueName.toLowerCase().trim()));
+
+            // All synced leagues — always have syncedLeagueId, so link always works
+            const fromSynced = leagues.map(l => {
+                const existing = connectedByName.get(l.leagueName.toLowerCase().trim());
+                return {
+                    id:             existing?.id ?? `auto-${l.id}`,
+                    leagueName:     l.leagueName,
+                    platform:       l.platform,
+                    createdAt:      existing ? existing.createdAt : new Date(0).toISOString(),
+                    syncedLeagueId: l.id,
+                    isCommissioner: commissionerLeagueIds.has(l.id),
+                    isAutoIncluded: !existing,
+                };
+            });
+
+            // Connected leagues with no matching synced record (show without link)
+            const orphans = user.connectedLeagues
+                .filter(cl => !syncedLeagueNames.has(cl.leagueName.toLowerCase().trim()))
+                .map(cl => ({
+                    ...cl,
+                    syncedLeagueId: undefined,
+                    isCommissioner: false,
+                    isAutoIncluded: false,
+                }));
+
+            return [...fromSynced, ...orphans].sort((a, b) =>
+                a.leagueName.localeCompare(b.leagueName)
+            );
+        })()
+        : connectedLeagues;
+
     const testDataReset = params.test_data_reset === 'true';
 
     return (
@@ -207,7 +254,7 @@ export default async function DashboardPage({
                         <>
                             <div className="flex items-start justify-between gap-6 flex-wrap">
                                 <div>
-                                    <p className="text-2xl font-bold text-[#C8A951]">{formatTier(playerSub.tier)}</p>
+                                    <p className="text-2xl font-bold text-[#D4AF37]">{formatTier(playerSub.tier)}</p>
                                     <div className="flex items-center gap-3 mt-2 flex-wrap">
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${STATUS_STYLES[playerSub.status] ?? STATUS_STYLES.inactive}`}>
                                             {playerSub.status.replace('_', ' ')}
@@ -219,7 +266,7 @@ export default async function DashboardPage({
                                 </div>
                                 {isElite ? (
                                     <Link href="/pricing"
-                                        className="shrink-0 bg-[#C8A951]/15 border border-[#C8A951]/50 text-[#C8A951] font-bold px-5 py-2.5 rounded-lg transition text-sm">
+                                        className="shrink-0 bg-[#D4AF37]/15 border border-[#D4AF37]/50 text-[#D4AF37] font-bold px-5 py-2.5 rounded-lg transition text-sm">
                                         Elite ✦
                                     </Link>
                                 ) : (
@@ -231,7 +278,7 @@ export default async function DashboardPage({
                             </div>
                             <div className="mt-4 pt-4 border-t border-gray-800 flex items-center justify-between gap-4 flex-wrap">
                                 <Link href="/dashboard/plan/player"
-                                    className="text-[#C8A951]/70 hover:text-[#C8A951] text-sm font-medium transition shrink-0">
+                                    className="text-[#D4AF37]/70 hover:text-[#D4AF37] text-sm font-medium transition shrink-0">
                                     View Plan Details →
                                 </Link>
                                 <form action={createPortalSession}>
@@ -242,7 +289,7 @@ export default async function DashboardPage({
                                 </form>
                             </div>
                             <ConnectedLeagues
-                                leagues={connectedLeagues}
+                                leagues={effectiveConnectedLeagues}
                                 syncedLeagues={leagues.map(l => ({
                                     id: l.id,
                                     leagueName: l.leagueName,
@@ -258,7 +305,7 @@ export default async function DashboardPage({
                         <div className="flex items-center justify-between gap-4 flex-wrap">
                             <p className="text-gray-400 text-sm">No active player plan.</p>
                             <Link href="/pricing"
-                                className="bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-5 py-2.5 rounded-lg transition text-sm">
+                                className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-5 py-2.5 rounded-lg transition text-sm">
                                 View Plans
                             </Link>
                         </div>
@@ -278,7 +325,7 @@ export default async function DashboardPage({
                                 scoringType: l.scoringType ?? null,
                             }))} />
                             <Link href="/pricing?tab=commissioner&mode=new"
-                                className="text-sm border border-gray-700 hover:border-[#C8A951]/50 text-gray-300 font-semibold px-4 py-1.5 rounded-lg transition">
+                                className="text-sm border border-gray-700 hover:border-[#D4AF37]/50 text-gray-300 font-semibold px-4 py-1.5 rounded-lg transition">
                                 + Add League
                             </Link>
                         </div>
@@ -303,12 +350,12 @@ export default async function DashboardPage({
                                                     : null;
                                                 const resolvedId = leagueId ?? partialMatch?.id;
                                                 return resolvedId ? (
-                                                    <Link href={`/dashboard/league/${resolvedId}`}
-                                                        className="text-[#C8A951] font-semibold text-sm hover:underline">
+                                                    <Link href={`/dashboard/league/${resolvedId}/commissioner`}
+                                                        className="text-[#D4AF37] font-semibold text-sm hover:underline">
                                                         {sub.leagueName} →
                                                     </Link>
                                                 ) : (
-                                                    <p className="text-[#C8A951] font-semibold text-sm">{sub.leagueName}</p>
+                                                    <p className="text-[#D4AF37] font-semibold text-sm">{sub.leagueName}</p>
                                                 );
                                             })()}
                                             <p className="font-medium text-gray-300 text-xs mt-0.5">{commLabel(sub.tier, sub.leagueSize)}</p>
@@ -337,7 +384,7 @@ export default async function DashboardPage({
                                     </div>
                                     <div className="flex justify-end items-center gap-4 mt-3">
                                         <Link href={`/dashboard/plan/commissioner/${sub.id}`}
-                                            className="text-[#C8A951]/70 hover:text-[#C8A951] text-sm font-medium transition">
+                                            className="text-[#D4AF37]/70 hover:text-[#D4AF37] text-sm font-medium transition">
                                             View Details →
                                         </Link>
                                         <form action={createPortalSession}>
@@ -404,21 +451,21 @@ export default async function DashboardPage({
                     <h2 className="font-semibold text-lg mb-4">Quick Actions</h2>
                     <div className="grid sm:grid-cols-3 gap-3">
                         <Link href="/dashboard/trade"
-                            className="block bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">
+                            className="block bg-gray-900 border border-gray-800 hover:border-[#D4AF37]/50 rounded-xl p-5 transition group">
                             <div className="text-2xl mb-2">📊</div>
-                            <p className="font-semibold text-white group-hover:text-[#C8A951] transition">Trade Values</p>
+                            <p className="font-semibold text-white group-hover:text-[#D4AF37] transition">Trade Values</p>
                             <p className="text-gray-500 text-sm mt-0.5">Dynamic trade evaluator</p>
                         </Link>
                         <Link href="/dashboard/sync"
-                            className="block bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">
+                            className="block bg-gray-900 border border-gray-800 hover:border-[#D4AF37]/50 rounded-xl p-5 transition group">
                             <div className="text-2xl mb-2">🔗</div>
-                            <p className="font-semibold text-white group-hover:text-[#C8A951] transition">Sync League</p>
+                            <p className="font-semibold text-white group-hover:text-[#D4AF37] transition">Sync League</p>
                             <p className="text-gray-500 text-sm mt-0.5">Connect your Sleeper account</p>
                         </Link>
                         <Link href="/pricing"
-                            className="block bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-xl p-5 transition group">
+                            className="block bg-gray-900 border border-gray-800 hover:border-[#D4AF37]/50 rounded-xl p-5 transition group">
                             <div className="text-2xl mb-2">💳</div>
-                            <p className="font-semibold text-white group-hover:text-[#C8A951] transition">Manage Subscription</p>
+                            <p className="font-semibold text-white group-hover:text-[#D4AF37] transition">Manage Subscription</p>
                             <p className="text-gray-500 text-sm mt-0.5">
                                 {!hasAnyActiveSub ? 'View plans and pricing' : isElite ? 'Billing and plan details' : 'Plans, billing, and upgrades'}
                             </p>

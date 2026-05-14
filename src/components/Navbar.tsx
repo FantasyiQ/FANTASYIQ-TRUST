@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { auth, signOut } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import NotificationBell from '@/components/notifications/NotificationBell';
 
 export default async function Navbar() {
   const session = await auth();
@@ -26,9 +27,9 @@ export default async function Navbar() {
       .filter(s => s.tier.startsWith('PLAYER_'))
       .map(s => s.tier);
     if (tiers.includes('PLAYER_ELITE')) {
-      navBadge = { label: 'ELITE ✦',  className: 'bg-[#C9A227]/15 border border-[#C9A227]/50 text-[#C9A227]' };
+      navBadge = { label: 'ELITE ✦',  className: 'bg-[#D4AF37]/15 border border-[#D4AF37]/50 text-[#D4AF37]' };
     } else if (tiers.includes('PLAYER_ALL_PRO')) {
-      navBadge = { label: 'ALL-PRO', className: 'bg-[#C9A227]/10 border border-[#C9A227]/30 text-[#C9A227]/80' };
+      navBadge = { label: 'ALL-PRO', className: 'bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37]/80' };
     } else if (tiers.includes('PLAYER_PRO')) {
       navBadge = { label: 'PRO',     className: 'bg-gray-800 border border-gray-600 text-gray-300' };
     }
@@ -36,28 +37,41 @@ export default async function Navbar() {
 
   return (
     <nav className="fixed top-0 w-full z-50 bg-gray-950/90 backdrop-blur-sm border-b border-gray-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2 min-w-0">
         <Link href="/" className="text-lg sm:text-2xl font-bold text-white shrink-0">
-          Fantasy<span className="text-[#C9A227]">i</span>Q Trust
+          Fantasy<span className="text-[#D4AF37]">i</span>Q Trust
         </Link>
-        <div className="flex items-center gap-3 sm:gap-6">
+        {/* Scrollable nav items — overflow-x: auto prevents page widening on mobile */}
+        <div
+          className="flex items-center gap-3 sm:gap-6 overflow-x-auto overflow-y-hidden"
+          style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}
+        >
           {loggedIn ? (
             <>
               <Link
                 href="/dashboard"
-                className="text-gray-300 hover:text-white transition text-sm sm:text-base whitespace-nowrap"
+                className="text-gray-300 hover:text-white transition text-sm whitespace-nowrap shrink-0"
               >
                 My Leagues
               </Link>
+              <Link
+                href="/leaguefinder"
+                className="text-gray-300 hover:text-white transition text-sm whitespace-nowrap shrink-0"
+              >
+                League Finder
+              </Link>
+              <span className="shrink-0">
+                <NotificationBell userId={session?.user?.id ?? undefined} />
+              </span>
               {navBadge ? (
                 <Link
                   href="/pricing"
-                  className={`${navBadge.className} font-bold px-2 sm:px-3 py-1 rounded-lg transition text-xs sm:text-sm whitespace-nowrap hover:opacity-80`}
+                  className={`${navBadge.className} font-bold px-2 sm:px-3 py-1 rounded-lg transition text-xs whitespace-nowrap shrink-0 hover:opacity-80`}
                 >
                   {navBadge.label}
                 </Link>
               ) : (
-                <Link href="/pricing" className="text-gray-300 hover:text-white transition text-sm sm:text-base whitespace-nowrap">
+                <Link href="/pricing" className="text-gray-300 hover:text-white transition text-sm whitespace-nowrap shrink-0">
                   Upgrade
                 </Link>
               )}
@@ -66,10 +80,11 @@ export default async function Navbar() {
                   'use server';
                   await signOut({ redirectTo: '/' });
                 }}
+                className="shrink-0"
               >
                 <button
                   type="submit"
-                  className="bg-gray-800 hover:bg-gray-700 text-white font-semibold px-3 sm:px-5 py-2 rounded-lg transition text-sm sm:text-base whitespace-nowrap"
+                  className="bg-gray-800 hover:bg-gray-700 text-white font-semibold px-3 sm:px-5 py-2 rounded-lg transition text-sm whitespace-nowrap"
                 >
                   Sign Out
                 </button>
@@ -77,12 +92,15 @@ export default async function Navbar() {
             </>
           ) : (
             <>
-              <Link href="/pricing" className="text-gray-300 hover:text-white transition text-sm sm:text-base whitespace-nowrap">
+              <Link href="/leaguefinder" className="text-gray-300 hover:text-white transition text-sm whitespace-nowrap shrink-0">
+                League Finder
+              </Link>
+              <Link href="/pricing" className="text-gray-300 hover:text-white transition text-sm whitespace-nowrap shrink-0">
                 Pricing
               </Link>
               <Link
                 href="/sign-in"
-                className="bg-[#C9A227] hover:bg-[#B8911F] text-gray-950 font-semibold px-3 sm:px-5 py-2 rounded-lg transition text-sm sm:text-base whitespace-nowrap"
+                className="bg-[#D4AF37] hover:bg-[#B8911F] text-gray-950 font-semibold px-3 sm:px-5 py-2 rounded-lg transition text-sm whitespace-nowrap shrink-0"
               >
                 Sign In
               </Link>

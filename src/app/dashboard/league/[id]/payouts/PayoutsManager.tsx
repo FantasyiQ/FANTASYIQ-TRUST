@@ -156,7 +156,7 @@ export default function PayoutsManager({
                     {sorted.map((spot, i) => (
                         <div key={i} className="space-y-2">
                             <div className="flex items-center justify-between">
-                                <span className="text-[#C8A951] font-semibold text-sm">{spot.label}</span>
+                                <span className="text-[#D4AF37] font-semibold text-sm">{spot.label}</span>
                                 <span className="text-white font-bold text-sm">${spot.amount.toFixed(0)}</span>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -167,7 +167,7 @@ export default function PayoutsManager({
                                         value={teamNames[i] ?? ''}
                                         onChange={e => updateTeamName(i, e.target.value)}
                                         placeholder="e.g. Dynasty Destroyers"
-                                        className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#C8A951]/60"
+                                        className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#D4AF37]/60"
                                     />
                                 </div>
                                 <div>
@@ -177,7 +177,7 @@ export default function PayoutsManager({
                                         value={displayNames[i] ?? ''}
                                         onChange={e => updateDisplayName(i, e.target.value)}
                                         placeholder="e.g. John Smith"
-                                        className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#C8A951]/60"
+                                        className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#D4AF37]/60"
                                     />
                                 </div>
                             </div>
@@ -194,7 +194,7 @@ export default function PayoutsManager({
                     <button
                         type="submit"
                         disabled={saving}
-                        className="w-full bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-50 text-gray-950 font-bold py-3 rounded-xl transition text-sm"
+                        className="w-full bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-50 text-gray-950 font-bold py-3 rounded-xl transition text-sm"
                     >
                         {saving ? 'Saving…' : 'Save Winners'}
                     </button>
@@ -217,7 +217,7 @@ export default function PayoutsManager({
                         type="button"
                         onClick={() => { void handleMarkComplete(); }}
                         disabled={marking || !allHaveWinners || allPaidOut}
-                        className="w-full bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-40 disabled:cursor-not-allowed text-gray-950 font-bold py-3 rounded-xl transition text-sm"
+                        className="w-full bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-40 disabled:cursor-not-allowed text-gray-950 font-bold py-3 rounded-xl transition text-sm"
                     >
                         {marking ? 'Marking…' : allPaidOut ? '✓ Payouts Marked Complete' : 'Mark All Payouts Complete'}
                     </button>

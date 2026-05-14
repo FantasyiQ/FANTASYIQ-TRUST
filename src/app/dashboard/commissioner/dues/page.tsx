@@ -14,7 +14,7 @@ function statusLabel(status: string): { label: string; className: string } {
         case 'active':             return { label: 'Active',            className: 'bg-green-900/40 text-green-400 border-green-800' };
         case 'season_ended':       return { label: 'Season Ended',      className: 'bg-blue-900/40 text-blue-400 border-blue-800' };
         case 'pending_approval':   return { label: 'Awaiting Approval', className: 'bg-yellow-900/40 text-yellow-400 border-yellow-800' };
-        case 'approved':           return { label: 'Approved',          className: 'bg-[#C8A951]/20 text-[#C8A951] border-[#C8A951]/40' };
+        case 'approved':           return { label: 'Approved',          className: 'bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/40' };
         case 'paid_out':           return { label: 'Paid Out',          className: 'bg-gray-800 text-gray-500 border-gray-700' };
         default:                   return { label: status,              className: 'bg-gray-800 text-gray-400 border-gray-700' };
     }
@@ -74,7 +74,7 @@ export default async function DuesPage() {
                         <h2 className="text-lg font-bold mb-2">No Commissioner Plans</h2>
                         <p className="text-gray-400 text-sm mb-6">You need an active commissioner plan to use the dues tracker.</p>
                         <Link href="/pricing?tab=commissioner"
-                            className="inline-block bg-[#C8A951] hover:bg-[#b8992f] text-black font-bold px-6 py-2.5 rounded-lg transition text-sm">
+                            className="inline-block bg-[#D4AF37] hover:bg-[#BF9D2F] text-black font-bold px-6 py-2.5 rounded-lg transition text-sm">
                             View Commissioner Plans
                         </Link>
                     </div>
@@ -105,7 +105,7 @@ export default async function DuesPage() {
                                                 href={dues
                                                     ? `/dashboard/commissioner/dues/${dues.id}`
                                                     : `/dashboard/commissioner/dues/setup?subId=${sub.id}&leagueName=${encodeURIComponent(sub.leagueName ?? '')}&leagueSize=${sub.leagueSize ?? ''}`}
-                                                className="bg-[#C8A951] hover:bg-[#b8992f] text-black font-bold px-4 py-2 rounded-lg text-sm transition">
+                                                className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-black font-bold px-4 py-2 rounded-lg text-sm transition">
                                                 {dues ? 'Open Tracker' : 'Set Up Tracker'}
                                             </Link>
                                         </div>
@@ -119,7 +119,7 @@ export default async function DuesPage() {
                                             </div>
                                             <div className="w-full bg-gray-800 rounded-full h-2">
                                                 <div
-                                                    className="bg-[#C8A951] h-2 rounded-full transition-all"
+                                                    className="bg-[#D4AF37] h-2 rounded-full transition-all"
                                                     style={{ width: `${progress}%` }}
                                                 />
                                             </div>

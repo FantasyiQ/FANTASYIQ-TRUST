@@ -27,7 +27,6 @@ interface Props {
     sleeperSettings:        SleeperSettings;
     duesData:               DuesManagerData | null;
     announcements:          AnnouncementData[];
-    proBowlContest:         { id: string; name: string; openAt: string; lockAt: string; endAt: string } | null;
     isCommissioner:         boolean;
     currentUserId:          string;
 }
@@ -67,21 +66,100 @@ function CollapsibleCard({ title, defaultOpen = false, children }: { title: stri
 
 // ── Card 1: Dues & Payouts nav card ──────────────────────────────────────────
 
-function DuesNavCard({ leagueId }: { leagueId: string }) {
-    return (
-        <Link
-            href={`/dashboard/league/${leagueId}/dues`}
-            className="group block rounded-xl border border-[#CBA135] bg-[#0A0A0A] p-5 md:p-7 transition-all duration-200 hover:border-[#E2B857] hover:bg-[#111111]"
-        >
-            <div className="flex items-center justify-between mb-2">
-                <h2 className="text-lg font-semibold text-[#CBA135] transition-colors duration-200 group-hover:text-[#E2B857]">
-                    Dues &amp; Payouts
-                </h2>
-                <span className="text-[28px] leading-none transition-transform duration-200 group-hover:scale-105 select-none">💰</span>
+function DuesNavCard({ leagueId, duesData, isCommissioner, leagueName }: {
+    leagueId:       string;
+    duesData:       DuesManagerData | null;
+    isCommissioner: boolean;
+    leagueName:     string;
+}) {
+    const showSetup = isCommissioner && !duesData;
+    const cardClass = "rounded-xl border border-[#D4AF37] bg-[#0A0A0A] p-5 md:p-6 transition-all duration-200 hover:border-[#D4AF37] hover:bg-[#111111]";
+
+    // ── Tracker derived values ────────────────────────────────────────────────
+    const paidCount   = duesData ? duesData.members.filter(m => m.duesStatus === 'paid').length : 0;
+    const totalCount  = duesData ? duesData.teamCount : 0;
+    const potTotal    = duesData?.potTotal ?? 0;
+    const fullPot     = duesData ? duesData.buyInAmount * duesData.teamCount : 0;
+    const progress    = fullPot > 0 ? Math.min(100, Math.round((potTotal / fullPot) * 100)) : 0;
+    const allPaid     = duesData ? paidCount >= totalCount && totalCount > 0 : false;
+
+    const inner = (
+        <div className="flex items-start justify-between gap-6">
+            {/* Left: label + description */}
+            <div className="min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                    <h2 className="text-lg font-semibold text-[#D4AF37]">Dues &amp; Payouts</h2>
+                    <span className="text-[22px] leading-none select-none">💰</span>
+                </div>
+                <p className="text-gray-500 text-sm">
+                    {showSetup
+                        ? 'Set up dues tracking for your league.'
+                        : 'View dues, pot totals, payouts, and history.'}
+                </p>
+                {showSetup && (
+                    <Link
+                        href={`/dashboard/commissioner/dues/setup?leagueName=${encodeURIComponent(leagueName)}&leagueId=${leagueId}`}
+                        className="inline-block mt-3 text-sm font-semibold text-[#D4AF37] hover:underline"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        Set Up a Dues Tracker →
+                    </Link>
+                )}
+                {isCommissioner && duesData && (
+                    <Link
+                        href={`/dashboard/league/${leagueId}/commissioner/invite`}
+                        className="inline-block mt-2 text-sm font-semibold text-[#D4AF37] hover:underline"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        Invite Members →
+                    </Link>
+                )}
             </div>
-            <p className="text-gray-500 text-sm">
-                View dues, pot totals, payouts, and payment history.
-            </p>
+
+            {/* Right: live tracker (only when dues exist) */}
+            {duesData && (
+                <div className="shrink-0 min-w-[140px] space-y-2.5">
+                    {/* Pot total */}
+                    <div className="text-right">
+                        <p className="text-xs text-gray-600 uppercase tracking-wider font-semibold">Pot</p>
+                        <p className="text-2xl font-extrabold text-white leading-tight">
+                            ${potTotal.toFixed(0)}
+                            <span className="text-gray-600 text-sm font-normal"> / ${fullPot.toFixed(0)}</span>
+                        </p>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
+                        <div
+                            className="h-2 rounded-full transition-all duration-500"
+                            style={{
+                                width: `${progress}%`,
+                                background: allPaid
+                                    ? '#4ade80'
+                                    : 'linear-gradient(90deg, #D4AF37, #E8C96B)',
+                            }}
+                        />
+                    </div>
+
+                    {/* Paid count */}
+                    <div className="flex items-center justify-between text-xs">
+                        <span className={`font-semibold ${allPaid ? 'text-green-400' : 'text-[#D4AF37]'}`}>
+                            {allPaid ? '✓ All Paid' : `${paidCount} of ${totalCount} paid`}
+                        </span>
+                        <span className="text-gray-600">{progress}%</span>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+
+    if (showSetup) {
+        return <div className={cardClass}>{inner}</div>;
+    }
+
+    return (
+        <Link href={`/dashboard/league/${leagueId}/dues`} className={`group block ${cardClass}`}>
+            {inner}
         </Link>
     );
 }
@@ -90,11 +168,11 @@ function DuesNavCard({ leagueId }: { leagueId: string }) {
 
 function AnnouncementsCard({
     initialAnnouncements,
-    duesId,
+    leagueId,
     isCommissioner,
 }: {
     initialAnnouncements: AnnouncementData[];
-    duesId: string | null;
+    leagueId: string;
     isCommissioner: boolean;
 }) {
     const [items, setItems]         = useState<AnnouncementData[]>(initialAnnouncements);
@@ -105,20 +183,20 @@ function AnnouncementsCard({
     const [postError, setPostError] = useState('');
     const [showForm, setShowForm]   = useState(false);
 
-    const pinned   = items.filter(a => a.pinned);
-    const recents  = items.filter(a => !a.pinned);
-    const visible  = showAll ? items : [...pinned, ...recents.slice(0, 3)];
-    const hasMore  = items.length > visible.length;
+    const pinned  = items.filter(a => a.pinned);
+    const recents = items.filter(a => !a.pinned);
+    const visible = showAll ? items : [...pinned, ...recents.slice(0, 3)];
+    const hasMore = items.length > visible.length;
 
     async function handlePost() {
-        if (!body.trim() || !duesId) return;
+        if (!body.trim()) return;
         setPosting(true);
         setPostError('');
         try {
-            const res = await fetch(`/api/dues/${duesId}/announcements`, {
-                method: 'POST',
+            const res = await fetch(`/api/leagues/${leagueId}/announcements`, {
+                method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ body: body.trim(), mediaUrl: mediaUrl.trim() || undefined }),
+                body:    JSON.stringify({ body: body.trim(), mediaUrl: mediaUrl.trim() || undefined }),
             });
             if (!res.ok) {
                 const d = await res.json() as { error?: string };
@@ -136,8 +214,7 @@ function AnnouncementsCard({
     }
 
     async function handleTogglePin(id: string) {
-        if (!duesId) return;
-        const res = await fetch(`/api/dues/${duesId}/announcements/${id}`, { method: 'PATCH' });
+        const res = await fetch(`/api/leagues/${leagueId}/announcements/${id}`, { method: 'PATCH' });
         if (res.ok) {
             const raw = await res.json() as { id: string; pinned: boolean };
             setItems(prev =>
@@ -148,8 +225,7 @@ function AnnouncementsCard({
     }
 
     async function handleDelete(id: string) {
-        if (!duesId) return;
-        await fetch(`/api/dues/${duesId}/announcements/${id}`, { method: 'DELETE' });
+        await fetch(`/api/leagues/${leagueId}/announcements/${id}`, { method: 'DELETE' });
         setItems(prev => prev.filter(a => a.id !== id));
     }
 
@@ -157,11 +233,11 @@ function AnnouncementsCard({
         <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between gap-4">
                 <h2 className="font-semibold text-lg">Announcements</h2>
-                {isCommissioner && duesId && (
+                {isCommissioner && (
                     <button
                         type="button"
                         onClick={() => setShowForm(v => !v)}
-                        className="text-sm border border-gray-700 hover:border-[#C8A951]/50 text-gray-300 font-semibold px-3 py-1.5 rounded-lg transition"
+                        className="text-sm border border-gray-700 hover:border-[#D4AF37]/50 text-gray-300 font-semibold px-3 py-1.5 rounded-lg transition"
                     >
                         {showForm ? 'Cancel' : '+ Post'}
                     </button>
@@ -169,37 +245,29 @@ function AnnouncementsCard({
             </div>
 
             <div className="px-6 py-5 space-y-4">
-                {isCommissioner && showForm && duesId && (
+                {isCommissioner && showForm && (
                     <div className="space-y-2 bg-gray-800/40 rounded-xl p-4">
                         <textarea
                             value={body}
                             onChange={e => setBody(e.target.value)}
                             placeholder="Write an announcement…"
                             rows={3}
-                            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/50 resize-none"
+                            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/50 resize-none"
                         />
                         <input
                             value={mediaUrl}
                             onChange={e => setMediaUrl(e.target.value)}
                             placeholder="Image / GIF URL (optional)"
-                            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/50"
+                            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/50"
                         />
                         {postError && <p className="text-red-400 text-xs">{postError}</p>}
                         <button
                             onClick={() => { void handlePost(); }}
                             disabled={posting || !body.trim()}
-                            className="bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-50 disabled:cursor-not-allowed text-gray-950 font-semibold px-4 py-2 rounded-lg text-sm transition"
+                            className="bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-50 disabled:cursor-not-allowed text-gray-950 font-semibold px-4 py-2 rounded-lg text-sm transition"
                         >
                             {posting ? 'Posting…' : 'Post Announcement'}
                         </button>
-                    </div>
-                )}
-
-                {isCommissioner && !duesId && (
-                    <div className="text-center py-4 space-y-2">
-                        <p className="text-gray-400 text-sm">Announcements require a dues tracker.</p>
-                        <Link href="/dashboard/commissioner/dues"
-                            className="text-[#C8A951] text-sm hover:underline">Set up a dues tracker →</Link>
                     </div>
                 )}
 
@@ -210,7 +278,7 @@ function AnnouncementsCard({
                         {visible.map(a => (
                             <div key={a.id} className="bg-gray-800/40 rounded-xl p-4">
                                 {a.pinned && (
-                                    <span className="text-xs font-semibold text-[#C8A951] mb-1 block">📌 Pinned</span>
+                                    <span className="text-xs font-semibold text-[#D4AF37] mb-1 block">📌 Pinned</span>
                                 )}
                                 <p className="text-gray-200 text-sm leading-relaxed">{a.body}</p>
                                 {a.mediaUrl && (
@@ -224,7 +292,7 @@ function AnnouncementsCard({
                                     </p>
                                     {isCommissioner && (
                                         <div className="flex items-center gap-3">
-                                            <button onClick={() => { void handleTogglePin(a.id); }} className="text-xs text-gray-500 hover:text-[#C8A951] transition">
+                                            <button onClick={() => { void handleTogglePin(a.id); }} className="text-xs text-gray-500 hover:text-[#D4AF37] transition">
                                                 {a.pinned ? 'Unpin' : 'Pin'}
                                             </button>
                                             <button onClick={() => { void handleDelete(a.id); }} className="text-xs text-red-500 hover:text-red-400 transition">Delete</button>
@@ -240,7 +308,7 @@ function AnnouncementsCard({
                     <button
                         type="button"
                         onClick={() => setShowAll(v => !v)}
-                        className="text-sm text-[#C8A951]/70 hover:text-[#C8A951] transition font-medium"
+                        className="text-sm text-[#D4AF37]/70 hover:text-[#D4AF37] transition font-medium"
                     >
                         {showAll ? '↑ Show fewer' : `View all announcements (${items.length}) →`}
                     </button>
@@ -250,27 +318,11 @@ function AnnouncementsCard({
     );
 }
 
-// ── Pro Bowl row ──────────────────────────────────────────────────────────────
-
-type ProBowlContest = { id: string; name: string; openAt: string; lockAt: string; endAt: string };
-
-function proBowlLabels(contest: ProBowlContest): { statusLabel: string; ctaLabel: string } {
-    const now    = new Date();
-    const openAt = new Date(contest.openAt);
-    const lockAt = new Date(contest.lockAt);
-    const endAt  = new Date(contest.endAt);
-
-    if (now < openAt)                   return { statusLabel: 'Opens soon', ctaLabel: 'View Details' };
-    if (now >= openAt && now < lockAt)  return { statusLabel: 'Open',       ctaLabel: 'Set Your Lineup' };
-    if (now >= lockAt && now < endAt)   return { statusLabel: 'Locked',     ctaLabel: 'View Lineups & Leaderboard' };
-    return                                     { statusLabel: 'Final',      ctaLabel: 'View Results' };
-}
-
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function LeagueOverviewCards({
     leagueId,
-    leagueName: _leagueName,
+    leagueName,
     season: _season,
     scoringType,
     totalRosters: _totalRosters,
@@ -284,7 +336,6 @@ export default function LeagueOverviewCards({
     sleeperSettings,
     duesData,
     announcements,
-    proBowlContest,
     isCommissioner,
     currentUserId,
 }: Props) {
@@ -293,53 +344,17 @@ export default function LeagueOverviewCards({
         <div className="space-y-4">
 
             {/* Dues & Payouts nav card */}
-            <DuesNavCard leagueId={leagueId} />
+            <DuesNavCard leagueId={leagueId} duesData={duesData} isCommissioner={isCommissioner} leagueName={leagueName} />
 
             {/* Announcements */}
             <AnnouncementsCard
                 initialAnnouncements={announcements}
-                duesId={duesData?.id ?? null}
+                leagueId={leagueId}
                 isCommissioner={isCommissioner}
             />
 
-            {/* Card 3: Pro Bowl Contest */}
-            {proBowlContest && (() => {
-                const { statusLabel, ctaLabel } = proBowlLabels(proBowlContest);
-                return (
-                    <div className="bg-gray-900 border border-gray-800 rounded-2xl px-6 py-4 flex items-center justify-between gap-4">
-                        <div>
-                            <p className="text-sm font-medium text-white">Pro‑Bowl Contest</p>
-                            <p className="text-xs text-gray-500">
-                                {statusLabel} · Locks {new Date(proBowlContest.lockAt).toLocaleString()}
-                            </p>
-                        </div>
-                        <Link
-                            href={`/dashboard/pro-bowl/${proBowlContest.id}`}
-                            className="text-xs font-medium text-[#C8A951] hover:underline shrink-0"
-                        >
-                            {ctaLabel} →
-                        </Link>
-                    </div>
-                );
-            })()}
 
-            {/* Card 4: Trade Evaluator launch */}
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl px-6 py-5 flex items-center justify-between gap-6">
-                <div>
-                    <h2 className="font-semibold text-base">Trade Evaluator</h2>
-                    <p className="text-gray-500 text-sm mt-0.5">
-                        Analyze trades, compare rosters, and browse dynasty values — scoped to this league.
-                    </p>
-                </div>
-                <Link
-                    href={`/dashboard/league/${leagueId}/trade`}
-                    className="shrink-0 bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-5 py-2 rounded-xl transition text-sm"
-                >
-                    Open →
-                </Link>
-            </div>
-
-            {/* Card 5: Player Rankings launch */}
+            {/* Card 4: Player Rankings launch */}
             <div className="bg-gray-900 border border-gray-800 rounded-2xl px-6 py-5 flex items-center justify-between gap-6">
                 <div>
                     <h2 className="font-semibold text-base">Player Rankings</h2>
@@ -349,14 +364,30 @@ export default function LeagueOverviewCards({
                 </div>
                 <Link
                     href={`/dashboard/league/${leagueId}/rankings`}
-                    className="shrink-0 border border-gray-700 hover:border-[#C8A951]/50 text-gray-300 hover:text-[#C8A951] font-semibold px-5 py-2 rounded-xl transition text-sm"
+                    className="shrink-0 bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-5 py-2 rounded-xl transition text-sm"
+                >
+                    Open →
+                </Link>
+            </div>
+
+            {/* Card 5: Trade Evaluator launch */}
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl px-6 py-5 flex items-center justify-between gap-6">
+                <div>
+                    <h2 className="font-semibold text-base">Trade Evaluator</h2>
+                    <p className="text-gray-500 text-sm mt-0.5">
+                        Analyze trades, compare rosters, and browse dynasty values — scoped to this league.
+                    </p>
+                </div>
+                <Link
+                    href={`/dashboard/league/${leagueId}/trade`}
+                    className="shrink-0 bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-5 py-2 rounded-xl transition text-sm"
                 >
                     Open →
                 </Link>
             </div>
 
             {/* Card 6: Standings */}
-            <CollapsibleCard title="Standings" defaultOpen>
+            <CollapsibleCard title="Standings">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
@@ -420,7 +451,7 @@ export default function LeagueOverviewCards({
                                         <span key={i} className={`px-2 py-0.5 rounded text-xs font-semibold ${
                                             pos === 'BN' ? 'bg-gray-800 text-gray-500' :
                                             pos === 'IR' ? 'bg-red-900/30 text-red-500' :
-                                            'bg-[#C8A951]/10 text-[#C8A951]'
+                                            'bg-[#D4AF37]/10 text-[#D4AF37]'
                                         }`}>{pos}</span>
                                     ))}
                                 </div>
@@ -436,7 +467,7 @@ export default function LeagueOverviewCards({
                             {[
                                 ['Scoring',      scoringType === 'ppr' ? 'PPR' : scoringType === 'half_ppr' ? '½ PPR' : 'Standard'],
                                 ['Type',         sleeperSettings.type === 2 ? 'Dynasty' : 'Redraft'],
-                                ['Platform',     'Sleeper'],
+                                ['Platform',     'Fantasy'],
                                 ['Roster Size',  rosterPositions.length > 0 ? String(rosterPositions.length) : '—'],
                                 ...(sleeperSettings.playoff_teams != null ? [['Playoff Teams', String(sleeperSettings.playoff_teams)]] : []),
                                 ...(sleeperSettings.trade_deadline != null ? [['Trade Deadline', `Week ${sleeperSettings.trade_deadline}`]] : []),

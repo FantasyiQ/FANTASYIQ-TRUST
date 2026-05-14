@@ -14,7 +14,7 @@ export const PLAYER_TIERS = {
     },
     all_pro: {
         name: "All-Pro",
-        price: 14.99,
+        price: 17.99,
         leagueMin: 3,
         leagueMax: 5,
         priceId: process.env.STRIPE_PRICE_ALL_PRO!,
@@ -31,14 +31,14 @@ export const PLAYER_TIERS = {
 export const COMMISSIONER_PRICING = {
     pro: {
         name: "Commissioner Pro",
-        sizes: { 8: 39.99, 10: 49.99, 12: 59.99, 14: 69.99, 16: 79.99, 32: 159.99 },
+        sizes: { 8: 54.99, 10: 64.99, 12: 74.99, 14: 84.99, 16: 94.99, 32: 174.99 },
     },
     all_pro: {
         name: "Commissioner All-Pro",
-        sizes: { 8: 49.99, 10: 59.99, 12: 69.99, 14: 79.99, 16: 89.99, 32: 169.99 },
+        sizes: { 8: 64.99, 10: 74.99, 12: 84.99, 14: 94.99, 16: 104.99, 32: 184.99 },
     },
     elite: {
         name: "Commissioner Elite",
-        sizes: { 8: 59.99, 10: 69.99, 12: 79.99, 14: 89.99, 16: 99.99, 32: 179.99 },
+        sizes: { 8: 74.99, 10: 84.99, 12: 94.99, 14: 104.99, 16: 114.99, 32: 194.99 },
     },
 } as const;

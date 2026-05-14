@@ -55,6 +55,12 @@ export default function InviteMembers({ leagueId, sleeperLeagueId, leagueName, s
                 <p className="text-gray-500 text-sm mt-0.5">{leagueName} · {season}</p>
             </div>
 
+            <div className="bg-[#D4AF37]/8 border border-[#D4AF37]/25 rounded-xl px-5 py-4 text-sm text-gray-300 space-y-1 max-w-lg">
+                <p><span className="text-[#D4AF37] font-semibold">Commissioner Plans cover the entire league.</span> All members get access at no additional cost.</p>
+                <p>Members must join via your invite link for the league plan to apply.</p>
+                <p className="text-gray-500">Player Plans are optional personal upgrades and are never required.</p>
+            </div>
+
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4 max-w-lg">
                 <p className="text-sm text-gray-400">
                     Share this link with your league members so they can create a FantasyiQ Trust account and join your league automatically.
@@ -66,7 +72,7 @@ export default function InviteMembers({ leagueId, sleeperLeagueId, leagueName, s
                             <span className="text-sm text-gray-300 flex-1 truncate">{inviteUrl}</span>
                             <button
                                 onClick={copy}
-                                className="text-xs font-medium text-[#C8A951] hover:underline whitespace-nowrap"
+                                className="text-xs font-medium text-[#D4AF37] hover:underline whitespace-nowrap"
                             >
                                 {copied ? 'Copied!' : 'Copy'}
                             </button>
@@ -83,7 +89,7 @@ export default function InviteMembers({ leagueId, sleeperLeagueId, leagueName, s
                     <button
                         onClick={generate}
                         disabled={loading}
-                        className="bg-[#C8A951] text-black font-semibold text-sm px-4 py-2 rounded-lg hover:bg-[#b8993f] transition disabled:opacity-50"
+                        className="bg-[#D4AF37] text-black font-semibold text-sm px-4 py-2 rounded-lg hover:bg-[#b8993f] transition disabled:opacity-50"
                     >
                         {loading ? 'Generating…' : 'Generate Invite Link'}
                     </button>

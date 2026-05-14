@@ -49,12 +49,12 @@ const TEAM_SIZES: TeamSize[] = [8, 10, 12, 14, 16, 32];
 
 // [Pro, All-Pro, Elite]
 const COMM_PRICES: Record<TeamSize, [string, string, string]> = {
-    8:  ['39.99', '49.99',  '59.99'],
-    10: ['49.99', '59.99',  '69.99'],
-    12: ['59.99', '69.99',  '79.99'],
-    14: ['69.99', '79.99',  '89.99'],
-    16: ['79.99', '89.99',  '99.99'],
-    32: ['159.99', '169.99', '179.99'],
+    8:  ['54.99',  '64.99',  '74.99' ],
+    10: ['64.99',  '74.99',  '84.99' ],
+    12: ['74.99',  '84.99',  '94.99' ],
+    14: ['84.99',  '94.99',  '104.99'],
+    16: ['94.99',  '104.99', '114.99'],
+    32: ['174.99', '184.99', '194.99'],
 };
 
 // Index 0=Pro, 1=All-Pro, 2=Elite
@@ -101,7 +101,7 @@ const PLAYER_PRO_FEATURES: Feature[] = [
     { name: 'Power League Rankings',             included: false },
     { name: 'Dynamic Mock Drafts',               included: false },
     { name: 'League Analysis',                   included: false },
-    { name: 'Team Builder',                      included: false },
+    { name: 'Roster Intelligence',                included: false },
 ];
 
 const PLAYER_ALL_PRO_FEATURES: Feature[] = [
@@ -119,7 +119,7 @@ const PLAYER_ALL_PRO_FEATURES: Feature[] = [
     { name: 'Power League Rankings',             included: true  },
     { name: 'Dynamic Mock Drafts',               included: false },
     { name: 'League Analysis',                   included: false },
-    { name: 'Team Builder',                      included: false },
+    { name: 'Roster Intelligence',                included: false },
 ];
 
 const PLAYER_ELITE_FEATURES: Feature[] = [
@@ -154,7 +154,7 @@ const COMM_PRO_FEATURES: Feature[] = [
     { name: 'Power League Rankings',             included: false },
     { name: 'Dynamic Mock Drafts',               included: false },
     { name: 'League Analysis',                   included: false },
-    { name: 'Team Builder',                      included: false },
+    { name: 'Roster Intelligence',                included: false },
 ];
 
 const COMM_ALL_PRO_FEATURES: Feature[] = [
@@ -171,7 +171,7 @@ const COMM_ALL_PRO_FEATURES: Feature[] = [
     { name: 'Power League Rankings',             included: true  },
     { name: 'Dynamic Mock Drafts',               included: false },
     { name: 'League Analysis',                   included: false },
-    { name: 'Team Builder',                      included: false },
+    { name: 'Roster Intelligence',                included: false },
 ];
 
 const COMM_ELITE_FEATURES: Feature[] = [
@@ -235,7 +235,7 @@ function UpgradeModal({
                 <h2 className="text-xl font-bold text-white mb-2">Confirm Upgrade</h2>
                 <p className="text-gray-400 text-sm mb-4">
                     Upgrade to <span className="text-white font-semibold">{pending.planName}</span> for{' '}
-                    <span className="text-[#C9A227] font-bold">${pending.price}{pending.period}</span>?
+                    <span className="text-[#D4AF37] font-bold">${pending.price}{pending.period}</span>?
                 </p>
                 <p className="text-gray-500 text-xs mb-4">
                     You&apos;ll be charged the prorated difference immediately. Your new plan takes effect right away.
@@ -251,7 +251,7 @@ function UpgradeModal({
                         Cancel
                     </button>
                     <button onClick={onConfirm} disabled={loading}
-                        className="flex-1 py-2.5 rounded-xl bg-[#C9A227] text-black font-bold text-sm hover:bg-[#b8912a] transition disabled:opacity-50">
+                        className="flex-1 py-2.5 rounded-xl bg-[#D4AF37] text-black font-bold text-sm hover:bg-[#b8912a] transition disabled:opacity-50">
                         {loading ? 'Upgrading…' : 'Confirm Upgrade'}
                     </button>
                 </div>
@@ -281,12 +281,12 @@ interface CardProps {
 
 function PlanCard({ name, price, period, badge, badgeGold, ring, features, priceId, tier, cardStatus, onUpgrade, sourceStripeSubId, leagueLimitNote, atLeagueLimit }: CardProps) {
     return (
-        <div className={`relative flex flex-col bg-gray-900 rounded-2xl p-6 border transition-shadow hover:shadow-lg hover:shadow-[#C9A227]/5 ${
-            ring ? 'border-[#C9A227] shadow-md shadow-[#C9A227]/10' : 'border-gray-800'
+        <div className={`relative flex flex-col bg-gray-900 rounded-2xl p-6 border transition-shadow hover:shadow-lg hover:shadow-[#D4AF37]/5 ${
+            ring ? 'border-[#D4AF37] shadow-md shadow-[#D4AF37]/10' : 'border-gray-800'
         } ${cardStatus === 'unavailable' ? 'opacity-50' : ''}`}>
             {badge && cardStatus !== 'current' && (
                 <span className={`absolute -top-3.5 left-1/2 -translate-x-1/2 text-xs font-bold px-4 py-1 rounded-full whitespace-nowrap ${
-                    badgeGold ? 'bg-[#C9A227] text-black' : 'bg-white text-black'
+                    badgeGold ? 'bg-[#D4AF37] text-black' : 'bg-white text-black'
                 }`}>{badge}</span>
             )}
             {cardStatus === 'current' && (
@@ -302,7 +302,7 @@ function PlanCard({ name, price, period, badge, badgeGold, ring, features, price
             </div>
             {leagueLimitNote && (
                 <div className="mb-4 flex items-center gap-2">
-                    <span className="text-xs font-semibold text-[#C9A227] bg-[#C9A227]/10 border border-[#C9A227]/30 px-2.5 py-1 rounded-full">
+                    <span className="text-xs font-semibold text-[#D4AF37] bg-[#D4AF37]/10 border border-[#D4AF37]/30 px-2.5 py-1 rounded-full">
                         {leagueLimitNote}
                     </span>
                     {atLeagueLimit && (
@@ -322,7 +322,7 @@ function PlanCard({ name, price, period, badge, badgeGold, ring, features, price
                         <input type="hidden" name="tier" value={tier} />
                         <input type="hidden" name="leagueName" value="" />
                         <button type="submit" disabled={!priceId}
-                            className="w-full py-3 rounded-xl font-bold transition-colors bg-[#C9A227] text-black hover:bg-[#b8912a] disabled:opacity-50 disabled:cursor-not-allowed">
+                            className="w-full py-3 rounded-xl font-bold transition-colors bg-[#D4AF37] text-black hover:bg-[#b8912a] disabled:opacity-50 disabled:cursor-not-allowed">
                             Get Started
                         </button>
                     </form>
@@ -330,7 +330,7 @@ function PlanCard({ name, price, period, badge, badgeGold, ring, features, price
                 {cardStatus === 'upgrade' && (
                     <button
                         onClick={() => onUpgrade({ priceId, planName: name, price, period, sourceStripeSubId: sourceStripeSubId! })}
-                        className="w-full py-3 rounded-xl font-bold transition-colors bg-[#C9A227] text-black hover:bg-[#b8912a]">
+                        className="w-full py-3 rounded-xl font-bold transition-colors bg-[#D4AF37] text-black hover:bg-[#b8912a]">
                         Upgrade
                     </button>
                 )}
@@ -370,12 +370,12 @@ function CommPlanCard({ name, price, period, badge, badgeGold, ring, features, p
     const canCheckout = leagueName.trim().length > 0 && !!priceId;
 
     return (
-        <div className={`relative flex flex-col bg-gray-900 rounded-2xl p-6 border transition-shadow hover:shadow-lg hover:shadow-[#C9A227]/5 ${
-            ring ? 'border-[#C9A227] shadow-md shadow-[#C9A227]/10' : 'border-gray-800'
+        <div className={`relative flex flex-col bg-gray-900 rounded-2xl p-6 border transition-shadow hover:shadow-lg hover:shadow-[#D4AF37]/5 ${
+            ring ? 'border-[#D4AF37] shadow-md shadow-[#D4AF37]/10' : 'border-gray-800'
         }`}>
             {badge && (
                 <span className={`absolute -top-3.5 left-1/2 -translate-x-1/2 text-xs font-bold px-4 py-1 rounded-full whitespace-nowrap ${
-                    badgeGold ? 'bg-[#C9A227] text-black' : 'bg-white text-black'
+                    badgeGold ? 'bg-[#D4AF37] text-black' : 'bg-white text-black'
                 }`}>{badge}</span>
             )}
 
@@ -397,7 +397,7 @@ function CommPlanCard({ name, price, period, badge, badgeGold, ring, features, p
                             <input type="hidden" name="tier" value={tier} />
                             <input type="hidden" name="leagueName" value={leagueName.trim()} />
                             <button type="submit" disabled={!canCheckout}
-                                className="w-full py-3 rounded-xl font-bold transition-colors bg-[#C9A227] text-black hover:bg-[#b8912a] disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="w-full py-3 rounded-xl font-bold transition-colors bg-[#D4AF37] text-black hover:bg-[#b8912a] disabled:opacity-40 disabled:cursor-not-allowed"
                                 title={!leagueName.trim() ? 'Enter your league name above' : undefined}>
                                 Get Started
                             </button>
@@ -410,7 +410,7 @@ function CommPlanCard({ name, price, period, badge, badgeGold, ring, features, p
                 {cardStatus === 'upgrade' && (
                     <button
                         onClick={() => onUpgrade({ priceId, planName: name, price, period, sourceStripeSubId: sourceStripeSubId! })}
-                        className="w-full py-3 rounded-xl font-bold transition-colors bg-[#C9A227] text-black hover:bg-[#b8912a]">
+                        className="w-full py-3 rounded-xl font-bold transition-colors bg-[#D4AF37] text-black hover:bg-[#b8912a]">
                         Upgrade
                     </button>
                 )}
@@ -539,13 +539,13 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                         <div className="inline-flex bg-gray-900 rounded-full p-1 border border-gray-800">
                             <button onClick={() => setTab('player')}
                                 className={`px-6 py-2 rounded-full text-sm font-semibold transition-colors ${
-                                    tab === 'player' ? 'bg-[#C9A227] text-black' : 'text-gray-400 hover:text-white'
+                                    tab === 'player' ? 'bg-[#D4AF37] text-black' : 'text-gray-400 hover:text-white'
                                 }`}>
                                 Player Plans
                             </button>
                             <button onClick={() => setTab('commissioner')}
                                 className={`px-6 py-2 rounded-full text-sm font-semibold transition-colors ${
-                                    tab === 'commissioner' ? 'bg-[#C9A227] text-black' : 'text-gray-400 hover:text-white'
+                                    tab === 'commissioner' ? 'bg-[#D4AF37] text-black' : 'text-gray-400 hover:text-white'
                                 }`}>
                                 Commissioner Plans
                             </button>
@@ -555,6 +555,13 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                     {/* Commissioner: size selector + league name input */}
                     {tab === 'commissioner' && (
                         <div className="mb-10 max-w-5xl mx-auto space-y-6">
+
+                            {/* How commissioner plans work */}
+                            <div className="bg-[#D4AF37]/8 border border-[#D4AF37]/25 rounded-xl px-5 py-4 text-sm text-gray-300 space-y-1">
+                                <p><span className="text-[#D4AF37] font-semibold">Commissioner Plans cover the entire league.</span> All members get access at no additional cost.</p>
+                                <p>Commissioners must send invites for members to join a commissioner‑paid league.</p>
+                                <p className="text-gray-500">Player Plans are optional personal upgrades and are never required to use commissioner‑paid tools.</p>
+                            </div>
 
                             {/* League name input */}
                             <div>
@@ -571,7 +578,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                         onChange={e => setLeagueName(e.target.value)}
                                         placeholder="e.g. Monday Night Mayhem"
                                         maxLength={80}
-                                        className="block mx-auto w-full max-w-sm bg-gray-900 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#C9A227]/60"
+                                        className="block mx-auto w-full max-w-sm bg-gray-900 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#D4AF37]/60"
                                     />
                                 )}
                             </div>
@@ -584,7 +591,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                         <button key={s} onClick={() => setSize(s)}
                                             className={`relative py-2.5 rounded-xl text-sm font-semibold transition-all border ${
                                                 size === s
-                                                    ? 'bg-[#C9A227] text-black border-[#C9A227]'
+                                                    ? 'bg-[#D4AF37] text-black border-[#D4AF37]'
                                                     : 'bg-gray-900 text-gray-400 border-gray-800 hover:border-gray-600 hover:text-white'
                                             }`}>
                                             {s} Teams
@@ -613,7 +620,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     atLeagueLimit={resolvePlayerCardStatus('PLAYER_PRO', playerSub) === 'current' && activePlayerLeagueCount >= 2}
                                 />
                                 <PlanCard
-                                    name="All-Pro" price="14.99" period="/yr"
+                                    name="All-Pro" price="17.99" period="/yr"
                                     badge="Most Popular" badgeGold ring
                                     features={PLAYER_ALL_PRO_FEATURES}
                                     priceId={PLAYER_PRICE_IDS.all_pro} tier="PLAYER_ALL_PRO"

@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-export default function SyncMembersButton({ duesId }: { duesId: string }) {
+export default function SyncMembersButton({ duesId, platform = 'sleeper' }: { duesId: string; platform?: string }) {
+    const platformLabel = platform === 'espn' ? 'ESPN' : 'Fantasy';
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [result, setResult]   = useState<string | null>(null);
@@ -21,7 +22,7 @@ export default function SyncMembersButton({ duesId }: { duesId: string }) {
             } else if ((data.added ?? 0) === 0) {
                 setResult(data.message ?? 'All members already synced.');
             } else {
-                setResult(`✓ Added ${data.added} member${data.added === 1 ? '' : 's'} from Sleeper.`);
+                setResult(`✓ Added ${data.added} member${data.added === 1 ? '' : 's'} from ${platformLabel}.`);
                 router.refresh();
             }
         } catch {
@@ -36,9 +37,9 @@ export default function SyncMembersButton({ duesId }: { duesId: string }) {
             <button
                 onClick={sync}
                 disabled={loading}
-                className="bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-50 text-gray-950 font-bold px-5 py-2.5 rounded-xl transition text-sm"
+                className="bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-50 text-gray-950 font-bold px-5 py-2.5 rounded-xl transition text-sm"
             >
-                {loading ? 'Syncing…' : 'Sync Roster from Sleeper'}
+                {loading ? 'Syncing…' : `Sync Roster from ${platformLabel}`}
             </button>
             {result && <p className="text-green-400 text-xs">{result}</p>}
             {error  && <p className="text-red-400 text-xs max-w-xs text-center">{error}</p>}

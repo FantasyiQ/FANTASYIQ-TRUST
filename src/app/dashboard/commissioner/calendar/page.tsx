@@ -54,7 +54,7 @@ export default async function SeasonCalendarPage() {
                         <h2 className="text-lg font-bold">No leagues synced yet</h2>
                         <p className="text-gray-400 text-sm">Sync a league first to set up its season calendar.</p>
                         <Link href="/dashboard/sync"
-                            className="inline-block bg-[#C8A951] hover:bg-[#b8992f] text-black font-bold px-6 py-2.5 rounded-lg transition text-sm">
+                            className="inline-block bg-[#D4AF37] hover:bg-[#BF9D2F] text-black font-bold px-6 py-2.5 rounded-lg transition text-sm">
                             Sync a League
                         </Link>
                     </div>
@@ -85,7 +85,7 @@ export default async function SeasonCalendarPage() {
                                                 </div>
                                             )}
                                             <div className="flex-1 min-w-0">
-                                                <p className="font-semibold text-white group-hover:text-[#C8A951] transition truncate">
+                                                <p className="font-semibold text-white group-hover:text-[#D4AF37] transition truncate">
                                                     {league.leagueName}
                                                 </p>
                                                 <p className="text-gray-500 text-xs mt-0.5">
@@ -95,7 +95,7 @@ export default async function SeasonCalendarPage() {
                                             </div>
                                             <div className="shrink-0 text-right">
                                                 {count > 0 ? (
-                                                    <span className="text-xs font-semibold text-[#C8A951]">
+                                                    <span className="text-xs font-semibold text-[#D4AF37]">
                                                         {count} event{count !== 1 ? 's' : ''}
                                                     </span>
                                                 ) : (

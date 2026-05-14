@@ -1,0 +1,31 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "gold": {
+    "$description": "Premium gold color system — metallic, modern SaaS palette anchored at #D4AF37",
+    "50":    { "$value": "#FBF5D8", "$type": "color", "$description": "Near-white tint — subtle page backgrounds" },
+    "100":   { "$value": "#F4E49C", "$type": "color", "$description": "Very light — tag backgrounds, faint fills"  },
+    "200":   { "$value": "#EDD368", "$type": "color", "$description": "Light highlight — badge accents"             },
+    "300":   { "$value": "#E8C96B", "$type": "color", "$description": "Gold Light — hover states, highlighted text" },
+    "400":   { "$value": "#DDB94A", "$type": "color", "$description": "Mid-light — icon tints"                      },
+    "500":   { "$value": "#D4AF37", "$type": "color", "$description": "PRIMARY — buttons, borders, headings"        },
+    "600":   { "$value": "#BF9D2F", "$type": "color", "$description": "Press / active tint on gold buttons"         },
+    "700":   { "$value": "#A8872B", "$type": "color", "$description": "Gold Dark — active states, depth shadows"    },
+    "800":   { "$value": "#8A6D20", "$type": "color", "$description": "Deep anchor — rarely needed"                 },
+    "900":   { "$value": "#6B5218", "$type": "color", "$description": "Near-black gold — extreme contrast only"     }
+  },
+  "goldAlias": {
+    "primary":   { "$value": "{gold.500}", "$type": "color" },
+    "light":     { "$value": "{gold.300}", "$type": "color" },
+    "dark":      { "$value": "{gold.700}", "$type": "color" },
+    "hover":     { "$value": "{gold.600}", "$type": "color" }
+  },
+  "goldGradient": {
+    "default":  { "$value": "linear-gradient(135deg, #D4AF37 0%, #E8C96B 100%)", "$type": "custom-gradient" },
+    "reversed": { "$value": "linear-gradient(135deg, #E8C96B 0%, #D4AF37 100%)", "$type": "custom-gradient" }
+  },
+  "goldShadow": {
+    "sm": { "$value": "0 2px 8px  rgba(212, 175, 55, 0.18)", "$type": "shadow", "$description": "Subtle glow — cards, inputs on focus" },
+    "md": { "$value": "0 4px 20px rgba(212, 175, 55, 0.22)", "$type": "shadow", "$description": "Standard glow — elevated gold elements" },
+    "lg": { "$value": "0 8px 40px rgba(212, 175, 55, 0.28)", "$type": "shadow", "$description": "Strong glow — hero CTAs, modals"        }
+  }
+}

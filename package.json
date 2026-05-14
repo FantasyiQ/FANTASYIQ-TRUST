@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && prisma db push --accept-data-loss && next build",
     "start": "next start",
     "lint": "eslint",
     "db:generate": "dotenv -e .env.local -- prisma generate",
@@ -12,7 +12,8 @@
     "db:migrate": "dotenv -e .env.local -- prisma migrate dev",
     "db:studio": "dotenv -e .env.local -- prisma studio",
     "dob:check": "npx tsx scripts/dobSyncValidator.ts",
-    "deploy": "vercel --prod --yes"
+    "deploy": "vercel --prod --yes",
+    "test": "tsx --test src/lib/auction/computeAuctionValues.test.ts src/lib/rankings/rankingsUtils.test.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
@@ -25,8 +26,11 @@
     "next-auth": "^5.0.0-beta.30",
     "pg": "^8.20.0",
     "prisma": "^7.7.0",
+    "pusher": "^5.3.3",
+    "pusher-js": "^8.5.0",
     "react": "18.2.0",
     "react-dom": "18.2.0",
+    "resend": "^6.12.2",
     "stripe": "^22.0.0"
   },
   "devDependencies": {

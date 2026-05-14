@@ -53,9 +53,9 @@ export default async function CommissionerLeagueCalendarPage({
                 {/* Header */}
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
-                        <Link href="/dashboard/commissioner/calendar"
+                        <Link href={`/dashboard/league/${leagueId}/commissioner`}
                             className="text-gray-500 hover:text-gray-300 text-sm transition">
-                            ← Season Calendar
+                            ← Back to Commissioner Hub
                         </Link>
                         <h1 className="text-2xl font-bold mt-3">Season Calendar</h1>
                         <p className="text-gray-400 text-sm mt-0.5">
@@ -64,7 +64,7 @@ export default async function CommissionerLeagueCalendarPage({
                     </div>
                     <Link
                         href={`/dashboard/league/${leagueId}/calendar`}
-                        className="border border-gray-700 hover:border-[#C8A951]/50 text-gray-300 font-semibold px-4 py-2 rounded-lg text-sm transition">
+                        className="border border-gray-700 hover:border-[#D4AF37]/50 text-gray-300 font-semibold px-4 py-2 rounded-lg text-sm transition">
                         Member View →
                     </Link>
                 </div>

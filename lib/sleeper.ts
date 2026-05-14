@@ -35,6 +35,7 @@ export interface SleeperLeague {
     };
     roster_positions: string[];
     previous_league_id?: string | null;
+    draft_id?: string | null; // current season's draft ID; null on legacy leagues
 }
 
 export interface SleeperLeagueMember {
@@ -168,17 +169,47 @@ export interface SleeperDraft {
     season:      string;
     status:      string; // pre_draft | drafting | complete
     type:        string; // linear | snake | auction
+    start_time:  number | null; // epoch ms; null when not yet scheduled
+    name?:       string | null; // e.g. "Startup Draft", "Rookie Draft"
     // user_id → 1-based draft position (1 = picks first).
     // null when the draft hasn't been configured yet.
     draft_order: Record<string, number> | null;
     settings: {
-        rounds: number;
-        teams:  number;
+        rounds:     number;
+        teams:      number;
+        is_auction?: number; // 1 = auction, 0 = snake (not always present)
+        type?:      string;  // "rookie" for rookie drafts (not always present)
     };
+    metadata?: {
+        type?:        string; // "rookie" for rookie drafts
+        scoring_type?: string;
+        name?:        string;
+        [key: string]: string | undefined;
+    } | null;
 }
 
 export async function getLeagueDrafts(leagueId: string): Promise<SleeperDraft[]> {
     return sleeperFetch<SleeperDraft[]>(`/league/${leagueId}/drafts`, 0);
+}
+
+/**
+ * Determine the effective draft type to persist for a league.
+ * Only two values are valid: 'rookie' and 'snake'.
+ *
+ * Dynasty rookie drafts: Sleeper reports type='linear' and sets
+ * metadata.scoring_type to 'dynasty_*' (e.g. 'dynasty_ppr', 'dynasty_2qb').
+ */
+export function resolveDraftType(draft: SleeperDraft | null): string {
+    if (!draft) return 'snake';
+
+    const scoringType    = draft.metadata?.scoring_type ?? '';
+    const isRookieDraft  =
+        draft.metadata?.type === 'rookie'                       ||
+        draft.settings?.type  === 'rookie'                      ||
+        (draft.name?.toLowerCase().includes('rookie') === true) ||
+        (draft.type === 'linear' && scoringType.startsWith('dynasty_'));
+
+    return isRookieDraft ? 'rookie' : 'snake';
 }
 
 /**
@@ -248,6 +279,7 @@ export interface SlimPlayer {
     full_name: string;
     position: string;
     team: string;
+    age?: number;
 }
 
 /**
@@ -262,7 +294,7 @@ export async function getPlayers(ids?: string[]): Promise<Record<string, SlimPla
         );
         const result: Record<string, SlimPlayer> = {};
         for (const r of rows) {
-            result[r.playerId] = { full_name: r.fullName, position: r.position, team: r.team };
+            result[r.playerId] = { full_name: r.fullName, position: r.position, team: r.team, age: r.age ?? undefined };
         }
         return result;
     } catch {

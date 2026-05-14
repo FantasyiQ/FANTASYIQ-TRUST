@@ -69,11 +69,11 @@ export default function PayoutsWinnersCard({
     const allPaidOut = payouts && payouts.length > 0 && payouts.every(p => localPaidAt[p.rank] ?? p.paidAt);
 
     return (
-        <div className="bg-[#0A0A0A] border border-[#CBA135] hover:border-[#E2B857] rounded-xl p-5 md:p-7 space-y-4 transition-colors">
+        <div className="bg-[#0A0A0A] border border-[#D4AF37] hover:border-[#D4AF37] rounded-xl p-5 md:p-7 space-y-4 transition-colors">
 
             {/* Header */}
             <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-[#CBA135]">Payouts</h2>
+                <h2 className="text-lg font-semibold text-[#D4AF37]">Payouts</h2>
                 <span className="text-[28px] leading-none select-none">🏆</span>
             </div>
 
@@ -86,7 +86,7 @@ export default function PayoutsWinnersCard({
                     {isCommissioner && (
                         <Link
                             href={`/dashboard/league/${leagueId}/payouts`}
-                            className="text-sm font-semibold text-[#CBA135] hover:text-[#E2B857] transition-colors"
+                            className="text-sm font-semibold text-[#D4AF37] hover:text-[#D4AF37] transition-colors"
                         >
                             Record payouts →
                         </Link>
@@ -120,7 +120,7 @@ export default function PayoutsWinnersCard({
                                         <p className="text-white font-semibold text-sm">{p.teamName || '—'}</p>
                                     </div>
                                     <div className="flex items-center gap-3 shrink-0">
-                                        <span className="text-[#CBA135] font-bold text-sm">{fmt(p.amount)}</span>
+                                        <span className="text-[#D4AF37] font-bold text-sm">{fmt(p.amount)}</span>
                                         {isPaid ? (
                                             <span className="inline-flex items-center gap-1 bg-[#0F3D2E] border border-emerald-500/40 text-emerald-400 text-xs font-semibold px-2 py-0.5 rounded-full">
                                                 ✓ Paid
@@ -130,7 +130,7 @@ export default function PayoutsWinnersCard({
                                                 type="button"
                                                 disabled={markingRank === p.rank}
                                                 onClick={() => { void handleMarkPaid(p.rank); }}
-                                                className="text-[#CBA135] hover:text-[#E2B857] text-xs font-semibold transition-colors disabled:opacity-50 whitespace-nowrap"
+                                                className="text-[#D4AF37] hover:text-[#D4AF37] text-xs font-semibold transition-colors disabled:opacity-50 whitespace-nowrap"
                                             >
                                                 {markingRank === p.rank ? '…' : 'Mark paid →'}
                                             </button>
@@ -158,13 +158,13 @@ export default function PayoutsWinnersCard({
                         <div className="flex items-center justify-between pt-1">
                             <Link
                                 href={`/dashboard/league/${leagueId}/payouts`}
-                                className="text-sm font-semibold text-[#CBA135] hover:text-[#E2B857] transition-colors"
+                                className="text-sm font-semibold text-[#D4AF37] hover:text-[#D4AF37] transition-colors"
                             >
                                 Manage payouts →
                             </Link>
                             <Link
                                 href={`/dashboard/league/${leagueId}/payouts/history`}
-                                className="text-xs text-gray-500 hover:text-[#CBA135] transition-colors"
+                                className="text-xs text-gray-500 hover:text-[#D4AF37] transition-colors"
                             >
                                 View history →
                             </Link>

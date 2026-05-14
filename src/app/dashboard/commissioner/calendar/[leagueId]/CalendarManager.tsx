@@ -33,8 +33,8 @@ const EVENT_META: Record<string, { label: string; icon: string; color: string; b
     trade_deadline:      { label: 'Trade Deadline',     icon: '🔒', color: 'text-red-400',    border: 'border-red-800'    },
     waiver_deadline:     { label: 'Waiver Deadline',    icon: '📋', color: 'text-yellow-400', border: 'border-yellow-800' },
     regular_season_end:  { label: 'Regular Season End', icon: '🏁', color: 'text-gray-400',   border: 'border-gray-700'   },
-    playoff_start:       { label: 'Playoffs Begin',     icon: '🏆', color: 'text-[#C8A951]',  border: 'border-[#C8A951]/50' },
-    championship:        { label: 'Championship',       icon: '🥇', color: 'text-[#C8A951]',  border: 'border-[#C8A951]/50' },
+    playoff_start:       { label: 'Playoffs Begin',     icon: '🏆', color: 'text-[#D4AF37]',  border: 'border-[#D4AF37]/50' },
+    championship:        { label: 'Championship',       icon: '🥇', color: 'text-[#D4AF37]',  border: 'border-[#D4AF37]/50' },
     custom:              { label: 'Custom Event',       icon: '📅', color: 'text-gray-300',   border: 'border-gray-700'   },
 };
 
@@ -160,20 +160,20 @@ function EventRow({ event, leagueId, onUpdate, onDelete }: {
                         value={form.title}
                         onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
                         placeholder="Event title"
-                        className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/60"
+                        className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/60"
                     />
                     <input
                         type="date"
                         value={form.date}
                         onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
-                        className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#C8A951]/60"
+                        className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#D4AF37]/60"
                     />
                 </div>
                 <div className="grid sm:grid-cols-2 gap-3">
                     <select
                         value={form.type}
                         onChange={e => setForm(f => ({ ...f, type: e.target.value as EventType }))}
-                        className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#C8A951]/60">
+                        className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#D4AF37]/60">
                         {EVENT_TYPE_OPTIONS.map(o => (
                             <option key={o.value} value={o.value}>{o.label}</option>
                         ))}
@@ -183,13 +183,13 @@ function EventRow({ event, leagueId, onUpdate, onDelete }: {
                         value={form.description}
                         onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                         placeholder="Notes (optional)"
-                        className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/60"
+                        className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/60"
                     />
                 </div>
                 {error && <p className="text-red-400 text-xs">{error}</p>}
                 <div className="flex items-center gap-2">
                     <button onClick={handleSave} disabled={saving || !form.title.trim() || !form.date}
-                        className="bg-[#C8A951] hover:bg-[#b8992f] text-black font-bold px-4 py-1.5 rounded-lg text-sm transition disabled:opacity-40">
+                        className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-black font-bold px-4 py-1.5 rounded-lg text-sm transition disabled:opacity-40">
                         {saving ? 'Saving…' : 'Save'}
                     </button>
                     <button onClick={() => setEditing(false)}
@@ -233,7 +233,7 @@ function EventRow({ event, leagueId, onUpdate, onDelete }: {
             {/* Actions */}
             <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition">
                 <button onClick={() => setEditing(true)}
-                    className="p-1.5 rounded-lg text-gray-600 hover:text-[#C8A951] hover:bg-[#C8A951]/10 transition text-sm">
+                    className="p-1.5 rounded-lg text-gray-600 hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 transition text-sm">
                     ✏️
                 </button>
                 <button onClick={handleDelete}
@@ -297,21 +297,21 @@ function AddEventForm({ leagueId, onAdd, onClose }: {
                     placeholder="Event title"
                     required
                     autoFocus
-                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/60"
+                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/60"
                 />
                 <input
                     type="date"
                     value={form.date}
                     onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
                     required
-                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#C8A951]/60"
+                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#D4AF37]/60"
                 />
             </div>
             <div className="grid sm:grid-cols-2 gap-3">
                 <select
                     value={form.type}
                     onChange={e => setForm(f => ({ ...f, type: e.target.value as EventType }))}
-                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#C8A951]/60">
+                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#D4AF37]/60">
                     {EVENT_TYPE_OPTIONS.map(o => (
                         <option key={o.value} value={o.value}>{o.label}</option>
                     ))}
@@ -321,13 +321,13 @@ function AddEventForm({ leagueId, onAdd, onClose }: {
                     value={form.description}
                     onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                     placeholder="Notes (optional)"
-                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/60"
+                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/60"
                 />
             </div>
             {error && <p className="text-red-400 text-xs">{error}</p>}
             <div className="flex items-center gap-2">
                 <button type="submit" disabled={saving || !form.title.trim() || !form.date}
-                    className="bg-[#C8A951] hover:bg-[#b8992f] text-black font-bold px-5 py-2 rounded-lg text-sm transition disabled:opacity-40">
+                    className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-black font-bold px-5 py-2 rounded-lg text-sm transition disabled:opacity-40">
                     {saving ? 'Adding…' : 'Add Event'}
                 </button>
                 <button type="button" onClick={onClose}
@@ -382,7 +382,7 @@ export default function CalendarManager({ leagueId, leagueName, initial }: Calen
                         <p className="text-gray-500 text-xs mt-0.5">Total Events</p>
                     </div>
                     <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
-                        <p className="text-2xl font-bold text-[#C8A951]">{upcomingEvents.length}</p>
+                        <p className="text-2xl font-bold text-[#D4AF37]">{upcomingEvents.length}</p>
                         <p className="text-gray-500 text-xs mt-0.5">Upcoming</p>
                     </div>
                     <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
@@ -405,7 +405,7 @@ export default function CalendarManager({ leagueId, leagueName, initial }: Calen
                     {!showAddForm && (
                         <button
                             onClick={() => setShowAddForm(true)}
-                            className="bg-[#C8A951] hover:bg-[#b8992f] text-black font-bold px-4 py-2 rounded-lg text-sm transition">
+                            className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-black font-bold px-4 py-2 rounded-lg text-sm transition">
                             + Add Event
                         </button>
                     )}
@@ -431,7 +431,7 @@ export default function CalendarManager({ leagueId, leagueName, initial }: Calen
                         {!showAddForm && (
                             <button
                                 onClick={() => setShowAddForm(true)}
-                                className="inline-block border border-gray-700 hover:border-[#C8A951]/50 text-gray-300 font-semibold px-4 py-2 rounded-lg text-sm transition">
+                                className="inline-block border border-gray-700 hover:border-[#D4AF37]/50 text-gray-300 font-semibold px-4 py-2 rounded-lg text-sm transition">
                                 Add First Event
                             </button>
                         )}

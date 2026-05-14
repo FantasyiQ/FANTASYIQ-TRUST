@@ -73,7 +73,7 @@ export default function AssignLeagueToPlan({ planId, planType, unassignedLeagues
                 className={
                     isReassign
                         ? 'text-xs text-gray-400 hover:text-gray-200 transition underline underline-offset-2'
-                        : 'text-sm bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-4 py-2 rounded-lg transition'
+                        : 'text-sm bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-4 py-2 rounded-lg transition'
                 }
             >
                 {isReassign ? 'Change' : 'Assign League'}
@@ -97,7 +97,7 @@ export default function AssignLeagueToPlan({ planId, planType, unassignedLeagues
                             {!hasChoices ? (
                                 <p className="text-gray-400 text-sm py-2">
                                     No unassigned leagues available.{' '}
-                                    <a href="/dashboard/sync" className="text-[#C8A951] hover:underline">Sync a league</a> first.
+                                    <a href="/dashboard/sync" className="text-[#D4AF37] hover:underline">Sync a league</a> first.
                                 </p>
                             ) : (
                                 <div className="space-y-2 max-h-60 overflow-y-auto">
@@ -108,7 +108,7 @@ export default function AssignLeagueToPlan({ planId, planType, unassignedLeagues
                                             onClick={() => setPicked(l.id)}
                                             className={`w-full text-left px-4 py-3 rounded-xl border transition ${
                                                 picked === l.id
-                                                    ? 'border-[#C8A951] bg-[#C8A951]/10'
+                                                    ? 'border-[#D4AF37] bg-[#D4AF37]/10'
                                                     : 'border-gray-700 bg-gray-800 hover:border-gray-600'
                                             }`}
                                         >
@@ -140,7 +140,7 @@ export default function AssignLeagueToPlan({ planId, planType, unassignedLeagues
                                 type="button"
                                 onClick={() => { void handleAssign(); }}
                                 disabled={saving || !picked}
-                                className="bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-50 disabled:cursor-not-allowed text-gray-950 font-bold px-5 py-2 rounded-lg transition text-sm"
+                                className="bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-50 disabled:cursor-not-allowed text-gray-950 font-bold px-5 py-2 rounded-lg transition text-sm"
                             >
                                 {saving ? 'Saving…' : isReassign ? 'Change' : 'Assign'}
                             </button>

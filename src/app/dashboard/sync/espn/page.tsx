@@ -170,7 +170,7 @@ export default function EspnSyncPage() {
                         <span key={s} className="flex items-center gap-2">
                             <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border ${
                                 i === stepIndex
-                                    ? 'border-[#C8A951] bg-[#C8A951]/20 text-[#C8A951]'
+                                    ? 'border-[#D4AF37] bg-[#D4AF37]/20 text-[#D4AF37]'
                                     : i < stepIndex
                                         ? 'border-green-700 bg-green-900/30 text-green-400'
                                         : 'border-gray-700 text-gray-600'
@@ -230,7 +230,7 @@ export default function EspnSyncPage() {
                                         onChange={(e) => setLeagueId(e.target.value)}
                                         placeholder="e.g. 350564"
                                         required
-                                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-[#C8A951] transition font-mono text-sm"
+                                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-[#D4AF37] transition font-mono text-sm"
                                     />
                                     <p className="text-gray-600 text-xs mt-1">Found in your ESPN league URL: <span className="font-mono">?leagueId=XXXXXX</span></p>
                                 </div>
@@ -243,7 +243,7 @@ export default function EspnSyncPage() {
                                         onChange={(e) => { setSwid(e.target.value); setCredStatus('idle'); }}
                                         placeholder="{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}"
                                         required
-                                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-[#C8A951] transition font-mono text-sm"
+                                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-[#D4AF37] transition font-mono text-sm"
                                     />
                                 </div>
 
@@ -255,7 +255,7 @@ export default function EspnSyncPage() {
                                         placeholder="AECZHkZa..."
                                         required
                                         rows={3}
-                                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-[#C8A951] transition font-mono text-xs resize-none"
+                                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-[#D4AF37] transition font-mono text-xs resize-none"
                                     />
                                     <p className="text-gray-600 text-xs mt-1">Spaces and line breaks are stripped automatically.</p>
                                 </div>
@@ -284,7 +284,7 @@ export default function EspnSyncPage() {
                                 <button
                                     type="submit"
                                     disabled={loading || !canLookup}
-                                    className="w-full bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-50 disabled:cursor-not-allowed text-gray-950 font-bold py-2.5 rounded-lg transition"
+                                    className="w-full bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-50 disabled:cursor-not-allowed text-gray-950 font-bold py-2.5 rounded-lg transition"
                                 >
                                     {loading ? 'Finding league…' : 'Find League'}
                                 </button>
@@ -320,7 +320,7 @@ export default function EspnSyncPage() {
                                 Back
                             </button>
                             <button type="button" onClick={() => { void handleSync(); }}
-                                className="flex-1 bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold py-2.5 rounded-lg transition text-sm">
+                                className="flex-1 bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold py-2.5 rounded-lg transition text-sm">
                                 Sync {result.name}
                             </button>
                         </div>
@@ -331,7 +331,7 @@ export default function EspnSyncPage() {
                 {step === 'syncing' && (
                     <div className="bg-gray-900 border border-gray-800 rounded-2xl p-10 text-center space-y-4">
                         <div className="flex justify-center">
-                            <div className="w-10 h-10 border-4 border-[#C8A951]/30 border-t-[#C8A951] rounded-full animate-spin" />
+                            <div className="w-10 h-10 border-4 border-[#D4AF37]/30 border-t-[#D4AF37] rounded-full animate-spin" />
                         </div>
                         <p className="text-white font-semibold">{syncProgress}</p>
                         <p className="text-gray-500 text-sm">Fetching your full league — this takes a few seconds.</p>

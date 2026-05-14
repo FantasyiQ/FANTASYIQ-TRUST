@@ -10,6 +10,10 @@ import { effectiveTierForLeague, tierLevel } from '@/lib/league-limits';
 import { stripe, priceIdToTier } from '@/lib/stripe';
 import type { SubscriptionTier } from '@prisma/client';
 import type { LeagueType } from '@/lib/trade-engine';
+import { buildLeagueConfig } from '@/lib/rankings/leagueConfigBuilder';
+import { buildLeagueDefensiveAndKickerRankings } from '@/lib/rankings/defensiveEngine';
+import { buildIdpSeedProjections, buildKickerSeedProjections, buildDefenseSeedProjections, toIdpPosition } from '@/lib/rankings/seedProjections';
+import { buildProjectionsFromSleeperStats } from '@/lib/rankings/sleeperStatsAdapter';
 
 export type TradeEvaluatorContent = {
     leagueName:          string;
@@ -20,16 +24,23 @@ export type TradeEvaluatorContent = {
     leagueType:          LeagueType;
     rosterPositions:     string[];
     scoringSettings:     Record<string, number>;
+    sleeperLeagueId:     string;
+    mySleeperUserId:     string | null;
+    /**
+     * Defensive value scores (0–100) keyed by player name, from the defensive
+     * ranking engine. Empty when the league has no IDP/K/DEF positions.
+     */
+    defenseValues:       Record<string, number>;
     myTeamData?: {
         rosterId:   number;
         teamName:   string;
-        players:    { name: string; position: string; team: string }[];
+        players:    { id: string; name: string; position: string; team: string }[];
         ownedPicks: { season: string; round: number; slot?: number; tier?: string; tierProjected?: boolean; origTeamName?: string }[];
     };
     otherTeamsData: {
         rosterId:   number;
         teamName:   string;
-        players:    { name: string; position: string; team: string }[];
+        players:    { id: string; name: string; position: string; team: string }[];
         ownedPicks: { season: string; round: number; slot?: number; tier?: string; tierProjected?: boolean; origTeamName?: string }[];
     }[];
 };
@@ -40,9 +51,12 @@ export async function getTradeEvaluatorContent(id: string): Promise<TradeEvaluat
 
     const league = await prisma.league.findUnique({
         where:  { id },
-        select: { id: true, userId: true, leagueId: true, leagueName: true, scoringType: true, totalRosters: true, rosterPositions: true, sleeperUserId: true },
+        select: { id: true, userId: true, leagueId: true, leagueName: true, scoringType: true, totalRosters: true, rosterPositions: true, sleeperUserId: true, platform: true },
     });
     if (!league || league.userId !== session.user.id) notFound();
+
+    // Trade evaluator requires Sleeper roster data — ESPN leagues not supported
+    if (league.platform === 'espn') redirect(`/dashboard/league/${id}/overview`);
 
     const safeLeagueP = getSafeSleeperLeague(league.leagueId);
     const [allPlayers, tradedPicks, dbUser] = await Promise.all([
@@ -164,7 +178,7 @@ export async function getTradeEvaluatorContent(id: string): Promise<TradeEvaluat
         teamName:   row.teamName,
         players:    (row.roster.players ?? [])
             .filter(pid => pid !== '0' && allPlayers[pid])
-            .map(pid => ({ name: allPlayers[pid].full_name, position: allPlayers[pid].position, team: allPlayers[pid].team })),
+            .map(pid => ({ id: pid, name: allPlayers[pid].full_name, position: allPlayers[pid].position, team: allPlayers[pid].team })),
         ownedPicks: computeOwnedPicks(row.roster.roster_id),
     }));
 
@@ -172,6 +186,57 @@ export async function getTradeEvaluatorContent(id: string): Promise<TradeEvaluat
         ? teamTradeData.find(t => safeRosters.find(r => r.roster_id === t.rosterId)?.owner_id === mySleeperUserId)
         : undefined;
     const otherTeamsData = teamTradeData.filter(t => t.rosterId !== myTeamData?.rosterId);
+
+    // ── Defensive ranking engine ───────────────────────────────────────────────
+    // Build league config from Sleeper data, run the defensive engine with
+    // seed projections (NFL population averages), and return value scores
+    // keyed by player name for the unified trade evaluator.
+    const rawScoringSettings = (sleeperLeague.scoring_settings as Record<string, number>) ?? {};
+    const { scoring, lineup } = buildLeagueConfig(
+        rawScoringSettings,
+        rosterPositions,
+        league.totalRosters,
+    );
+
+    let defenseValues: Record<string, number> = {};
+    const anyDefensiveSlots =
+        lineup.starters.DL > 0 || lineup.starters.LB > 0 || lineup.starters.DB > 0 ||
+        lineup.starters.IDP > 0 || lineup.starters.K > 0 || lineup.starters.DEF > 0;
+
+    if (anyDefensiveSlots) {
+        // Bucket roster players by their defensive position using the players map.
+        const idpPlayers: { playerId: string; position: 'DL' | 'LB' | 'DB' }[] = [];
+        const kickerIds:  string[] = [];
+
+        for (const [pid, player] of Object.entries(allPlayers)) {
+            const idpPos = toIdpPosition(player.position);
+            if (idpPos) {
+                idpPlayers.push({ playerId: pid, position: idpPos });
+            } else if (player.position === 'K') {
+                kickerIds.push(pid);
+            }
+        }
+
+        const liveProjections    = await buildProjectionsFromSleeperStats('2025', allPlayers, rawScoringSettings);
+        const idpProjections     = liveProjections?.idpProjections     ?? buildIdpSeedProjections(idpPlayers);
+        const kickerProjections  = liveProjections?.kickerProjections  ?? buildKickerSeedProjections(kickerIds);
+        const defenseProjections = liveProjections?.defenseProjections ?? buildDefenseSeedProjections();
+
+        const rankings = buildLeagueDefensiveAndKickerRankings(
+            scoring,
+            lineup,
+            idpProjections,
+            kickerProjections,
+            defenseProjections,
+            leagueType,
+            liveProjections?.offensiveTop5Avg ?? {},
+        );
+
+        // Store by Sleeper player ID — unified evaluator does ID-keyed lookup.
+        for (const entity of [...rankings.idp, ...rankings.kickers, ...rankings.defenses]) {
+            defenseValues[entity.id] = entity.valueScore;
+        }
+    }
 
     return {
         leagueName:          league.leagueName,
@@ -181,7 +246,10 @@ export async function getTradeEvaluatorContent(id: string): Promise<TradeEvaluat
         draftOrderProjected,
         leagueType,
         rosterPositions,
-        scoringSettings:     (sleeperLeague.scoring_settings as Record<string, number>) ?? {},
+        scoringSettings:     rawScoringSettings,
+        sleeperLeagueId:     league.leagueId,
+        mySleeperUserId:     mySleeperUserId ?? null,
+        defenseValues,
         myTeamData,
         otherTeamsData,
     };

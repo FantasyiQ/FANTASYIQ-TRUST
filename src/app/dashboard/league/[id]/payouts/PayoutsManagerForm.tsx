@@ -202,7 +202,7 @@ export default function PayoutsManagerForm({
                 <BackToOverview leagueId={leagueId} />
 
                 <div>
-                    <h1 className="text-2xl font-bold text-[#CBA135]">Payouts Manager</h1>
+                    <h1 className="text-2xl font-bold text-[#D4AF37]">Payouts Manager</h1>
                     <p className="text-gray-400 text-sm mt-1">{leagueName}</p>
                 </div>
 
@@ -229,12 +229,12 @@ export default function PayoutsManagerForm({
                 )}
 
                 {/* Payout table */}
-                <div className="bg-[#0A0A0A] border border-[#CBA135] rounded-xl p-5 md:p-7 space-y-4">
+                <div className="bg-[#0A0A0A] border border-[#D4AF37] rounded-xl p-5 md:p-7 space-y-4">
                     <div className="flex items-center justify-between">
-                        <h2 className="text-[#CBA135] font-semibold text-base">Recorded Payouts</h2>
+                        <h2 className="text-[#D4AF37] font-semibold text-base">Recorded Payouts</h2>
                         <a
                             href={`/dashboard/league/${leagueId}/payouts/history`}
-                            className="text-xs text-gray-500 hover:text-[#CBA135] transition-colors"
+                            className="text-xs text-gray-500 hover:text-[#D4AF37] transition-colors"
                         >
                             View history →
                         </a>
@@ -260,7 +260,7 @@ export default function PayoutsManagerForm({
                                         <p className="text-xs text-gray-500 mb-0.5">{rankLabel(p.rank)}</p>
                                         <p className="text-white font-semibold text-sm">{p.teamName || '—'}</p>
                                     </div>
-                                    <span className="text-[#CBA135] font-bold text-sm text-right">
+                                    <span className="text-[#D4AF37] font-bold text-sm text-right">
                                         {fmt(p.amount)}
                                     </span>
                                     <div className="text-right">
@@ -273,7 +273,7 @@ export default function PayoutsManagerForm({
                                                 type="button"
                                                 disabled={markingRank === p.rank}
                                                 onClick={() => { void handleMarkPaid(p.rank); }}
-                                                className="text-[#CBA135] hover:text-[#E2B857] text-xs font-semibold transition-colors disabled:opacity-50 whitespace-nowrap"
+                                                className="text-[#D4AF37] hover:text-[#D4AF37] text-xs font-semibold transition-colors disabled:opacity-50 whitespace-nowrap"
                                             >
                                                 {markingRank === p.rank ? 'Saving…' : 'Mark as paid →'}
                                             </button>
@@ -298,7 +298,7 @@ export default function PayoutsManagerForm({
                     <button
                         type="button"
                         onClick={() => setEditing(true)}
-                        className="w-full border border-[#CBA135] text-[#CBA135] hover:bg-[#CBA135]/10 font-semibold py-3 rounded-xl transition text-sm"
+                        className="w-full border border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/10 font-semibold py-3 rounded-xl transition text-sm"
                     >
                         Edit Payouts
                     </button>
@@ -321,7 +321,7 @@ export default function PayoutsManagerForm({
             <BackToOverview leagueId={leagueId} />
 
             <div>
-                <h1 className="text-2xl font-bold text-[#CBA135]">Payouts Manager</h1>
+                <h1 className="text-2xl font-bold text-[#D4AF37]">Payouts Manager</h1>
                 <p className="text-gray-400 text-sm mt-1">
                     Review your final standings and record payouts for this league.
                 </p>
@@ -330,9 +330,9 @@ export default function PayoutsManagerForm({
 
             {/* Auto-detect notice */}
             {autoFilled && (
-                <div className="bg-[#CBA135]/10 border border-[#CBA135]/30 rounded-xl px-4 py-3 flex items-center gap-2">
-                    <span className="text-[#CBA135]">✦</span>
-                    <p className="text-[#CBA135] text-sm">
+                <div className="bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-xl px-4 py-3 flex items-center gap-2">
+                    <span className="text-[#D4AF37]">✦</span>
+                    <p className="text-[#D4AF37] text-sm">
                         Auto-detected from Sleeper final standings. Review and confirm below.
                     </p>
                 </div>
@@ -350,7 +350,7 @@ export default function PayoutsManagerForm({
             {/* Main form card */}
             <form
                 onSubmit={(e) => { void handleSave(e); }}
-                className="bg-[#0A0A0A] border border-[#CBA135] hover:border-[#E2B857] rounded-xl p-5 md:p-7 space-y-6 transition-colors"
+                className="bg-[#0A0A0A] border border-[#D4AF37] hover:border-[#D4AF37] rounded-xl p-5 md:p-7 space-y-6 transition-colors"
             >
                 {/* Pot total header */}
                 {potTotal > 0 && (
@@ -363,7 +363,7 @@ export default function PayoutsManagerForm({
                 <div className="space-y-5">
                     {rows.map(row => (
                         <div key={row.rank} className="space-y-2">
-                            <p className="text-[#CBA135] font-semibold text-sm">{row.label}</p>
+                            <p className="text-[#D4AF37] font-semibold text-sm">{row.label}</p>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 {/* Team dropdown */}
@@ -373,7 +373,7 @@ export default function PayoutsManagerForm({
                                         value={row.teamId}
                                         onChange={e => updateRow(row.rank, 'teamId', e.target.value)}
                                         required
-                                        className="w-full bg-black border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#CBA135]/60 appearance-none"
+                                        className="w-full bg-black border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#D4AF37]/60 appearance-none"
                                     >
                                         <option value="">Select a team…</option>
                                         {teams.map(t => (
@@ -395,7 +395,7 @@ export default function PayoutsManagerForm({
                                             onChange={e => updateRow(row.rank, 'amount', e.target.value)}
                                             placeholder="0"
                                             required
-                                            className="w-full bg-black border border-white/10 rounded-xl pl-7 pr-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#CBA135]/60"
+                                            className="w-full bg-black border border-white/10 rounded-xl pl-7 pr-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#D4AF37]/60"
                                         />
                                     </div>
                                 </div>
@@ -436,7 +436,7 @@ export default function PayoutsManagerForm({
                 <button
                     type="submit"
                     disabled={saving || !canSave}
-                    className="w-full bg-[#CBA135] hover:bg-[#E2B857] disabled:opacity-40 disabled:cursor-not-allowed text-gray-950 font-bold py-3 rounded-xl transition text-sm"
+                    className="w-full bg-[#D4AF37] hover:bg-[#D4AF37] disabled:opacity-40 disabled:cursor-not-allowed text-gray-950 font-bold py-3 rounded-xl transition text-sm"
                 >
                     {saving ? 'Saving…' : 'Save Payouts'}
                 </button>

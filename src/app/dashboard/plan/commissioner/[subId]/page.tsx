@@ -36,7 +36,6 @@ const COMM_FEATURES = [
     { href: '/dashboard/commissioner/announcements', icon: '📣', title: 'Commissioner Announcements',   desc: 'Rulebook, bylaws, and league docs.' },
     { href: '/dashboard/commissioner/calendar',      icon: '📅', title: 'Season Calendar',              desc: 'Trade deadlines, playoff schedule.' },
     { href: '/dashboard/commissioner/settings',      icon: '⚙️', title: 'League Settings Sync',        desc: 'Review settings across all leagues.' },
-    { href: '/dashboard/commissioner/pro-bowl',      icon: '🏆', title: 'Pro Bowl Contest',             desc: 'Week 18 DK-style lineup contest.' },
 ] as const;
 
 export default async function CommissionerPlanPage({
@@ -86,7 +85,7 @@ export default async function CommissionerPlanPage({
                 {/* Header */}
                 <div>
                     <Link href="/dashboard" className="text-gray-500 hover:text-gray-300 text-sm transition">
-                        ← Back to Dashboard
+                        ← Back to My Leagues
                     </Link>
                     <h1 className="text-2xl font-bold mt-3">Your Commissioner Plan</h1>
                     {sub.leagueName && (
@@ -94,12 +93,19 @@ export default async function CommissionerPlanPage({
                     )}
                 </div>
 
+                {/* How commissioner plans work */}
+                <div className="bg-[#D4AF37]/8 border border-[#D4AF37]/25 rounded-xl px-5 py-4 text-sm text-gray-300 space-y-1">
+                    <p><span className="text-[#D4AF37] font-semibold">Commissioner Plans cover the entire league.</span> All members get access at no additional cost.</p>
+                    <p>Commissioners must send invites for members to join a commissioner‑paid league.</p>
+                    <p className="text-gray-500">Player Plans are optional personal upgrades and are never required to use commissioner‑paid tools.</p>
+                </div>
+
                 {/* Plan Summary Card */}
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
                     <div className="flex items-start justify-between gap-4 flex-wrap">
                         <div>
                             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Commissioner Plan</p>
-                            <p className="text-2xl font-bold text-[#C8A951]">{formatTier(tier)}</p>
+                            <p className="text-2xl font-bold text-[#D4AF37]">{formatTier(tier)}</p>
                             <div className="flex items-center gap-2 mt-2 flex-wrap">
                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${STATUS_STYLES[sub.status] ?? STATUS_STYLES.inactive}`}>
                                     {sub.status.replace('_', ' ')}
@@ -119,7 +125,7 @@ export default async function CommissionerPlanPage({
                     <div className="pt-3 border-t border-gray-800">
                         <form action={createPortalSession}>
                             <button type="submit"
-                                className="text-[#C8A951]/70 hover:text-[#C8A951] text-sm font-medium transition">
+                                className="text-[#D4AF37]/70 hover:text-[#D4AF37] text-sm font-medium transition">
                                 Manage Subscription →
                             </button>
                         </form>
@@ -164,8 +170,8 @@ export default async function CommissionerPlanPage({
                                     <div className="w-11 h-11 rounded-lg bg-gray-700 shrink-0 flex items-center justify-center text-gray-500 text-xs font-bold">FF</div>
                                 )}
                                 <div className="flex-1 min-w-0">
-                                    <Link href={`/dashboard/league/${assignedLeague.id}`}
-                                        className="font-semibold text-white hover:text-[#C8A951] transition truncate block">
+                                    <Link href={`/dashboard/league/${assignedLeague.id}/commissioner`}
+                                        className="font-semibold text-white hover:text-[#D4AF37] transition truncate block">
                                         {assignedLeague.leagueName}
                                     </Link>
                                     <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -211,10 +217,10 @@ export default async function CommissionerPlanPage({
                             >
                                 <span className="text-xl shrink-0">{f.icon}</span>
                                 <div className="flex-1 min-w-0">
-                                    <p className="font-medium text-white group-hover:text-[#C8A951] transition text-sm">{f.title}</p>
+                                    <p className="font-medium text-white group-hover:text-[#D4AF37] transition text-sm">{f.title}</p>
                                     <p className="text-gray-500 text-xs mt-0.5">{f.desc}</p>
                                 </div>
-                                <span className="text-gray-600 group-hover:text-[#C8A951] transition text-sm shrink-0">→</span>
+                                <span className="text-gray-600 group-hover:text-[#D4AF37] transition text-sm shrink-0">→</span>
                             </Link>
                         ))}
                     </div>
@@ -233,19 +239,19 @@ export default async function CommissionerPlanPage({
                                     </div>
                                     <Link
                                         href={`/pricing?tab=commissioner&size=${sub.leagueSize ?? 12}&leagueName=${encodeURIComponent(sub.leagueName ?? '')}`}
-                                        className="shrink-0 border border-gray-600 hover:border-[#C8A951]/60 text-gray-300 font-semibold px-4 py-2 rounded-lg transition text-sm">
+                                        className="shrink-0 border border-gray-600 hover:border-[#D4AF37]/60 text-gray-300 font-semibold px-4 py-2 rounded-lg transition text-sm">
                                         Upgrade →
                                     </Link>
                                 </div>
                             )}
-                            <div className="flex items-center justify-between gap-4 p-4 bg-[#C8A951]/5 rounded-xl border border-[#C8A951]/20">
+                            <div className="flex items-center justify-between gap-4 p-4 bg-[#D4AF37]/5 rounded-xl border border-[#D4AF37]/20">
                                 <div>
-                                    <p className="font-medium text-[#C8A951] text-sm">Commissioner Elite ✦</p>
+                                    <p className="font-medium text-[#D4AF37] text-sm">Commissioner Elite ✦</p>
                                     <p className="text-gray-500 text-xs mt-0.5">All features · Priority support · Future tools first</p>
                                 </div>
                                 <Link
                                     href={`/pricing?tab=commissioner&size=${sub.leagueSize ?? 12}&leagueName=${encodeURIComponent(sub.leagueName ?? '')}`}
-                                    className="shrink-0 bg-[#C8A951]/15 border border-[#C8A951]/50 text-[#C8A951] font-bold px-4 py-2 rounded-lg transition text-sm hover:bg-[#C8A951]/25">
+                                    className="shrink-0 bg-[#D4AF37]/15 border border-[#D4AF37]/50 text-[#D4AF37] font-bold px-4 py-2 rounded-lg transition text-sm hover:bg-[#D4AF37]/25">
                                     {isAllPro ? 'Upgrade →' : 'View Plans →'}
                                 </Link>
                             </div>

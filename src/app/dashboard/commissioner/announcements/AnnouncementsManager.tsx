@@ -28,7 +28,7 @@ interface GifResult {
 }
 
 export interface AnnouncementsManagerProps {
-    duesId:     string;
+    leagueId:     string;
     leagueName: string;
     initial:    Post[];
 }
@@ -72,7 +72,7 @@ function MediaPreview({ url, alt = '' }: { url: string; alt?: string }) {
     const [errored, setErrored] = useState(false);
     if (errored) return (
         <a href={url} target="_blank" rel="noopener noreferrer"
-            className="text-[#C8A951] text-xs hover:underline break-all">{url}</a>
+            className="text-[#D4AF37] text-xs hover:underline break-all">{url}</a>
     );
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={url} alt={alt} onError={() => setErrored(true)}
@@ -83,9 +83,9 @@ function MediaPreview({ url, alt = '' }: { url: string; alt?: string }) {
 // PostCard
 // ---------------------------------------------------------------------------
 
-function PostCard({ post, duesId, onPin, onDelete }: {
+function PostCard({ post, leagueId, onPin, onDelete }: {
     post:     Post;
-    duesId:   string;
+    leagueId:   string;
     onPin:    (id: string) => void;
     onDelete: (id: string) => void;
 }) {
@@ -93,7 +93,7 @@ function PostCard({ post, duesId, onPin, onDelete }: {
 
     async function handlePin() {
         setBusy(true);
-        await fetch(`/api/dues/${duesId}/announcements/${post.id}`, { method: 'PATCH' });
+        await fetch(`/api/leagues/${leagueId}/announcements/${post.id}`, { method: 'PATCH' });
         onPin(post.id);
         setBusy(false);
     }
@@ -101,14 +101,14 @@ function PostCard({ post, duesId, onPin, onDelete }: {
     async function handleDelete() {
         if (!confirm('Delete this announcement?')) return;
         setBusy(true);
-        await fetch(`/api/dues/${duesId}/announcements/${post.id}`, { method: 'DELETE' });
+        await fetch(`/api/leagues/${leagueId}/announcements/${post.id}`, { method: 'DELETE' });
         onDelete(post.id);
     }
 
     const initials = (post.author.name ?? 'C').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
     return (
-        <div className={`bg-gray-900 border rounded-2xl p-5 space-y-3 transition ${post.pinned ? 'border-[#C8A951]/40' : 'border-gray-800'}`}>
+        <div className={`bg-gray-900 border rounded-2xl p-5 space-y-3 transition ${post.pinned ? 'border-[#D4AF37]/40' : 'border-gray-800'}`}>
             {/* Header row */}
             <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
@@ -116,7 +116,7 @@ function PostCard({ post, duesId, onPin, onDelete }: {
                         <Image src={post.author.image} alt={post.author.name ?? ''} width={36} height={36}
                             className="rounded-full shrink-0" />
                     ) : (
-                        <div className="w-9 h-9 rounded-full bg-[#C8A951]/20 text-[#C8A951] flex items-center justify-center text-xs font-bold shrink-0">
+                        <div className="w-9 h-9 rounded-full bg-[#D4AF37]/20 text-[#D4AF37] flex items-center justify-center text-xs font-bold shrink-0">
                             {initials}
                         </div>
                     )}
@@ -125,7 +125,7 @@ function PostCard({ post, duesId, onPin, onDelete }: {
                         <div className="flex items-center gap-2">
                             <p className="text-gray-600 text-xs">{timeAgo(post.createdAt)}</p>
                             {post.pinned && (
-                                <span className="text-[#C8A951] text-[10px] font-bold uppercase tracking-wide">📌 Pinned</span>
+                                <span className="text-[#D4AF37] text-[10px] font-bold uppercase tracking-wide">📌 Pinned</span>
                             )}
                         </div>
                     </div>
@@ -134,8 +134,8 @@ function PostCard({ post, duesId, onPin, onDelete }: {
                     <button onClick={handlePin} disabled={busy} title={post.pinned ? 'Unpin' : 'Pin to top'}
                         className={`p-1.5 rounded-lg text-sm transition disabled:opacity-40 ${
                             post.pinned
-                                ? 'text-[#C8A951] hover:bg-[#C8A951]/10'
-                                : 'text-gray-700 hover:text-[#C8A951] hover:bg-[#C8A951]/10'
+                                ? 'text-[#D4AF37] hover:bg-[#D4AF37]/10'
+                                : 'text-gray-700 hover:text-[#D4AF37] hover:bg-[#D4AF37]/10'
                         }`}>
                         📌
                     </button>
@@ -158,7 +158,7 @@ function PostCard({ post, duesId, onPin, onDelete }: {
                         <MediaPreview url={post.mediaUrl} alt="announcement media" />
                     ) : (
                         <a href={post.mediaUrl} target="_blank" rel="noopener noreferrer"
-                            className="text-[#C8A951] text-xs hover:underline break-all">{post.mediaUrl}</a>
+                            className="text-[#D4AF37] text-xs hover:underline break-all">{post.mediaUrl}</a>
                     )}
                 </div>
             )}
@@ -170,7 +170,7 @@ function PostCard({ post, duesId, onPin, onDelete }: {
 // AnnouncementsManager
 // ---------------------------------------------------------------------------
 
-export default function AnnouncementsManager({ duesId, leagueName, initial }: AnnouncementsManagerProps) {
+export default function AnnouncementsManager({ leagueId, leagueName, initial }: AnnouncementsManagerProps) {
     const [posts, setPosts]         = useState<Post[]>(initial);
     const [body, setBody]           = useState('');
     const [isPending, startTransition] = useTransition();
@@ -226,7 +226,7 @@ export default function AnnouncementsManager({ duesId, leagueName, initial }: An
         try {
             const fd = new FormData();
             fd.append('file', file);
-            const res  = await fetch(`/api/dues/${duesId}/announcements/upload`, { method: 'POST', body: fd });
+            const res  = await fetch(`/api/leagues/${leagueId}/announcements/upload`, { method: 'POST', body: fd });
             const data = await res.json() as { url?: string; error?: string };
             if (!res.ok) { setUploadError(data.error ?? 'Upload failed.'); return; }
             setSelectedMedia({ url: data.url!, type: 'image' });
@@ -247,7 +247,7 @@ export default function AnnouncementsManager({ duesId, leagueName, initial }: An
         if (!body.trim() && !selectedMedia) return;
         setError('');
         startTransition(async () => {
-            const res = await fetch(`/api/dues/${duesId}/announcements`, {
+            const res = await fetch(`/api/leagues/${leagueId}/announcements`, {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body:    JSON.stringify({
@@ -331,7 +331,7 @@ export default function AnnouncementsManager({ duesId, leagueName, initial }: An
                                 <button key={tab} type="button" onClick={() => setMediaTab(tab)}
                                     className={`px-5 py-2.5 text-xs font-semibold transition border-b-2 -mb-px ${
                                         mediaTab === tab
-                                            ? 'border-[#C8A951] text-[#C8A951]'
+                                            ? 'border-[#D4AF37] text-[#D4AF37]'
                                             : 'border-transparent text-gray-500 hover:text-gray-300'
                                     }`}>
                                     {tab === 'gif' ? '🎭 Search GIFs' : '📸 Upload Image'}
@@ -348,7 +348,7 @@ export default function AnnouncementsManager({ duesId, leagueName, initial }: An
                                     onChange={e => setGifQuery(e.target.value)}
                                     placeholder="Search Giphy… (e.g. touchdown, trade, sad)"
                                     autoFocus
-                                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/60"
+                                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/60"
                                 />
                                 {gifError && <p className="text-red-400 text-xs">{gifError}</p>}
                                 {gifSearching && (
@@ -364,7 +364,7 @@ export default function AnnouncementsManager({ duesId, leagueName, initial }: An
                                                     setSelectedMedia({ url: gif.url, type: 'gif' });
                                                     setMediaTab(null);
                                                 }}
-                                                className="aspect-square rounded-lg overflow-hidden border border-transparent hover:border-[#C8A951]/60 transition focus:outline-none">
+                                                className="aspect-square rounded-lg overflow-hidden border border-transparent hover:border-[#D4AF37]/60 transition focus:outline-none">
                                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                                 <img src={gif.previewUrl} alt="gif" className="w-full h-full object-cover" />
                                             </button>
@@ -385,7 +385,7 @@ export default function AnnouncementsManager({ duesId, leagueName, initial }: An
                             <div className="px-5 py-4 space-y-3">
                                 <div
                                     onClick={() => fileRef.current?.click()}
-                                    className="border-2 border-dashed border-gray-700 hover:border-[#C8A951]/50 rounded-xl p-8 text-center cursor-pointer transition">
+                                    className="border-2 border-dashed border-gray-700 hover:border-[#D4AF37]/50 rounded-xl p-8 text-center cursor-pointer transition">
                                     <p className="text-gray-400 text-sm">
                                         Click to select an image
                                     </p>
@@ -413,7 +413,7 @@ export default function AnnouncementsManager({ duesId, leagueName, initial }: An
                             onClick={() => setMediaTab(t => t ? null : 'gif')}
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
                                 mediaTab
-                                    ? 'border-[#C8A951]/50 text-[#C8A951] bg-[#C8A951]/10'
+                                    ? 'border-[#D4AF37]/50 text-[#D4AF37] bg-[#D4AF37]/10'
                                     : 'border-gray-700 text-gray-400 hover:border-gray-600 hover:text-gray-300'
                             }`}>
                             <span>🖼️</span> Image / GIF
@@ -427,7 +427,7 @@ export default function AnnouncementsManager({ duesId, leagueName, initial }: An
                         <button
                             onClick={handlePost}
                             disabled={!canPost}
-                            className="bg-[#C8A951] hover:bg-[#b8992f] text-black font-bold px-5 py-2 rounded-lg text-sm transition disabled:opacity-40 disabled:cursor-not-allowed">
+                            className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-black font-bold px-5 py-2 rounded-lg text-sm transition disabled:opacity-40 disabled:cursor-not-allowed">
                             {isPending ? 'Posting…' : 'Post →'}
                         </button>
                     </div>
@@ -446,7 +446,7 @@ export default function AnnouncementsManager({ duesId, leagueName, initial }: An
                         <PostCard
                             key={post.id}
                             post={post}
-                            duesId={duesId}
+                            leagueId={leagueId}
                             onPin={handlePin}
                             onDelete={handleDelete}
                         />

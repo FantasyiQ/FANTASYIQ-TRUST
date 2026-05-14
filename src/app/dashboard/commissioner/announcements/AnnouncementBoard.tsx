@@ -18,9 +18,9 @@ interface Post {
 }
 
 interface Props {
-    duesId:    string;
+    leagueId:   string;
     leagueName: string;
-    initial:   Post[];
+    initial:    Post[];
 }
 
 function timeAgo(date: Date | string): string {
@@ -52,7 +52,7 @@ function MediaPreview({ url, alt = '' }: { url: string; alt?: string }) {
     const [errored, setErrored] = useState(false);
     if (errored) return (
         <a href={url} target="_blank" rel="noopener noreferrer"
-            className="text-[#C8A951] text-xs hover:underline break-all">{url}</a>
+            className="text-[#D4AF37] text-xs hover:underline break-all">{url}</a>
     );
     return (
         // eslint-disable-next-line @next/next/no-img-element
@@ -63,13 +63,13 @@ function MediaPreview({ url, alt = '' }: { url: string; alt?: string }) {
 }
 
 function PostCard({
-    post, duesId, onPin, onDelete,
-}: { post: Post; duesId: string; onPin: (id: string) => void; onDelete: (id: string) => void }) {
+    post, leagueId, onPin, onDelete,
+}: { post: Post; leagueId: string; onPin: (id: string) => void; onDelete: (id: string) => void }) {
     const [busy, setBusy] = useState(false);
 
     async function handlePin() {
         setBusy(true);
-        await fetch(`/api/dues/${duesId}/announcements/${post.id}`, { method: 'PATCH' });
+        await fetch(`/api/leagues/${leagueId}/announcements/${post.id}`, { method: 'PATCH' });
         onPin(post.id);
         setBusy(false);
     }
@@ -77,14 +77,14 @@ function PostCard({
     async function handleDelete() {
         if (!confirm('Delete this announcement?')) return;
         setBusy(true);
-        await fetch(`/api/dues/${duesId}/announcements/${post.id}`, { method: 'DELETE' });
+        await fetch(`/api/leagues/${leagueId}/announcements/${post.id}`, { method: 'DELETE' });
         onDelete(post.id);
     }
 
     const initials = (post.author.name ?? 'C').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
     return (
-        <div className={`bg-gray-900 border rounded-2xl p-5 space-y-3 transition ${post.pinned ? 'border-[#C8A951]/40' : 'border-gray-800'}`}>
+        <div className={`bg-gray-900 border rounded-2xl p-5 space-y-3 transition ${post.pinned ? 'border-[#D4AF37]/40' : 'border-gray-800'}`}>
             {/* Header */}
             <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
@@ -92,7 +92,7 @@ function PostCard({
                         <Image src={post.author.image} alt={post.author.name ?? ''} width={36} height={36}
                             className="rounded-full shrink-0" />
                     ) : (
-                        <div className="w-9 h-9 rounded-full bg-[#C8A951]/20 text-[#C8A951] flex items-center justify-center text-xs font-bold shrink-0">
+                        <div className="w-9 h-9 rounded-full bg-[#D4AF37]/20 text-[#D4AF37] flex items-center justify-center text-xs font-bold shrink-0">
                             {initials}
                         </div>
                     )}
@@ -101,7 +101,7 @@ function PostCard({
                         <div className="flex items-center gap-2">
                             <p className="text-gray-600 text-xs">{timeAgo(post.createdAt)}</p>
                             {post.pinned && (
-                                <span className="text-[#C8A951] text-[10px] font-bold uppercase tracking-wide">
+                                <span className="text-[#D4AF37] text-[10px] font-bold uppercase tracking-wide">
                                     📌 Pinned
                                 </span>
                             )}
@@ -113,8 +113,8 @@ function PostCard({
                     <button onClick={handlePin} disabled={busy} title={post.pinned ? 'Unpin' : 'Pin to top'}
                         className={`p-1.5 rounded-lg text-sm transition disabled:opacity-40 ${
                             post.pinned
-                                ? 'text-[#C8A951] hover:bg-[#C8A951]/10'
-                                : 'text-gray-700 hover:text-[#C8A951] hover:bg-[#C8A951]/10'
+                                ? 'text-[#D4AF37] hover:bg-[#D4AF37]/10'
+                                : 'text-gray-700 hover:text-[#D4AF37] hover:bg-[#D4AF37]/10'
                         }`}>
                         📌
                     </button>
@@ -135,7 +135,7 @@ function PostCard({
                         <MediaPreview url={post.mediaUrl} alt="announcement media" />
                     ) : (
                         <a href={post.mediaUrl} target="_blank" rel="noopener noreferrer"
-                            className="text-[#C8A951] text-xs hover:underline break-all">
+                            className="text-[#D4AF37] text-xs hover:underline break-all">
                             {post.mediaUrl}
                         </a>
                     )}
@@ -145,7 +145,7 @@ function PostCard({
     );
 }
 
-export default function AnnouncementBoard({ duesId, leagueName, initial }: Props) {
+export default function AnnouncementBoard({ leagueId, leagueName, initial }: Props) {
     const [posts, setPosts]             = useState<Post[]>(initial);
     const [body, setBody]               = useState('');
     const [mediaUrl, setMediaUrl]       = useState('');
@@ -173,7 +173,7 @@ export default function AnnouncementBoard({ duesId, leagueName, initial }: Props
         if (!body.trim()) return;
         setError('');
         startTransition(async () => {
-            const res = await fetch(`/api/dues/${duesId}/announcements`, {
+            const res = await fetch(`/api/leagues/${leagueId}/announcements`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ body: body.trim(), mediaUrl: mediaUrl.trim() || undefined }),
@@ -228,7 +228,7 @@ export default function AnnouncementBoard({ duesId, leagueName, initial }: Props
                                     value={mediaUrl}
                                     onChange={e => handleMediaInput(e.target.value)}
                                     placeholder="Paste image or GIF URL (Giphy, Tenor, Imgur, any direct link…)"
-                                    className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/60"
+                                    className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/60"
                                 />
                                 <button onClick={() => { setShowMedia(false); setMediaUrl(''); setMediaPreview(''); }}
                                     className="text-gray-600 hover:text-gray-400 text-lg leading-none px-1">×</button>
@@ -257,7 +257,7 @@ export default function AnnouncementBoard({ duesId, leagueName, initial }: Props
                             onClick={() => setShowMedia(v => !v)}
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
                                 showMedia
-                                    ? 'border-[#C8A951]/50 text-[#C8A951] bg-[#C8A951]/10'
+                                    ? 'border-[#D4AF37]/50 text-[#D4AF37] bg-[#D4AF37]/10'
                                     : 'border-gray-700 text-gray-400 hover:border-gray-600 hover:text-gray-300'
                             }`}>
                             <span>🖼️</span> Image / GIF
@@ -271,7 +271,7 @@ export default function AnnouncementBoard({ duesId, leagueName, initial }: Props
                         <button
                             onClick={handlePost}
                             disabled={isPending || !body.trim()}
-                            className="bg-[#C8A951] hover:bg-[#b8992f] text-black font-bold px-5 py-2 rounded-lg text-sm transition disabled:opacity-40 disabled:cursor-not-allowed">
+                            className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-black font-bold px-5 py-2 rounded-lg text-sm transition disabled:opacity-40 disabled:cursor-not-allowed">
                             {isPending ? 'Posting…' : 'Post →'}
                         </button>
                     </div>
@@ -290,7 +290,7 @@ export default function AnnouncementBoard({ duesId, leagueName, initial }: Props
                         <PostCard
                             key={post.id}
                             post={post}
-                            duesId={duesId}
+                            leagueId={leagueId}
                             onPin={handlePin}
                             onDelete={handleDelete}
                         />

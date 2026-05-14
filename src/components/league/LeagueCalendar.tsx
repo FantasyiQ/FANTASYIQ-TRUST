@@ -5,8 +5,8 @@ const EVENT_META: Record<string, { label: string; icon: string; color: string }>
     trade_deadline:      { label: 'Trade Deadline',     icon: '🔒', color: 'text-red-400'    },
     waiver_deadline:     { label: 'Waiver Deadline',    icon: '📋', color: 'text-yellow-400' },
     regular_season_end:  { label: 'Regular Season End', icon: '🏁', color: 'text-gray-400'   },
-    playoff_start:       { label: 'Playoffs Begin',     icon: '🏆', color: 'text-[#C8A951]'  },
-    championship:        { label: 'Championship',       icon: '🥇', color: 'text-[#C8A951]'  },
+    playoff_start:       { label: 'Playoffs Begin',     icon: '🏆', color: 'text-[#D4AF37]'  },
+    championship:        { label: 'Championship',       icon: '🥇', color: 'text-[#D4AF37]'  },
     custom:              { label: 'Event',              icon: '📅', color: 'text-gray-300'   },
 };
 
@@ -58,8 +58,8 @@ export default function LeagueCalendar({ league, timeline, keyDates }: LeagueCal
                         const meta  = EVENT_META[nextEvent.type] ?? EVENT_META.custom;
                         const delta = daysUntil(nextEvent.date);
                         return (
-                            <div className="bg-gray-900 border border-[#C8A951]/30 rounded-2xl p-5">
-                                <p className="text-xs font-semibold text-[#C8A951] uppercase tracking-wider mb-3">Next Up</p>
+                            <div className="bg-gray-900 border border-[#D4AF37]/30 rounded-2xl p-5">
+                                <p className="text-xs font-semibold text-[#D4AF37] uppercase tracking-wider mb-3">Next Up</p>
                                 <div className="flex items-start gap-4">
                                     <div className="shrink-0 w-14 text-center bg-gray-800 rounded-xl py-2">
                                         <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">
@@ -109,7 +109,7 @@ export default function LeagueCalendar({ league, timeline, keyDates }: LeagueCal
                                                 <p className="text-[10px] text-gray-600 uppercase tracking-wider font-semibold">
                                                     {event.date.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' })}
                                                 </p>
-                                                <p className={`text-xl font-extrabold leading-none ${isToday ? 'text-[#C8A951]' : 'text-white'}`}>
+                                                <p className={`text-xl font-extrabold leading-none ${isToday ? 'text-[#D4AF37]' : 'text-white'}`}>
                                                     {event.date.getUTCDate()}
                                                 </p>
                                             </div>

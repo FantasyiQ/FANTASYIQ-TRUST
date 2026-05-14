@@ -375,7 +375,7 @@ export default function DuesManager({
                         <p className="text-gray-500 text-sm">No dues configured for this league yet.</p>
                         <button
                             onClick={() => setShowSetup(true)}
-                            className="inline-block bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-5 py-2.5 rounded-xl transition text-sm"
+                            className="inline-block bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-5 py-2.5 rounded-xl transition text-sm"
                         >
                             Set Up Dues →
                         </button>
@@ -410,7 +410,7 @@ export default function DuesManager({
                                 value={buyIn}
                                 onChange={e => handleBuyInChange(e.target.value)}
                                 placeholder="100"
-                                className="w-full bg-gray-800 border border-gray-700 rounded-xl pl-7 pr-4 py-3 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#C8A951]/60"
+                                className="w-full bg-gray-800 border border-gray-700 rounded-xl pl-7 pr-4 py-3 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#D4AF37]/60"
                             />
                         </div>
                     </div>
@@ -419,7 +419,7 @@ export default function DuesManager({
                         <div className="bg-gray-800/40 border border-gray-700 rounded-xl px-4 py-3 text-sm min-h-[46px] flex items-center gap-2">
                             {potPreview > 0 ? (
                                 <>
-                                    <span className="text-[#C8A951] font-bold">${potPreview.toFixed(0)}</span>
+                                    <span className="text-[#D4AF37] font-bold">${potPreview.toFixed(0)}</span>
                                     <span className="text-gray-600 text-xs">{totalRosters} × ${parseFloat(buyIn || '0').toFixed(0)}</span>
                                 </>
                             ) : (
@@ -449,7 +449,7 @@ export default function DuesManager({
                                     value={spot.label}
                                     onChange={e => updatePayoutSpot(i, 'label', e.target.value)}
                                     placeholder="e.g. 1st Place"
-                                    className="flex-1 min-w-0 bg-gray-800 border border-gray-700 rounded-lg px-3 py-3 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#C8A951]/60"
+                                    className="flex-1 min-w-0 bg-gray-800 border border-gray-700 rounded-lg px-3 py-3 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#D4AF37]/60"
                                 />
                                 {/* Amount */}
                                 <div className="flex items-center gap-2">
@@ -461,7 +461,7 @@ export default function DuesManager({
                                             value={spot.amount}
                                             onChange={e => updatePayoutSpot(i, 'amount', e.target.value)}
                                             placeholder="0"
-                                            className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-7 pr-3 py-3 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#C8A951]/60"
+                                            className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-7 pr-3 py-3 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#D4AF37]/60"
                                         />
                                     </div>
                                     <button
@@ -479,7 +479,7 @@ export default function DuesManager({
                     <button
                         type="button"
                         onClick={addPayoutLine}
-                        className="text-xs text-[#C8A951]/70 hover:text-[#C8A951] font-medium transition"
+                        className="text-xs text-[#D4AF37]/70 hover:text-[#D4AF37] font-medium transition"
                     >
                         + Add payout line
                     </button>
@@ -506,7 +506,7 @@ export default function DuesManager({
                     <button
                         type="submit"
                         disabled={setupSaving}
-                        className="flex-1 bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-50 text-gray-950 font-bold py-2.5 rounded-xl transition text-sm"
+                        className="flex-1 bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-50 text-gray-950 font-bold py-2.5 rounded-xl transition text-sm"
                     >
                         {setupSaving ? 'Saving…' : 'Save Dues Configuration'}
                     </button>
@@ -586,7 +586,7 @@ export default function DuesManager({
                     <button
                         onClick={handlePayDues}
                         disabled={payingDues}
-                        className="w-full bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-60 disabled:cursor-not-allowed text-gray-950 font-bold py-3.5 rounded-xl transition flex flex-col items-center gap-0.5 text-sm"
+                        className="w-full bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-60 disabled:cursor-not-allowed text-gray-950 font-bold py-3.5 rounded-xl transition flex flex-col items-center gap-0.5 text-sm"
                     >
                         {payingDues ? (
                             <span className="flex items-center gap-2">
@@ -619,7 +619,7 @@ export default function DuesManager({
                 </div>
                 <div className="bg-gray-800/60 rounded-xl p-4">
                     <p className="text-gray-500 text-xs mb-1">Cash Collected</p>
-                    <p className="text-[#C8A951] font-bold text-lg">${collectedAmount.toFixed(0)}</p>
+                    <p className="text-[#D4AF37] font-bold text-lg">${collectedAmount.toFixed(0)}</p>
                     <p className="text-gray-600 text-xs">of ${fullPot.toFixed(0)}</p>
                 </div>
                 <div className="bg-gray-800/60 rounded-xl p-4">
@@ -641,13 +641,13 @@ export default function DuesManager({
                     <div className="w-full bg-gray-800 rounded-full h-2 relative">
                         {/* Members paid (gold) */}
                         <div
-                            className="bg-[#C8A951] h-2 rounded-full transition-all duration-500"
+                            className="bg-[#D4AF37] h-2 rounded-full transition-all duration-500"
                             style={{ width: `${Math.min(100, (potTotal / fullPot) * 100)}%` }}
                         />
                         {/* Cash collected marker (slightly lighter, behind) */}
                         {collectedAmount > potTotal && (
                             <div
-                                className="absolute top-0 left-0 bg-[#C8A951]/30 h-2 rounded-full transition-all duration-500"
+                                className="absolute top-0 left-0 bg-[#D4AF37]/30 h-2 rounded-full transition-all duration-500"
                                 style={{ width: `${Math.min(100, (collectedAmount / fullPot) * 100)}%` }}
                             />
                         )}
@@ -712,14 +712,14 @@ export default function DuesManager({
                                 className={`w-full bg-gray-800 border rounded-lg pl-7 pr-3 py-2 text-white placeholder-gray-600 text-sm focus:outline-none transition ${
                                     addInputShake
                                         ? 'border-red-500 ring-2 ring-red-500/40'
-                                        : 'border-gray-700 focus:border-[#C8A951]/60'
+                                        : 'border-gray-700 focus:border-[#D4AF37]/60'
                                 }`}
                             />
                         </div>
                         <button
                             type="submit"
                             disabled={addSaving || !addAmount.trim()}
-                            className="bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-50 text-gray-950 font-bold px-4 py-2 rounded-lg text-sm transition whitespace-nowrap"
+                            className="bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-50 text-gray-950 font-bold px-4 py-2 rounded-lg text-sm transition whitespace-nowrap"
                         >
                             {addSaving ? '…' : '+ Add'}
                         </button>
@@ -739,7 +739,7 @@ export default function DuesManager({
                         {duesData.payoutSpots.map((spot, i) => (
                             <div key={i} className="flex items-center justify-between bg-gray-800/40 rounded-lg px-4 py-2.5">
                                 <span className="text-gray-300 text-sm">{spot.label}</span>
-                                <span className="text-[#C8A951] font-semibold text-sm">${spot.amount.toFixed(0)}</span>
+                                <span className="text-[#D4AF37] font-semibold text-sm">${spot.amount.toFixed(0)}</span>
                             </div>
                         ))}
                     </div>
@@ -845,7 +845,7 @@ export default function DuesManager({
                         <div className="flex gap-3 pt-1">
                             <button
                                 onClick={() => { setShowManualModal(false); setPendingManualId(null); }}
-                                className="flex-1 bg-[#C8A951] hover:bg-[#b8992f] text-black font-bold py-2.5 rounded-xl text-sm transition"
+                                className="flex-1 bg-[#D4AF37] hover:bg-[#BF9D2F] text-black font-bold py-2.5 rounded-xl text-sm transition"
                             >
                                 Cancel
                             </button>

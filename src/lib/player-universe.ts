@@ -48,13 +48,74 @@ export interface DeltaResponse {
     entries:         DeltaEntry[];
 }
 
-// Volatility classification based on dynasty delta magnitude.
+// ── Delta classification (0–100 FIQ scale) ────────────────────────────────────
+// |Δ| < 1.0  → stable     (noise / rounding)
+// |Δ| < 3.0  → minor      (small market shift)
+// |Δ| < 6.0  → significant (notable move, worth surfacing)
+// |Δ| ≥ 6.0  → major      (tier-crossing move, highlight)
+
+export type DeltaClass = 'major' | 'significant' | 'minor' | 'stable';
+
+export function classifyDelta(absD: number): DeltaClass {
+    if (absD >= 6.0) return 'major';
+    if (absD >= 3.0) return 'significant';
+    if (absD >= 1.0) return 'minor';
+    return 'stable';
+}
+
+/** Volatility label for UI badges — uses dynasty delta. */
 export function playerVolatility(delta: DeltaEntry | undefined): 'volatile' | 'moving' | 'stable' | null {
     if (!delta || delta.isNew || delta.isDropped) return null;
-    const d = Math.abs(delta.dynasty.delta);
-    if (d >= 10) return 'volatile';
-    if (d >= 4)  return 'moving';
+    const cls = classifyDelta(Math.abs(delta.dynasty.delta));
+    if (cls === 'major')       return 'volatile';
+    if (cls === 'significant') return 'moving';
     return 'stable';
+}
+
+// ── Player comparison engine (0–100 FIQ scale, tier-aware) ────────────────────
+
+export type CompareEdge = 'big' | 'clear' | 'small' | 'equal';
+export type CompareDirection = 'A' | 'B' | 'equal';
+
+export interface PlayerCompareResult {
+    direction: CompareDirection;
+    edge:      CompareEdge;
+    label:     string;   // human-readable verdict
+}
+
+/**
+ * Compare two player values on the 0–100 FIQ scale.
+ * Tier difference takes precedence; within the same tier, value gap determines strength.
+ *
+ * Tier gap (any): "Advantage: [position/name] — higher tier"
+ * Same tier gaps:
+ *   Δ < 3  → "Essentially equal"
+ *   Δ < 7  → "Small edge"
+ *   Δ < 12 → "Clear edge"
+ *   Δ ≥ 12 → "Big edge"
+ */
+export function comparePlayerValues(
+    valueA: number, tierA: number,
+    valueB: number, tierB: number,
+): PlayerCompareResult {
+    if (tierA !== tierB) {
+        const direction: CompareDirection = tierA < tierB ? 'A' : 'B'; // lower tier # = better
+        return {
+            direction,
+            edge:  'big',
+            label: `Advantage: ${direction === 'A' ? 'Player A' : 'Player B'} — higher tier`,
+        };
+    }
+
+    const delta = Math.abs(valueA - valueB);
+    const direction: CompareDirection =
+        valueA > valueB ? 'A' :
+        valueB > valueA ? 'B' : 'equal';
+
+    if (delta < 3)  return { direction: 'equal', edge: 'equal', label: 'Essentially equal' };
+    if (delta < 7)  return { direction, edge: 'small', label: `Small edge — ${direction === 'A' ? 'Player A' : 'Player B'}` };
+    if (delta < 12) return { direction, edge: 'clear', label: `Clear edge — ${direction === 'A' ? 'Player A' : 'Player B'}` };
+    return { direction, edge: 'big', label: `Big edge — ${direction === 'A' ? 'Player A' : 'Player B'}` };
 }
 
 // ── Value computation ─────────────────────────────────────────────────────────

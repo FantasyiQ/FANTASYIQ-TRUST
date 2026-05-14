@@ -121,7 +121,7 @@ export default function PayoutSpotsPage() {
                                 value={spot.label}
                                 onChange={e => updateSpot(i, 'label', e.target.value)}
                                 placeholder="e.g. 1st Place"
-                                className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#C8A951]/60"
+                                className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#D4AF37]/60"
                             />
                             <div className="relative w-36">
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
@@ -132,7 +132,7 @@ export default function PayoutSpotsPage() {
                                     value={spot.amount}
                                     onChange={e => updateSpot(i, 'amount', e.target.value)}
                                     placeholder="0.00"
-                                    className="w-full bg-gray-800 border border-gray-700 rounded-xl pl-7 pr-4 py-2.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#C8A951]/60"
+                                    className="w-full bg-gray-800 border border-gray-700 rounded-xl pl-7 pr-4 py-2.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#D4AF37]/60"
                                 />
                             </div>
                             {spots.length > 1 && (
@@ -141,7 +141,7 @@ export default function PayoutSpotsPage() {
                         </div>
                     ))}
 
-                    <button onClick={addSpot} className="text-sm text-[#C8A951] hover:underline mt-1">+ Add Spot</button>
+                    <button onClick={addSpot} className="text-sm text-[#D4AF37] hover:underline mt-1">+ Add Spot</button>
 
                     <div className={`flex items-center justify-between text-sm font-semibold pt-3 border-t border-gray-800 ${Math.abs(remaining) < 0.01 ? 'text-green-400' : 'text-yellow-400'}`}>
                         <span>Allocated</span>
@@ -154,7 +154,7 @@ export default function PayoutSpotsPage() {
                     <button
                         onClick={handleSave}
                         disabled={saving}
-                        className="w-full bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-50 text-black font-bold py-3 rounded-xl transition text-sm">
+                        className="w-full bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-50 text-black font-bold py-3 rounded-xl transition text-sm">
                         {saving ? 'Saving...' : 'Save Payout Spots'}
                     </button>
                 </div>

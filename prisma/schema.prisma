@@ -40,9 +40,21 @@ model User {
     leagues          League[]
     commissionerDues LeagueDues[]      @relation("CommissionerDues")
     duesMemberships  DuesMember[]      @relation("MemberDues")
-    proBowlEntries   ProBowlEntry[]    @relation("ProBowlEntries")
     announcements    Announcement[]    @relation("AuthorAnnouncements")
     leagueInvites    LeagueInvite[]    @relation("LeagueInvites")
+    notifications         Notification[]
+    notificationPrefs     NotificationPreference[]
+    // Weekly DFS Challenge
+    dfsLineups            DFSLineup[]
+
+    // LeagueFinder
+    trustScore            Int               @default(0)
+    prsScore              Int               @default(0)  // Player Reliability Score (0-100)
+    lfReviews             LFReview[]        @relation("ReviewerReviews")
+    lfVotes               LFReviewVote[]    @relation("ReviewVotes")
+    ownedCommissioner     LFCommissioner?   @relation("CommissionerOwner")
+    lfReplies             LFReviewReply[]   @relation("ReviewReplies")
+    lfJoinRequests        LFJoinRequest[]   @relation("LeagueJoinRequests")
 }
 
 model League {
@@ -64,15 +76,19 @@ model League {
     currentMatchup  Json?     // refreshed every 3 min on game days
     assignedPlanId  String?   // FK to Subscription.id — which plan this league is assigned to
     assignedPlanType String?  // "player" | "commissioner"
+    draftStartTime  BigInt?   // epoch ms of scheduled draft start (from Sleeper); null = not scheduled
+    draftStatus     String?   // pre_draft | drafting | complete (Sleeper draft status)
+    draftType       String?   // "auction" | "snake" | "linear" (Sleeper draft type)
     lastSyncedAt    DateTime?
     createdAt       DateTime  @default(now())
     updatedAt       DateTime  @updatedAt
 
     user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+    dfsContests      DFSContest[]         @relation("DFSSourceLeague")
     calendarEvents   LeagueCalendarEvent[]
-    proBowlContests  ProBowlContest[]
     leaguePayouts    LeaguePayout[]
     leaguePayoutWinners LeaguePayoutWinner[]
+    announcements    Announcement[]
 
     @@unique([userId, platform, leagueId])
     @@index([userId])
@@ -185,6 +201,7 @@ model LeagueDues {
     teamCount            Int                // number of teams in the league
     collectedAmount      Float              @default(0) // cash actually received (manually entered by commissioner)
     potTotal             Float              @default(0) // running total of confirmed payments (paidCount × buyIn)
+    deadline             DateTime?          // payment deadline for dues reminders
     // setup | active | season_ended | pending_approval | approved | paid_out
     status               String             @default("setup")
     platform             String?            // "Sleeper" | "ESPN" | "Yahoo" | "Manual"
@@ -329,26 +346,6 @@ model PollVote {
     @@unique([pollId, memberId])  // one vote per member per poll
 }
 
-// ── Pro Bowl Contest ─────────────────────────────────────────────────────────
-
-model ProBowlContest {
-    id                String   @id @default(cuid())
-    leagueId          String
-    name              String
-    openAt            DateTime
-    lockAt            DateTime
-    endAt             DateTime
-    isActive          Boolean  @default(true)
-    createdAt         DateTime @default(now())
-    updatedAt         DateTime @updatedAt
-
-    rosterConfigJson  Json
-    scoringConfigJson Json
-
-    league  League         @relation(fields: [leagueId], references: [id])
-    entries ProBowlEntry[]
-}
-
 // ── League Documents (bylaws, rulebooks, etc.) ────────────────────────────────
 
 model LeagueDocument {
@@ -367,7 +364,8 @@ model LeagueDocument {
 
 model Announcement {
     id           String   @id @default(cuid())
-    leagueDuesId String
+    leagueId     String?  // primary: FK to League.id (null on legacy rows backfilled from leagueDuesId)
+    leagueDuesId String?  // legacy: kept for rows created before the schema migration
     authorId     String
     body         String   @db.Text
     mediaUrl     String?  // direct image / GIF URL (normalised from Giphy share links etc.)
@@ -375,9 +373,11 @@ model Announcement {
     createdAt    DateTime @default(now())
     updatedAt    DateTime @updatedAt
 
-    leagueDues   LeagueDues @relation(fields: [leagueDuesId], references: [id], onDelete: Cascade)
+    league       League?    @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+    leagueDues   LeagueDues? @relation(fields: [leagueDuesId], references: [id], onDelete: Cascade)
     author       User       @relation("AuthorAnnouncements", fields: [authorId], references: [id], onDelete: Cascade)
 
+    @@index([leagueId])
     @@index([leagueDuesId])
 }
 
@@ -440,6 +440,44 @@ model SleeperPlayer {
     weight          Int?     // lbs
     birthDate       String?  // birth_date from Sleeper API e.g. "1998-05-15" — canonical DOB source
     age             Int?     // pre-calculated by Sleeper (kept as fallback when birthDate is absent)
+    yearsExp        Int?     // years_exp from Sleeper API — 0 = current rookie
+    rookieYear      String?  // metadata.rookie_year — e.g. "2026"
+    searchRank      Int?     // search_rank — ADP proxy; lower = higher value; 9999999 = unranked
+    draftRound      Int?     // NFL draft round (1–7) from Sleeper draft_pick.round
+    draftPick       Int?     // NFL draft pick within round from Sleeper draft_pick.pick_no
+    // FiQ Draft Capital Engine v2.0 — true draft capital fields
+    draftTeam       String?  // NFL team abbreviation that selected this player
+    overallPick     Int?     // overall draft pick number (computed from round + pick_no)
+    draftDay        Int?     // 1, 2, or 3 — NFL Draft day
+    // NFL Combine athleticism data — used by FiQ Rookie Engine v1.5
+    fortyTime       Float?   // 40-yard dash (seconds)
+    verticalJump    Float?   // vertical jump (inches)
+    broadJump       Float?   // broad jump (inches)
+    threeCone       Float?   // 3-cone drill (seconds)
+    shuttle         Float?   // short shuttle (seconds)
+    // FiQ Production Engine v1.0 — derived college production metrics
+    // Populated by the DraftSharks ingestion pipeline. All nullable.
+    // Source: numeric totals only — no text/grades/proprietary scores stored.
+    productionGamesPlayed                     Int?
+    productionAgeAtDraft                      Float?
+    productionBreakoutAge                     Float?
+    productionEarlyDeclare                    Boolean?
+    productionReceivingYardsPerTeamAttempt    Float?
+    productionBestSeasonDominator             Float?
+    productionCareerDominator                 Float?
+    productionTargetShare                     Float?
+    productionYardsPerRouteRun                Float?
+    productionADot                            Float?
+    productionRushingYardsPerTeamAttempt      Float?
+    productionRushingDominator                Float?
+    productionReceptionsPerGame               Float?
+    productionYardsPerRouteRunRB              Float?
+    productionExplosiveRunRate                Float?
+    productionAdjustedCompletionRate          Float?
+    productionBigTimeThrowRate                Float?
+    productionTurnoverWorthyPlayRate          Float?
+    productionYardsPerAttempt                 Float?
+    productionRushingYardsPerGameQB           Float?
     updatedAt       DateTime @updatedAt
 
     projections     PlayerProjection[]
@@ -460,37 +498,6 @@ model PlayerProjection {
 
     @@unique([playerId, season, week])
     @@index([season, week])
-}
-
-model ProBowlEntry {
-    id          String   @id @default(cuid())
-    contestId   String
-    userId      String
-    totalPoints Float    @default(0)
-    isFinal     Boolean  @default(false)
-    createdAt   DateTime @default(now())
-    updatedAt   DateTime @updatedAt
-
-    contest ProBowlContest   @relation(fields: [contestId], references: [id], onDelete: Cascade)
-    user    User              @relation("ProBowlEntries", fields: [userId], references: [id], onDelete: Cascade)
-    slots   ProBowlEntrySlot[]
-
-    @@unique([contestId, userId])
-    @@index([contestId])
-}
-
-model ProBowlEntrySlot {
-    id        String    @id @default(cuid())
-    entryId   String
-    position  String    // "QB" | "RB" | "WR" | "TE" | "FLEX" | "SUPER_FLEX" | "K" | "DEF"
-    playerId  String    // SleeperPlayer.playerId
-    salary    Int
-    lockedAt  DateTime?
-    points    Float     @default(0)
-
-    entry  ProBowlEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
-
-    @@index([entryId])
 }
 
 model FantasyCalcValue {
@@ -574,4 +581,261 @@ model LeaguePayoutWinner {
 
     @@unique([leagueId, rank])
     @@index([leagueId])
+}
+
+// ── Notifications ────────────────────────────────────────────────────────────
+
+model Notification {
+    id           String    @id @default(cuid())
+    userId       String
+    type         String    // notification type key (see NotificationType)
+    title        String
+    body         String    @db.Text
+    data         Json?     // arbitrary payload (leagueId, amount, duesId, etc.)
+    read         Boolean   @default(false)
+    readAt       DateTime?
+    emailSent    Boolean   @default(false)
+    emailSentAt  DateTime?
+    createdAt    DateTime  @default(now())
+    expiresAt    DateTime?
+
+    user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId, read])
+    @@index([userId, createdAt])
+    @@index([type, userId, createdAt])
+}
+
+model NotificationPreference {
+    id        String   @id @default(cuid())
+    userId    String
+    type      String   // notification type key, or "*" for global opt-out
+    email     Boolean  @default(true)
+    inApp     Boolean  @default(true)
+    updatedAt DateTime @updatedAt
+
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, type])
+    @@index([userId])
+}
+
+// ── LeagueFinder ─────────────────────────────────────────────────────────────
+
+model LFCommissioner {
+    id              String   @id @default(cuid())
+    displayName     String
+    platformHandles Json     // { sleeper?: "...", espn?: "...", yahoo?: "..." }
+    avgRating       Float    @default(0)
+    reviewsCount    Int      @default(0)
+    flagsCount      Int      @default(0)
+    ownerId         String?  @unique  // User who claimed this profile
+    claimToken      String?  @unique  // Reserved for future email verification
+    claimed         Boolean  @default(false)
+    createdAt       DateTime @default(now())
+
+    leagues         LFLeague[]
+    reviews         LFReview[]
+    owner           User?           @relation("CommissionerOwner", fields: [ownerId], references: [id])
+    replyRecords    LFReviewReply[]
+
+    @@index([avgRating])
+}
+
+model LFLeague {
+    id              String   @id @default(cuid())
+    name            String
+    platform        String   // Sleeper | ESPN | Yahoo | MFL | Fleaflicker
+    format          String   // Dynasty | Redraft | Best Ball
+    scoring         String   // PPR | Half PPR | Standard | TE Premium
+    size            Int
+    buyIn           Int?
+    payoutStructure Json?
+    completedSeasons     Int     @default(0)   // each season = +20 to stabilityScore
+    activityScore        Int     @default(0)   // 20/40/60/80/100 ← activityLevel 1-5
+    stabilityScore       Int     @default(0)   // = min(100, completedSeasons * 20)
+    verifiedReviewsCount Int     @default(0)
+    rankingScore         Int     @default(0)   // composite for search ordering
+    commissionerId       String
+    createdAt            DateTime @default(now())
+
+    commissioner    LFCommissioner  @relation(fields: [commissionerId], references: [id])
+    reviews         LFReview[]
+    joinRequests    LFJoinRequest[]
+    seasons         LFLeagueSeason[]
+
+    @@index([commissionerId])
+    @@index([format])
+    @@index([platform])
+    @@index([rankingScore])
+}
+
+model LFReview {
+    id              String   @id @default(cuid())
+    leagueId        String
+    commissionerId  String
+    reviewerId      String
+    ratingOverall   Int      // 1-5
+    ratingFairness  Int      // 1-5
+    ratingComm      Int      // 1-5
+    ratingStability Int      // 1-5
+    text            String?
+    seasonYear      Int
+    verified        Boolean  @default(false)
+    disputed        Boolean  @default(false)
+    helpfulCount    Int      @default(0)
+    notHelpfulCount Int      @default(0)
+    createdAt       DateTime @default(now())
+
+    league          LFLeague       @relation(fields: [leagueId], references: [id])
+    commissioner    LFCommissioner @relation(fields: [commissionerId], references: [id])
+    reviewer        User           @relation("ReviewerReviews", fields: [reviewerId], references: [id])
+    votes           LFReviewVote[]
+    reply           LFReviewReply?
+
+    @@unique([leagueId, reviewerId, seasonYear])
+    @@index([leagueId])
+    @@index([commissionerId])
+    @@index([reviewerId])
+}
+
+model LFReviewVote {
+    id        String   @id @default(cuid())
+    reviewId  String
+    voterId   String
+    helpful   Boolean
+    createdAt DateTime @default(now())
+
+    review    LFReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+    voter     User     @relation("ReviewVotes", fields: [voterId], references: [id], onDelete: Cascade)
+
+    @@unique([reviewId, voterId])
+    @@index([reviewId])
+}
+
+model LFReviewReply {
+    id             String   @id @default(cuid())
+    reviewId       String   @unique
+    commissionerId String
+    ownerId        String
+    text           String
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @updatedAt
+
+    review         LFReview       @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+    commissioner   LFCommissioner @relation(fields: [commissionerId], references: [id])
+    owner          User           @relation("ReviewReplies", fields: [ownerId], references: [id])
+}
+
+enum LFJoinStatus {
+    PENDING
+    ACCEPTED
+    REJECTED
+    PINNED
+}
+
+model LFJoinRequest {
+    id           String       @id @default(cuid())
+    leagueId     String
+    userId       String
+    status       LFJoinStatus @default(PENDING)
+    introMessage String?
+    createdAt    DateTime     @default(now())
+    updatedAt    DateTime     @updatedAt
+
+    league       LFLeague @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+    user         User     @relation("LeagueJoinRequests", fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([leagueId, userId])
+    @@index([leagueId])
+    @@index([userId])
+}
+
+model LFLeagueSeason {
+    id           String    @id @default(cuid())
+    leagueId     String
+    year         Int
+    champion     String?
+    payoutSent   Boolean   @default(false)
+    payoutDate   DateTime?
+    notes        String?
+    createdAt    DateTime  @default(now())
+
+    league       LFLeague @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+
+    @@unique([leagueId, year])
+    @@index([leagueId])
+}
+
+// ── Weekly DFS Challenge ──────────────────────────────────────────────────────
+
+enum DFSContestStatus {
+    OPEN
+    LOCKED
+    FINAL
+}
+
+// One contest per external league per week. Shared across all members of that league.
+model DFSContest {
+    id               String           @id @default(cuid())
+    platform         String           // "sleeper" | "espn"
+    externalLeagueId String           // Sleeper/ESPN league ID (shared key)
+    sourceLeagueId   String           // League.id used for roster/scoring settings
+    week             Int
+    season           Int
+    status           DFSContestStatus @default(OPEN)
+    createdAt        DateTime         @default(now())
+    updatedAt        DateTime         @updatedAt
+
+    sourceLeague     League      @relation("DFSSourceLeague", fields: [sourceLeagueId], references: [id])
+    lineups          DFSLineup[]
+
+    @@unique([platform, externalLeagueId, season, week])
+    @@index([externalLeagueId])
+    @@index([status])
+}
+
+// ── Dynasty Rookie Rankings ───────────────────────────────────────────────────
+// Standalone table — no relation to DTV, trade engine, or veteran scoring.
+// Powered exclusively by the FiQ Rookie Rankings engine.
+model RookieRankingsPlayer {
+    id          String   @id @default(cuid())
+    season      String   // e.g. "2026"
+    playerName  String
+    school      String
+    position    String   // QB | RB | WR | TE | K
+    nflGrade    Float    // NFL scout grade (0–10 scale)
+    fiqGrade    Float    // FiQ scouting grade (0–100)
+    eliteScore  Float    // FiQ EliteScore (0–100)
+    marketScore Float    // FiQ MarketScore (0–100)
+    overallPick Int      // NFL Draft overall pick number
+    draftCap    Float    // FiQ DraftCap score (0–100)
+    fiqScore    Float    // FiQ composite score (0–100)
+    fiqTier     String   // "Tier 1" | "Tier 2" | "Tier 3" | "Tier 4" | "Tier 5"
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    @@unique([season, playerName])
+    @@index([season, position])
+    @@map("rookie_rankings_players")
+}
+
+// One lineup per user per contest.
+model DFSLineup {
+    id          String   @id @default(cuid())
+    contestId   String
+    userId      String
+    // [{ slot: "QB", playerId: "123" }, { slot: "RB", playerId: "456" }, ...]
+    entriesJson Json
+    totalPoints Float    @default(0)
+    locked      Boolean  @default(false)
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    contest     DFSContest @relation(fields: [contestId], references: [id], onDelete: Cascade)
+    user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([contestId, userId])
+    @@index([contestId])
+    @@index([userId])
 }

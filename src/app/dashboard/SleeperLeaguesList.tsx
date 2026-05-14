@@ -34,6 +34,13 @@ interface Props {
     platform?: 'sleeper' | 'espn';
 }
 
+function tierLevel(tier: string): number {
+    if (tier.includes('ELITE'))   return 3;
+    if (tier.includes('ALL_PRO')) return 2;
+    if (tier.includes('_PRO'))    return 1;
+    return 0;
+}
+
 function statusBadgeClass(status: string) {
     switch (status) {
         case 'in_season': return 'bg-green-900/40 text-green-400 border-green-800';
@@ -69,7 +76,7 @@ export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier
                     {isEspn ? 'Connect your ESPN league to get started.' : 'Connect your Sleeper account to get started.'}
                 </p>
                 <Link href={isEspn ? '/dashboard/sync/espn' : '/dashboard/sync'}
-                    className="inline-block bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold px-5 py-2.5 rounded-lg transition text-sm">
+                    className="inline-block bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-5 py-2.5 rounded-lg transition text-sm">
                     {isEspn ? 'Sync an ESPN League' : 'Sync a Sleeper League'}
                 </Link>
             </div>
@@ -80,11 +87,11 @@ export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier
         <ul className="divide-y divide-gray-800/50">
             {leagues.map((league) => {
                 const standing = (league.standings as { wins: number; losses: number }[] | null)?.[0];
-                // Player tier applies to all leagues; commissioner tier scoped to matching league name
-                const leagueTier = playerTier !== 'FREE'
-                    ? playerTier
-                    : (commSubs.find(s => s.leagueName?.toLowerCase().trim() === league.leagueName.toLowerCase().trim())?.tier ?? 'FREE');
-                const badge = tierBadgeProps(leagueTier);
+                // Effective tier = highest of player plan (account-wide) vs commissioner plan (per-league).
+                // If the user paid for a higher player plan than the commissioner plan, their plan wins.
+                const commTier   = commSubs.find(s => s.leagueName?.toLowerCase().trim() === league.leagueName.toLowerCase().trim())?.tier ?? 'FREE';
+                const effectiveTier = tierLevel(playerTier) >= tierLevel(commTier) ? playerTier : commTier;
+                const badge = tierBadgeProps(effectiveTier);
                 return (
                     <li key={league.id} className="flex items-center gap-4 px-6 py-4 hover:bg-gray-800/30 transition-colors">
                         <Link
@@ -127,7 +134,7 @@ export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier
                                         Unassigned
                                     </span>
                                 )}
-                                <span className="text-[#C8A951] text-sm font-semibold whitespace-nowrap">View →</span>
+                                <span className="text-[#D4AF37] text-sm font-semibold whitespace-nowrap">View →</span>
                             </div>
                         </Link>
                         <form action={unsyncLeague.bind(null, league.leagueId, league.platform)}>

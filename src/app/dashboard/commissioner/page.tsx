@@ -27,12 +27,6 @@ const FEATURES = [
         title:       'Commissioner Announcements',
         description: 'Store your rulebook, bylaws, and league documents. Draft and send announcements to keep your managers in the loop.',
     },
-    {
-        href:        '/dashboard/commissioner/pro-bowl',
-        icon:        '🏆',
-        title:       'Pro Bowl Contest',
-        description: 'Week 18 free contest — DraftKings-style lineup picks, no salary cap. One contest per league.',
-    },
 ] as const;
 
 export default async function CommissionerHubPage() {
@@ -58,14 +52,14 @@ export default async function CommissionerHubPage() {
                         <Link
                             key={f.href}
                             href={f.href}
-                            className="group block bg-gray-900 border border-gray-800 hover:border-[#C8A951]/50 rounded-2xl p-6 transition"
+                            className="group block bg-gray-900 border border-gray-800 hover:border-[#D4AF37]/50 rounded-2xl p-6 transition"
                         >
                             <div className="text-3xl mb-3">{f.icon}</div>
-                            <h2 className="text-lg font-bold text-white group-hover:text-[#C8A951] transition mb-2">
+                            <h2 className="text-lg font-bold text-white group-hover:text-[#D4AF37] transition mb-2">
                                 {f.title}
                             </h2>
                             <p className="text-gray-500 text-sm leading-relaxed">{f.description}</p>
-                            <div className="mt-4 flex items-center gap-1 text-[#C8A951] text-sm font-semibold opacity-0 group-hover:opacity-100 transition">
+                            <div className="mt-4 flex items-center gap-1 text-[#D4AF37] text-sm font-semibold opacity-0 group-hover:opacity-100 transition">
                                 Open <span>→</span>
                             </div>
                         </Link>

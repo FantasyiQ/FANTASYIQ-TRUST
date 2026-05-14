@@ -2,6 +2,8 @@ import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getLeagueUsers } from '@/lib/sleeper';
+import { notify } from '@/lib/notifications/service';
+import { NotificationType } from '@/lib/notifications/types';
 
 export async function POST(
     request: NextRequest,
@@ -53,6 +55,19 @@ export async function POST(
             },
             select: { token: true },
         });
+
+        // Notify commissioner that the invite link was created (member joined flow)
+        notify({
+            userId: user.id,
+            type:   NotificationType.MEMBER_JOINED_LEAGUE,
+            title:  `Invite link created — ${leagueName}`,
+            body:   `An invite link has been generated for ${leagueName} (${season} season).`,
+            data: {
+                leagueId,
+                leagueName,
+            },
+            email: false,
+        }).catch(err => console.error('[invite] notify commissioner failed', err));
     }
 
     // Return the path only — client builds the full URL using window.location.origin

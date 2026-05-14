@@ -30,11 +30,58 @@ export default async function PayoutsPage({
             leagueName:    true,
             season:        true,
             sleeperUserId: true,
+            platform:      true,
+            standings:     true,
         },
     });
 
     if (!league || league.userId !== session.user.id) {
         redirect(`/dashboard/league/${id}/overview?no_permission_manage_payouts=true`);
+    }
+
+    // ── ESPN branch: use stored DB standings, skip Sleeper ───────────────────
+    if (league.platform === 'espn') {
+        type EspnStandingRow = { teamId: number; name: string; wins: number; losses: number; ties: number; fpts: number };
+        const espnTeams = (league.standings as EspnStandingRow[] | null) ?? [];
+
+        const [leagueDues, existingPayouts, existingWinners] = await Promise.all([
+            prisma.leagueDues.findFirst({
+                where: { leagueName: { equals: league.leagueName, mode: 'insensitive' }, season: league.season },
+                select: {
+                    potTotal:    true,
+                    payoutSpots: { select: { label: true, amount: true, sortOrder: true }, orderBy: { sortOrder: 'asc' } },
+                },
+            }),
+            prisma.leaguePayout.findMany({ where: { leagueId: id }, orderBy: { rank: 'asc' } }),
+            prisma.leaguePayoutWinner.findMany({ where: { leagueId: id }, orderBy: { rank: 'asc' } }),
+        ]);
+
+        const teams = espnTeams.map(t => ({ id: String(t.teamId), name: t.name })).sort((a, b) => a.name.localeCompare(b.name));
+        const defaultSpots = leagueDues && leagueDues.payoutSpots.length > 0
+            ? leagueDues.payoutSpots.map((s, i) => ({ rank: i + 1, label: s.label, amount: s.amount }))
+            : [{ rank: 1, label: '1st Place', amount: 0 }, { rank: 2, label: '2nd Place', amount: 0 }, { rank: 3, label: '3rd Place', amount: 0 }];
+        const potTotal = leagueDues?.potTotal ?? 0;
+        const winnerByRank = new Map(existingWinners.map(w => [w.rank, w]));
+        const existingCombined = existingPayouts.length > 0
+            ? existingPayouts.map(p => ({ rank: p.rank, amount: p.amount, teamId: winnerByRank.get(p.rank)?.teamId ?? '', teamName: winnerByRank.get(p.rank)?.teamName ?? '', paidAt: p.paidAt?.toISOString() ?? null }))
+            : null;
+        const seasonComplete = league.season !== String(new Date().getFullYear());
+        const autoDetectedWinners = seasonComplete && !existingCombined
+            ? [...espnTeams].sort((a, b) => b.wins - a.wins || b.fpts - a.fpts).slice(0, defaultSpots.length).map((t, i) => ({ rank: i + 1, teamId: String(t.teamId), teamName: t.name }))
+            : null;
+
+        return (
+            <PayoutsManagerForm
+                leagueId={id}
+                leagueName={league.leagueName}
+                potTotal={potTotal}
+                teams={teams}
+                defaultSpots={defaultSpots}
+                existingPayouts={existingCombined}
+                seasonComplete={seasonComplete}
+                autoDetectedWinners={autoDetectedWinners}
+            />
+        );
     }
 
     // ── Fetch Sleeper data + DB data in parallel ──────────────────────────────

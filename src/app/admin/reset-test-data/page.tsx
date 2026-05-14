@@ -16,7 +16,7 @@ export default async function ResetTestDataPage() {
                     <p className="text-3xl">🔒</p>
                     <p className="font-semibold text-white">Reset not available</p>
                     <p className="text-gray-400 text-sm">
-                        Set <code className="text-[#CBA135] bg-black/60 px-1 rounded">DEV_RESET_ENABLED=true</code> in your environment to unlock this route.
+                        Set <code className="text-[#D4AF37] bg-black/60 px-1 rounded">DEV_RESET_ENABLED=true</code> in your environment to unlock this route.
                     </p>
                 </div>
             </div>

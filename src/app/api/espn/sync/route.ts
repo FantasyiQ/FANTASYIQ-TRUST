@@ -52,6 +52,7 @@ export async function POST(request: NextRequest): Promise<Response> {
                 fpts:         t.pointsFor,
                 fptsAgainst:  t.pointsAgainst,
                 rosterSize:   t.roster.length,
+                players:      t.roster.map(p => ({ name: p.fullName, position: p.position })),
             })),
             currentMatchup: currentWeekMatchups.length > 0 ? JSON.parse(JSON.stringify({
                 week:     data.currentWeek,

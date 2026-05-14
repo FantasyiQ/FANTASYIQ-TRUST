@@ -3,20 +3,29 @@ import { prisma } from '@/lib/prisma';
 export const maxDuration = 60;
 
 type RawPlayer = {
-    active?:          boolean;
-    position?:        string;
-    full_name?:       string;
-    first_name?:      string;
-    last_name?:       string;
-    team?:            string;
-    espn_id?:         string | number | null;
-    injury_status?:   string | null;
+    active?:           boolean;
+    position?:         string;
+    full_name?:        string;
+    first_name?:       string;
+    last_name?:        string;
+    team?:             string;
+    espn_id?:          string | number | null;
+    injury_status?:    string | null;
     injury_body_part?: string | null;
-    number?:          number | string | null;
-    height?:          string | null;  // inches as string e.g. "74"
-    weight?:          string | null;  // lbs as string e.g. "225"
-    birth_date?:      string | null;  // ISO date e.g. "1998-05-15" — canonical DOB source
-    age?:             number | null;  // pre-calculated by Sleeper (fallback when birth_date absent)
+    number?:           number | string | null;
+    height?:           string | null;  // inches as string e.g. "74"
+    weight?:           string | null;  // lbs as string e.g. "225"
+    birth_date?:       string | null;  // ISO date e.g. "1998-05-15"
+    age?:              number | null;
+    years_exp?:        number | null;  // 0 = current rookie
+    search_rank?:      number | null;
+    metadata?:         { rookie_year?: string } | null;
+    // NFL draft data — present for drafted players
+    draft_pick?: {
+        round?:   number | null;
+        pick_no?: number | null;  // pick within round
+        slot?:    number | null;  // overall pick slot (fallback)
+    } | null;
 };
 
 function formatHeight(inches: string | null | undefined): string | null {
@@ -54,6 +63,20 @@ export async function GET(request: Request): Promise<Response> {
             weight:         p.weight ? parseInt(String(p.weight)) || null : null,
             birthDate:      p.birth_date ?? null,
             age:            p.age ?? null,
+            yearsExp:       p.years_exp ?? null,
+            rookieYear:     p.metadata?.rookie_year ?? null,
+            searchRank:     p.search_rank ?? null,
+            // Official NFL draft data — null if undrafted or not yet available
+            draftRound:     p.draft_pick?.round ?? null,
+            draftPick:      p.draft_pick?.pick_no ?? p.draft_pick?.slot ?? null,
+            // FiQ Draft Capital Engine v2.0 — derived draft capital fields
+            draftTeam:      (p.draft_pick?.round != null) ? (p.team ?? null) : null,
+            overallPick:    (p.draft_pick?.round != null && (p.draft_pick?.pick_no ?? p.draft_pick?.slot) != null)
+                                ? (p.draft_pick.round - 1) * 32 + (p.draft_pick.pick_no ?? p.draft_pick.slot ?? 1)
+                                : null,
+            draftDay:       p.draft_pick?.round != null
+                                ? (p.draft_pick.round === 1 ? 1 : p.draft_pick.round <= 3 ? 2 : 3)
+                                : null,
         }));
 
     // Upsert in batches of 500 to stay within statement limits
@@ -78,6 +101,15 @@ export async function GET(request: Request): Promise<Response> {
                         weight:         r.weight,
                         birthDate:      r.birthDate,
                         age:            r.age,
+                        yearsExp:       r.yearsExp,
+                        rookieYear:     r.rookieYear,
+                        searchRank:     r.searchRank,
+                        // Always overwrite draft data — official beats any prior estimate
+                        draftRound:     r.draftRound,
+                        draftPick:      r.draftPick,
+                        draftTeam:      r.draftTeam,
+                        overallPick:    r.overallPick,
+                        draftDay:       r.draftDay,
                     },
                 })
             )

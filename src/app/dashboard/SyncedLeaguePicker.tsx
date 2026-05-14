@@ -28,7 +28,7 @@ export default function SyncedLeaguePicker({ leagues }: { leagues: SyncedLeague[
         <>
             <button
                 onClick={() => setOpen(true)}
-                className="text-sm border border-[#C8A951]/40 hover:border-[#C8A951] text-[#C8A951] font-semibold px-4 py-1.5 rounded-lg transition">
+                className="text-sm border border-[#D4AF37]/40 hover:border-[#D4AF37] text-[#D4AF37] font-semibold px-4 py-1.5 rounded-lg transition">
                 + Synced League
             </button>
 
@@ -44,8 +44,8 @@ export default function SyncedLeaguePicker({ leagues }: { leagues: SyncedLeague[
                                 <button
                                     key={league.id}
                                     onClick={() => handlePick(league)}
-                                    className="w-full text-left px-4 py-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-[#C8A951]/50 rounded-xl transition group">
-                                    <p className="text-white font-semibold text-sm group-hover:text-[#C8A951] transition">
+                                    className="w-full text-left px-4 py-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-[#D4AF37]/50 rounded-xl transition group">
+                                    <p className="text-white font-semibold text-sm group-hover:text-[#D4AF37] transition">
                                         {league.leagueName}
                                     </p>
                                     <p className="text-gray-500 text-xs mt-0.5">

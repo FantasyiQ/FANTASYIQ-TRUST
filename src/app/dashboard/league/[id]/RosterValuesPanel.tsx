@@ -6,7 +6,7 @@ import type { RosterValuesResponse, RosterTeam, RosterPlayer, RosterTier } from 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const TIER_STYLES: Record<RosterTier, { label: string; badge: string; row: string }> = {
-    Elite:       { label: 'Elite',       badge: 'bg-[#C8A951]/15 text-[#C8A951] border-[#C8A951]/40',           row: 'border-l-2 border-[#C8A951]/50' },
+    Elite:       { label: 'Elite',       badge: 'bg-[#D4AF37]/15 text-[#D4AF37] border-[#D4AF37]/40',           row: 'border-l-2 border-[#D4AF37]/50' },
     Contender:   { label: 'Contender',   badge: 'bg-green-900/30 text-green-400 border-green-800/50',            row: 'border-l-2 border-green-700/50' },
     Competitive: { label: 'Competitive', badge: 'bg-blue-900/30 text-blue-400 border-blue-800/50',               row: 'border-l-2 border-blue-700/50' },
     Rebuilding:  { label: 'Rebuilding',  badge: 'bg-gray-800 text-gray-500 border-gray-700',                    row: 'border-l-2 border-gray-700/50' },
@@ -27,7 +27,7 @@ function PlayerRow({ p }: { p: RosterPlayer }) {
             <td className="pl-10 pr-3 py-2 text-white text-sm">
                 <div className="flex items-center gap-1.5 flex-wrap">
                     <span>{p.name}</span>
-                    {p.isNew     && <span className="text-[9px] font-bold px-1 py-px rounded bg-[#C8A951]/10 text-[#C8A951] border border-[#C8A951]/30">NEW</span>}
+                    {p.isNew     && <span className="text-[9px] font-bold px-1 py-px rounded bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/30">NEW</span>}
                     {p.isTraded  && <span className="text-[9px] font-bold px-1 py-px rounded bg-blue-900/30 text-blue-400 border border-blue-800/40">TRADED</span>}
                     {p.injuryStatus && p.injuryStatus !== 'Active' && (
                         <span className="text-[9px] font-bold px-1 py-px rounded bg-orange-900/30 text-orange-400 border border-orange-800/40">{p.injuryStatus.toUpperCase()}</span>
@@ -158,7 +158,7 @@ export default function RosterValuesPanel({ sleeperLeagueId }: { sleeperLeagueId
     if (loading) {
         return (
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-12 flex flex-col items-center gap-3">
-                <div className="w-7 h-7 border-2 border-[#C8A951] border-t-transparent rounded-full animate-spin" />
+                <div className="w-7 h-7 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
                 <p className="text-gray-500 text-sm">Computing roster values…</p>
             </div>
         );

@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { getSleeperLeagues, getLeagueRosters, getNflState, deriveScoringType, rosterFpts } from '@/lib/sleeper';
+import { getSleeperLeagues, getLeagueRosters, getLeagueDrafts, getNflState, deriveScoringType, rosterFpts, resolveDraftType } from '@/lib/sleeper';
 
 export const maxDuration = 60;
 
@@ -32,7 +32,10 @@ export async function GET(request: Request): Promise<Response> {
                     if (!sleeperLeague) continue;
 
                     try {
-                        const rosters = await getLeagueRosters(dbLeague.leagueId);
+                        const [rosters, drafts] = await Promise.all([
+                            getLeagueRosters(dbLeague.leagueId),
+                            getLeagueDrafts(dbLeague.leagueId),
+                        ]);
                         const standings = rosters.map((r) => ({
                             rosterId:  r.roster_id,
                             ownerId:   r.owner_id,
@@ -42,6 +45,16 @@ export async function GET(request: Request): Promise<Response> {
                             fpts:      rosterFpts(r.settings),
                         })).sort((a, b) => b.wins - a.wins || b.fpts - a.fpts);
 
+                        // Resolve draft info using the league's own draft_id pointer.
+                        // Fall back to snake defaults if the league has no draft_id or no match.
+                        const safeDrafts   = Array.isArray(drafts) ? drafts : [];
+                        const currentDraft = sleeperLeague.draft_id
+                            ? safeDrafts.find(d => d.draft_id === sleeperLeague.draft_id) ?? null
+                            : null;
+                        const draftStartTime = currentDraft?.start_time ? BigInt(currentDraft.start_time) : null;
+                        const draftStatus    = currentDraft?.status ?? null;
+                        const draftType      = resolveDraftType(currentDraft);
+
                         await prisma.league.update({
                             where: { id: dbLeague.id },
                             data: {
@@ -50,6 +63,9 @@ export async function GET(request: Request): Promise<Response> {
                                 leagueType:      sleeperLeague.settings?.type === 2 ? 'Dynasty' : 'Redraft',
                                 scoringSettings: sleeperLeague.scoring_settings ?? {},
                                 standings,
+                                draftStartTime,
+                                draftStatus,
+                                draftType,
                                 lastSyncedAt: new Date(),
                             },
                         });

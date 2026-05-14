@@ -23,7 +23,7 @@ export default function LeagueTabs({ leagueId }: { leagueId: string }) {
                         href={href}
                         className={`px-4 py-2.5 text-sm font-medium rounded-t-lg transition border-b-2 -mb-px ${
                             active
-                                ? 'text-white border-[#C8A951]'
+                                ? 'text-white border-[#D4AF37]'
                                 : 'text-gray-500 border-transparent hover:text-gray-300'
                         }`}
                     >

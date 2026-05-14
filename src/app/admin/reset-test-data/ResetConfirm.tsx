@@ -57,7 +57,6 @@ export default function ResetConfirm() {
                         'All Payout History & Documents',
                         'All Connected Leagues & Invites',
                         'All Power Ranking Snapshots',
-                        'All Pro Bowl Contests & Entries',
                         'All Calendar Events',
                     ].map(item => (
                         <li key={item} className="flex items-start gap-2">

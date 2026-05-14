@@ -235,8 +235,11 @@ export async function GET(
             ? calcDtv(playerShell, ppr, leagueType, undefined, leagueSettings)
             : { finalDtv: 0 };
 
-        dtvByName.set(exact, { universe: u, finalDtv: dtv.finalDtv });
-        if (!dtvByName.has(normd)) dtvByName.set(normd, { universe: u, finalDtv: dtv.finalDtv });
+        const entry = { universe: u, finalDtv: dtv.finalDtv };
+        const existingExact = dtvByName.get(exact);
+        const existingNormd = dtvByName.get(normd);
+        if (!existingExact || dtv.finalDtv > existingExact.finalDtv) dtvByName.set(exact, entry);
+        if (!existingNormd || dtv.finalDtv > existingNormd.finalDtv) dtvByName.set(normd, entry);
     }
 
     // 6. Build delta lookup from latest snapshot batch

@@ -244,9 +244,14 @@ export async function GET(
             ? calcDtv(playerShell, ppr, leagueType, undefined, leagueSettings)
             : { finalDtv: 0 };
 
-        dtvByName.set(exact, { universe: u, finalDtv: dtv.finalDtv });
-        // Also index by normalized name for suffix-mismatched lookups
-        if (!dtvByName.has(normd)) dtvByName.set(normd, { universe: u, finalDtv: dtv.finalDtv });
+        // Always prefer the higher-valued entry so a stale duplicate name (e.g.
+        // "dj moore" with value 0 shadowing the canonical "d.j. moore" with value 4795)
+        // never wins over the real entry.
+        const existing      = dtvByName.get(exact);
+        const existingNormd = dtvByName.get(normd);
+        const entry         = { universe: u, finalDtv: dtv.finalDtv };
+        if (!existing      || dtv.finalDtv > existing.finalDtv)      dtvByName.set(exact, entry);
+        if (!existingNormd || dtv.finalDtv > existingNormd.finalDtv) dtvByName.set(normd, entry);
     }
 
     // 6. Build delta + isNew lookup from latest snapshot

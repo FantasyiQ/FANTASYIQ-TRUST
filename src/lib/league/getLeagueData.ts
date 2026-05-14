@@ -12,8 +12,7 @@ export type LeagueData = {
         platform:   'sleeper';
         is_owner:   boolean;
     };
-    dues:           { id: string } | null;
-    proBowlContest: { id: string; name: string } | null;
+    dues: { id: string } | null;
 };
 
 export async function getLeagueData(id: string): Promise<LeagueData> {
@@ -23,7 +22,7 @@ export async function getLeagueData(id: string): Promise<LeagueData> {
     const [league, dbUser] = await Promise.all([
         prisma.league.findUnique({
             where:  { id },
-            select: { id: true, userId: true, leagueId: true, leagueName: true, season: true, sleeperUserId: true },
+            select: { id: true, userId: true, leagueId: true, leagueName: true, season: true, sleeperUserId: true, platform: true },
         }),
         prisma.user.findUnique({
             where:  { id: session.user.id },
@@ -33,28 +32,24 @@ export async function getLeagueData(id: string): Promise<LeagueData> {
 
     if (!league || league.userId !== session.user.id) notFound();
 
-    const mySleeperUserId = dbUser?.sleeperUserId ?? league.sleeperUserId ?? null;
-
-    // Commissioner check via Sleeper
+    // Commissioner check: ESPN leagues use DB ownership; Sleeper uses API
     let is_owner = false;
-    try {
-        const members = await getLeagueUsers(league.leagueId);
-        const commId  = members.find(m => m.is_owner)?.user_id;
-        is_owner = !!commId && !!mySleeperUserId &&
-            String(commId).trim() === String(mySleeperUserId).trim();
-    } catch { /* Sleeper unreachable */ }
+    if (league.platform === 'espn') {
+        is_owner = league.userId === session.user.id;
+    } else {
+        const mySleeperUserId = dbUser?.sleeperUserId ?? league.sleeperUserId ?? null;
+        try {
+            const members = await getLeagueUsers(league.leagueId);
+            const commId  = members.find(m => m.is_owner)?.user_id;
+            is_owner = !!commId && !!mySleeperUserId &&
+                String(commId).trim() === String(mySleeperUserId).trim();
+        } catch { /* Sleeper unreachable */ }
+    }
 
-    const [dues, proBowlContest] = await Promise.all([
-        prisma.leagueDues.findFirst({
-            where:  { leagueName: { equals: league.leagueName, mode: 'insensitive' }, season: league.season },
-            select: { id: true },
-        }),
-        prisma.proBowlContest.findFirst({
-            where:   { leagueId: league.id, isActive: true },
-            select:  { id: true, name: true },
-            orderBy: { createdAt: 'desc' },
-        }),
-    ]);
+    const dues = await prisma.leagueDues.findFirst({
+        where:  { leagueName: { equals: league.leagueName, mode: 'insensitive' }, season: league.season },
+        select: { id: true },
+    });
 
     return {
         league: {
@@ -65,7 +60,6 @@ export async function getLeagueData(id: string): Promise<LeagueData> {
             platform:   'sleeper',
             is_owner,
         },
-        dues:           dues ?? null,
-        proBowlContest: proBowlContest ?? null,
+        dues: dues ?? null,
     };
 }

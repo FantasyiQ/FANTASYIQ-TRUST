@@ -6,7 +6,7 @@ import type { TradePartnersResponse, TradePartner, TradePartnerAsset } from '@/a
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const TIER_BADGE: Record<string, string> = {
-    Elite:       'bg-[#C8A951]/15 text-[#C8A951] border-[#C8A951]/40',
+    Elite:       'bg-[#D4AF37]/15 text-[#D4AF37] border-[#D4AF37]/40',
     Contender:   'bg-green-900/30 text-green-400 border-green-800/50',
     Competitive: 'bg-blue-900/30 text-blue-400 border-blue-800/50',
     Rebuilding:  'bg-gray-800 text-gray-500 border-gray-700',
@@ -28,21 +28,21 @@ const NEED_BADGE: Record<string, string> = {
 
 function fitScoreColor(score: number): string {
     if (score >= 75) return 'text-green-400';
-    if (score >= 50) return 'text-[#C8A951]';
+    if (score >= 50) return 'text-[#D4AF37]';
     if (score >= 25) return 'text-orange-400';
     return 'text-gray-500';
 }
 
 function fitScoreBarColor(score: number): string {
     if (score >= 75) return 'bg-green-500';
-    if (score >= 50) return 'bg-[#C8A951]';
+    if (score >= 50) return 'bg-[#D4AF37]';
     if (score >= 25) return 'bg-orange-500';
     return 'bg-gray-600';
 }
 
 function rowBorderColor(score: number): string {
     if (score >= 75) return 'border-green-700/50';
-    if (score >= 50) return 'border-[#C8A951]/40';
+    if (score >= 50) return 'border-[#D4AF37]/40';
     if (score >= 25) return 'border-orange-700/40';
     return 'border-gray-700/30';
 }
@@ -57,7 +57,7 @@ function AssetRow({ asset }: { asset: TradePartnerAsset }) {
             </span>
             <span className="text-white text-sm flex-1 flex items-center gap-1.5 flex-wrap min-w-0">
                 <span className="truncate">{asset.name}</span>
-                {asset.isNew    && <span className="text-[9px] font-bold px-1 py-px rounded bg-[#C8A951]/10 text-[#C8A951] border border-[#C8A951]/30 shrink-0">NEW</span>}
+                {asset.isNew    && <span className="text-[9px] font-bold px-1 py-px rounded bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/30 shrink-0">NEW</span>}
                 {asset.isTraded && <span className="text-[9px] font-bold px-1 py-px rounded bg-blue-900/30 text-blue-400 border border-blue-800/40 shrink-0">TRADED</span>}
                 {asset.injuryStatus && asset.injuryStatus !== 'Active' && (
                     <span className="text-[9px] font-bold px-1 py-px rounded bg-orange-900/30 text-orange-400 border border-orange-800/40 shrink-0">{asset.injuryStatus.toUpperCase()}</span>
@@ -177,7 +177,7 @@ function PartnerRow({
                             </div>
                             <div>
                                 <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
-                                    <span className="text-[#C8A951]">↑</span> Offer to {partner.displayName}
+                                    <span className="text-[#D4AF37]">↑</span> Offer to {partner.displayName}
                                 </h4>
                                 {partner.suggestedAssetsForThem.length > 0
                                     ? partner.suggestedAssetsForThem.map(a => <AssetRow key={a.playerId} asset={a} />)
@@ -193,7 +193,7 @@ function PartnerRow({
                                 <ul className="space-y-1">
                                     {partner.notes.map((note, i) => (
                                         <li key={i} className="text-gray-400 text-xs flex items-start gap-2">
-                                            <span className="text-[#C8A951] mt-px shrink-0">›</span>
+                                            <span className="text-[#D4AF37] mt-px shrink-0">›</span>
                                             {note}
                                         </li>
                                     ))}
@@ -216,13 +216,17 @@ export default function TradePartnersPanel({
     sleeperLeagueId:  string;
     mySleeperUserId:  string | null;
 }) {
-    const [data,     setData]     = useState<TradePartnersResponse | null>(null);
-    const [loading,  setLoading]  = useState(true);
-    const [error,    setError]    = useState<string | null>(null);
-    const [expanded, setExpanded] = useState<Set<number>>(new Set());
+    const [data,       setData]       = useState<TradePartnersResponse | null>(null);
+    const [loading,    setLoading]    = useState(false);
+    const [error,      setError]      = useState<string | null>(null);
+    const [expanded,   setExpanded]   = useState<Set<number>>(new Set());
+    const [collapsed,  setCollapsed]  = useState(true);
+    const [fetched,    setFetched]    = useState(false);
 
     useEffect(() => {
-        if (!mySleeperUserId) { setLoading(false); return; }
+        if (collapsed || fetched || !mySleeperUserId) return;
+        setFetched(true);
+        setLoading(true);
         fetch(`/api/leagues/${sleeperLeagueId}/trade-partners?ownerId=${encodeURIComponent(mySleeperUserId)}`)
             .then(r => {
                 if (!r.ok) throw new Error(`${r.status}`);
@@ -230,7 +234,7 @@ export default function TradePartnersPanel({
             })
             .then(d => { setData(d); setLoading(false); })
             .catch(e => { setError(String(e)); setLoading(false); });
-    }, [sleeperLeagueId, mySleeperUserId]);
+    }, [collapsed, fetched, sleeperLeagueId, mySleeperUserId]);
 
     const toggle = (rosterId: number) => {
         setExpanded(prev => {
@@ -240,99 +244,117 @@ export default function TradePartnersPanel({
         });
     };
 
-    if (!mySleeperUserId) {
+    function renderBody() {
+        if (!mySleeperUserId) {
+            return (
+                <div className="px-6 py-8 text-center">
+                    <p className="text-gray-400 text-sm">Connect your Sleeper account to see trade partner suggestions.</p>
+                </div>
+            );
+        }
+        if (loading) {
+            return (
+                <div className="px-6 py-12 flex flex-col items-center gap-3">
+                    <div className="w-7 h-7 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
+                    <p className="text-gray-500 text-sm">Analyzing trade fits…</p>
+                </div>
+            );
+        }
+        if (error || !data) {
+            return (
+                <div className="px-6 py-8 text-center">
+                    <p className="text-red-400 text-sm">Failed to load trade partners.</p>
+                    <p className="text-gray-600 text-xs mt-1">{error}</p>
+                </div>
+            );
+        }
+        if (data.partners.length === 0) {
+            return (
+                <div className="px-6 py-8 text-center">
+                    <p className="text-gray-400 text-sm">Your team was not found in this league&apos;s roster data.</p>
+                    <p className="text-gray-600 text-xs mt-1">Try syncing your league first.</p>
+                </div>
+            );
+        }
         return (
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center">
-                <p className="text-gray-400 text-sm">Connect your Sleeper account to see trade partner suggestions.</p>
-            </div>
-        );
-    }
+            <>
+                <div className="px-6 py-3 border-b border-gray-800 flex items-center gap-3 flex-wrap">
+                    <span className="flex items-center gap-1.5 text-xs text-gray-500">
+                        <span className="w-2 h-2 rounded-full bg-green-500 inline-block shrink-0" /> Great ≥75
+                    </span>
+                    <span className="flex items-center gap-1.5 text-xs text-gray-500">
+                        <span className="w-2 h-2 rounded-full bg-[#D4AF37] inline-block shrink-0" /> Good ≥50
+                    </span>
+                    <span className="flex items-center gap-1.5 text-xs text-gray-500">
+                        <span className="w-2 h-2 rounded-full bg-orange-500 inline-block shrink-0" /> Limited
+                    </span>
+                </div>
 
-    if (loading) {
-        return (
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-12 flex flex-col items-center gap-3">
-                <div className="w-7 h-7 border-2 border-[#C8A951] border-t-transparent rounded-full animate-spin" />
-                <p className="text-gray-500 text-sm">Analyzing trade fits…</p>
-            </div>
-        );
-    }
+                {/* Table */}
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm min-w-[750px]">
+                        <thead>
+                            <tr className="border-b border-gray-800">
+                                <th className="text-left px-4 py-3 text-gray-500 font-medium w-10">#</th>
+                                <th className="text-left px-3 py-3 text-gray-500 font-medium">Team</th>
+                                <th className="text-left px-3 py-3 text-gray-500 font-medium">Fit Score</th>
+                                <th className="text-left px-3 py-3 text-gray-500 font-medium">Tier</th>
+                                <th className="text-left px-3 py-3 text-gray-500 font-medium">Your Needs</th>
+                                <th className="text-left px-4 py-3 text-gray-500 font-medium">Their Needs</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-800/50">
+                            {data.partners.map((partner, i) => (
+                                <PartnerRow
+                                    key={partner.rosterId}
+                                    partner={partner}
+                                    rank={i + 1}
+                                    expanded={expanded.has(partner.rosterId)}
+                                    onToggle={() => toggle(partner.rosterId)}
+                                />
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
 
-    if (error || !data) {
-        return (
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center">
-                <p className="text-red-400 text-sm">Failed to load trade partners.</p>
-                <p className="text-gray-600 text-xs mt-1">{error}</p>
-            </div>
-        );
-    }
-
-    if (data.partners.length === 0) {
-        return (
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center">
-                <p className="text-gray-400 text-sm">Your team was not found in this league's roster data.</p>
-                <p className="text-gray-600 text-xs mt-1">Try syncing your league first.</p>
-            </div>
+                {/* Footer */}
+                <div className="px-6 py-3 border-t border-gray-800">
+                    <p className="text-gray-600 text-xs">
+                        Fit score based on positional complementarity, asset momentum, and roster tier contrast. Generated {new Date(data.meta.generatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.
+                    </p>
+                </div>
+            </>
         );
     }
 
     return (
         <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-gray-800">
-                <div className="flex items-start justify-between flex-wrap gap-3">
-                    <div>
-                        <h2 className="font-bold text-lg">Trade Partners</h2>
-                        <p className="text-gray-500 text-xs mt-0.5">
-                            Best fits for {data.meta.myDisplayName ?? 'your team'} · {data.meta.teamCount} teams ranked by positional complementarity
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-3 flex-wrap">
-                        <span className="flex items-center gap-1.5 text-xs text-gray-500">
-                            <span className="w-2 h-2 rounded-full bg-green-500 inline-block shrink-0" /> Great ≥75
-                        </span>
-                        <span className="flex items-center gap-1.5 text-xs text-gray-500">
-                            <span className="w-2 h-2 rounded-full bg-[#C8A951] inline-block shrink-0" /> Good ≥50
-                        </span>
-                        <span className="flex items-center gap-1.5 text-xs text-gray-500">
-                            <span className="w-2 h-2 rounded-full bg-orange-500 inline-block shrink-0" /> Limited
-                        </span>
-                    </div>
+            {/* Collapsible header */}
+            <button
+                type="button"
+                onClick={() => setCollapsed(prev => !prev)}
+                className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-800/40 transition text-left"
+            >
+                <div>
+                    <h2 className="font-bold text-base">Trade Partners</h2>
+                    <p className="text-gray-500 text-xs mt-0.5">
+                        {data ? `Best fits for ${data.meta.myDisplayName ?? 'your team'} · ${data.meta.teamCount} teams` : 'Ranked by positional complementarity'}
+                    </p>
                 </div>
-            </div>
+                <svg
+                    className={`w-4 h-4 text-gray-500 transition-transform shrink-0 ${collapsed ? '' : 'rotate-180'}`}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+                >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
 
-            {/* Table */}
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[750px]">
-                    <thead>
-                        <tr className="border-b border-gray-800">
-                            <th className="text-left px-4 py-3 text-gray-500 font-medium w-10">#</th>
-                            <th className="text-left px-3 py-3 text-gray-500 font-medium">Team</th>
-                            <th className="text-left px-3 py-3 text-gray-500 font-medium">Fit Score</th>
-                            <th className="text-left px-3 py-3 text-gray-500 font-medium">Tier</th>
-                            <th className="text-left px-3 py-3 text-gray-500 font-medium">Your Needs</th>
-                            <th className="text-left px-4 py-3 text-gray-500 font-medium">Their Needs</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-800/50">
-                        {data.partners.map((partner, i) => (
-                            <PartnerRow
-                                key={partner.rosterId}
-                                partner={partner}
-                                rank={i + 1}
-                                expanded={expanded.has(partner.rosterId)}
-                                onToggle={() => toggle(partner.rosterId)}
-                            />
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-3 border-t border-gray-800">
-                <p className="text-gray-600 text-xs">
-                    Fit score based on positional complementarity, asset momentum, and roster tier contrast. Generated {new Date(data.meta.generatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.
-                </p>
-            </div>
+            {/* Body */}
+            {!collapsed && (
+                <div className="border-t border-gray-800">
+                    {renderBody()}
+                </div>
+            )}
         </div>
     );
 }

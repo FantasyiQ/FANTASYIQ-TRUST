@@ -106,7 +106,7 @@ export default function DocumentsManager({ duesId, leagueName, initialDocuments 
                 <h3 className="font-bold text-white">{leagueName}</h3>
                 <button
                     onClick={() => { setShowForm(f => !f); setError(''); }}
-                    className="text-[#C8A951] hover:text-[#b8992f] text-sm font-semibold transition">
+                    className="text-[#D4AF37] hover:text-[#BF9D2F] text-sm font-semibold transition">
                     {showForm ? 'Cancel' : '+ Add Document'}
                 </button>
             </div>
@@ -120,7 +120,7 @@ export default function DocumentsManager({ duesId, leagueName, initialDocuments 
                             <button key={m} type="button" onClick={() => { setMode(m); setError(''); }}
                                 className={`px-5 py-2.5 text-xs font-semibold transition border-b-2 -mb-px ${
                                     mode === m
-                                        ? 'border-[#C8A951] text-[#C8A951]'
+                                        ? 'border-[#D4AF37] text-[#D4AF37]'
                                         : 'border-transparent text-gray-500 hover:text-gray-300'
                                 }`}>
                                 {m === 'upload' ? '📎 Upload File' : '🔗 Add Link'}
@@ -143,7 +143,7 @@ export default function DocumentsManager({ duesId, leagueName, initialDocuments 
                                 onClick={() => fileRef.current?.click()}
                                 className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition ${
                                     dragOver
-                                        ? 'border-[#C8A951] bg-[#C8A951]/5'
+                                        ? 'border-[#D4AF37] bg-[#D4AF37]/5'
                                         : file
                                             ? 'border-green-700 bg-green-900/10'
                                             : 'border-gray-700 hover:border-gray-600'
@@ -160,7 +160,7 @@ export default function DocumentsManager({ duesId, leagueName, initialDocuments 
                                     </div>
                                 ) : (
                                     <>
-                                        <p className="text-gray-400 text-sm">Drop file here or <span className="text-[#C8A951]">browse</span></p>
+                                        <p className="text-gray-400 text-sm">Drop file here or <span className="text-[#D4AF37]">browse</span></p>
                                         <p className="text-gray-700 text-xs mt-1">PDF, Word, Excel, TXT, CSV, images — max 10 MB</p>
                                     </>
                                 )}
@@ -170,11 +170,11 @@ export default function DocumentsManager({ duesId, leagueName, initialDocuments 
 
                             <input type="text" placeholder="Label (e.g. Rulebook 2025)"
                                 value={uploadLabel} onChange={e => setUploadLabel(e.target.value)}
-                                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/60" />
+                                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/60" />
 
                             {error && <p className="text-red-400 text-sm">{error}</p>}
                             <button type="submit" disabled={busy || !file}
-                                className="bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-50 text-black font-bold px-5 py-2 rounded-lg text-sm transition">
+                                className="bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-50 text-black font-bold px-5 py-2 rounded-lg text-sm transition">
                                 {busy ? 'Uploading…' : 'Upload'}
                             </button>
                         </form>
@@ -186,14 +186,14 @@ export default function DocumentsManager({ duesId, leagueName, initialDocuments 
                             <div className="grid sm:grid-cols-2 gap-3">
                                 <input type="text" placeholder="Label (e.g. Rulebook 2025)"
                                     value={label} onChange={e => setLabel(e.target.value)} required
-                                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/60 w-full" />
+                                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/60 w-full" />
                                 <input type="url" placeholder="https://drive.google.com/…"
                                     value={url} onChange={e => setUrl(e.target.value)} required
-                                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#C8A951]/60 w-full" />
+                                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/60 w-full" />
                             </div>
                             {error && <p className="text-red-400 text-sm">{error}</p>}
                             <button type="submit" disabled={busy}
-                                className="bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-50 text-black font-bold px-5 py-2 rounded-lg text-sm transition">
+                                className="bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-50 text-black font-bold px-5 py-2 rounded-lg text-sm transition">
                                 {busy ? 'Saving…' : 'Save Link'}
                             </button>
                         </form>
@@ -215,7 +215,7 @@ export default function DocumentsManager({ duesId, leagueName, initialDocuments 
                                 <div className="min-w-0">
                                     <p className="text-white text-sm font-medium truncate">{doc.label}</p>
                                     <a href={doc.url} target="_blank" rel="noopener noreferrer"
-                                        className="text-[#C8A951]/70 hover:text-[#C8A951] text-xs truncate block transition max-w-xs">
+                                        className="text-[#D4AF37]/70 hover:text-[#D4AF37] text-xs truncate block transition max-w-xs">
                                         {isBlobUrl(doc.url) ? '↓ Download / View' : doc.url}
                                     </a>
                                 </div>

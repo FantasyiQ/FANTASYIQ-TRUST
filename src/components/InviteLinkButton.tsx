@@ -60,7 +60,7 @@ export default function InviteLinkButton({ sleeperLeagueId, leagueName, season }
                         className={`shrink-0 text-xs font-bold px-3 py-2 rounded-lg transition border ${
                             copied
                                 ? 'bg-green-900/40 text-green-400 border-green-800'
-                                : 'bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 border-[#C8A951]'
+                                : 'bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 border-[#D4AF37]'
                         }`}
                     >
                         {copied ? '✓ Copied!' : 'Copy'}
@@ -70,7 +70,7 @@ export default function InviteLinkButton({ sleeperLeagueId, leagueName, season }
                 <button
                     onClick={generateInvite}
                     disabled={inviteLoading}
-                    className="w-full bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-50 text-gray-950 font-bold px-4 py-2 rounded-lg text-sm transition"
+                    className="w-full bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-50 text-gray-950 font-bold px-4 py-2 rounded-lg text-sm transition"
                 >
                     {inviteLoading ? 'Generating…' : '+ Invite Members'}
                 </button>

@@ -13,6 +13,8 @@ export interface Player {
     team:             string;
     age:              number;
     baseValue:        number;
+    /** Sleeper player ID — used for defensive engine value lookup */
+    id?:              string;
     injuryStatus?:    string | null;
     birthDate?:       string | null;  // ISO date from Sleeper — used for runtime age display
     playerImageUrl?:  string | null;  // Sleeper CDN headshot URL (raw)
@@ -205,22 +207,32 @@ export function calcDtv(
     };
 }
 
+/**
+ * Trade fairness score: ratio of the weaker side's value to the stronger side's.
+ * Returns 0–100 where 100 = perfectly even, lower = more lopsided.
+ * R = min(totalA, totalB) / max(totalA, totalB) × 100
+ */
 function tradeScore(totalA: number, totalB: number): number {
-    if (totalA === 0 && totalB === 0) return 50;
-    // Net DTV differential from Team A's perspective (Team A gives totalA, receives totalB)
-    const netDiff = totalB - totalA;
-    const rawScore = 50 + (netDiff * 1.67);
-    return Math.min(100, Math.max(0, Math.round(rawScore)));
+    if (totalA === 0 && totalB === 0) return 100;
+    const maxV = Math.max(totalA, totalB);
+    if (maxV === 0) return 100;
+    return Math.round((Math.min(totalA, totalB) / maxV) * 100);
 }
 
+/**
+ * Verdict labels — describe the degree of imbalance, direction-agnostic.
+ * Pair with winner ('A' | 'B' | 'Even') to show full context.
+ *
+ * R ≥ 90 → Very Fair       (within 10%)
+ * R ≥ 80 → Slight Edge     (10–20% gap)
+ * R ≥ 70 → Clear Winner    (20–30% gap)
+ * R < 70 → Lopsided        (>30% gap)
+ */
 function verdict(score: number): string {
-    if (score >= 90) return 'Slam Dunk';
-    if (score >= 75) return 'Strong Win';
-    if (score >= 56) return 'Slight Edge';
-    if (score >= 45) return 'Fair Trade';
-    if (score >= 30) return 'Slight Loss';
-    if (score >= 15) return 'Bad Deal';
-    return 'Robbery';
+    if (score >= 90) return 'Very Fair';
+    if (score >= 80) return 'Slight Edge';
+    if (score >= 70) return 'Clear Winner';
+    return 'Lopsided';
 }
 
 export function evaluateTrade(
@@ -247,7 +259,11 @@ export function evaluateTrade(
     const totalB = Math.round(b.reduce((s, p) => s + p.finalDtv, 0) * 10) / 10;
     const diff   = Math.round(Math.abs(totalA - totalB) * 10) / 10;
     const score  = tradeScore(totalA, totalB);
-    const winner: 'A' | 'B' | 'Even' = score >= 55 ? 'A' : score <= 45 ? 'B' : 'Even';
+    // Winner: A wins if totalA > totalB, B wins if totalB > totalA, Even if within 2%
+    const maxV   = Math.max(totalA, totalB, 0.01);
+    const winner: 'A' | 'B' | 'Even' =
+        totalA > totalB && (totalA - totalB) / maxV > 0.02 ? 'A' :
+        totalB > totalA && (totalB - totalA) / maxV > 0.02 ? 'B' : 'Even';
     return { sideA: a, sideB: b, totalA, totalB, diff, score, verdict: verdict(score), winner };
 }
 const ROUND_ORDINALS = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];

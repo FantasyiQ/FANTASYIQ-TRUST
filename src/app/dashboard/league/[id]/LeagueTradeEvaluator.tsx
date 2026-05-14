@@ -5,6 +5,7 @@ import TradeEvaluator from '@/app/dashboard/trade/TradeEvaluator';
 import { getDraftPicks, DEFAULT_LEAGUE_SETTINGS, roundOrdinal } from '@/lib/trade-engine';
 import type { PprFormat, LeagueType, LeagueSettings, Player } from '@/lib/trade-engine';
 import type { TradeTeam } from '@/app/dashboard/trade/TradeEvaluator';
+import type { DefenseValues } from '@/lib/rankings/unifiedTradeEvaluator';
 
 const LEAGUE_SIZES = [8, 10, 12, 14, 16, 32] as const;
 type LeagueSize = typeof LEAGUE_SIZES[number];
@@ -76,7 +77,7 @@ interface RawOwnedPick {
 export interface RawTeamData {
     rosterId:   number;
     teamName:   string;
-    players:    { name: string; position: string; team: string }[];
+    players:    { id: string; name: string; position: string; team: string }[];
     ownedPicks: RawOwnedPick[];
 }
 
@@ -96,11 +97,18 @@ interface Props {
     scoringSettings?:     ScoringSettings;
     myTeamData?:          RawTeamData;
     otherTeamsData?:      RawTeamData[];
+    /**
+     * Pre-computed defensive value scores (0–100) keyed by player name,
+     * from the defensive ranking engine. Optional — when absent the
+     * evaluator shows DTV values only.
+     */
+    defenseValues?:       DefenseValues;
 }
 
 export default function LeagueTradeEvaluator({
     leagueName, scoringType, totalRosters, draftRounds = 5, draftOrderProjected = false,
     leagueType, rosterPositions = [], scoringSettings = {}, myTeamData, otherTeamsData = [],
+    defenseValues,
 }: Props) {
     const ppr           = scoringTypeToPpr(scoringType);
     const leagueSize    = nearestLeagueSize(totalRosters);
@@ -132,26 +140,26 @@ export default function LeagueTradeEvaluator({
     // Depth base values for unranked / non-skill-position players
     const DEPTH_BASE: Record<string, number> = {
         QB: 22, RB: 18, WR: 18, TE: 14, K: 8, DEF: 8,
+        // IDP positions — shown as placeholder until defensive engine scores load
+        DL: 12, LB: 12, DB: 12, DE: 12, DT: 12, NT: 12,
+        OLB: 12, ILB: 12, MLB: 12, EDGE: 12,
+        CB: 12, S: 12, SS: 12, FS: 12,
     };
 
     let depthRank = 400;
 
     function convertRaw(raw: RawTeamData): TradeTeam {
         const players: Player[] = raw.players
-            .map(p => {
-                if (!p.name || !p.position) return undefined;
-                // Build a Player shell — patchPlayer in TradeEvaluator will overlay
-                // the correct KTC baseValue from the universe once it loads.
-                return {
-                    rank:      depthRank++,
-                    name:      p.name,
-                    position:  p.position,
-                    team:      p.team ?? '',
-                    age:       0,   // will be overlaid by patchPlayer from universe
-                    baseValue: DEPTH_BASE[p.position] ?? 10,
-                } satisfies Player;
-            })
-            .filter((p): p is Player => p !== undefined);
+            .filter(p => !!p.name && !!p.position)
+            .map(p => ({
+                rank:      depthRank++,
+                id:        p.id,
+                name:      p.name,
+                position:  p.position,
+                team:      p.team ?? '',
+                age:       0,   // will be overlaid by patchPlayer from universe
+                baseValue: DEPTH_BASE[p.position] ?? 12,
+            } as Player));
 
         const picks: Player[] = raw.ownedPicks
             .map(op => {
@@ -186,14 +194,15 @@ export default function LeagueTradeEvaluator({
 
     return (
         <TradeEvaluator
-            initialPpr={ppr}
-            initialLeagueSize={leagueSize}
-            initialLeagueType={leagueType}
-            initialLeagueSettings={leagueSettings}
-            leagueLabel={label}
-            lockSettings
-            myTeam={myTeam}
-            otherTeams={otherTeams}
+                initialPpr={ppr}
+                initialLeagueSize={leagueSize}
+                initialLeagueType={leagueType}
+                initialLeagueSettings={leagueSettings}
+                leagueLabel={label}
+                lockSettings
+                myTeam={myTeam}
+                otherTeams={otherTeams}
+                defenseValues={defenseValues}
         />
     );
 }

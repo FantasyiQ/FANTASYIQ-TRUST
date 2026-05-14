@@ -51,12 +51,11 @@ export async function POST(request: NextRequest): Promise<Response> {
                         where:  { userId, leagueId: league.previous_league_id },
                         select: { id: true },
                     });
+                    // Delete the old-season row so the upsert below creates a clean
+                    // new row for the current season. Updating in place risks carrying
+                    // forward stale state (wrong leagueId, bad assignedPlanId, etc.).
                     if (prior) {
-                        return prisma.league.update({
-                            where:  { id: prior.id },
-                            data:   sharedFields(league),
-                            select: { id: true, leagueId: true, leagueName: true, totalRosters: true, scoringType: true, assignedPlanId: true, assignedPlanType: true },
-                        });
+                        await prisma.league.delete({ where: { id: prior.id } });
                     }
                 }
                 return prisma.league.upsert({

@@ -6,6 +6,57 @@ import { tierBadgeProps } from '@/lib/tier-badge';
 import LeagueResyncButton from '@/app/dashboard/league/[id]/LeagueResyncButton';
 import EspnRefreshButton from '@/app/dashboard/league/[id]/EspnRefreshButton';
 
+type DraftVariant = 'none' | 'upcoming' | 'urgent' | 'done';
+
+function getDraftDisplay(
+    draftStartTime: bigint | null,
+    draftStatus: string | null,
+    now: number,
+): { text: string; variant: DraftVariant } {
+    if (!draftStartTime) return { text: 'Draft Date: Not Scheduled', variant: 'none' };
+
+    if (draftStatus === 'complete') return { text: 'Draft Completed', variant: 'done' };
+
+    const draftMs  = Number(draftStartTime);
+    const msUntil  = draftMs - now;
+
+    // Draft time already passed and not yet marked complete — treat as done
+    if (msUntil <= 0 && draftStatus !== 'drafting') return { text: 'Draft Completed', variant: 'done' };
+
+    if (draftStatus === 'drafting') return { text: 'Draft In Progress', variant: 'urgent' };
+
+    const draftDate = new Date(draftMs);
+    const timeStr   = new Intl.DateTimeFormat('en-US', {
+        hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York', timeZoneName: 'short',
+    }).format(draftDate);
+
+    const hoursUntil = msUntil / (1000 * 60 * 60);
+    const daysUntil  = Math.floor(msUntil / (1000 * 60 * 60 * 24));
+
+    if (hoursUntil < 24) {
+        return { text: `Draft Today · ${timeStr}`, variant: 'urgent' };
+    }
+
+    if (daysUntil < 30) {
+        return { text: `Draft in ${daysUntil} day${daysUntil === 1 ? '' : 's'}`, variant: 'upcoming' };
+    }
+
+    const dateStr = new Intl.DateTimeFormat('en-US', {
+        month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/New_York',
+    }).format(draftDate);
+
+    return { text: `Draft Date: ${dateStr} · ${timeStr}`, variant: 'upcoming' };
+}
+
+function draftBadgeClass(variant: DraftVariant) {
+    switch (variant) {
+        case 'upcoming': return 'bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/40';
+        case 'urgent':   return 'bg-red-900/30 text-red-400 border-red-800';
+        case 'done':     return 'bg-gray-800 text-gray-500 border-gray-700';
+        default:         return 'bg-gray-800/50 text-gray-600 border-gray-700/50';
+    }
+}
+
 function statusBadge(status: string) {
     switch (status) {
         case 'in_season': return 'bg-green-900/40 text-green-400 border-green-800';
@@ -35,7 +86,8 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
                 leagueName: true, season: true, status: true,
                 totalRosters: true, scoringType: true,
                 avatar: true, lastSyncedAt: true,
-                sleeperUserId: true, platform: true,
+                sleeperUserId: true, platform: true, userId: true,
+                draftStartTime: true, draftStatus: true, draftType: true,
             },
         }),
         session?.user?.id
@@ -52,13 +104,32 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
         league.scoringType === 'ppr'      ? 'PPR'   :
         league.scoringType === 'half_ppr' ? '½ PPR' : 'Standard';
 
-    const tierStr       = dbUser?.subscriptionTier ?? 'FREE';
-    const badge         = tierBadgeProps(tierStr);
-    const isElite       = tierStr.includes('ELITE');
-    const isCommissioner =
-        !!league.sleeperUserId &&
-        !!dbUser?.sleeperUserId &&
-        String(league.sleeperUserId).trim() === String(dbUser.sleeperUserId).trim();
+    const tierStr = dbUser?.subscriptionTier ?? 'FREE';
+    const badge   = tierBadgeProps(tierStr);
+    const isElite = tierStr.includes('ELITE');
+
+    const isCommissioner = league.platform === 'espn'
+        ? league.userId === session?.user?.id
+        : !!league.sleeperUserId &&
+          !!dbUser?.sleeperUserId &&
+          String(league.sleeperUserId).trim() === String(dbUser.sleeperUserId).trim();
+
+    // Fetch dues status for this member
+    const dues = session?.user?.id ? await prisma.leagueDues.findFirst({
+        where:  { leagueName: { equals: league.leagueName, mode: 'insensitive' }, season: league.season },
+        select: {
+            id:      true,
+            members: {
+                where:  { userId: session.user.id },
+                select: { duesStatus: true },
+                take:   1,
+            },
+        },
+    }) : null;
+
+    const memberStatus  = dues?.members?.[0]?.duesStatus ?? null;
+    const duesPaid      = memberStatus === 'paid';
+    const duesOwed      = dues && !duesPaid;
 
     return (
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 flex flex-col gap-4">
@@ -85,7 +156,7 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
                     </h1>
                     <div className="flex items-center gap-2 mt-2 flex-wrap">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-800 border border-gray-700 text-xs font-semibold text-gray-300">
-                            {league.platform === 'espn' ? 'ESPN' : 'Sleeper'}
+                            {league.platform === 'espn' ? 'ESPN' : 'Fantasy'}
                         </span>
                         <span className="inline-flex items-center px-2 py-0.5 rounded bg-gray-800 border border-gray-700 text-xs font-semibold text-gray-300">
                             {scoringDisplay}
@@ -119,8 +190,8 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
                 </div>
             </div>
 
-            {/* Bottom row: sync (left) · Pay Dues pill (right) */}
-            <div className="flex items-center justify-between">
+            {/* Bottom row: sync (left) · draft date (center) · dues pill (right) */}
+            <div className="flex items-center gap-3 flex-wrap">
                 {league.platform === 'espn' ? (
                     <EspnRefreshButton leagueDbId={leagueId} />
                 ) : (
@@ -129,21 +200,44 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
                         lastSyncedAt={league.lastSyncedAt?.toISOString() ?? null}
                     />
                 )}
-                {isCommissioner ? (
-                    <Link
-                        href={`/dashboard/league/${leagueId}/commissioner/dues`}
-                        className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold border bg-[#C8A951]/10 text-[#C8A951] border-[#C8A951]/40 hover:bg-[#C8A951]/20 transition"
-                    >
-                        Manage Dues →
-                    </Link>
-                ) : (
-                    <Link
-                        href={`/dashboard/league/${leagueId}/dues/pay`}
-                        className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold border bg-[#C8A951]/10 text-[#C8A951] border-[#C8A951]/40 hover:bg-[#C8A951]/20 transition"
-                    >
-                        Pay Dues →
-                    </Link>
-                )}
+
+                {/* Draft date — Sleeper only */}
+                {league.platform !== 'espn' && (() => {
+                    const { text, variant } = getDraftDisplay(
+                        league.draftStartTime ?? null,
+                        league.draftStatus ?? null,
+                        Date.now(),
+                    );
+                    return (
+                        <span
+                            title={
+                                league.draftStartTime
+                                    ? new Date(Number(league.draftStartTime)).toLocaleString('en-US', { timeZone: 'America/New_York', timeZoneName: 'long' })
+                                    : undefined
+                            }
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition ${draftBadgeClass(variant)} ${variant === 'urgent' ? 'animate-pulse' : ''}`}
+                        >
+                            {variant === 'upcoming' && <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] shrink-0" />}
+                            {variant === 'urgent'   && <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />}
+                            {text}
+                        </span>
+                    );
+                })()}
+
+                <div className="ml-auto">
+                    {duesPaid ? (
+                        <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold border bg-green-900/40 text-green-400 border-green-800">
+                            Dues Paid ✓
+                        </span>
+                    ) : duesOwed ? (
+                        <Link
+                            href={`/dashboard/league/${leagueId}/dues/pay`}
+                            className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold border bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/40 hover:bg-[#D4AF37]/20 transition"
+                        >
+                            Pay Dues →
+                        </Link>
+                    ) : null}
+                </div>
             </div>
         </div>
     );

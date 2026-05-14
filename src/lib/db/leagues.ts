@@ -22,7 +22,7 @@ export async function getLeagueById(
     const [league, dbUser] = await Promise.all([
         prisma.league.findUnique({
             where:  { id },
-            select: { id: true, leagueId: true, leagueName: true, season: true, userId: true, sleeperUserId: true },
+            select: { id: true, leagueId: true, leagueName: true, season: true, userId: true, sleeperUserId: true, platform: true },
         }),
         prisma.user.findUnique({
             where:  { id: requestingUserId },
@@ -32,10 +32,12 @@ export async function getLeagueById(
 
     if (!league || league.userId !== requestingUserId) return null;
 
-    const isCommissioner =
-        !!league.sleeperUserId &&
-        !!dbUser?.sleeperUserId &&
-        String(league.sleeperUserId).trim() === String(dbUser.sleeperUserId).trim();
+    // ESPN leagues: the user who synced the league is always the commissioner
+    const isCommissioner = league.platform === 'espn'
+        ? true
+        : !!league.sleeperUserId &&
+          !!dbUser?.sleeperUserId &&
+          String(league.sleeperUserId).trim() === String(dbUser.sleeperUserId).trim();
 
     return {
         id:             league.id,

@@ -112,7 +112,7 @@ export default async function PollPage({ params }: { params: Promise<{ duesId: s
                                     <span className="text-white font-medium">{item.payoutSpot.label}</span>
                                     <span className="text-gray-500 ml-2">→ {item.member.displayName}</span>
                                 </div>
-                                <span className="text-[#C8A951] font-bold">${item.amount.toFixed(2)}</span>
+                                <span className="text-[#D4AF37] font-bold">${item.amount.toFixed(2)}</span>
                             </div>
                         ))}
                     </div>

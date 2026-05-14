@@ -149,12 +149,12 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
                     <p className="text-gray-300 text-sm leading-relaxed">
                         Your commissioner has invited you to track dues, payouts, standings, and trades for{' '}
                         <strong className="text-white">{invite.leagueName}</strong> on{' '}
-                        <span className="text-[#C8A951] font-semibold">FantasyiQ Trust</span>.
+                        <span className="text-[#D4AF37] font-semibold">FantasyiQ Trust</span>.
                     </p>
                     <ul className="space-y-1.5 text-gray-500 text-xs">
                         <li>✓ See who&apos;s paid dues and who hasn&apos;t</li>
                         <li>✓ View payout structure and standings</li>
-                        <li>✓ Trade evaluator powered by real dynasty values</li>
+                        <li>✓ Trade evaluator with dynasty player values</li>
                         <li>✓ League announcements from your commissioner</li>
                     </ul>
                 </div>
@@ -162,7 +162,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
                 <div className="space-y-3">
                     <Link
                         href={signInHref}
-                        className="block bg-[#C8A951] hover:bg-[#b8992f] text-gray-950 font-bold py-3 px-6 rounded-xl transition text-sm"
+                        className="block bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold py-3 px-6 rounded-xl transition text-sm"
                     >
                         Sign In to Get Started →
                     </Link>

@@ -111,20 +111,20 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
                         onClick={() => setPaymentModel('stripe')}
                         className={`w-full text-left px-4 py-3.5 rounded-xl border transition ${
                             paymentModel === 'stripe'
-                                ? 'border-[#C8A951]/60 bg-[#C8A951]/8'
+                                ? 'border-[#D4AF37]/60 bg-[#D4AF37]/8'
                                 : 'border-gray-700 bg-gray-800/40 hover:border-gray-600'
                         }`}
                     >
                         <div className="flex items-start gap-3">
                             <span className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                                paymentModel === 'stripe' ? 'border-[#C8A951]' : 'border-gray-600'
+                                paymentModel === 'stripe' ? 'border-[#D4AF37]' : 'border-gray-600'
                             }`}>
-                                {paymentModel === 'stripe' && <span className="w-2 h-2 rounded-full bg-[#C8A951] block" />}
+                                {paymentModel === 'stripe' && <span className="w-2 h-2 rounded-full bg-[#D4AF37] block" />}
                             </span>
                             <div>
                                 <p className="text-white text-sm font-semibold">
                                     Member-Direct Payments
-                                    <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#C8A951]/15 text-[#C8A951] border border-[#C8A951]/30">RECOMMENDED</span>
+                                    <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30">RECOMMENDED</span>
                                 </p>
                                 <p className="text-gray-500 text-xs mt-0.5">Each member pays through their own account via Stripe. Automatic tracking, full transparency.</p>
                             </div>
@@ -169,7 +169,7 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
                     <select
                         value={selectedLeagueId}
                         onChange={e => handleLeagueSelect(e.target.value)}
-                        className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-[#C8A951]/60">
+                        className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-[#D4AF37]/60">
                         <option value="">— select a league —</option>
                         {syncedLeagues.map(l => (
                             <option key={l.id} value={l.id}>
@@ -188,7 +188,7 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
                     onChange={e => setLeagueName(e.target.value)}
                     placeholder="e.g. Monday Night Mayhem"
                     maxLength={80}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#C8A951]/60"
+                    className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#D4AF37]/60"
                 />
             </div>
 
@@ -205,7 +205,7 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
                             onClick={() => toggleSeason(s)}
                             className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition ${
                                 selectedSeasons.includes(s)
-                                    ? 'bg-[#C8A951] text-black border-[#C8A951]'
+                                    ? 'bg-[#D4AF37] text-black border-[#D4AF37]'
                                     : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'
                             }`}>
                             {s}
@@ -226,7 +226,7 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
                             value={buyIn}
                             onChange={e => setBuyIn(e.target.value)}
                             placeholder="100.00"
-                            className="w-full bg-gray-800 border border-gray-700 rounded-xl pl-7 pr-4 py-2.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#C8A951]/60"
+                            className="w-full bg-gray-800 border border-gray-700 rounded-xl pl-7 pr-4 py-2.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#D4AF37]/60"
                         />
                     </div>
                 </div>
@@ -235,7 +235,7 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
                     <select
                         value={teamCount}
                         onChange={e => setTeamCount(e.target.value)}
-                        className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-[#C8A951]/60">
+                        className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-[#D4AF37]/60">
                         {[8,10,12,14,16,18,20,32].map(n => (
                             <option key={n} value={n}>{n} Teams</option>
                         ))}
@@ -244,15 +244,15 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
             </div>
 
             {buyIn && parseFloat(buyIn) > 0 && (
-                <div className="bg-[#C8A951]/10 border border-[#C8A951]/30 rounded-xl px-4 py-3 space-y-1 text-sm">
+                <div className="bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-xl px-4 py-3 space-y-1 text-sm">
                     <div>
-                        <span className="text-[#C8A951] font-bold">Pot Per Season: </span>
+                        <span className="text-[#D4AF37] font-bold">Pot Per Season: </span>
                         <span className="text-white">${(parseFloat(buyIn) * parseInt(teamCount)).toFixed(2)}</span>
                         <span className="text-gray-400 ml-2">({teamCount} teams × ${parseFloat(buyIn).toFixed(2)})</span>
                     </div>
                     {selectedSeasons.length > 1 && perMemberTotal && (
                         <div>
-                            <span className="text-[#C8A951] font-bold">Per Member ({selectedSeasons.length} seasons): </span>
+                            <span className="text-[#D4AF37] font-bold">Per Member ({selectedSeasons.length} seasons): </span>
                             <span className="text-white">${perMemberTotal.toFixed(2)}</span>
                         </div>
                     )}
@@ -262,7 +262,7 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
             <button
                 type="submit"
                 disabled={loading || !selectedSeasons.length}
-                className="w-full bg-[#C8A951] hover:bg-[#b8992f] disabled:opacity-50 text-black font-bold py-3 rounded-xl transition text-sm">
+                className="w-full bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-50 text-black font-bold py-3 rounded-xl transition text-sm">
                 {loading ? 'Creating...' : selectedSeasons.length > 1 ? `Create ${selectedSeasons.length} Trackers` : 'Create Tracker'}
             </button>
         </form>
