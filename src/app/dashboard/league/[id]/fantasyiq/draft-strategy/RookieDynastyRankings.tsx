@@ -7,27 +7,38 @@ import { rookieTierBadgeClass, rookieTierLabel, ROOKIE_TIER_BANDS } from '@/lib/
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Player {
-    id:          string;
-    playerName:  string;
-    school:      string;
-    position:    string;
-    nflGrade:    number;
-    fiqGrade:    number;
-    eliteScore:  number;
-    marketScore: number;
-    overallPick: number;
-    draftCap:    number;
-    fiqScore:    number;
-    fiqTier:     string;
-    playerId:    string | null;
-    team:        string | null;
-    height:      string | null;
-    weight:      number | null;
-    age:         number | null;
+    id:              string;
+    playerName:      string;
+    school:          string;
+    position:        string;
+    nflGrade:        number;
+    fiqGrade:        number;
+    eliteScore:      number;
+    marketScore:     number;
+    overallPick:     number;
+    draftCap:        number;
+    baseFiQScore:    number;
+    opportunityScore: number;
+    fiqScore:        number;
+    fiqTier:         string;
+    playerId:        string | null;
+    team:            string | null;
+    height:          string | null;
+    weight:          number | null;
+    age:             number | null;
+    fortyTime:       number | null;
 }
 
-const POSITIONS = ['All', 'QB', 'RB', 'WR', 'TE', 'K'] as const;
-const TIERS     = ['All Tiers', 'Tier 1', 'Tier 2', 'Tier 3', 'Tier 4', 'Tier 5'] as const;
+const SKILL_POSITIONS   = ['All', 'QB', 'RB', 'WR', 'TE', 'K'] as const;
+const IDP_POSITIONS     = ['DL', 'LB', 'DB'] as const;
+const TIERS             = ['All Tiers', 'Tier 1', 'Tier 2', 'Tier 3', 'Tier 4', 'Tier 5'] as const;
+
+// Maps specific IDP positions → display group for filtering
+const IDP_GROUP: Record<string, string> = {
+    DE: 'DL', DT: 'DL', NT: 'DL', DL: 'DL', EDGE: 'DL',
+    OLB: 'LB', ILB: 'LB', MLB: 'LB', LB: 'LB',
+    CB: 'DB', FS: 'DB', SS: 'DB', NB: 'DB', S: 'DB', DB: 'DB', SAF: 'DB',
+};
 
 const POS_COLORS: Record<string, string> = {
     QB:  'bg-red-900/40 text-red-300 border-red-700/60',
@@ -35,6 +46,23 @@ const POS_COLORS: Record<string, string> = {
     WR:  'bg-green-900/40 text-green-300 border-green-700/60',
     TE:  'bg-orange-900/40 text-orange-300 border-orange-700/60',
     K:   'bg-gray-800 text-gray-400 border-gray-700',
+    // IDP
+    DE:  'bg-rose-900/40 text-rose-300 border-rose-700/60',
+    DT:  'bg-rose-900/40 text-rose-300 border-rose-700/60',
+    NT:  'bg-rose-900/40 text-rose-300 border-rose-700/60',
+    DL:  'bg-rose-900/40 text-rose-300 border-rose-700/60',
+    OLB: 'bg-purple-900/40 text-purple-300 border-purple-700/60',
+    ILB: 'bg-purple-900/40 text-purple-300 border-purple-700/60',
+    MLB: 'bg-purple-900/40 text-purple-300 border-purple-700/60',
+    LB:  'bg-purple-900/40 text-purple-300 border-purple-700/60',
+    CB:  'bg-teal-900/40 text-teal-300 border-teal-700/60',
+    FS:  'bg-teal-900/40 text-teal-300 border-teal-700/60',
+    SS:  'bg-teal-900/40 text-teal-300 border-teal-700/60',
+    NB:  'bg-teal-900/40 text-teal-300 border-teal-700/60',
+    S:   'bg-teal-900/40 text-teal-300 border-teal-700/60',
+    DB:  'bg-teal-900/40 text-teal-300 border-teal-700/60',
+    SAF: 'bg-teal-900/40 text-teal-300 border-teal-700/60',
+    P:   'bg-gray-800 text-gray-400 border-gray-700',
     DEF: 'bg-gray-800 text-gray-400 border-gray-700',
 };
 
@@ -62,32 +90,80 @@ function TierSummary({ players }: { players: Player[] }) {
     );
 }
 
-// ── Player avatar ─────────────────────────────────────────────────────────────
+// ── Team logo ─────────────────────────────────────────────────────────────────
 
-function PlayerAvatar({ playerId, name }: { playerId: string | null; name: string }) {
+function TeamLogo({ team }: { team: string }) {
     const [errored, setErrored] = useState(false);
+    if (errored) return null;
+    return (
+        <Image
+            src={`https://sleepercdn.com/images/team_logos/nfl/${team.toLowerCase()}.jpg`}
+            alt={team}
+            width={20}
+            height={20}
+            className="w-full h-full object-contain"
+            onError={() => setErrored(true)}
+            unoptimized
+        />
+    );
+}
 
-    if (!playerId || errored) {
+// ── Draft badge ───────────────────────────────────────────────────────────────
+
+function DraftBadge({ pick }: { pick: number }) {
+    if (pick >= 261) {
         return (
-            <div className="w-9 h-9 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center shrink-0">
-                <span className="text-gray-600 text-[10px] font-bold">
-                    {name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                </span>
-            </div>
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border bg-gray-800/60 text-gray-600 border-gray-700/50">
+                UDFA
+            </span>
         );
     }
+    const round = pick <= 32 ? 1 : pick <= 64 ? 2 : pick <= 96 ? 3 : pick <= 128 ? 4 : pick <= 165 ? 5 : pick <= 215 ? 6 : 7;
+    const style =
+        round === 1 ? 'bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/40' :
+        round === 2 ? 'bg-slate-700/30 text-slate-300 border-slate-500/40' :
+        round === 3 ? 'bg-amber-900/20 text-amber-500/80 border-amber-700/30' :
+                     'bg-gray-800/60 text-gray-500 border-gray-700/50';
+    return (
+        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${style}`}>
+            Rd {round} · #{pick}
+        </span>
+    );
+}
+
+// ── Player avatar ─────────────────────────────────────────────────────────────
+
+function PlayerAvatar({ playerId, name, team }: { playerId: string | null; name: string; team: string | null }) {
+    const [errored, setErrored] = useState(false);
 
     return (
-        <div className="w-9 h-9 rounded-full overflow-hidden border border-gray-700 shrink-0 bg-gray-800">
-            <Image
-                src={`https://sleepercdn.com/content/nfl/players/thumb/${playerId}.jpg`}
-                alt={name}
-                width={36}
-                height={36}
-                className="w-full h-full object-cover object-top"
-                onError={() => setErrored(true)}
-                unoptimized
-            />
+        <div className="relative shrink-0">
+            {/* Headshot */}
+            {!playerId || errored ? (
+                <div className="w-9 h-9 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center">
+                    <span className="text-gray-600 text-[10px] font-bold">
+                        {name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                    </span>
+                </div>
+            ) : (
+                <div className="w-9 h-9 rounded-full overflow-hidden border border-gray-700 bg-gray-800">
+                    <Image
+                        src={`https://sleepercdn.com/content/nfl/players/thumb/${playerId}.jpg`}
+                        alt={name}
+                        width={36}
+                        height={36}
+                        className="w-full h-full object-cover object-top"
+                        onError={() => setErrored(true)}
+                        unoptimized
+                    />
+                </div>
+            )}
+            {/* Team logo overlay */}
+            {team && (
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-gray-900 border border-gray-700 flex items-center justify-center overflow-hidden">
+                    <TeamLogo team={team} />
+                </div>
+            )}
         </div>
     );
 }
@@ -107,7 +183,7 @@ function PlayerRow({ player, rank }: { player: Player; rank: number }) {
             {/* Player */}
             <td className="px-4 py-3">
                 <div className="flex items-center gap-3">
-                    <PlayerAvatar playerId={player.playerId} name={player.playerName} />
+                    <PlayerAvatar playerId={player.playerId} name={player.playerName} team={player.team} />
                     <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                             <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border shrink-0 ${posClass}`}>
@@ -118,9 +194,11 @@ function PlayerRow({ player, rank }: { player: Player; rank: number }) {
                                 <span className="text-[#D4AF37] text-[10px] font-bold">{player.team}</span>
                             )}
                         </div>
-                        <div className="flex items-center gap-2 mt-0.5">
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                             <span className="text-gray-600 text-[10px]">{player.school}</span>
-                            {(player.height || player.weight || player.age) && (
+                            <span className="text-gray-700 text-[10px]">·</span>
+                            <DraftBadge pick={player.overallPick} />
+                            {(player.height || player.weight || player.age || player.fortyTime) && (
                                 <span className="text-gray-700 text-[10px]">·</span>
                             )}
                             {player.height && (
@@ -128,6 +206,9 @@ function PlayerRow({ player, rank }: { player: Player; rank: number }) {
                             )}
                             {player.weight && (
                                 <span className="text-gray-600 text-[10px]">{player.weight} lbs</span>
+                            )}
+                            {player.fortyTime && (
+                                <span className="text-gray-600 text-[10px]">{player.fortyTime}</span>
                             )}
                             {player.age && (
                                 <span className="text-gray-600 text-[10px]">Age {player.age}</span>
@@ -151,10 +232,6 @@ function PlayerRow({ player, rank }: { player: Player; rank: number }) {
                 </span>
             </td>
 
-            {/* Draft Pick */}
-            <td className="px-4 py-3 text-right text-gray-500 tabular-nums text-xs hidden sm:table-cell">
-                {player.overallPick >= 261 ? 'UDFA' : `#${player.overallPick}`}
-            </td>
         </tr>
     );
 }
@@ -190,9 +267,11 @@ function TierLegend() {
 export default function RookieDynastyRankings({
     players,
     season,
+    hasIDP = false,
 }: {
     players: Player[];
     season:  string;
+    hasIDP?: boolean;
 }) {
     const [posFilter,  setPosFilter]  = useState<string>('All');
     const [tierFilter, setTierFilter] = useState<string>('All Tiers');
@@ -200,8 +279,16 @@ export default function RookieDynastyRankings({
 
     const filtered = useMemo(() => {
         let list = players;
-        if (posFilter  !== 'All')       list = list.filter(p => p.position === posFilter);
-        if (tierFilter !== 'All Tiers') list = list.filter(p => p.fiqTier  === tierFilter);
+        if (posFilter !== 'All') {
+            // IDP group filter (DL/LB/DB) matches specific positions via IDP_GROUP
+            const isIdpGroup = IDP_POSITIONS.includes(posFilter as typeof IDP_POSITIONS[number]);
+            list = list.filter(p =>
+                isIdpGroup
+                    ? IDP_GROUP[p.position] === posFilter
+                    : p.position === posFilter
+            );
+        }
+        if (tierFilter !== 'All Tiers') list = list.filter(p => p.fiqTier === tierFilter);
         if (search.trim()) {
             const q = search.toLowerCase();
             list = list.filter(p =>
@@ -213,11 +300,16 @@ export default function RookieDynastyRankings({
         return list;
     }, [players, posFilter, tierFilter, search]);
 
-    // Positions that actually have data
+    // Build position tabs — skill positions always shown, IDP only if league uses it
     const availablePositions = useMemo(() => {
         const present = new Set(players.map(p => p.position));
-        return POSITIONS.filter(pos => pos === 'All' || present.has(pos));
-    }, [players]);
+        const presentIdpGroups = new Set(
+            players.map(p => IDP_GROUP[p.position]).filter(Boolean)
+        );
+        const skill = SKILL_POSITIONS.filter(pos => pos === 'All' || present.has(pos));
+        const idp   = hasIDP ? IDP_POSITIONS.filter(g => presentIdpGroups.has(g)) : [];
+        return [...skill, ...idp];
+    }, [players, hasIDP]);
 
     return (
         <div className="space-y-4">
@@ -230,7 +322,7 @@ export default function RookieDynastyRankings({
                             Dynasty Rookie Rankings
                         </p>
                         <p className="text-white font-bold mt-0.5">
-                            FiQ Score: NFL Scouting Grades, Player Profile, Athleticism, Production &amp; Draft Capital
+                            FiQ Score: NFL Scouting Grades · Draft Capital · Opportunity · Market Value
                         </p>
                     </div>
                     <span className="shrink-0 text-[10px] font-bold text-[#D4AF37] bg-[#D4AF37]/10 border border-[#D4AF37]/30 px-2.5 py-1 rounded-full">
@@ -241,50 +333,59 @@ export default function RookieDynastyRankings({
             </div>
 
             {/* Filters */}
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex items-center gap-2 flex-nowrap overflow-x-auto pb-1">
 
-                {/* Position tabs */}
-                <div className="flex gap-1 flex-wrap">
-                    {availablePositions.map(pos => (
-                        <button
-                            key={pos}
-                            type="button"
-                            onClick={() => setPosFilter(pos)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition border
-                                ${posFilter === pos
-                                    ? 'bg-[#D4AF37] text-black border-[#D4AF37]'
-                                    : 'bg-gray-800 text-gray-500 border-gray-700 hover:border-gray-500'}`}
-                        >
-                            {pos}
-                        </button>
-                    ))}
+                {/* Position tabs — single row, no wrap */}
+                <div className="flex gap-1 items-center shrink-0">
+                    {availablePositions.map((pos, i) => {
+                        const isIdpGroup = IDP_POSITIONS.includes(pos as typeof IDP_POSITIONS[number]);
+                        const prevPos    = availablePositions[i - 1];
+                        const showDivider = isIdpGroup && prevPos && !IDP_POSITIONS.includes(prevPos as typeof IDP_POSITIONS[number]);
+                        return (
+                            <span key={pos} className="flex items-center gap-1">
+                                {showDivider && (
+                                    <span className="w-px h-4 bg-gray-700 mx-0.5 shrink-0" />
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => setPosFilter(pos)}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition border whitespace-nowrap
+                                        ${posFilter === pos
+                                            ? isIdpGroup
+                                                ? 'bg-rose-700/80 text-white border-rose-600'
+                                                : 'bg-[#D4AF37] text-black border-[#D4AF37]'
+                                            : 'bg-gray-800 text-gray-500 border-gray-700 hover:border-gray-500'}`}
+                                >
+                                    {pos}
+                                </button>
+                            </span>
+                        );
+                    })}
                 </div>
 
-                {/* Tier filter */}
-                <div className="flex gap-1 flex-wrap">
-                    {TIERS.map(t => (
-                        <button
-                            key={t}
-                            type="button"
-                            onClick={() => setTierFilter(t)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition border
-                                ${tierFilter === t
-                                    ? 'bg-gray-700 text-white border-gray-500'
-                                    : 'bg-gray-800/50 text-gray-600 border-gray-700/50 hover:border-gray-600'}`}
-                        >
-                            {t === 'All Tiers' ? t : rookieTierLabel(t)}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Search */}
+                {/* Search — grows to fill remaining space */}
                 <input
                     type="text"
-                    placeholder="Search player…"
+                    placeholder="Search players…"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
-                    className="ml-auto px-3 py-1.5 rounded-lg text-xs bg-gray-800 border border-gray-700 text-white placeholder-gray-600 focus:outline-none focus:border-gray-500 w-40"
+                    className="flex-1 min-w-[140px] px-3 py-1.5 rounded-lg text-sm bg-gray-800 border border-gray-700 text-white placeholder-gray-600 focus:outline-none focus:border-gray-500"
                 />
+
+                {/* Tier dropdown — far right */}
+                <div className="shrink-0">
+                    <select
+                        value={tierFilter}
+                        onChange={e => setTierFilter(e.target.value)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-800 border border-gray-700 text-gray-300 focus:outline-none focus:border-gray-500 cursor-pointer"
+                    >
+                        {TIERS.map(t => (
+                            <option key={t} value={t}>
+                                {t === 'All Tiers' ? 'All Tiers' : rookieTierLabel(t)}
+                            </option>
+                        ))}
+                    </select>
+                </div>
             </div>
 
             {/* Table */}
@@ -302,7 +403,6 @@ export default function RookieDynastyRankings({
                                 <th className="px-4 py-3">Player</th>
                                 <th className="px-4 py-3 text-right normal-case">FiQ Score</th>
                                 <th className="px-4 py-3 text-right">Tier</th>
-                                <th className="px-4 py-3 text-right hidden sm:table-cell">Pick</th>
                             </tr>
                         </thead>
                         <tbody>

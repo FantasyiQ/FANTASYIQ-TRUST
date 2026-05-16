@@ -6,6 +6,17 @@
 import { getPlayerIntel, ageCurveDynasty } from './player-intelligence';
 export type { ContractTier } from './player-intelligence';
 
+/** IDP positions — no KTC dynasty value exists; show "—" in DTV displays */
+export const IDP_POSITIONS = new Set([
+    'DL','DE','DT','NT','EDGE',
+    'LB','OLB','ILB','MLB',
+    'CB','S','SS','FS','NB','DB','SAF',
+]);
+
+export function isIdpPosition(position: string | null | undefined): boolean {
+    return !!position && IDP_POSITIONS.has(position);
+}
+
 export interface Player {
     rank:             number;
     name:             string;

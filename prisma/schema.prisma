@@ -449,6 +449,9 @@ model SleeperPlayer {
     draftTeam       String?  // NFL team abbreviation that selected this player
     overallPick     Int?     // overall draft pick number (computed from round + pick_no)
     draftDay        Int?     // 1, 2, or 3 — NFL Draft day
+    // Depth chart — updated daily by sleeper-players cron
+    depthChartOrder Int?     // 1 = starter, 2 = backup, 3 = 3rd string, etc.
+    depthChartPos   String?  // positional label e.g. "LWR", "RB1", "TE1"
     // NFL Combine athleticism data — used by FiQ Rookie Engine v1.5
     fortyTime       Float?   // 40-yard dash (seconds)
     verticalJump    Float?   // vertical jump (inches)
@@ -810,8 +813,14 @@ model RookieRankingsPlayer {
     marketScore Float    // FiQ MarketScore (0–100)
     overallPick Int      // NFL Draft overall pick number
     draftCap    Float    // FiQ DraftCap score (0–100)
-    fiqScore    Float    // FiQ composite score (0–100)
-    fiqTier     String   // "Tier 1" | "Tier 2" | "Tier 3" | "Tier 4" | "Tier 5"
+    baseFiQScore     Float    @default(0)  // original scouting-only FiQ score (0–100); set on seed, never overwritten
+    opportunityScore Float    @default(0)  // Sleeper-derived opportunity score (0–100); updated nightly by rookie-opportunity-sync
+    manualDepthOrder Int?                  // manual depth chart override (1=starter, 2=backup, 3=3rd string); used when Sleeper has no data
+    height           String?              // combine/pro day height (e.g. "6'4 1/8\""); shown when Sleeper has no data
+    weight           Int?                 // combine/pro day weight in lbs; shown when Sleeper has no data
+    fortyTime        Float?               // combine 40-yard dash time (e.g. 4.46); for display only
+    fiqScore         Float    // adjusted FiQ Score = (baseFiQScore × 0.75) + (opportunityScore × 0.25)
+    fiqTier          String   // derived from adjusted fiqScore: "Tier 1"–"Tier 5"
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 

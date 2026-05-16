@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { calcDtv } from '@/lib/trade-engine';
+import { calcDtv, isIdpPosition } from '@/lib/trade-engine';
 import type { LeagueSettings, LeagueType, PprFormat, Player } from '@/lib/trade-engine';
 import type { UniversePlayer, UniverseResponse, UniverseMeta, DeltaEntry, DeltaResponse } from '@/lib/player-universe';
 import { computePlayerBaseValue, playerVolatility } from '@/lib/player-universe';
@@ -180,16 +180,22 @@ export default function PlayerRankings({
                                     </td>
                                     <td className="px-3 py-3 text-gray-400">{p.team}</td>
                                     <td className="px-3 py-3 text-right">
-                                        <div className="flex items-center justify-end gap-1.5">
-                                            <span className="font-bold text-white">{dtv.finalDtv}</span>
-                                            {dDelta !== undefined && dDelta !== 0 && (
-                                                <span className={`text-[10px] font-bold ${dDelta > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                    {dDelta > 0 ? `+${dDelta}` : dDelta}
-                                                </span>
-                                            )}
-                                        </div>
+                                        {isIdpPosition(p.position) ? (
+                                            <span className="text-gray-600 text-xs">—</span>
+                                        ) : (
+                                            <div className="flex items-center justify-end gap-1.5">
+                                                <span className="font-bold text-white">{dtv.finalDtv}</span>
+                                                {dDelta !== undefined && dDelta !== 0 && (
+                                                    <span className={`text-[10px] font-bold ${dDelta > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                        {dDelta > 0 ? `+${dDelta}` : dDelta}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
                                     </td>
-                                    <td className={`px-4 py-3 text-right font-semibold text-xs ${TIER_COLORS[dtv.tier] ?? 'text-gray-400'}`}>{dtv.tier}</td>
+                                    <td className={`px-4 py-3 text-right font-semibold text-xs ${isIdpPosition(p.position) ? 'text-gray-600' : (TIER_COLORS[dtv.tier] ?? 'text-gray-400')}`}>
+                                        {isIdpPosition(p.position) ? '—' : dtv.tier}
+                                    </td>
                                 </tr>
                             );
                         })}

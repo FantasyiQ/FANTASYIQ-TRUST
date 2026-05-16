@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { getDraftPicks, evaluateTrade, calcDtv, DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
+import { getDraftPicks, evaluateTrade, calcDtv, DEFAULT_LEAGUE_SETTINGS, isIdpPosition } from '@/lib/trade-engine';
 import type { Player, PprFormat, LeagueType, DtvResult, LeagueSettings } from '@/lib/trade-engine';
 import type { UniversePlayer, UniverseResponse, UniverseMeta, DeltaEntry, DeltaResponse } from '@/lib/player-universe';
 import { computePlayerBaseValue, playerVolatility } from '@/lib/player-universe';
@@ -258,7 +258,7 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, leagu
                         const dtv  = calcDtv(p, ppr, leagueType, undefined, settings);
                         return (
                             <button key={p.name} type="button" disabled={used} onClick={() => onAdd(p)}
-                                title={`${p.name} — DTV ${dtv.finalDtv}`}
+                                title={`${p.name} — ${dtv.finalDtv}`}
                                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium transition ${
                                     used
                                         ? 'border-gray-800 text-gray-700 cursor-not-allowed'
@@ -442,8 +442,10 @@ function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEA
                                         </div>
                                     </div>
                                     <div className="text-right shrink-0">
-                                        <span className={`text-sm font-bold ${TIER_COLORS[dtv.tier]}`}>{dtv.finalDtv}</span>
-                                        <span className="text-gray-600 text-xs ml-1">{dtv.tier}</span>
+                                        <span className={`text-sm font-bold ${TIER_COLORS[dtv.tier] ?? 'text-gray-300'}`}>{dtv.finalDtv}</span>
+                                        {!isIdpPosition(p.position) && (
+                                            <span className="text-gray-600 text-xs ml-1">{dtv.tier}</span>
+                                        )}
                                     </div>
                                 </button>
                             </li>

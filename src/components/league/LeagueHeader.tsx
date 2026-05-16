@@ -30,11 +30,18 @@ function getDraftDisplay(
         hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York', timeZoneName: 'short',
     }).format(draftDate);
 
-    const hoursUntil = msUntil / (1000 * 60 * 60);
-    const daysUntil  = Math.floor(msUntil / (1000 * 60 * 60 * 24));
+    // Compare calendar days in ET to avoid "Today" showing for tomorrow's draft
+    const etFormatter = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
+    const nowDay      = etFormatter.format(new Date(now));
+    const draftDay    = etFormatter.format(draftDate);
+    const daysUntil   = Math.round(msUntil / (1000 * 60 * 60 * 24));
 
-    if (hoursUntil < 24) {
+    if (nowDay === draftDay) {
         return { text: `Draft Today · ${timeStr}`, variant: 'urgent' };
+    }
+
+    if (daysUntil === 1) {
+        return { text: `Draft Tomorrow · ${timeStr}`, variant: 'upcoming' };
     }
 
     if (daysUntil < 30) {

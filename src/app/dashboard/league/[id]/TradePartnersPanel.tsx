@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import type { TradePartnersResponse, TradePartner, TradePartnerAsset } from '@/app/api/leagues/[leagueId]/trade-partners/route';
+import { isIdpPosition } from '@/lib/trade-engine';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -65,14 +66,20 @@ function AssetRow({ asset }: { asset: TradePartnerAsset }) {
             </span>
             <span className="text-gray-500 text-xs shrink-0">{asset.team ?? '—'}</span>
             <div className="flex items-center gap-1 shrink-0">
-                <span className="font-bold text-white text-sm">{asset.finalDtv}</span>
-                {asset.delta !== null && asset.delta !== 0 && (
-                    <span className={`text-[10px] font-bold ${asset.delta > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {asset.delta > 0 ? `+${asset.delta}` : asset.delta}
-                    </span>
-                )}
-                {asset.delta !== null && Math.abs(asset.delta) >= 10 && (
-                    <span className="text-[9px] font-bold px-1 py-px rounded bg-orange-900/30 text-orange-400 border border-orange-800/40">HOT</span>
+                {isIdpPosition(asset.position) ? (
+                    <span className="text-gray-600 text-xs">—</span>
+                ) : (
+                    <>
+                        <span className="font-bold text-white text-sm">{asset.finalDtv}</span>
+                        {asset.delta !== null && asset.delta !== 0 && (
+                            <span className={`text-[10px] font-bold ${asset.delta > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                {asset.delta > 0 ? `+${asset.delta}` : asset.delta}
+                            </span>
+                        )}
+                        {asset.delta !== null && Math.abs(asset.delta) >= 10 && (
+                            <span className="text-[9px] font-bold px-1 py-px rounded bg-orange-900/30 text-orange-400 border border-orange-800/40">HOT</span>
+                        )}
+                    </>
                 )}
             </div>
         </div>

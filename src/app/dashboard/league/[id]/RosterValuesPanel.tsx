@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import type { RosterValuesResponse, RosterTeam, RosterPlayer, RosterTier } from '@/app/api/leagues/[leagueId]/roster-values/route';
+import { isIdpPosition } from '@/lib/trade-engine';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -41,14 +42,18 @@ function PlayerRow({ p }: { p: RosterPlayer }) {
             </td>
             <td className="px-3 py-2 text-gray-400 text-sm">{p.team ?? '—'}</td>
             <td className="px-3 py-2 text-right">
-                <div className="flex items-center justify-end gap-1.5">
-                    <span className="font-bold text-white text-sm">{p.finalDtv}</span>
-                    {p.delta !== null && p.delta !== 0 && (
-                        <span className={`text-[10px] font-bold ${p.delta > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {p.delta > 0 ? `+${p.delta}` : p.delta}
-                        </span>
-                    )}
-                </div>
+                {isIdpPosition(p.position) ? (
+                    <span className="text-gray-600 text-xs">—</span>
+                ) : (
+                    <div className="flex items-center justify-end gap-1.5">
+                        <span className="font-bold text-white text-sm">{p.finalDtv}</span>
+                        {p.delta !== null && p.delta !== 0 && (
+                            <span className={`text-[10px] font-bold ${p.delta > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                {p.delta > 0 ? `+${p.delta}` : p.delta}
+                            </span>
+                        )}
+                    </div>
+                )}
             </td>
         </tr>
     );

@@ -140,10 +140,10 @@ export default function LeagueTradeEvaluator({
     // Depth base values for unranked / non-skill-position players
     const DEPTH_BASE: Record<string, number> = {
         QB: 22, RB: 18, WR: 18, TE: 14, K: 8, DEF: 8,
-        // IDP positions — shown as placeholder until defensive engine scores load
-        DL: 12, LB: 12, DB: 12, DE: 12, DT: 12, NT: 12,
-        OLB: 12, ILB: 12, MLB: 12, EDGE: 12,
-        CB: 12, S: 12, SS: 12, FS: 12,
+        // IDP positions — no KTC value; DTV shown as "—" in UI
+        DL: 0, LB: 0, DB: 0, DE: 0, DT: 0, NT: 0,
+        OLB: 0, ILB: 0, MLB: 0, EDGE: 0,
+        CB: 0, S: 0, SS: 0, FS: 0, SAF: 0, NB: 0,
     };
 
     let depthRank = 400;

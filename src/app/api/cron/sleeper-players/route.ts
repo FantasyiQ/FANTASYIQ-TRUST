@@ -19,6 +19,8 @@ type RawPlayer = {
     age?:              number | null;
     years_exp?:        number | null;  // 0 = current rookie
     search_rank?:      number | null;
+    depth_chart_order?: number | null;
+    depth_chart_position?: string | null;
     metadata?:         { rookie_year?: string } | null;
     // NFL draft data — present for drafted players
     draft_pick?: {
@@ -65,7 +67,9 @@ export async function GET(request: Request): Promise<Response> {
             age:            p.age ?? null,
             yearsExp:       p.years_exp ?? null,
             rookieYear:     p.metadata?.rookie_year ?? null,
-            searchRank:     p.search_rank ?? null,
+            searchRank:      p.search_rank ?? null,
+            depthChartOrder: p.depth_chart_order ?? null,
+            depthChartPos:   p.depth_chart_position ?? null,
             // Official NFL draft data — null if undrafted or not yet available
             draftRound:     p.draft_pick?.round ?? null,
             draftPick:      p.draft_pick?.pick_no ?? p.draft_pick?.slot ?? null,
@@ -101,9 +105,11 @@ export async function GET(request: Request): Promise<Response> {
                         weight:         r.weight,
                         birthDate:      r.birthDate,
                         age:            r.age,
-                        yearsExp:       r.yearsExp,
-                        rookieYear:     r.rookieYear,
-                        searchRank:     r.searchRank,
+                        yearsExp:        r.yearsExp,
+                        rookieYear:      r.rookieYear,
+                        searchRank:      r.searchRank,
+                        depthChartOrder: r.depthChartOrder,
+                        depthChartPos:   r.depthChartPos,
                         // Always overwrite draft data — official beats any prior estimate
                         draftRound:     r.draftRound,
                         draftPick:      r.draftPick,

@@ -26,11 +26,11 @@ export interface RookieRankingsPlayer {
 // ── Official Tier Bands (Rookie Rankings only — NOT used for DTV) ─────────────
 
 export const ROOKIE_TIER_BANDS = [
-    { tier: 'Tier 1', label: 'Elite',         min: 85,   max: Infinity, description: 'Elite prospects, cornerstone dynasty assets.' },
-    { tier: 'Tier 2', label: 'Strong',        min: 70,   max: 84.99,   description: 'Strong starters, high-floor contributors.' },
-    { tier: 'Tier 3', label: 'Flex',          min: 60,   max: 69.99,   description: 'Flex-range players, role players, situational upside.' },
-    { tier: 'Tier 4', label: 'Depth',         min: 50,   max: 59.99,   description: 'Depth, low hit-rate, opportunity-dependent.' },
-    { tier: 'Tier 5', label: 'Developmental', min: 0,    max: 49.99,   description: 'Long-shots, taxi squad, developmental profiles.' },
+    { tier: 'Tier 1', label: 'Elite',         min: 85,   max: Infinity, description: 'Elite prospects. Cornerstone dynasty assets.' },
+    { tier: 'Tier 2', label: 'Strong',        min: 78,   max: 84.99,   description: 'Strong prospects with starter-level upside.' },
+    { tier: 'Tier 3', label: 'Flex',          min: 70,   max: 77.99,   description: 'Flex-range players, role players, situational upside.' },
+    { tier: 'Tier 4', label: 'Depth',         min: 62,   max: 69.99,   description: 'Depth pieces with low hit-rates; opportunity-dependent.' },
+    { tier: 'Tier 5', label: 'Developmental', min: 0,    max: 61.99,   description: 'Long-shots, taxi squad, developmental profiles.' },
 ] as const;
 
 export type RookieFiQTier = 'Tier 1' | 'Tier 2' | 'Tier 3' | 'Tier 4' | 'Tier 5';
@@ -38,9 +38,9 @@ export type RookieFiQTier = 'Tier 1' | 'Tier 2' | 'Tier 3' | 'Tier 4' | 'Tier 5'
 /** Compute tier from FiQScore using official bands. Used for new entries only — stored records use their persisted fiqTier. */
 export function computeRookieFiQTier(fiqScore: number): RookieFiQTier {
     if (fiqScore >= 85) return 'Tier 1';
-    if (fiqScore >= 70) return 'Tier 2';
-    if (fiqScore >= 60) return 'Tier 3';
-    if (fiqScore >= 50) return 'Tier 4';
+    if (fiqScore >= 78) return 'Tier 2';
+    if (fiqScore >= 70) return 'Tier 3';
+    if (fiqScore >= 62) return 'Tier 4';
     return 'Tier 5';
 }
 
