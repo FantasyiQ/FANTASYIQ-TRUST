@@ -4,7 +4,7 @@
 // pick capital can be normalized against the league average.
 
 import { prisma } from '@/lib/prisma';
-import { getLeagueRosters, getTradedPicks } from '@/lib/sleeper';
+import { getLeagueRosters, getDraftPicks } from '@/lib/sleeper';
 import type { LeagueContext, TeamContext, TeamPick } from './types';
 import type { LeaguePhaseResult } from '@/lib/leaguePhase';
 
@@ -127,9 +127,9 @@ export async function getLeagueContext(
     superflex: boolean,
     phaseResult: LeaguePhaseResult,
 ): Promise<LeagueContextResult> {
-    const [rosters, tradedPicks] = await Promise.all([
+    const [rosters, draftPicks] = await Promise.all([
         getLeagueRosters(sleeperLeagueId),
-        getTradedPicks(sleeperLeagueId),
+        getDraftPicks(sleeperLeagueId),
     ]);
 
     // Collect all player IDs across all rosters
@@ -206,7 +206,7 @@ export async function getLeagueContext(
     const teams: TeamContext[] = rosters.map(roster => {
         const id      = String(roster.roster_id);
         const players = enrichPlayers(roster.players ?? []);
-        const picks   = computeOwnedPicks(roster.roster_id, allRosterIds, tradedPicks, futureSeasons, draftRounds);
+        const picks   = computeOwnedPicks(roster.roster_id, allRosterIds, draftPicks, futureSeasons, draftRounds);
 
         if (roster.owner_id === mySleeperUserId) myTeamId = id;
 

@@ -275,6 +275,16 @@ export async function getTradedPicks(leagueId: string): Promise<SleeperTradedPic
     return sleeperFetch<SleeperTradedPick[]>(`/league/${leagueId}/traded_picks`, 0);
 }
 
+/**
+ * Returns current pick ownership for the league — one record per pick with
+ * owner_id already resolved to the current holder.  More reliable than
+ * /traded_picks for ownership lookups because it gives authoritative state
+ * rather than a log of trade events that must be chain-reconstructed.
+ */
+export async function getDraftPicks(leagueId: string): Promise<SleeperTradedPick[]> {
+    return sleeperFetch<SleeperTradedPick[]>(`/league/${leagueId}/draft_picks`, 0);
+}
+
 // ─── Player cache ──────────────────────────────────────────────────────────────
 
 export interface SlimPlayer {
