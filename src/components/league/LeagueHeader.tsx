@@ -5,6 +5,9 @@ import { prisma } from '@/lib/prisma';
 import { tierBadgeProps } from '@/lib/tier-badge';
 import LeagueResyncButton from '@/app/dashboard/league/[id]/LeagueResyncButton';
 import EspnRefreshButton from '@/app/dashboard/league/[id]/EspnRefreshButton';
+import { getNflState } from '@/lib/sleeper';
+import { getLeaguePhaseResult, phaseLabel } from '@/lib/leaguePhase';
+import type { LeaguePhase } from '@/lib/leaguePhase';
 
 type DraftVariant = 'none' | 'upcoming' | 'urgent' | 'done';
 
@@ -64,22 +67,13 @@ function draftBadgeClass(variant: DraftVariant) {
     }
 }
 
-function statusBadge(status: string) {
-    switch (status) {
-        case 'in_season': return 'bg-green-900/40 text-green-400 border-green-800';
-        case 'drafting':  return 'bg-blue-900/40 text-blue-400 border-blue-800';
-        case 'pre_draft': return 'bg-yellow-900/40 text-yellow-400 border-yellow-800';
-        default:          return 'bg-gray-800 text-gray-500 border-gray-700';
-    }
-}
-
-function statusLabel(status: string) {
-    switch (status) {
-        case 'in_season': return 'In Season';
-        case 'drafting':  return 'Drafting';
-        case 'pre_draft': return 'Pre-Draft';
-        case 'complete':  return 'Complete';
-        default:          return status;
+function phaseBadgeClass(phase: LeaguePhase): string {
+    switch (phase) {
+        case 'PRE_DRAFT':      return 'bg-indigo-900/30 text-indigo-300 border-indigo-700/50';
+        case 'OFFSEASON':      return 'bg-gray-800 text-gray-400 border-gray-700';
+        case 'REGULAR_SEASON': return 'bg-green-900/30 text-green-400 border-green-700/50';
+        case 'PLAYOFFS':       return 'bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/40';
+        case 'CHAMPIONSHIP':   return 'bg-red-900/20 text-red-400 border-red-700/40';
     }
 }
 
@@ -95,6 +89,7 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
                 avatar: true, lastSyncedAt: true,
                 sleeperUserId: true, platform: true, userId: true,
                 draftStartTime: true, draftStatus: true, draftType: true,
+                playoffWeekStart: true, champWeek: true,
             },
         }),
         session?.user?.id
@@ -106,6 +101,22 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
     ]);
 
     if (!league) return null;
+
+    // Compute phase using the same engine as Trade Evaluator / Draft Strategy
+    let currentWeek = 0;
+    if (league.platform !== 'espn') {
+        try {
+            const nflState = await getNflState();
+            currentWeek = nflState.week ?? 0;
+        } catch { /* keep 0 */ }
+    }
+    const phaseResult = getLeaguePhaseResult({
+        season:           league.season ?? String(new Date().getFullYear()),
+        currentWeek,
+        draftStatus:      league.draftStatus,
+        playoffWeekStart: league.playoffWeekStart,
+        champWeek:        league.champWeek,
+    });
 
     const scoringDisplay =
         league.scoringType === 'ppr'      ? 'PPR'   :
@@ -171,8 +182,8 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
                         <span className="text-gray-500 text-xs">
                             {league.totalRosters} teams · {league.season}
                         </span>
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusBadge(league.status)}`}>
-                            {statusLabel(league.status)}
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${phaseBadgeClass(phaseResult.phase)}`}>
+                            {phaseLabel(phaseResult.phase)}
                         </span>
                     </div>
                 </div>
