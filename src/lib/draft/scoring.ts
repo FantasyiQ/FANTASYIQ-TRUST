@@ -18,7 +18,10 @@ export interface DraftRecommendation {
 
 function countPositions(roster: DraftContext['myRoster']): Record<string, number> {
     const counts: Record<string, number> = {};
-    for (const p of roster) counts[p.position] = (counts[p.position] ?? 0) + 1;
+    for (const p of roster) {
+        const pos = unifyPosition(p.position);
+        counts[pos] = (counts[pos] ?? 0) + 1;
+    }
     return counts;
 }
 
@@ -47,10 +50,17 @@ function positionalNeedWeight(
     return { delta: 0, reason: null };
 }
 
+const IDP_POSITIONS = new Set(['DE', 'DT', 'NT', 'DL', 'EDGE', 'OLB', 'ILB', 'MLB', 'LB', 'CB', 'FS', 'SS', 'NB', 'S', 'DB', 'SAF', 'IDP', 'IDPFLEX', 'IDP_FLEX']);
+
+function unifyPosition(position: string): string {
+    return IDP_POSITIONS.has(position) ? 'IDP' : position;
+}
+
 function scarcityBoost(
     position: string,
     scoring:  DraftContext['scoring'],
 ): { delta: number; reason: string | null } {
+    if (position === 'IDP') return { delta: -35, reason: 'IDP: abundant supply, draft skill positions first' };
     if (position === 'QB' && scoring.superflex) return { delta: 10, reason: 'QB scarcity in Superflex' };
     if (position === 'TE' && scoring.tePremium) return { delta: 8,  reason: 'TE premium scoring' };
     return { delta: 0, reason: null };
@@ -65,6 +75,9 @@ export function scoreCandidate(
     const reasons: string[] = [];
     let score = player.fiqScore;
 
+    // Collapse all IDP variants to a single bucket for need + scarcity logic
+    const pos = unifyPosition(player.position);
+
     // 1. Base: contextual grade label
     if      (player.fiqScore >= 85) reasons.push('Elite FiQ grade');
     else if (player.fiqScore >= 75) reasons.push('Strong FiQ grade');
@@ -74,7 +87,7 @@ export function scoreCandidate(
     // 2. Positional need
     const counts = countPositions(ctx.myRoster);
     const target = inferTargetBuild(ctx.scoring);
-    const need   = positionalNeedWeight(player.position, counts, target);
+    const need   = positionalNeedWeight(pos, counts, target);
     score += need.delta;
     if (need.reason) reasons.push(need.reason);
 
@@ -89,8 +102,8 @@ export function scoreCandidate(
         else if (value <= -3) reasons.push(`Reach vs ADP: ${Math.round(Math.abs(value))} picks early`);
     }
 
-    // 4. Positional scarcity (SF / TE+)
-    const sc = scarcityBoost(player.position, ctx.scoring);
+    // 4. Positional scarcity / dampening
+    const sc = scarcityBoost(pos, ctx.scoring);
     if (sc.delta !== 0) {
         score += sc.delta;
         if (sc.reason) reasons.push(sc.reason);
