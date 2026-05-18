@@ -24,6 +24,7 @@ interface Meta {
     draftType:          'rookie' | 'startup';
     onTheClockRosterId: string | null;
     myPickCount:        number;
+    teamMode:           'WIN_NOW' | 'BALANCED' | 'REBUILD';
 }
 
 interface Props {
@@ -197,6 +198,16 @@ export default function DraftAssistantPanel({
                     <span className="text-[10px] font-bold px-2.5 py-1 rounded-full border bg-gray-800 text-gray-400 border-gray-700 uppercase">
                         {meta.draftType === 'rookie' ? 'Rookie Draft' : 'Startup Draft'}
                     </span>
+                    {meta.teamMode && (
+                        <span className={[
+                            'text-[10px] font-bold px-2.5 py-1 rounded-full border uppercase',
+                            meta.teamMode === 'WIN_NOW'  ? 'bg-red-900/30 text-red-300 border-red-700/50' :
+                            meta.teamMode === 'REBUILD'  ? 'bg-blue-900/30 text-blue-300 border-blue-700/50' :
+                            'bg-gray-800 text-gray-400 border-gray-700',
+                        ].join(' ')}>
+                            {meta.teamMode === 'WIN_NOW' ? '⚡ Win Now' : meta.teamMode === 'REBUILD' ? '🔄 Rebuild' : '⚖ Balanced'}
+                        </span>
+                    )}
                 </div>
             )}
 

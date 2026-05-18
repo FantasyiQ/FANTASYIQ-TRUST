@@ -11,8 +11,8 @@ import {
     type SleeperDraft,
     type SleeperDraftPickEntry,
 } from '@/lib/sleeper';
-import type { DraftContext, DraftType } from './context';
-import { normalizePosition, getTier } from './context';
+import type { DraftContext, DraftType, RosterProfile } from './context';
+import { normalizePosition, getTier, computeTeamMode } from './context';
 
 // ── On-the-clock resolution ────────────────────────────────────────────────────
 
@@ -104,7 +104,7 @@ export async function loadDraftContext(params: {
     const existingPlayers = existingPlayerIds.length > 0
         ? await prisma.sleeperPlayer.findMany({
             where:  { playerId: { in: existingPlayerIds } },
-            select: { playerId: true, position: true },
+            select: { playerId: true, position: true, fullName: true, age: true },
         })
         : [];
 
@@ -121,7 +121,7 @@ export async function loadDraftContext(params: {
     const myPickPlayers = myPickIds.length > 0
         ? await prisma.sleeperPlayer.findMany({
             where:  { playerId: { in: myPickIds } },
-            select: { playerId: true, position: true },
+            select: { playerId: true, position: true, fullName: true, age: true },
         })
         : [];
 
@@ -215,11 +215,51 @@ export async function loadDraftContext(params: {
         }
     }
 
+    // ── Team Mode ────────────────────────────────────────────────────────────────
+    // Fetch FantasyCalc values for all roster players (existing + my picks this session)
+    // to derive normalized FiQ proxy for the starter-strength signal.
+    const rosterNames = [
+        ...existingPlayers.map(p => p.fullName),
+        ...myPickPlayers.map(p => p.fullName),
+    ].filter((n): n is string => Boolean(n));
+
+    const rosterFcValues = rosterNames.length > 0
+        ? await prisma.fantasyCalcValue.findMany({
+            where:  { playerName: { in: rosterNames } },
+            select: { playerName: true, dynastyValue: true, dynastyValueSf: true },
+        })
+        : [];
+
+    const fcByName = new Map(rosterFcValues.map(v => [v.playerName, v]));
+
+    function toRosterProfile(p: {
+        fullName?: string | null;
+        position: string;
+        age?: number | null;
+    }): RosterProfile {
+        const fc       = p.fullName ? fcByName.get(p.fullName) : undefined;
+        const ktcValue = fc ? (superflex ? fc.dynastyValueSf : fc.dynastyValue) : null;
+        const fiqScore = ktcValue != null ? Math.min(100, Math.round(ktcValue / 90)) : null;
+        return {
+            position: normalizePosition(p.position),
+            age:      p.age ?? null,
+            fiqScore,
+        };
+    }
+
+    const teamModeProfiles: RosterProfile[] = [
+        ...existingPlayers.map(toRosterProfile),
+        ...myPickPlayers.map(toRosterProfile),
+    ];
+
+    const teamMode = computeTeamMode(teamModeProfiles);
+
     return {
         leagueId:        leagueDbId,
         sleeperLeagueId,
         sleeperDraftId,
         draftType,
+        teamMode,
         scoring:  { ppr, superflex, tePremium, bestBall, rosterSlots },
         draftMeta: {
             totalTeams,

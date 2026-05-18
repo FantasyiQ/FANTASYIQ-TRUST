@@ -1,8 +1,9 @@
-// FantasyiQ Trust — Live Draft Assistant v3 — Scoring Engine
-// Tier-gap BPA: tier gap ≥ 2 → always BPA, gap = 1 → win-now comparison,
-// gap = 0 → fill need. Opportunity score as year-1 role tiebreaker.
+// FantasyiQ Trust — Live Draft Assistant v4 — Scoring Engine
+// Dynamic Team Mode (WIN_NOW / BALANCED / REBUILD) adjusts need + opportunity
+// multipliers. Tier-gap BPA logic: gap ≥ 2 → always BPA, gap = 1 →
+// win-now comparison, gap = 0 → fill need freely.
 
-import type { DraftContext } from './context';
+import type { DraftContext, TeamMode } from './context';
 import { normalizePosition } from './context';
 
 export interface DraftRecommendation {
@@ -16,6 +17,13 @@ export interface DraftRecommendation {
     adpVsPick:       number | null; // positive = value pick, negative = reach
     reasons:         string[];      // up to 3 bullets
 }
+
+// ── Multiplier tables ─────────────────────────────────────────────────────────
+
+const MODE_NEED_MULT: Record<TeamMode, number>        = { WIN_NOW: 1.2, BALANCED: 1.0, REBUILD: 0.8 };
+const MODE_OPP_MULT:  Record<TeamMode, number>        = { WIN_NOW: 1.5, BALANCED: 1.0, REBUILD: 0.7 };
+const MODE_CEILING_BONUS: Record<TeamMode, number>    = { WIN_NOW: 0,   BALANCED: 0,   REBUILD: 8   }; // T1/T2 boost in REBUILD
+const MODE_DEV_PENALTY:   Record<TeamMode, number>    = { WIN_NOW: -10, BALANCED: 0,   REBUILD: 0   }; // T4/T5 penalty in WIN_NOW
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -37,15 +45,12 @@ function inferTargetBuild(scoring: DraftContext['scoring']): Record<string, numb
     };
 }
 
-/** Returns how many positions this player would fill (1 = fills a need). */
 function positionDeficit(
     position: string,
     counts:   Record<string, number>,
     target:   Record<string, number>,
 ): number {
-    const have = counts[position] ?? 0;
-    const want = target[position] ?? 0;
-    return Math.max(0, want - have);
+    return Math.max(0, (target[position] ?? 0) - (counts[position] ?? 0));
 }
 
 function scarcityDelta(
@@ -63,15 +68,12 @@ function scarcityDelta(
 export function detectTradeDown(ctx: DraftContext): string | null {
     if (ctx.availablePlayers.length === 0) return null;
 
-    // BPA = top available player by raw fiqScore
     const bpa = ctx.availablePlayers[0];
     if (!bpa || bpa.tier !== 1) return null;
 
-    // Count Tier 2 players still available
     const tier2Available = ctx.availablePlayers.filter(p => p.tier === 2);
     if (tier2Available.length < 3) return null;
 
-    // Does any Tier 2 player fill a positional need?
     const counts = countPositions(ctx.myEffectiveRoster);
     const target = inferTargetBuild(ctx.scoring);
 
@@ -96,38 +98,65 @@ export function scoreCandidate(
     const reasons: string[] = [];
     let score = player.fiqScore;
 
-    const pos = normalizePosition(player.position);
+    const pos      = normalizePosition(player.position);
+    const mode     = ctx.teamMode;
 
     // 1. Base: tier label
     const tierLabels = ['', 'Elite FiQ grade', 'Strong FiQ grade', 'Solid FiQ grade', 'Depth value', 'Developmental value'];
     reasons.push(tierLabels[player.tier] ?? 'Developmental value');
 
-    // 2. Tier-gap BPA logic
-    const tierGap = player.tier - bpaTier;   // 0 = same tier as BPA, positive = worse than BPA
+    // 2. Tier-gap BPA logic — gap drives base need multiplier
+    const tierGap = player.tier - bpaTier;
+    let baseNeedMult: number;
+    if      (tierGap >= 2) baseNeedMult = 0;    // always take BPA
+    else if (tierGap === 1) baseNeedMult = 0.5;  // light win-now nudge
+    else                    baseNeedMult = 1.0;  // same tier — fill need
+
+    // 3. TeamMode scales the need multiplier
+    const effectiveNeedMult = baseNeedMult * MODE_NEED_MULT[mode];
+
     const counts  = countPositions(ctx.myEffectiveRoster);
     const target  = inferTargetBuild(ctx.scoring);
     const deficit = positionDeficit(pos, counts, target);
 
-    let needMultiplier: number;
-    if      (tierGap >= 2) needMultiplier = 0;    // always take BPA — don't let need override elite talent
-    else if (tierGap === 1) needMultiplier = 0.5;  // slight nudge for win-now alignment
-    else                    needMultiplier = 1.0;  // same tier — fill need
-
-    if (deficit > 0 && needMultiplier > 0) {
-        const needBoost = Math.round(deficit * 4 * needMultiplier);
+    if (deficit > 0 && effectiveNeedMult > 0) {
+        const needBoost = Math.round(deficit * 4 * effectiveNeedMult);
         score += needBoost;
         if (needBoost > 0) reasons.push(`Need ${pos} — ${counts[pos] ?? 0}/${target[pos] ?? 0} filled`);
     }
 
-    // 3. Opportunity score — year-1 role tiebreaker (rookies only, +0 to +8)
+    // 4. Opportunity score — year-1 role signal (rookies only)
     if (player.opportunityScore != null) {
-        const oppBoost = Math.round((player.opportunityScore / 100) * 8);
+        const oppMult  = MODE_OPP_MULT[mode];
+        const oppBoost = Math.round((player.opportunityScore / 100) * 8 * oppMult);
         score += oppBoost;
-        if (player.opportunityScore >= 70) reasons.push(`High year-1 role opportunity (${player.opportunityScore})`);
-        else if (player.opportunityScore >= 50) reasons.push(`Moderate year-1 opportunity`);
+        if (player.opportunityScore >= 70) {
+            reasons.push(
+                mode === 'WIN_NOW'
+                    ? `High year-1 role — fits WIN NOW window (${player.opportunityScore})`
+                    : `High year-1 role opportunity (${player.opportunityScore})`
+            );
+        } else if (player.opportunityScore >= 50) {
+            reasons.push('Moderate year-1 opportunity');
+        }
     }
 
-    // 4. ADP value (reduced weight — FiQ is primary signal)
+    // 5. TeamMode ceiling bonus (REBUILD: +8 to T1/T2 — maximize future value)
+    const ceilingBonus = MODE_CEILING_BONUS[mode];
+    if (ceilingBonus > 0 && player.tier <= 2) {
+        score += ceilingBonus;
+        if (player.tier === 1) reasons.push('Elite ceiling — maximize future value');
+        else reasons.push('High ceiling — prioritizing rebuild value');
+    }
+
+    // 6. TeamMode developmental penalty (WIN_NOW: -10 to T4/T5)
+    const devPenalty = MODE_DEV_PENALTY[mode];
+    if (devPenalty < 0 && player.tier >= 4) {
+        score += devPenalty;
+        reasons.push('Developmental prospect — WIN NOW mode penalized');
+    }
+
+    // 7. ADP value (reduced weight — FiQ/tier is primary signal)
     let adpVsPick: number | null = null;
     if (player.adp != null && player.adp < 9_000_000) {
         const value   = ctx.draftMeta.currentPickOverall - player.adp;
@@ -138,7 +167,7 @@ export function scoreCandidate(
         else if (value <= -3) reasons.push(`Reach vs ADP: ${Math.round(Math.abs(value))} picks early`);
     }
 
-    // 5. Positional scarcity / IDP dampening
+    // 8. Positional scarcity / IDP dampening
     const sc = scarcityDelta(pos, ctx.scoring);
     if (sc.delta !== 0) {
         score += sc.delta;

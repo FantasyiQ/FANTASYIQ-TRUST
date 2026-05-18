@@ -51,6 +51,7 @@ export async function GET(req: NextRequest): Promise<Response> {
             draftType:          ctx.draftType,
             onTheClockRosterId: ctx.draftMeta.onTheClockRosterId,
             myPickCount:        ctx.myRoster.length,
+            teamMode:           ctx.teamMode,
         },
     });
 }

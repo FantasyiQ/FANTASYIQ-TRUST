@@ -1,9 +1,9 @@
-// FantasyiQ Trust — Live Draft Assistant v1 — Core Types
+// FantasyiQ Trust — Live Draft Assistant — Core Types
 
 export type DraftType = 'rookie' | 'startup';
+export type TeamMode  = 'WIN_NOW' | 'BALANCED' | 'REBUILD';
 
 // Shared position normalizer — IDP variants all collapse to 'IDP'.
-// Used by both contextLoader and scoring engine.
 const IDP_POSITIONS = new Set([
     'DE', 'DT', 'NT', 'DL', 'EDGE',
     'OLB', 'ILB', 'MLB', 'LB',
@@ -15,11 +15,87 @@ export function normalizePosition(position: string): string {
     return IDP_POSITIONS.has(position) ? 'IDP' : position;
 }
 
+/** FiQ tier number from score. 1 = Elite, 5 = Developmental. */
+export function getTier(fiqScore: number): number {
+    if (fiqScore >= 85) return 1;
+    if (fiqScore >= 78) return 2;
+    if (fiqScore >= 70) return 3;
+    if (fiqScore >= 62) return 4;
+    return 5;
+}
+
+// ── Team Mode ─────────────────────────────────────────────────────────────────
+
+export interface RosterProfile {
+    position: string;   // already normalized
+    age:      number | null;
+    fiqScore: number | null;
+}
+
+/**
+ * Derives WIN_NOW / BALANCED / REBUILD from three independent signals:
+ * 1. Age Curve   — avg skill-position age
+ * 2. Starter Quality — avg FiQ of skill positions
+ * 3. Positional Stability — fraction of target slots filled
+ *
+ * Each signal votes +1 (WIN_NOW), 0 (BALANCED), or -1 (REBUILD).
+ * Sum ≥ 2 → WIN_NOW, ≤ -2 → REBUILD, else BALANCED.
+ * Falls back to BALANCED when not enough data (< 4 skill players).
+ */
+export function computeTeamMode(
+    profiles: RosterProfile[],
+): TeamMode {
+    const skill = profiles.filter(p => ['QB', 'RB', 'WR', 'TE'].includes(p.position));
+
+    if (skill.length < 4) return 'BALANCED';
+
+    // Signal 1: Age Curve
+    const ages = skill.filter(p => p.age != null).map(p => p.age!);
+    let ageSignal = 0;
+    if (ages.length >= 3) {
+        const avg = ages.reduce((a, b) => a + b, 0) / ages.length;
+        if (avg >= 27)   ageSignal =  1;  // old core → WIN_NOW
+        else if (avg <= 24) ageSignal = -1;  // young core → REBUILD
+    }
+
+    // Signal 2: Starter Quality
+    const fiqs = skill.filter(p => p.fiqScore != null).map(p => p.fiqScore!);
+    let strengthSignal = 0;
+    if (fiqs.length >= 3) {
+        const avg = fiqs.reduce((a, b) => a + b, 0) / fiqs.length;
+        if (avg >= 65)   strengthSignal =  1;  // strong starters → WIN_NOW
+        else if (avg <= 45) strengthSignal = -1;  // weak starters → REBUILD
+    }
+
+    // Signal 3: Positional Stability
+    const counts: Record<string, number> = {};
+    for (const p of profiles) {
+        counts[p.position] = (counts[p.position] ?? 0) + 1;
+    }
+    const filled = [
+        (counts['QB'] ?? 0) >= 1,
+        (counts['RB'] ?? 0) >= 3,
+        (counts['WR'] ?? 0) >= 4,
+        (counts['TE'] ?? 0) >= 1,
+    ].filter(Boolean).length;
+    let stabilitySignal = 0;
+    if (filled >= 3)      stabilitySignal =  1;  // stable → WIN_NOW
+    else if (filled <= 1) stabilitySignal = -1;  // holes → REBUILD
+
+    const total = ageSignal + strengthSignal + stabilitySignal;
+    if (total >= 2) return 'WIN_NOW';
+    if (total <= -2) return 'REBUILD';
+    return 'BALANCED';
+}
+
+// ── Draft Context ─────────────────────────────────────────────────────────────
+
 export interface DraftContext {
-    leagueId:         string;   // internal FiQ DB league id
+    leagueId:         string;
     sleeperLeagueId:  string;
     sleeperDraftId:   string;
     draftType:        DraftType;
+    teamMode:         TeamMode;
 
     scoring: {
         ppr:         boolean;
@@ -45,31 +121,19 @@ export interface DraftContext {
         sleeperPlayerId: string;
     }[];
 
-    /** Players picked in this draft session by my team. */
-    myRoster: {
-        sleeperPlayerId: string;
-        position:        string;
-    }[];
-
-    /** Existing Sleeper roster (starters + bench + taxi + IR) before this draft. */
-    fullRoster: {
-        sleeperPlayerId: string;
-        position:        string;
-    }[];
-
-    /** fullRoster + picks made so far in this draft — what the team actually has. */
-    myEffectiveRoster: {
-        sleeperPlayerId: string;
-        position:        string;
-    }[];
+    myRoster:          { sleeperPlayerId: string; position: string }[];
+    fullRoster:        { sleeperPlayerId: string; position: string }[];
+    myEffectiveRoster: { sleeperPlayerId: string; position: string }[];
 
     availablePlayers: {
-        sleeperPlayerId: string;
-        name:            string;
-        position:        string;
-        team:            string | null;
-        age:             number | null;
-        fiqScore:        number;   // 0–100; dynasty KTC normalized or rookie FiQ score
-        adp:             number | null;  // Sleeper searchRank — lower = more valued
+        sleeperPlayerId:  string;
+        name:             string;
+        position:         string;
+        team:             string | null;
+        age:              number | null;
+        fiqScore:         number;          // 0–100
+        tier:             number;          // 1–5 FiQ tier
+        opportunityScore: number | null;   // 0–100 year-1 role signal (rookies only)
+        adp:              number | null;
     }[];
 }
