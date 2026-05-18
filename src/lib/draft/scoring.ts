@@ -6,14 +6,14 @@
 //   + TrajectoryiQ weights (WIN_NOW / ASCENDING / PLATEAU / REBUILD from forward-looking engine)
 //   + Positional need (tier-gap gated)
 //   + Opportunity score (year-1 role, rookies only)
-//   + ADP value (0.3× weight — FiQ is primary)
+//   + Draft Pool ADP value (0.3× weight — FiQ is primary)
 //   + IDP / scarcity dampening
 //
 // Guardrail: tier-gap ≥ 2 always takes BPA. Trajectory tilts within a tier;
 // it never makes you take T3 over T1.
 
 import type { DraftContext, TeamMode, TrajectoryWindow, DraftProfile } from './context';
-import { normalizePosition } from './context';
+import { normalizePosition, getDraftPoolADPDelta } from './context';
 
 export interface DraftRecommendation {
     sleeperPlayerId: string;
@@ -289,15 +289,19 @@ export function scoreCandidate(
         }
     }
 
-    // 8. ADP value (0.3× weight — FiQ/tier is primary)
+    // 8. Draft Pool ADP value (0.3× weight — FiQ/tier is primary)
     let adpVsPick: number | null = null;
-    if (player.adp != null && player.adp < 9_000_000) {
-        const value   = ctx.draftMeta.currentPickOverall - player.adp;
-        adpVsPick     = Math.round(value);
-        const clamped = Math.max(-24, Math.min(24, value));
+    const poolADPDelta = getDraftPoolADPDelta(
+        ctx.draftPoolADP,
+        player.sleeperPlayerId,
+        ctx.draftMeta.currentPickOverall,
+    );
+    if (poolADPDelta != null) {
+        adpVsPick     = poolADPDelta;
+        const clamped = Math.max(-24, Math.min(24, poolADPDelta));
         score        += clamped * 0.3;
-        if (value >= 3)       reasons.push(`Value vs ADP: +${Math.round(value)} picks`);
-        else if (value <= -3) reasons.push(`Reach vs ADP: ${Math.round(Math.abs(value))} picks early`);
+        if (poolADPDelta >= 3)       reasons.push(`Value vs Draft Pool ADP: +${poolADPDelta} picks`);
+        else if (poolADPDelta <= -3) reasons.push(`Reach vs Draft Pool ADP: ${Math.abs(poolADPDelta)} picks early`);
     }
 
     // 9. Positional scarcity / IDP dampening

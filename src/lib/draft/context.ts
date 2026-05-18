@@ -100,6 +100,35 @@ export function computeTeamMode(profiles: RosterProfile[]): TeamMode {
     return 'BALANCED';
 }
 
+// ── Draft Pool ADP ────────────────────────────────────────────────────────────
+
+/**
+ * Pool-relative ADP entry for a single player.
+ * adpRankInPool = 1-based rank in the draft pool sorted by value (fiqScore desc
+ * for rookies, KTC value desc for startups). Rank 1 = best player in this pool.
+ */
+export interface DraftPoolADPEntry {
+    playerId:      string;
+    isRookie:      boolean;
+    isVet:         boolean;
+    adpRankInPool: number;          // 1 = top of pool
+    adpSource:     'rookie' | 'fa' | 'blended';
+}
+
+/**
+ * Delta helper: positive = value (drafted later than expected),
+ * negative = reach (drafted earlier than expected).
+ */
+export function getDraftPoolADPDelta(
+    draftPoolADP:      Record<string, DraftPoolADPEntry>,
+    playerId:          string,
+    overallPickNumber: number,
+): number | null {
+    const entry = draftPoolADP[playerId];
+    if (!entry) return null;
+    return overallPickNumber - entry.adpRankInPool;
+}
+
 // ── Draft Context ─────────────────────────────────────────────────────────────
 
 export interface DraftContext {
@@ -146,6 +175,11 @@ export interface DraftContext {
         fiqScore:         number;          // 0–100
         tier:             number;          // 1–5 FiQ tier
         opportunityScore: number | null;   // 0–100 year-1 role signal (rookies only)
-        adp:              number | null;
     }[];
+
+    /** All player IDs in the draft pool, ordered by pool rank (best first). */
+    draftPoolPlayers: string[];
+
+    /** Pool-relative ADP by sleeperPlayerId — includes drafted players. */
+    draftPoolADP: Record<string, DraftPoolADPEntry>;
 }

@@ -14,7 +14,7 @@ import {
 } from '@/lib/sleeper';
 import type {
     DraftContext, DraftType, RosterProfile,
-    DraftProfile, TrajectoryWindow, HorizonYears, RiskTolerance,
+    DraftProfile, TrajectoryWindow, HorizonYears, RiskTolerance, DraftPoolADPEntry,
 } from './context';
 import { normalizePosition, getTier, computeTeamMode } from './context';
 import { getLeagueContext } from '@/lib/trajectory/contextLoader';
@@ -193,8 +193,14 @@ export async function loadDraftContext(params: {
 
     const myEffectiveRoster = [...fullRoster, ...myRosterData];
 
-    // ── Available player pool ─────────────────────────────────────────────
+    // ── Available player pool + Draft Pool ADP ──────────────────────────────
+    // Build pool ADP by iterating ALL players (including drafted) in value-sorted
+    // order. Pool rank = position in this list (1 = best in pool).
+    // Then filter to availablePlayers = undrafted only.
+
     const availablePlayers: DraftContext['availablePlayers'] = [];
+    const draftPoolPlayers: string[]                         = [];
+    const draftPoolADP:     Record<string, DraftPoolADPEntry> = {};
 
     if (draftType === 'rookie') {
         const rookies = await prisma.rookieRankingsPlayer.findMany({
@@ -205,11 +211,28 @@ export async function loadDraftContext(params: {
 
         const sleeperPlayers = await prisma.sleeperPlayer.findMany({
             where:  { fullName: { in: rookies.map(r => r.playerName) } },
-            select: { fullName: true, playerId: true, team: true, searchRank: true, age: true },
+            select: { fullName: true, playerId: true, team: true, age: true },
         });
 
         const spByName = new Map(sleeperPlayers.map(p => [p.fullName, p]));
 
+        // Pass 1: build pool ADP for all players (including drafted)
+        let poolRank = 0;
+        for (const r of rookies) {
+            const sp = spByName.get(r.playerName);
+            if (!sp?.playerId) continue;
+            poolRank++;
+            draftPoolPlayers.push(sp.playerId);
+            draftPoolADP[sp.playerId] = {
+                playerId:      sp.playerId,
+                isRookie:      true,
+                isVet:         false,
+                adpRankInPool: poolRank,
+                adpSource:     'rookie',
+            };
+        }
+
+        // Pass 2: available players = undrafted only
         for (const r of rookies) {
             const sp = spByName.get(r.playerName);
             if (sp && draftedIds.has(sp.playerId)) continue;
@@ -225,7 +248,6 @@ export async function loadDraftContext(params: {
                 fiqScore,
                 tier,
                 opportunityScore: r.opportunityScore ?? null,
-                adp:              sp?.searchRank ?? null,
             });
         }
     } else {
@@ -245,11 +267,28 @@ export async function loadDraftContext(params: {
 
         const sleeperPlayers = await prisma.sleeperPlayer.findMany({
             where:  { fullName: { in: fcValues.map(v => v.playerName) }, active: true },
-            select: { fullName: true, playerId: true, team: true, searchRank: true, age: true },
+            select: { fullName: true, playerId: true, team: true, age: true },
         });
 
         const spByName = new Map(sleeperPlayers.map(p => [p.fullName, p]));
 
+        // Pass 1: build pool ADP for all players (including drafted)
+        let poolRank = 0;
+        for (const fcv of fcValues) {
+            const sp = spByName.get(fcv.playerName);
+            if (!sp?.playerId) continue;
+            poolRank++;
+            draftPoolPlayers.push(sp.playerId);
+            draftPoolADP[sp.playerId] = {
+                playerId:      sp.playerId,
+                isRookie:      false,
+                isVet:         true,
+                adpRankInPool: poolRank,
+                adpSource:     'fa',
+            };
+        }
+
+        // Pass 2: available players = undrafted only
         for (const fcv of fcValues) {
             const sp = spByName.get(fcv.playerName);
             if (sp && draftedIds.has(sp.playerId)) continue;
@@ -264,7 +303,6 @@ export async function loadDraftContext(params: {
                 fiqScore,
                 tier:            getTier(fiqScore),
                 opportunityScore: null,
-                adp:             sp?.searchRank ?? null,
             });
         }
     }
@@ -352,5 +390,7 @@ export async function loadDraftContext(params: {
         fullRoster,
         myEffectiveRoster,
         availablePlayers,
+        draftPoolPlayers,
+        draftPoolADP,
     };
 }

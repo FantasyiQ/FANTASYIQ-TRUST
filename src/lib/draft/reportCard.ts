@@ -410,7 +410,7 @@ export interface AllPickInput {
 export interface ReportCardInput {
     myPicks:         MyPickInput[];
     allPicks:        AllPickInput[];   // all teams, all picks, sorted by pickOverall
-    pool:            PoolPlayer[];     // full draft pool sorted by fiqScore desc
+    pool:            PoolPlayer[];     // full draft pool sorted by fiqScore desc (rank = index+1)
     rosterFull:      { position: string }[];           // existing roster before draft
     rosterRich:      RichRosterPlayer[];               // post-draft roster with fiqScores
     draftProfile:    DraftProfile;
@@ -435,6 +435,9 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
 
     // Build player lookup by sleeperPlayerId
     const playerBySlId = new Map(pool.map(p => [p.sleeperPlayerId, p]));
+
+    // Pool-relative ADP rank (pool is sorted by fiqScore desc, so rank = index + 1)
+    const poolRankBySlId = new Map(pool.map((p, i) => [p.sleeperPlayerId, i + 1]));
 
     // Build roster position counts from EXISTING roster (pre-draft)
     const preDraftCounts: Record<string, number> = {};
@@ -473,10 +476,17 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
         const deficit = Math.max(0, (TARGET[pos] ?? 0) - (preDraftCounts[pos] ?? 0));
         const fills   = deficit > 0;
 
-        // VOP
-        const expectedVal = 90 - (mp.pickOverall / totalPicksInDraft) * 50;
-        const tierVal     = TIER_VALUES[player.tier] ?? 40;
-        const vop         = Math.round(tierVal - expectedVal);
+        // VOP — blends tier-based value with pool ADP delta (soft 30% weight)
+        const expectedVal    = 90 - (mp.pickOverall / totalPicksInDraft) * 50;
+        const tierVal        = TIER_VALUES[player.tier] ?? 40;
+        const tierVop        = tierVal - expectedVal;
+        const poolRank       = poolRankBySlId.get(mp.sleeperPlayerId);
+        const poolADPDelta   = poolRank != null ? mp.pickOverall - poolRank : null;
+        const vop            = Math.round(
+            poolADPDelta != null
+                ? 0.7 * tierVop + 0.3 * poolADPDelta
+                : tierVop
+        );
 
         // Alignment components
         const tf  = tierFitScore(player.tier, bpaTierAtPick ?? player.tier);
