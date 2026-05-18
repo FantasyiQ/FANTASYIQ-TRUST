@@ -285,6 +285,28 @@ export async function getDraftPicks(leagueId: string): Promise<SleeperTradedPick
     return sleeperFetch<SleeperTradedPick[]>(`/league/${leagueId}/draft_picks`, 0);
 }
 
+// ─── Live draft picks ──────────────────────────────────────────────────────────
+
+/** A single pick made during a live/completed Sleeper draft. */
+export interface SleeperDraftPickEntry {
+    player_id:  string;   // Sleeper player_id of the player selected
+    picked_by:  string;   // user_id of the manager who made the pick
+    roster_id:  number;   // roster that received the player
+    round:      number;
+    draft_slot: number;   // 1-based draft slot assigned to this team
+    pick_no:    number;   // 1-based overall pick number
+}
+
+/** Returns all picks made so far in a specific draft. */
+export async function getActiveDraftPicks(draftId: string): Promise<SleeperDraftPickEntry[]> {
+    return sleeperFetch<SleeperDraftPickEntry[]>(`/draft/${draftId}/picks`, 0);
+}
+
+/** Fetch a single draft by its draft_id. */
+export async function getSleeperDraft(draftId: string): Promise<SleeperDraft> {
+    return sleeperFetch<SleeperDraft>(`/draft/${draftId}`);
+}
+
 // ─── Player cache ──────────────────────────────────────────────────────────────
 
 export interface SlimPlayer {
