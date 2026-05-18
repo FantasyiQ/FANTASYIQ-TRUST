@@ -1,5 +1,6 @@
-// FantasyiQ Trust — Live Draft Assistant v1 — Context Loader
+// FantasyiQ Trust — Live Draft Assistant — Context Loader
 // Builds a DraftContext from Sleeper API + DB for use by the scoring engine.
+// Integrates TrajectoryiQ for forward-looking DraftProfile computation.
 
 import { prisma } from '@/lib/prisma';
 import {
@@ -11,8 +12,15 @@ import {
     type SleeperDraft,
     type SleeperDraftPickEntry,
 } from '@/lib/sleeper';
-import type { DraftContext, DraftType, RosterProfile } from './context';
+import type {
+    DraftContext, DraftType, RosterProfile,
+    DraftProfile, TrajectoryWindow, HorizonYears, RiskTolerance,
+} from './context';
 import { normalizePosition, getTier, computeTeamMode } from './context';
+import { getLeagueContext } from '@/lib/trajectory/contextLoader';
+import { computeTeamTrajectoryForLeague } from '@/lib/trajectory/teamTrajectory';
+import type { TeamTrajectory, TrajectoryMode, WinCurve } from '@/lib/trajectory/types';
+import type { LeaguePhaseResult } from '@/lib/leaguePhase';
 
 // ── On-the-clock resolution ────────────────────────────────────────────────────
 
@@ -28,17 +36,72 @@ function deriveOnTheClockRosterId(
     const round      = Math.ceil(nextPickNo / totalTeams);
     const posInRound = ((nextPickNo - 1) % totalTeams) + 1;
 
-    // Snake drafts reverse order on even rounds; linear keeps same order
     const slot = (draft.type === 'snake' && round % 2 === 0)
         ? totalTeams - posInRound + 1
         : posInRound;
 
-    // draft_order: user_id → 1-based slot number
     const targetUserId = Object.entries(draft.draft_order).find(([, s]) => s === slot)?.[0];
     if (!targetUserId) return null;
 
     const roster = rosters.find(r => r.owner_id === targetUserId);
     return roster ? String(roster.roster_id) : null;
+}
+
+// ── DraftProfile construction ─────────────────────────────────────────────────
+
+function trajectoryWindowFromTrajectory(
+    winCurve: WinCurve,
+    mode: TrajectoryMode,
+): TrajectoryWindow {
+    // Mode takes precedence for strong signals
+    if (mode === 'CONTENDER')  return 'WIN_NOW';
+    if (mode === 'REBUILDER')  return 'REBUILD';
+    if (mode === 'DECLINING')  return 'REBUILD';
+    // Fall back to winCurve
+    if (winCurve === 'PEAKING_NOW') return 'WIN_NOW';
+    if (winCurve === 'PEAK_AHEAD')  return 'ASCENDING';
+    if (winCurve === 'FALLING')     return 'REBUILD';
+    return 'PLATEAU'; // FLAT → PLATEAU
+}
+
+function horizonFromWindow(window: TrajectoryWindow): HorizonYears {
+    if (window === 'WIN_NOW')   return 1;
+    if (window === 'ASCENDING') return 2;
+    return 3; // PLATEAU, REBUILD
+}
+
+function riskToleranceFromTrajectory(
+    pickCapital: number,
+    mode: TrajectoryMode,
+): RiskTolerance {
+    if (pickCapital >= 65 || mode === 'REBUILDER') return 'HIGH';
+    if (pickCapital <= 35 || mode === 'DECLINING') return 'LOW';
+    return 'MEDIUM';
+}
+
+function buildDraftProfile(
+    teamMode: ReturnType<typeof computeTeamMode>,
+    trajectory: TeamTrajectory | null,
+): DraftProfile {
+    if (!trajectory) {
+        // Fallback: derive trajectory from teamMode alone
+        const trajectoryWindow: TrajectoryWindow =
+            teamMode === 'WIN_NOW' ? 'WIN_NOW' :
+            teamMode === 'REBUILD' ? 'REBUILD' :
+            'PLATEAU';
+        return {
+            teamMode,
+            trajectoryWindow,
+            horizonYears:    horizonFromWindow(trajectoryWindow),
+            riskTolerance:   'MEDIUM',
+        };
+    }
+
+    const trajectoryWindow = trajectoryWindowFromTrajectory(trajectory.winCurve, trajectory.mode);
+    const horizonYears     = horizonFromWindow(trajectoryWindow);
+    const riskTolerance    = riskToleranceFromTrajectory(trajectory.pickCapital, trajectory.mode);
+
+    return { teamMode, trajectoryWindow, horizonYears, riskTolerance };
 }
 
 // ── Main export ────────────────────────────────────────────────────────────────
@@ -67,10 +130,8 @@ export async function loadDraftContext(params: {
     const tePremium  = rosterPositions.includes('TE_FLEX');
     const ppr        = dbLeague.scoringType === 'ppr';
     const bestBall   = (draft.metadata?.scoring_type ?? '').includes('best_ball');
+    const isDynasty  = dbLeague.leagueType === 'Dynasty';
 
-    // If the league already has rosters it's an established dynasty — the only
-    // draft that runs each year is the rookie draft.  Use this as the primary
-    // signal rather than Sleeper metadata, which is unreliable across league types.
     const leagueHasRosters = rosters.some(r => (r.players ?? []).length > 0);
     const draftType: DraftType = leagueHasRosters
         ? 'rookie'
@@ -85,7 +146,6 @@ export async function loadDraftContext(params: {
     const totalRounds        = draft.settings.rounds;
     const currentPickOverall = picks.length + 1;
     const currentRound       = Math.ceil(currentPickOverall / totalTeams);
-
     const onTheClockRosterId = deriveOnTheClockRosterId(draft, picks, rosters);
 
     const picksSoFar = picks.map(p => ({
@@ -97,9 +157,10 @@ export async function loadDraftContext(params: {
 
     const draftedIds = new Set(picks.map(p => p.player_id));
 
-    // ── Full existing roster (starters + bench + taxi + IR) ──────────────────
-    const mySleeperRoster = rosters.find(r => r.roster_id === myRosterIdNum);
-    const existingPlayerIds = (mySleeperRoster?.players ?? []).filter(id => id && id !== '0');
+    // ── Full existing roster ────────────────────────────────────────────────
+    const mySleeperRoster    = rosters.find(r => r.roster_id === myRosterIdNum);
+    const existingPlayerIds  = (mySleeperRoster?.players ?? []).filter(id => id && id !== '0');
+    const mySleeperUserId    = mySleeperRoster?.owner_id ?? null;
 
     const existingPlayers = existingPlayerIds.length > 0
         ? await prisma.sleeperPlayer.findMany({
@@ -113,7 +174,7 @@ export async function loadDraftContext(params: {
         position:        normalizePosition(p.position),
     }));
 
-    // ── My roster from picks so far in this draft ─────────────────────────────
+    // ── My picks from this draft ─────────────────────────────────────────────
     const myPickIds = picks
         .filter(p => p.roster_id === myRosterIdNum)
         .map(p => p.player_id);
@@ -130,14 +191,12 @@ export async function loadDraftContext(params: {
         position:        normalizePosition(p.position),
     }));
 
-    // fullRoster + picks this session = what the team actually has right now
     const myEffectiveRoster = [...fullRoster, ...myRosterData];
 
-    // ── Available player pool ─────────────────────────────────────────────────
+    // ── Available player pool ─────────────────────────────────────────────
     const availablePlayers: DraftContext['availablePlayers'] = [];
 
     if (draftType === 'rookie') {
-        // Source: 2026 FiQ Rookie Rankings
         const rookies = await prisma.rookieRankingsPlayer.findMany({
             where:   { season: '2026' },
             orderBy: { fiqScore: 'desc' },
@@ -154,10 +213,9 @@ export async function loadDraftContext(params: {
         for (const r of rookies) {
             const sp = spByName.get(r.playerName);
             if (sp && draftedIds.has(sp.playerId)) continue;
-            const fiqScore = Math.round(r.fiqScore);
-            // Parse tier from stored string ("Tier 1" → 1) or derive from score
+            const fiqScore  = Math.round(r.fiqScore);
             const tierMatch = r.fiqTier?.match(/(\d+)/);
-            const tier = tierMatch ? parseInt(tierMatch[1], 10) : getTier(fiqScore);
+            const tier      = tierMatch ? parseInt(tierMatch[1], 10) : getTier(fiqScore);
             availablePlayers.push({
                 sleeperPlayerId:  sp?.playerId ?? '',
                 name:             r.playerName,
@@ -171,7 +229,6 @@ export async function loadDraftContext(params: {
             });
         }
     } else {
-        // Source: FantasyCalcValue (KTC dynasty values) for startup drafts
         const fcValues = superflex
             ? await prisma.fantasyCalcValue.findMany({
                 where:   { dynastyValueSf: { gt: 300 } },
@@ -196,11 +253,8 @@ export async function loadDraftContext(params: {
         for (const fcv of fcValues) {
             const sp = spByName.get(fcv.playerName);
             if (sp && draftedIds.has(sp.playerId)) continue;
-
             const ktcValue = superflex ? fcv.dynastyValueSf : fcv.dynastyValue;
-            // Normalize KTC (0–9999) to 0–100: 9000 → 100, 3000 → 33, 500 → 0
             const fiqScore = Math.min(100, Math.round(ktcValue / 90));
-
             availablePlayers.push({
                 sleeperPlayerId: sp?.playerId ?? '',
                 name:            fcv.playerName,
@@ -215,9 +269,7 @@ export async function loadDraftContext(params: {
         }
     }
 
-    // ── Team Mode ────────────────────────────────────────────────────────────────
-    // Fetch FantasyCalc values for all roster players (existing + my picks this session)
-    // to derive normalized FiQ proxy for the starter-strength signal.
+    // ── TeamMode (roster snapshot) ──────────────────────────────────────────
     const rosterNames = [
         ...existingPlayers.map(p => p.fullName),
         ...myPickPlayers.map(p => p.fullName),
@@ -232,34 +284,60 @@ export async function loadDraftContext(params: {
 
     const fcByName = new Map(rosterFcValues.map(v => [v.playerName, v]));
 
-    function toRosterProfile(p: {
-        fullName?: string | null;
-        position: string;
-        age?: number | null;
-    }): RosterProfile {
+    function toRosterProfile(p: { fullName?: string | null; position: string; age?: number | null }): RosterProfile {
         const fc       = p.fullName ? fcByName.get(p.fullName) : undefined;
         const ktcValue = fc ? (superflex ? fc.dynastyValueSf : fc.dynastyValue) : null;
         const fiqScore = ktcValue != null ? Math.min(100, Math.round(ktcValue / 90)) : null;
-        return {
-            position: normalizePosition(p.position),
-            age:      p.age ?? null,
-            fiqScore,
-        };
+        return { position: normalizePosition(p.position), age: p.age ?? null, fiqScore };
     }
 
-    const teamModeProfiles: RosterProfile[] = [
+    const teamMode = computeTeamMode([
         ...existingPlayers.map(toRosterProfile),
         ...myPickPlayers.map(toRosterProfile),
-    ];
+    ]);
 
-    const teamMode = computeTeamMode(teamModeProfiles);
+    // ── TrajectoryiQ integration ────────────────────────────────────────────
+    // Fetch full league trajectory so pick capital can be normalized against
+    // the league average, then extract only the current user's team.
+    let myTrajectory: TeamTrajectory | null = null;
+
+    try {
+        const currentYear = new Date().getFullYear();
+        const minimalPhase: LeaguePhaseResult = {
+            phase:            'PRE_DRAFT',
+            activeRookieYear: currentYear,
+            pickYears:        [currentYear, currentYear + 1, currentYear + 2] as [number, number, number],
+            useBucketedPicks: false,
+            isWinNowWindow:   false,
+            missingSettings:  false,
+            currentWeek:      0,
+            playoffWeekStart: null,
+            champWeek:        null,
+        };
+
+        const { context: leagueCtx, myTeamId } = await getLeagueContext(
+            sleeperLeagueId,
+            mySleeperUserId,
+            String(currentYear),
+            isDynasty,
+            superflex,
+            minimalPhase,
+        );
+
+        const trajectoryMap = computeTeamTrajectoryForLeague(leagueCtx);
+        myTrajectory = myTeamId ? (trajectoryMap.get(myTeamId) ?? null) : null;
+    } catch {
+        // Trajectory is non-critical — continue with teamMode-only DraftProfile
+    }
+
+    const draftProfile = buildDraftProfile(teamMode, myTrajectory);
 
     return {
         leagueId:        leagueDbId,
         sleeperLeagueId,
         sleeperDraftId,
         draftType,
-        teamMode,
+        draftProfile,
         scoring:  { ppr, superflex, tePremium, bestBall, rosterSlots },
         draftMeta: {
             totalTeams,

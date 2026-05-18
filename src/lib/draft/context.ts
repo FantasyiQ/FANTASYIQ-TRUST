@@ -1,7 +1,24 @@
 // FantasyiQ Trust — Live Draft Assistant — Core Types
 
-export type DraftType = 'rookie' | 'startup';
-export type TeamMode  = 'WIN_NOW' | 'BALANCED' | 'REBUILD';
+export type DraftType        = 'rookie' | 'startup';
+export type TeamMode         = 'WIN_NOW' | 'BALANCED' | 'REBUILD';
+export type TrajectoryWindow = 'WIN_NOW' | 'ASCENDING' | 'PLATEAU' | 'REBUILD';
+export type HorizonYears     = 1 | 2 | 3;
+export type RiskTolerance    = 'LOW' | 'MEDIUM' | 'HIGH';
+
+/**
+ * Combined read model used by the scoring engine.
+ * teamMode = current roster snapshot (age curve, starter quality, positional stability).
+ * trajectoryWindow = forward-looking window from TrajectoryiQ (winCurve + mode).
+ * The two signals are reconciled inside the scoring engine — they are intentionally
+ * kept separate here so the reconciliation rules can be reasoned about explicitly.
+ */
+export interface DraftProfile {
+    teamMode:         TeamMode;
+    trajectoryWindow: TrajectoryWindow;
+    horizonYears:     HorizonYears;
+    riskTolerance:    RiskTolerance;
+}
 
 // Shared position normalizer — IDP variants all collapse to 'IDP'.
 const IDP_POSITIONS = new Set([
@@ -24,7 +41,7 @@ export function getTier(fiqScore: number): number {
     return 5;
 }
 
-// ── Team Mode ─────────────────────────────────────────────────────────────────
+// ── Team Mode (roster snapshot) ───────────────────────────────────────────────
 
 export interface RosterProfile {
     position: string;   // already normalized
@@ -42,11 +59,8 @@ export interface RosterProfile {
  * Sum ≥ 2 → WIN_NOW, ≤ -2 → REBUILD, else BALANCED.
  * Falls back to BALANCED when not enough data (< 4 skill players).
  */
-export function computeTeamMode(
-    profiles: RosterProfile[],
-): TeamMode {
+export function computeTeamMode(profiles: RosterProfile[]): TeamMode {
     const skill = profiles.filter(p => ['QB', 'RB', 'WR', 'TE'].includes(p.position));
-
     if (skill.length < 4) return 'BALANCED';
 
     // Signal 1: Age Curve
@@ -54,8 +68,8 @@ export function computeTeamMode(
     let ageSignal = 0;
     if (ages.length >= 3) {
         const avg = ages.reduce((a, b) => a + b, 0) / ages.length;
-        if (avg >= 27)   ageSignal =  1;  // old core → WIN_NOW
-        else if (avg <= 24) ageSignal = -1;  // young core → REBUILD
+        if (avg >= 27)      ageSignal =  1;
+        else if (avg <= 24) ageSignal = -1;
     }
 
     // Signal 2: Starter Quality
@@ -63,15 +77,13 @@ export function computeTeamMode(
     let strengthSignal = 0;
     if (fiqs.length >= 3) {
         const avg = fiqs.reduce((a, b) => a + b, 0) / fiqs.length;
-        if (avg >= 65)   strengthSignal =  1;  // strong starters → WIN_NOW
-        else if (avg <= 45) strengthSignal = -1;  // weak starters → REBUILD
+        if (avg >= 65)      strengthSignal =  1;
+        else if (avg <= 45) strengthSignal = -1;
     }
 
     // Signal 3: Positional Stability
     const counts: Record<string, number> = {};
-    for (const p of profiles) {
-        counts[p.position] = (counts[p.position] ?? 0) + 1;
-    }
+    for (const p of profiles) counts[p.position] = (counts[p.position] ?? 0) + 1;
     const filled = [
         (counts['QB'] ?? 0) >= 1,
         (counts['RB'] ?? 0) >= 3,
@@ -79,8 +91,8 @@ export function computeTeamMode(
         (counts['TE'] ?? 0) >= 1,
     ].filter(Boolean).length;
     let stabilitySignal = 0;
-    if (filled >= 3)      stabilitySignal =  1;  // stable → WIN_NOW
-    else if (filled <= 1) stabilitySignal = -1;  // holes → REBUILD
+    if (filled >= 3)      stabilitySignal =  1;
+    else if (filled <= 1) stabilitySignal = -1;
 
     const total = ageSignal + strengthSignal + stabilitySignal;
     if (total >= 2) return 'WIN_NOW';
@@ -95,7 +107,7 @@ export interface DraftContext {
     sleeperLeagueId:  string;
     sleeperDraftId:   string;
     draftType:        DraftType;
-    teamMode:         TeamMode;
+    draftProfile:     DraftProfile;
 
     scoring: {
         ppr:         boolean;

@@ -25,6 +25,9 @@ interface Meta {
     onTheClockRosterId: string | null;
     myPickCount:        number;
     teamMode:           'WIN_NOW' | 'BALANCED' | 'REBUILD';
+    trajectoryWindow:   'WIN_NOW' | 'ASCENDING' | 'PLATEAU' | 'REBUILD';
+    horizonYears:       1 | 2 | 3;
+    riskTolerance:      'LOW' | 'MEDIUM' | 'HIGH';
 }
 
 interface Props {
@@ -208,6 +211,22 @@ export default function DraftAssistantPanel({
                             {meta.teamMode === 'WIN_NOW' ? '⚡ Win Now' : meta.teamMode === 'REBUILD' ? '🔄 Rebuild' : '⚖ Balanced'}
                         </span>
                     )}
+                    {meta.trajectoryWindow && (
+                        <span className={[
+                            'text-[10px] font-medium px-2 py-0.5 rounded border',
+                            meta.trajectoryWindow === 'WIN_NOW'   ? 'bg-red-950/40 text-red-400/80 border-red-800/40' :
+                            meta.trajectoryWindow === 'ASCENDING' ? 'bg-emerald-950/40 text-emerald-400/80 border-emerald-800/40' :
+                            meta.trajectoryWindow === 'REBUILD'   ? 'bg-indigo-950/40 text-indigo-400/80 border-indigo-800/40' :
+                            'bg-gray-900 text-gray-500 border-gray-700',
+                        ].join(' ')}>
+                            Trajectory: {
+                                meta.trajectoryWindow === 'WIN_NOW'   ? `WIN‑NOW (${meta.horizonYears}-yr)` :
+                                meta.trajectoryWindow === 'ASCENDING' ? `ASCENDING (${meta.horizonYears}-yr)` :
+                                meta.trajectoryWindow === 'REBUILD'   ? `REBUILD (${meta.horizonYears}+ yr)` :
+                                `PLATEAU (${meta.horizonYears}-yr)`
+                            }
+                        </span>
+                    )}
                 </div>
             )}
 
@@ -271,6 +290,11 @@ export default function DraftAssistantPanel({
                                             </li>
                                         ))}
                                     </ul>
+                                    {rec.trajectoryNote && (
+                                        <p className="text-[10px] text-indigo-400/70 italic mt-0.5">
+                                            {rec.trajectoryNote}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         </div>
