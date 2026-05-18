@@ -12,6 +12,7 @@ import {
     type SleeperDraftPickEntry,
 } from '@/lib/sleeper';
 import type { DraftContext, DraftType } from './context';
+import { normalizePosition } from './context';
 
 // ── On-the-clock resolution ────────────────────────────────────────────────────
 
@@ -96,7 +97,23 @@ export async function loadDraftContext(params: {
 
     const draftedIds = new Set(picks.map(p => p.player_id));
 
-    // ── My roster from picks so far ───────────────────────────────────────────
+    // ── Full existing roster (starters + bench + taxi + IR) ──────────────────
+    const mySleeperRoster = rosters.find(r => r.roster_id === myRosterIdNum);
+    const existingPlayerIds = (mySleeperRoster?.players ?? []).filter(id => id && id !== '0');
+
+    const existingPlayers = existingPlayerIds.length > 0
+        ? await prisma.sleeperPlayer.findMany({
+            where:  { playerId: { in: existingPlayerIds } },
+            select: { playerId: true, position: true },
+        })
+        : [];
+
+    const fullRoster = existingPlayers.map(p => ({
+        sleeperPlayerId: p.playerId,
+        position:        normalizePosition(p.position),
+    }));
+
+    // ── My roster from picks so far in this draft ─────────────────────────────
     const myPickIds = picks
         .filter(p => p.roster_id === myRosterIdNum)
         .map(p => p.player_id);
@@ -110,8 +127,11 @@ export async function loadDraftContext(params: {
 
     const myRosterData = myPickPlayers.map(p => ({
         sleeperPlayerId: p.playerId,
-        position:        p.position,
+        position:        normalizePosition(p.position),
     }));
+
+    // fullRoster + picks this session = what the team actually has right now
+    const myEffectiveRoster = [...fullRoster, ...myRosterData];
 
     // ── Available player pool ─────────────────────────────────────────────────
     const availablePlayers: DraftContext['availablePlayers'] = [];
@@ -202,7 +222,9 @@ export async function loadDraftContext(params: {
             onTheClockRosterId,
         },
         picksSoFar,
-        myRoster: myRosterData,
+        myRoster:          myRosterData,
+        fullRoster,
+        myEffectiveRoster,
         availablePlayers,
     };
 }

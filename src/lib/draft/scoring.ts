@@ -2,6 +2,7 @@
 // League-aware: FiQ grade + positional need + ADP value + scarcity
 
 import type { DraftContext } from './context';
+import { normalizePosition } from './context';
 
 export interface DraftRecommendation {
     sleeperPlayerId: string;
@@ -9,17 +10,17 @@ export interface DraftRecommendation {
     position:        string;
     team:            string | null;
     age:             number | null;
-    fiqScore:        number;       // raw base grade (for display)
+    fiqScore:        number;        // raw base grade (for display)
     adpVsPick:       number | null; // positive = value pick, negative = reach
-    reasons:         string[];     // up to 3 bullets
+    reasons:         string[];      // up to 3 bullets
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function countPositions(roster: DraftContext['myRoster']): Record<string, number> {
+function countPositions(roster: { position: string }[]): Record<string, number> {
     const counts: Record<string, number> = {};
     for (const p of roster) {
-        const pos = unifyPosition(p.position);
+        const pos = normalizePosition(p.position);
         counts[pos] = (counts[pos] ?? 0) + 1;
     }
     return counts;
@@ -35,25 +36,23 @@ function inferTargetBuild(scoring: DraftContext['scoring']): Record<string, numb
 }
 
 function positionalNeedWeight(
-    position: string,
-    counts:   Record<string, number>,
-    target:   Record<string, number>,
+    position:  string,
+    counts:    Record<string, number>,
+    target:    Record<string, number>,
+    ctx:       DraftContext,
 ): { delta: number; reason: string | null } {
     const have    = counts[position] ?? 0;
-    const need    = target[position] ?? 3;
-    const deficit = need - have;
+    const want    = target[position] ?? 0;
+    const deficit = want - have;
 
-    if (deficit >= 3)  return { delta: 15, reason: `Big need at ${position} — ${have}/${need} filled` };
-    if (deficit === 2) return { delta: 10, reason: `Need ${position} — ${have}/${need} filled` };
-    if (deficit === 1) return { delta: 5,  reason: `Light at ${position}` };
-    if (deficit <= -2) return { delta: -12, reason: `Stacked at ${position}` };
-    return { delta: 0, reason: null };
-}
+    if (deficit <= 0) return { delta: 0, reason: null };
 
-const IDP_POSITIONS = new Set(['DE', 'DT', 'NT', 'DL', 'EDGE', 'OLB', 'ILB', 'MLB', 'LB', 'CB', 'FS', 'SS', 'NB', 'S', 'DB', 'SAF', 'IDP', 'IDPFLEX', 'IDP_FLEX']);
+    // Small nudge in early rounds — don't let need override elite talent
+    const isEarlyRound = ctx.draftMeta.currentRound <= 2;
+    const base  = deficit * 4;
+    const delta = isEarlyRound ? Math.min(base, 6) : base;
 
-function unifyPosition(position: string): string {
-    return IDP_POSITIONS.has(position) ? 'IDP' : position;
+    return { delta, reason: `Need ${position} — ${have}/${want} filled` };
 }
 
 function scarcityBoost(
@@ -75,8 +74,7 @@ export function scoreCandidate(
     const reasons: string[] = [];
     let score = player.fiqScore;
 
-    // Collapse all IDP variants to a single bucket for need + scarcity logic
-    const pos = unifyPosition(player.position);
+    const pos = normalizePosition(player.position);
 
     // 1. Base: contextual grade label
     if      (player.fiqScore >= 85) reasons.push('Elite FiQ grade');
@@ -84,10 +82,10 @@ export function scoreCandidate(
     else if (player.fiqScore >= 65) reasons.push('Solid FiQ grade');
     else                             reasons.push('Developmental value');
 
-    // 2. Positional need
-    const counts = countPositions(ctx.myRoster);
+    // 2. Positional need — uses full effective roster (existing + this draft)
+    const counts = countPositions(ctx.myEffectiveRoster);
     const target = inferTargetBuild(ctx.scoring);
-    const need   = positionalNeedWeight(pos, counts, target);
+    const need   = positionalNeedWeight(pos, counts, target, ctx);
     score += need.delta;
     if (need.reason) reasons.push(need.reason);
 
