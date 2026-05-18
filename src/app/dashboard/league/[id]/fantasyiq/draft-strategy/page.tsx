@@ -8,8 +8,11 @@ import { getNflState } from '@/lib/sleeper';
 import HubTabBar  from '../HubTabBar';
 import RookieDynastyRankings from './RookieDynastyRankings';
 import PhaseDebugStrip from '@/components/dev/PhaseDebugStrip';
+import TeamIntelligenceCard from '@/components/league/TeamIntelligenceCard';
 import { getLeaguePhaseResult } from '@/lib/leaguePhase';
 import type { LeaguePhaseResult } from '@/lib/leaguePhase';
+import { getMyTeamSnapshot } from '@/lib/league/getMyTeamSnapshot';
+import { getTeamTrajectory } from '@/lib/teamTrajectory';
 
 export default async function DraftStrategyPage({
     params,
@@ -27,6 +30,7 @@ export default async function DraftStrategyPage({
             id: true, userId: true, leagueName: true, season: true,
             rosterPositions: true, draftStatus: true, leagueType: true,
             playoffWeekStart: true, champWeek: true, platform: true,
+            leagueId: true, totalRosters: true, sleeperUserId: true,
         },
     });
 
@@ -50,6 +54,33 @@ export default async function DraftStrategyPage({
         playoffWeekStart: league.playoffWeekStart,
         champWeek:        league.champWeek,
     });
+
+    // ── Team Trajectory ───────────────────────────────────────────────────────
+    const isDynasty   = league.leagueType === 'Dynasty';
+    const superflex   = (league.rosterPositions as string[]).includes('SUPER_FLEX');
+
+    const dbUser = await prisma.user.findUnique({
+        where:  { id: session.user.id },
+        select: { sleeperUserId: true },
+    });
+    const mySleeperUserId = dbUser?.sleeperUserId ?? league.sleeperUserId ?? null;
+
+    let trajectory = null;
+    let myTeamName = 'My Team';
+    if (league.platform === 'sleeper' && isDynasty) {
+        try {
+            const snapshot = await getMyTeamSnapshot(
+                league.leagueId,
+                mySleeperUserId,
+                season,
+                superflex,
+                isDynasty,
+            );
+            if (snapshot) {
+                trajectory = getTeamTrajectory({ ...snapshot, leagueSize: league.totalRosters ?? 12, leagueType: 'Dynasty', superflex, phaseResult });
+            }
+        } catch { /* Sleeper unreachable — skip trajectory */ }
+    }
 
     // ── Position filtering ────────────────────────────────────────────────────
     const IDP_SLOTS = new Set(['DL','DE','DT','NT','LB','OLB','ILB','MLB','DB','CB','S','FS','SS','NB','IDP','IDPFLEX','IDP_FLEX']);
@@ -127,7 +158,6 @@ export default async function DraftStrategyPage({
         });
 
     // Show missing-settings warning only for Dynasty leagues that don't have playoff week data
-    const isDynasty         = league.leagueType === 'Dynasty';
     const showSettingsAlert = isDynasty && phaseResult.missingSettings;
 
     return (
@@ -157,6 +187,13 @@ export default async function DraftStrategyPage({
                         </p>
                     </div>
                 </div>
+            )}
+
+            {trajectory && (
+                <TeamIntelligenceCard
+                    trajectory={trajectory}
+                    teamName={myTeamName}
+                />
             )}
 
             <RookieDynastyRankings
