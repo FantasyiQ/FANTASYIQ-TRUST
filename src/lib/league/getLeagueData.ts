@@ -1,7 +1,8 @@
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getLeagueUsers } from '@/lib/sleeper';
+import { getLeague, getLeagueUsers } from '@/lib/sleeper';
+import { deriveChampWeek } from '@/lib/leaguePhase';
 
 export type LeagueData = {
     league: {
@@ -33,6 +34,32 @@ export async function getLeagueData(id: string): Promise<LeagueData> {
     ]);
 
     if (!league || league.userId !== session.user.id) notFound();
+
+    // ── Auto-persist Sleeper playoff settings if DB is missing them ───────────
+    // Sleeper leagues carry playoff_week_start in their settings.  On first load
+    // (or if the initial sync pre-dated this field) the DB may still be null.
+    // Rather than forcing the commissioner to manually save every time, we fetch
+    // from Sleeper once and write the values so the card shows "Configured".
+    if (league.platform !== 'espn' && (league.playoffWeekStart === null || league.champWeek === null)) {
+        try {
+            const sleeperLeague   = await getLeague(league.leagueId);
+            const playoffWeekStart = sleeperLeague.settings?.playoff_week_start ?? null;
+            const playoffTeams     = sleeperLeague.settings?.playoff_teams ?? 4;
+            const roundType        = sleeperLeague.settings?.playoff_round_type ?? 0;
+            const champWeek        = playoffWeekStart && playoffWeekStart > 0
+                ? deriveChampWeek(playoffWeekStart, playoffTeams, roundType)
+                : null;
+
+            if (playoffWeekStart && champWeek) {
+                await prisma.league.update({
+                    where: { id: league.id },
+                    data:  { playoffWeekStart, champWeek },
+                });
+                league.playoffWeekStart = playoffWeekStart;
+                league.champWeek        = champWeek;
+            }
+        } catch { /* Sleeper unreachable — leave as null, card stays editable */ }
+    }
 
     // Commissioner check: ESPN leagues use DB ownership; Sleeper uses API
     let is_owner = false;
