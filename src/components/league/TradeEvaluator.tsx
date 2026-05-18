@@ -15,6 +15,7 @@ export default function TradeEvaluator({ content }: { content: TradeEvaluatorCon
             myTeamData={content.myTeamData}
             otherTeamsData={content.otherTeamsData}
             defenseValues={content.defenseValues}
+            phaseResult={content.phaseResult}
         />
     );
 }

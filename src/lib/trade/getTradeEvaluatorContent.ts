@@ -10,6 +10,9 @@ import { effectiveTierForLeague, tierLevel } from '@/lib/league-limits';
 import { stripe, priceIdToTier } from '@/lib/stripe';
 import type { SubscriptionTier } from '@prisma/client';
 import type { LeagueType } from '@/lib/trade-engine';
+import { getLeaguePhaseResult } from '@/lib/leaguePhase';
+import type { LeaguePhaseResult } from '@/lib/leaguePhase';
+import { getNflState } from '@/lib/sleeper';
 import { buildLeagueConfig } from '@/lib/rankings/leagueConfigBuilder';
 import { buildLeagueDefensiveAndKickerRankings } from '@/lib/rankings/defensiveEngine';
 import { buildIdpSeedProjections, buildKickerSeedProjections, buildDefenseSeedProjections, toIdpPosition } from '@/lib/rankings/seedProjections';
@@ -26,6 +29,7 @@ export type TradeEvaluatorContent = {
     scoringSettings:     Record<string, number>;
     sleeperLeagueId:     string;
     mySleeperUserId:     string | null;
+    phaseResult:         LeaguePhaseResult;
     /**
      * Defensive value scores (0–100) keyed by player name, from the defensive
      * ranking engine. Empty when the league has no IDP/K/DEF positions.
@@ -51,7 +55,13 @@ export async function getTradeEvaluatorContent(id: string): Promise<TradeEvaluat
 
     const league = await prisma.league.findUnique({
         where:  { id },
-        select: { id: true, userId: true, leagueId: true, leagueName: true, scoringType: true, totalRosters: true, rosterPositions: true, sleeperUserId: true, platform: true },
+        select: {
+            id: true, userId: true, leagueId: true, leagueName: true,
+            scoringType: true, totalRosters: true, rosterPositions: true,
+            sleeperUserId: true, platform: true,
+            season: true, draftStatus: true,
+            playoffWeekStart: true, champWeek: true,
+        },
     });
     if (!league || league.userId !== session.user.id) notFound();
 
@@ -238,6 +248,21 @@ export async function getTradeEvaluatorContent(id: string): Promise<TradeEvaluat
         }
     }
 
+    // ── Phase resolution ──────────────────────────────────────────────────────
+    let currentWeek = 0;
+    try {
+        const nflState = await getNflState();
+        currentWeek = nflState.week ?? 0;
+    } catch { /* keep 0 */ }
+
+    const phaseResult = getLeaguePhaseResult({
+        season:           league.season ?? sleeperLeague.season ?? String(new Date().getFullYear()),
+        currentWeek,
+        draftStatus:      league.draftStatus,
+        playoffWeekStart: league.playoffWeekStart,
+        champWeek:        league.champWeek,
+    });
+
     return {
         leagueName:          league.leagueName,
         scoringType:         league.scoringType ?? null,
@@ -249,6 +274,7 @@ export async function getTradeEvaluatorContent(id: string): Promise<TradeEvaluat
         scoringSettings:     rawScoringSettings,
         sleeperLeagueId:     league.leagueId,
         mySleeperUserId:     mySleeperUserId ?? null,
+        phaseResult,
         defenseValues,
         myTeamData,
         otherTeamsData,

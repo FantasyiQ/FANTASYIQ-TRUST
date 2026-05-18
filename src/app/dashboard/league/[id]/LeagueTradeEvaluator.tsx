@@ -6,6 +6,7 @@ import { getDraftPicks, DEFAULT_LEAGUE_SETTINGS, roundOrdinal } from '@/lib/trad
 import type { PprFormat, LeagueType, LeagueSettings, Player } from '@/lib/trade-engine';
 import type { TradeTeam } from '@/app/dashboard/trade/TradeEvaluator';
 import type { DefenseValues } from '@/lib/rankings/unifiedTradeEvaluator';
+import type { LeaguePhaseResult } from '@/lib/leaguePhase';
 
 const LEAGUE_SIZES = [8, 10, 12, 14, 16, 32] as const;
 type LeagueSize = typeof LEAGUE_SIZES[number];
@@ -103,12 +104,13 @@ interface Props {
      * evaluator shows DTV values only.
      */
     defenseValues?:       DefenseValues;
+    phaseResult?:         LeaguePhaseResult;
 }
 
 export default function LeagueTradeEvaluator({
     leagueName, scoringType, totalRosters, draftRounds = 5, draftOrderProjected = false,
     leagueType, rosterPositions = [], scoringSettings = {}, myTeamData, otherTeamsData = [],
-    defenseValues,
+    defenseValues, phaseResult,
 }: Props) {
     const ppr           = scoringTypeToPpr(scoringType);
     const leagueSize    = nearestLeagueSize(totalRosters);
@@ -203,6 +205,7 @@ export default function LeagueTradeEvaluator({
                 myTeam={myTeam}
                 otherTeams={otherTeams}
                 defenseValues={defenseValues}
+                phaseResult={phaseResult}
         />
     );
 }

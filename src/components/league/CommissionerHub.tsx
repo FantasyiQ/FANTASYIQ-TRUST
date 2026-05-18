@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import Link from 'next/link';
 import type { LeagueData } from '@/lib/league/getLeagueData';
 import LeagueSwitcher from '@/components/commissioner/LeagueSwitcher';
+import PhaseSettingsCard from '@/components/league/PhaseSettingsCard';
 
 export default function CommissionerHub({ league, dues }: LeagueData) {
     const TOOLS = [
@@ -52,6 +53,11 @@ export default function CommissionerHub({ league, dues }: LeagueData) {
                     <LeagueSwitcher currentLeagueId={league.id} />
                 </Suspense>
             </div>
+            <PhaseSettingsCard
+                leagueId={league.id}
+                playoffWeekStart={league.playoffWeekStart}
+                champWeek={league.champWeek}
+            />
             <div className="grid sm:grid-cols-2 gap-4">
                 {TOOLS.map(tool => (
                     <div key={tool.label} className="bg-gray-900 border border-gray-800 rounded-2xl p-5 flex flex-col gap-3">

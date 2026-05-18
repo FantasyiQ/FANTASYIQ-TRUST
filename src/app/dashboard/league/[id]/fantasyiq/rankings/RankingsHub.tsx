@@ -12,7 +12,7 @@ import {
     type SortDir,
 } from '@/lib/rankings/rankingsUtils';
 
-const POS_FILTER_OPTIONS = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
+const POS_ORDER = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
 
 // ── Sortable column header ────────────────────────────────────────────────────
 
@@ -68,6 +68,11 @@ export default function RankingsHub({
         }
     }
 
+    const posFilterOptions = useMemo(() => {
+        const present = new Set(players.map(p => p.position));
+        return POS_ORDER.filter(p => p === 'ALL' || present.has(p));
+    }, [players]);
+
     const filtered = useMemo(() => filterPlayers(players, posFilter, search), [players, posFilter, search]);
     const sorted   = useMemo(() => sortPlayers(filtered, sortKey, sortDir),   [filtered, sortKey, sortDir]);
 
@@ -83,7 +88,7 @@ export default function RankingsHub({
             {/* Filter bar */}
             <div className="px-6 py-3 border-b border-gray-800 flex items-center justify-between flex-wrap gap-3">
                 <div className="flex gap-2 flex-wrap">
-                    {POS_FILTER_OPTIONS.map(pos => (
+                    {posFilterOptions.map(pos => (
                         <button
                             key={pos}
                             type="button"

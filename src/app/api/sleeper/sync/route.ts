@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getSleeperLeagues, getNflState, deriveScoringType, type SleeperLeague } from '@/lib/sleeper';
 import { getLeagueLimit, tierToLimitKey } from '@/lib/league-limits';
+import { deriveChampWeek } from '@/lib/leaguePhase';
 
 // POST /api/sleeper/sync — upsert selected leagues + persist sleeperUserId + auto-assign
 export async function POST(request: NextRequest): Promise<Response> {
@@ -28,18 +29,28 @@ export async function POST(request: NextRequest): Promise<Response> {
         const toSync = leagues.filter((l) => validIds.has(l.league_id));
         if (toSync.length === 0) return Response.json({ error: 'No valid leagues to sync' }, { status: 400 });
 
-        const sharedFields = (league: SleeperLeague) => ({
-            leagueId:        league.league_id,
-            leagueName:      league.name,
-            season:          league.season,
-            status:          league.status,
-            totalRosters:    league.total_rosters,
-            scoringType:     deriveScoringType(league),
-            avatar:          league.avatar,
-            rosterPositions: league.roster_positions,
-            sleeperUserId,
-            lastSyncedAt:    new Date(),
-        });
+        const sharedFields = (league: SleeperLeague) => {
+            const playoffWeekStart = league.settings?.playoff_week_start ?? null;
+            const playoffTeams     = league.settings?.playoff_teams ?? 4;
+            const roundType        = league.settings?.playoff_round_type ?? 0;
+            const champWeek        = playoffWeekStart !== null && playoffWeekStart > 0
+                ? deriveChampWeek(playoffWeekStart, playoffTeams, roundType)
+                : null;
+            return {
+                leagueId:         league.league_id,
+                leagueName:       league.name,
+                season:           league.season,
+                status:           league.status,
+                totalRosters:     league.total_rosters,
+                scoringType:      deriveScoringType(league),
+                avatar:           league.avatar,
+                rosterPositions:  league.roster_positions,
+                sleeperUserId,
+                ...(playoffWeekStart !== null && { playoffWeekStart }),
+                ...(champWeek        !== null && { champWeek }),
+                lastSyncedAt:     new Date(),
+            };
+        };
 
         const [, ...leagueResults] = await Promise.all([
             // Persist sleeperUserId so cron can find this user

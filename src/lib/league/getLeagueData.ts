@@ -5,12 +5,14 @@ import { getLeagueUsers } from '@/lib/sleeper';
 
 export type LeagueData = {
     league: {
-        id:         string;
-        leagueName: string;
-        season:     string;
-        leagueId:   string;
-        platform:   'sleeper';
-        is_owner:   boolean;
+        id:               string;
+        leagueName:       string;
+        season:           string;
+        leagueId:         string;
+        platform:         'sleeper';
+        is_owner:         boolean;
+        playoffWeekStart: number | null;
+        champWeek:        number | null;
     };
     dues: { id: string } | null;
 };
@@ -22,7 +24,7 @@ export async function getLeagueData(id: string): Promise<LeagueData> {
     const [league, dbUser] = await Promise.all([
         prisma.league.findUnique({
             where:  { id },
-            select: { id: true, userId: true, leagueId: true, leagueName: true, season: true, sleeperUserId: true, platform: true },
+            select: { id: true, userId: true, leagueId: true, leagueName: true, season: true, sleeperUserId: true, platform: true, playoffWeekStart: true, champWeek: true },
         }),
         prisma.user.findUnique({
             where:  { id: session.user.id },
@@ -53,12 +55,14 @@ export async function getLeagueData(id: string): Promise<LeagueData> {
 
     return {
         league: {
-            id:         league.id,
-            leagueName: league.leagueName,
-            season:     league.season,
-            leagueId:   league.leagueId,
-            platform:   'sleeper',
+            id:               league.id,
+            leagueName:       league.leagueName,
+            season:           league.season,
+            leagueId:         league.leagueId,
+            platform:         'sleeper',
             is_owner,
+            playoffWeekStart: league.playoffWeekStart ?? null,
+            champWeek:        league.champWeek        ?? null,
         },
         dues: dues ?? null,
     };

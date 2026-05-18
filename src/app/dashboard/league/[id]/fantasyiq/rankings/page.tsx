@@ -8,7 +8,7 @@ import { getNflState } from '@/lib/sleeper';
 import RankingsHub from './RankingsHub';
 import type { RankingPlayer } from '@/lib/rankings/rankingsUtils';
 
-const FANTASY_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE', 'K', 'DEF']);
+const ALL_FANTASY_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE', 'K', 'DEF']);
 
 export default async function RankingsPage({
     params,
@@ -30,6 +30,19 @@ export default async function RankingsPage({
     });
 
     if (!league || league.userId !== session.user.id) notFound();
+
+    // Only include positions that the league actually uses — never show K/DEF
+    // in skill-only leagues or IDP positions in non-IDP leagues.
+    const rosterPos = new Set(league.rosterPositions as string[]);
+    const hasKicker = rosterPos.has('K');
+    const hasDef    = rosterPos.has('DEF');
+    const FANTASY_POSITIONS = new Set(
+        [...ALL_FANTASY_POSITIONS].filter(pos =>
+            pos === 'QB' || pos === 'RB' || pos === 'WR' || pos === 'TE' ||
+            (pos === 'K'   && hasKicker) ||
+            (pos === 'DEF' && hasDef)
+        )
+    );
 
     // ── Determine season/week ─────────────────────────────────────────────────
 

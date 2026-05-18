@@ -76,10 +76,12 @@ model League {
     currentMatchup  Json?     // refreshed every 3 min on game days
     assignedPlanId  String?   // FK to Subscription.id — which plan this league is assigned to
     assignedPlanType String?  // "player" | "commissioner"
-    draftStartTime  BigInt?   // epoch ms of scheduled draft start (from Sleeper); null = not scheduled
-    draftStatus     String?   // pre_draft | drafting | complete (Sleeper draft status)
-    draftType       String?   // "auction" | "snake" | "linear" (Sleeper draft type)
-    lastSyncedAt    DateTime?
+    draftStartTime   BigInt?   // epoch ms of scheduled draft start (from Sleeper); null = not scheduled
+    draftStatus      String?   // pre_draft | drafting | complete (Sleeper draft status)
+    draftType        String?   // "auction" | "snake" | "linear" (Sleeper draft type)
+    playoffWeekStart Int?      // week number when playoffs begin (from Sleeper or manual)
+    champWeek        Int?      // week number of championship game (derived or manual)
+    lastSyncedAt     DateTime?
     createdAt       DateTime  @default(now())
     updatedAt       DateTime  @updatedAt
 

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { getSleeperLeagues, getLeagueRosters, getLeagueDrafts, getNflState, deriveScoringType, rosterFpts, resolveDraftType } from '@/lib/sleeper';
+import { deriveChampWeek } from '@/lib/leaguePhase';
 
 export const maxDuration = 60;
 
@@ -55,17 +56,26 @@ export async function GET(request: Request): Promise<Response> {
                         const draftStatus    = currentDraft?.status ?? null;
                         const draftType      = resolveDraftType(currentDraft);
 
+                        const playoffWeekStart = sleeperLeague.settings?.playoff_week_start ?? null;
+                        const playoffTeams     = sleeperLeague.settings?.playoff_teams ?? 4;
+                        const roundType        = sleeperLeague.settings?.playoff_round_type ?? 0;
+                        const champWeek        = playoffWeekStart !== null && playoffWeekStart > 0
+                            ? deriveChampWeek(playoffWeekStart, playoffTeams, roundType)
+                            : null;
+
                         await prisma.league.update({
                             where: { id: dbLeague.id },
                             data: {
-                                status:          sleeperLeague.status,
-                                scoringType:     deriveScoringType(sleeperLeague),
-                                leagueType:      sleeperLeague.settings?.type === 2 ? 'Dynasty' : 'Redraft',
-                                scoringSettings: sleeperLeague.scoring_settings ?? {},
+                                status:           sleeperLeague.status,
+                                scoringType:      deriveScoringType(sleeperLeague),
+                                leagueType:       sleeperLeague.settings?.type === 2 ? 'Dynasty' : 'Redraft',
+                                scoringSettings:  sleeperLeague.scoring_settings ?? {},
                                 standings,
                                 draftStartTime,
                                 draftStatus,
                                 draftType,
+                                ...(playoffWeekStart !== null && { playoffWeekStart }),
+                                ...(champWeek        !== null && { champWeek }),
                                 lastSyncedAt: new Date(),
                             },
                         });

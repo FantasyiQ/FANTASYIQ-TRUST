@@ -4,8 +4,12 @@ export const maxDuration = 30;
 import { redirect, notFound } from 'next/navigation';
 import { auth }   from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getNflState } from '@/lib/sleeper';
 import HubTabBar  from '../HubTabBar';
 import RookieDynastyRankings from './RookieDynastyRankings';
+import PhaseDebugStrip from '@/components/dev/PhaseDebugStrip';
+import { getLeaguePhaseResult } from '@/lib/leaguePhase';
+import type { LeaguePhaseResult } from '@/lib/leaguePhase';
 
 export default async function DraftStrategyPage({
     params,
@@ -19,18 +23,51 @@ export default async function DraftStrategyPage({
 
     const league = await prisma.league.findUnique({
         where:  { id },
-        select: { id: true, userId: true, leagueName: true, season: true, rosterPositions: true },
+        select: {
+            id: true, userId: true, leagueName: true, season: true,
+            rosterPositions: true, draftStatus: true, leagueType: true,
+            playoffWeekStart: true, champWeek: true, platform: true,
+        },
     });
 
     if (!league || league.userId !== session.user.id) notFound();
 
     const season = league.season ?? '2026';
 
-    const IDP_SLOTS = new Set(['DL','DE','DT','NT','LB','OLB','ILB','MLB','DB','CB','S','FS','SS','NB','IDP','IDPFLEX','IDP_FLEX']);
-    const hasIDP = (league.rosterPositions ?? []).some(pos => IDP_SLOTS.has(pos));
+    // ── Phase resolution ──────────────────────────────────────────────────────
+    let currentWeek = 0;
+    if (league.platform === 'sleeper') {
+        try {
+            const nflState = await getNflState();
+            currentWeek = nflState.week ?? 0;
+        } catch { /* keep 0 */ }
+    }
 
+    const phaseResult: LeaguePhaseResult = getLeaguePhaseResult({
+        season,
+        currentWeek,
+        draftStatus:      league.draftStatus,
+        playoffWeekStart: league.playoffWeekStart,
+        champWeek:        league.champWeek,
+    });
+
+    // ── Position filtering ────────────────────────────────────────────────────
+    const IDP_SLOTS = new Set(['DL','DE','DT','NT','LB','OLB','ILB','MLB','DB','CB','S','FS','SS','NB','IDP','IDPFLEX','IDP_FLEX']);
+    const rosterPos = new Set(league.rosterPositions as string[]);
+    const hasIDP    = [...rosterPos].some(pos => IDP_SLOTS.has(pos));
+    const hasKicker = rosterPos.has('K');
+    const IDP_PLAYER_POSITIONS = new Set(['DE','DT','NT','DL','EDGE','OLB','ILB','MLB','LB','CB','FS','SS','NB','S','DB','SAF']);
+
+    // ── Rookie class to display ───────────────────────────────────────────────
+    // Use the active rookie year from phase — but we can only show data we have seeded.
+    // Fall back to the current season if no data exists for the active year.
+    const targetSeason = String(phaseResult.activeRookieYear);
+    const seasonHasData = await prisma.rookieRankingsPlayer.count({ where: { season: targetSeason } });
+    const displaySeason = seasonHasData > 0 ? targetSeason : season;
+
+    // ── Player fetch ──────────────────────────────────────────────────────────
     const rawPlayers = await prisma.rookieRankingsPlayer.findMany({
-        where:   { season },
+        where:   { season: displaySeason },
         orderBy: { fiqScore: 'desc' },
         select: {
             id:               true,
@@ -69,20 +106,29 @@ export default async function DraftStrategyPage({
         sleeperByNamePos.get(sp.fullName)!.set(sp.position ?? '', sp);
     }
 
-    const players = rawPlayers.map(p => {
-        const byPos = sleeperByNamePos.get(p.playerName);
-        // Exact position match first, then any entry for this name
-        const sp = byPos?.get(p.position) ?? (byPos?.size === 1 ? byPos.values().next().value : undefined);
-        return {
-            ...p,
-            playerId:        sp?.playerId          ?? null,
-            team:            sp?.team              ?? null,
-            // Sleeper data takes priority; fall back to manually-seeded combine data
-            height:          sp?.height            ?? p.height    ?? null,
-            weight:          sp?.weight            ?? p.weight    ?? null,
-            age:             sp?.age               ?? null,
-        };
-    });
+    const players = rawPlayers
+        .filter(p => {
+            if (IDP_PLAYER_POSITIONS.has(p.position) && !hasIDP) return false;
+            if (p.position === 'K' && !hasKicker) return false;
+            if (p.position === 'P') return false;
+            return true;
+        })
+        .map(p => {
+            const byPos = sleeperByNamePos.get(p.playerName);
+            const sp = byPos?.get(p.position) ?? (byPos?.size === 1 ? byPos.values().next().value : undefined);
+            return {
+                ...p,
+                playerId:  sp?.playerId ?? null,
+                team:      sp?.team     ?? null,
+                height:    sp?.height   ?? p.height    ?? null,
+                weight:    sp?.weight   ?? p.weight    ?? null,
+                age:       sp?.age      ?? null,
+            };
+        });
+
+    // Show missing-settings warning only for Dynasty leagues that don't have playoff week data
+    const isDynasty         = league.leagueType === 'Dynasty';
+    const showSettingsAlert = isDynasty && phaseResult.missingSettings;
 
     return (
         <div className="space-y-6">
@@ -98,7 +144,27 @@ export default async function DraftStrategyPage({
 
             <HubTabBar leagueId={id} activeTab="draft-strategy" />
 
-            <RookieDynastyRankings players={players} season={season} hasIDP={hasIDP} />
+            <PhaseDebugStrip phase={phaseResult} />
+
+            {showSettingsAlert && (
+                <div className="bg-amber-900/20 border border-amber-700/40 rounded-xl px-5 py-3.5 flex items-start gap-3">
+                    <span className="text-amber-400 text-lg shrink-0">⚠</span>
+                    <div>
+                        <p className="text-amber-300 text-sm font-semibold">Playoff schedule not configured</p>
+                        <p className="text-amber-400/70 text-xs mt-0.5">
+                            Your league&apos;s playoff start week and championship week weren&apos;t found in Sleeper.
+                            A commissioner can set them manually in Commissioner → Settings to enable accurate phase-aware pick values.
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            <RookieDynastyRankings
+                players={players}
+                season={displaySeason}
+                hasIDP={hasIDP}
+                phaseResult={phaseResult}
+            />
         </div>
     );
 }

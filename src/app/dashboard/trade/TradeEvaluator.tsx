@@ -8,6 +8,9 @@ import { computePlayerBaseValue, playerVolatility } from '@/lib/player-universe'
 import { calculateAge } from '@/lib/calculateAge';
 import { evaluateUnifiedTrade } from '@/lib/rankings/unifiedTradeEvaluator';
 import type { DefenseValues } from '@/lib/rankings/unifiedTradeEvaluator';
+import type { LeaguePhaseResult } from '@/lib/leaguePhase';
+import { phaseLabel } from '@/lib/leaguePhase';
+import PhaseDebugStrip from '@/components/dev/PhaseDebugStrip';
 
 const LEAGUE_SIZES = [8, 10, 12, 14, 16, 32] as const;
 type LeagueSize = typeof LEAGUE_SIZES[number];
@@ -484,6 +487,7 @@ interface TradeEvaluatorProps {
      * values instead of DTV. Offensive positions are never affected.
      */
     defenseValues?:         DefenseValues;
+    phaseResult?:           LeaguePhaseResult;
 }
 
 export default function TradeEvaluator({
@@ -500,6 +504,7 @@ export default function TradeEvaluator({
     myTeam,
     otherTeams            = [],
     defenseValues         = {},
+    phaseResult,
 }: TradeEvaluatorProps = {}) {
     const [ppr, setPpr]                         = useState<PprFormat>(initialPpr);
     const [leagueType, setLeagueType]           = useState<LeagueType>(initialLeagueType);
@@ -712,11 +717,32 @@ export default function TradeEvaluator({
 
     return (
         <div className="space-y-6">
-            {/* League badge */}
+            {/* Phase debug strip (dev only) */}
+            {phaseResult && <PhaseDebugStrip phase={phaseResult} />}
+
+            {/* League badge + phase pill */}
             {leagueLabel && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-xl w-fit">
-                    <span className="text-[#D4AF37] text-xs font-semibold">⚙ Configured for:</span>
-                    <span className="text-[#D4AF37]/80 text-xs">{leagueLabel}</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-xl">
+                        <span className="text-[#D4AF37] text-xs font-semibold">⚙ Configured for:</span>
+                        <span className="text-[#D4AF37]/80 text-xs">{leagueLabel}</span>
+                    </div>
+                    {phaseResult && (
+                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                            phaseResult.phase === 'PRE_DRAFT'      ? 'bg-indigo-900/30 text-indigo-300 border-indigo-700/50' :
+                            phaseResult.phase === 'OFFSEASON'      ? 'bg-gray-800 text-gray-400 border-gray-700' :
+                            phaseResult.phase === 'REGULAR_SEASON' ? 'bg-green-900/30 text-green-400 border-green-700/50' :
+                            phaseResult.phase === 'PLAYOFFS'       ? 'bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/40' :
+                                                                      'bg-red-900/20 text-red-400 border-red-700/40'
+                        }`}>
+                            {phaseLabel(phaseResult.phase)}
+                        </span>
+                    )}
+                    {phaseResult?.isWinNowWindow && (
+                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-orange-900/30 text-orange-300 border border-orange-700/40">
+                            Win-Now Window
+                        </span>
+                    )}
                 </div>
             )}
 

@@ -3,6 +3,8 @@
 import { useState, useMemo } from 'react';
 import Image from 'next/image';
 import { rookieTierBadgeClass, rookieTierLabel, ROOKIE_TIER_BANDS } from '@/lib/dynasty/rookieRankings';
+import type { LeaguePhaseResult } from '@/lib/leaguePhase';
+import { phaseLabel } from '@/lib/leaguePhase';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -268,10 +270,12 @@ export default function RookieDynastyRankings({
     players,
     season,
     hasIDP = false,
+    phaseResult,
 }: {
-    players: Player[];
-    season:  string;
-    hasIDP?: boolean;
+    players:      Player[];
+    season:       string;
+    hasIDP?:      boolean;
+    phaseResult?: LeaguePhaseResult;
 }) {
     const [posFilter,  setPosFilter]  = useState<string>('All');
     const [tierFilter, setTierFilter] = useState<string>('All Tiers');
@@ -322,12 +326,30 @@ export default function RookieDynastyRankings({
                             Dynasty Rookie Rankings
                         </p>
                         <p className="text-white font-bold mt-0.5">
+                            {phaseResult?.phase === 'PRE_DRAFT'
+                                ? `${season} Rookie Class Overview`
+                                : `${season}–${parseInt(season) + 2} Rookie Class Outlook`}
+                        </p>
+                        <p className="text-gray-500 text-xs mt-0.5">
                             FiQ Score: NFL Scouting Grades · Draft Capital · Opportunity · Market Value
                         </p>
                     </div>
-                    <span className="shrink-0 text-[10px] font-bold text-[#D4AF37] bg-[#D4AF37]/10 border border-[#D4AF37]/30 px-2.5 py-1 rounded-full">
-                        {season}
-                    </span>
+                    <div className="shrink-0 flex flex-col items-end gap-1.5">
+                        <span className="text-[10px] font-bold text-[#D4AF37] bg-[#D4AF37]/10 border border-[#D4AF37]/30 px-2.5 py-1 rounded-full">
+                            {season}
+                        </span>
+                        {phaseResult && (
+                            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${
+                                phaseResult.phase === 'PRE_DRAFT'      ? 'bg-indigo-900/30 text-indigo-300 border-indigo-700/50' :
+                                phaseResult.phase === 'OFFSEASON'      ? 'bg-gray-800 text-gray-400 border-gray-700' :
+                                phaseResult.phase === 'REGULAR_SEASON' ? 'bg-green-900/30 text-green-400 border-green-700/50' :
+                                phaseResult.phase === 'PLAYOFFS'       ? 'bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/40' :
+                                                                          'bg-red-900/20 text-red-400 border-red-700/40'
+                            }`}>
+                                {phaseLabel(phaseResult.phase)}
+                            </span>
+                        )}
+                    </div>
                 </div>
                 <TierSummary players={players} />
             </div>
