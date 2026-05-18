@@ -1,6 +1,6 @@
 'use client';
 
-import type { TeamTrajectory } from '@/lib/teamTrajectory';
+import type { TeamTrajectory } from '@/lib/trajectory/types';
 
 interface Props {
     trajectory: TeamTrajectory;
@@ -16,10 +16,10 @@ const MODE_CONFIG = {
 };
 
 const CURVE_CONFIG = {
-    EARLY_PEAK: { label: 'Peaking Now',  color: 'text-[#D4AF37]' },
-    LATE_PEAK:  { label: 'Peak Ahead',   color: 'text-green-400' },
-    FLAT:       { label: 'Holding Flat', color: 'text-gray-400'  },
-    FALLING:    { label: 'Falling',      color: 'text-red-400'   },
+    PEAKING_NOW: { label: 'Peaking Now',  color: 'text-[#D4AF37]' },
+    PEAK_AHEAD:  { label: 'Peak Ahead',   color: 'text-green-400' },
+    FLAT:        { label: 'Holding Flat', color: 'text-gray-400'  },
+    FALLING:     { label: 'Falling',      color: 'text-red-400'   },
 };
 
 const DIRECTION_CONFIG = {
@@ -29,24 +29,21 @@ const DIRECTION_CONFIG = {
     SELL_PRODUCTION: { label: 'Sell Production',  color: 'text-orange-400', desc: 'Your key players are aging. Sell high now and restock picks and youth.' },
 };
 
-function MetricBar({ label, value, invert = false, hint }: {
-    label:   string;
-    value:   number;  // 0–100
-    invert?: boolean; // true = low value is good (age curve)
-    hint?:   string;
+function MetricBar({ label, value, hint }: {
+    label:  string;
+    value:  number;  // 0–100, higher is always better
+    hint?:  string;
 }) {
-    // Display color based on how "good" the score is
-    const displayValue = invert ? 100 - value : value;
     const barColor =
-        displayValue >= 70 ? 'bg-green-500' :
-        displayValue >= 45 ? 'bg-[#D4AF37]' :
-                             'bg-gray-600';
+        value >= 70 ? 'bg-green-500' :
+        value >= 45 ? 'bg-[#D4AF37]' :
+                      'bg-gray-600';
 
     return (
         <div className="space-y-1">
             <div className="flex items-center justify-between">
                 <span className="text-gray-400 text-xs">{label}</span>
-                <span className="text-gray-300 text-xs tabular-nums">{displayValue}/100</span>
+                <span className="text-gray-300 text-xs tabular-nums">{value}/100</span>
             </div>
             <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
                 <div
@@ -82,20 +79,20 @@ export default function TeamIntelligenceCard({ trajectory, teamName }: Props) {
                 </div>
             </div>
 
-            {/* Composite bar */}
+            {/* Overall score bar */}
             <div className="space-y-1">
                 <div className="flex items-center justify-between">
                     <span className="text-gray-300 text-xs font-medium">Overall Score</span>
-                    <span className="text-white text-xs font-bold tabular-nums">{trajectory.composite}/100</span>
+                    <span className="text-white text-xs font-bold tabular-nums">{trajectory.overallScore}/100</span>
                 </div>
                 <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
                     <div
                         className={`h-full rounded-full transition-all ${
-                            trajectory.composite >= 70 ? 'bg-[#D4AF37]' :
-                            trajectory.composite >= 45 ? 'bg-green-500' :
-                                                          'bg-blue-500'
+                            trajectory.overallScore >= 70 ? 'bg-[#D4AF37]' :
+                            trajectory.overallScore >= 45 ? 'bg-green-500' :
+                                                             'bg-blue-500'
                         }`}
-                        style={{ width: `${trajectory.composite}%` }}
+                        style={{ width: `${trajectory.overallScore}%` }}
                     />
                 </div>
             </div>
@@ -108,19 +105,18 @@ export default function TeamIntelligenceCard({ trajectory, teamName }: Props) {
                 />
                 <MetricBar
                     label="Roster Age"
-                    value={trajectory.rosterAgeCurve}
-                    invert
-                    hint={trajectory.rosterAgeCurve > 65 ? 'Aging core — monitor carefully' : undefined}
+                    value={trajectory.rosterAge}
+                    hint={trajectory.rosterAge < 35 ? 'Aging core — monitor carefully' : undefined}
                 />
                 <MetricBar
                     label="Pick Capital"
-                    value={trajectory.pickLeverage}
+                    value={trajectory.pickCapital}
                 />
                 <MetricBar
                     label="Future vs Production"
-                    value={100 - trajectory.productionFutureRatio}
-                    hint={trajectory.productionFutureRatio > 75 ? 'Heavy production — limited upside' :
-                          trajectory.productionFutureRatio < 30 ? 'Heavy future — limited floor' : undefined}
+                    value={trajectory.futureVsProduction}
+                    hint={trajectory.futureVsProduction < 25 ? 'Heavy production — limited upside' :
+                          trajectory.futureVsProduction > 75 ? 'Heavy future — limited floor' : undefined}
                 />
             </div>
 

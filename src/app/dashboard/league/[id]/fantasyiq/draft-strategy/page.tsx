@@ -11,8 +11,8 @@ import PhaseDebugStrip from '@/components/dev/PhaseDebugStrip';
 import TeamIntelligenceCard from '@/components/league/TeamIntelligenceCard';
 import { getLeaguePhaseResult } from '@/lib/leaguePhase';
 import type { LeaguePhaseResult } from '@/lib/leaguePhase';
-import { getMyTeamSnapshot } from '@/lib/league/getMyTeamSnapshot';
-import { getTeamTrajectory } from '@/lib/teamTrajectory';
+import { getLeagueContext } from '@/lib/trajectory/contextLoader';
+import { computeTeamTrajectoryForLeague } from '@/lib/trajectory/teamTrajectory';
 
 export default async function DraftStrategyPage({
     params,
@@ -69,15 +69,17 @@ export default async function DraftStrategyPage({
     let myTeamName = 'My Team';
     if (league.platform === 'sleeper' && isDynasty) {
         try {
-            const snapshot = await getMyTeamSnapshot(
+            const { context, myTeamId } = await getLeagueContext(
                 league.leagueId,
                 mySleeperUserId,
                 season,
-                superflex,
                 isDynasty,
+                superflex,
+                phaseResult,
             );
-            if (snapshot) {
-                trajectory = getTeamTrajectory({ ...snapshot, leagueSize: league.totalRosters ?? 12, leagueType: 'Dynasty', superflex, phaseResult });
+            if (myTeamId) {
+                const trajectoryMap = computeTeamTrajectoryForLeague(context);
+                trajectory = trajectoryMap.get(myTeamId) ?? null;
             }
         } catch { /* Sleeper unreachable — skip trajectory */ }
     }
