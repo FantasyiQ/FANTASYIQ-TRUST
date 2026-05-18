@@ -92,11 +92,7 @@ export default async function DraftStrategyPage({
     const IDP_PLAYER_POSITIONS = new Set(['DE','DT','NT','DL','EDGE','OLB','ILB','MLB','LB','CB','FS','SS','NB','S','DB','SAF']);
 
     // ── Rookie class to display ───────────────────────────────────────────────
-    // Use the active rookie year from phase — but we can only show data we have seeded.
-    // Fall back to the current season if no data exists for the active year.
-    const targetSeason = String(phaseResult.activeRookieYear);
-    const seasonHasData = await prisma.rookieRankingsPlayer.count({ where: { season: targetSeason } });
-    const displaySeason = seasonHasData > 0 ? targetSeason : season;
+    const displaySeason = '2026';
 
     // ── Player fetch ──────────────────────────────────────────────────────────
     const rawPlayers = await prisma.rookieRankingsPlayer.findMany({

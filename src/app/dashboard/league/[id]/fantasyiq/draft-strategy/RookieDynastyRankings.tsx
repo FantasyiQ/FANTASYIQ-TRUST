@@ -326,9 +326,7 @@ export default function RookieDynastyRankings({
                             Dynasty Rookie Rankings
                         </p>
                         <p className="text-white font-bold mt-0.5">
-                            {phaseResult?.phase === 'PRE_DRAFT'
-                                ? `${season} Rookie Class Overview`
-                                : `${season}–${parseInt(season) + 2} Rookie Class Outlook`}
+                            {season} Rookie Class
                         </p>
                         <p className="text-gray-500 text-xs mt-0.5">
                             FiQ Score: NFL Scouting Grades · Draft Capital · Opportunity · Market Value
