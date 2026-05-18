@@ -79,7 +79,7 @@ function FactorBar({ label, value, max = 1.30 }: { label: string; value: number;
     );
 }
 
-function PlayerPill({ result, onRemove, leagueSize }: { result: DtvResult; onRemove: () => void; leagueType: LeagueType; leagueSize: number }) {
+function PlayerPill({ result, onRemove, leagueSize, useBucketedPicks = false }: { result: DtvResult; onRemove: () => void; leagueType: LeagueType; leagueSize: number; useBucketedPicks?: boolean }) {
     const displayAge = result.birthDate ? calculateAge(result.birthDate) : result.age || null;
     const isPick = result.position === 'PICK';
     return (
@@ -108,7 +108,7 @@ function PlayerPill({ result, onRemove, leagueSize }: { result: DtvResult; onRem
                     <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
                             <p className="text-white text-sm font-semibold truncate">
-                                {isPick ? pickLabel(result.name, leagueSize) : result.name}
+                                {isPick ? pickLabel(result.name, leagueSize, useBucketedPicks) : result.name}
                             </p>
                             {result.injuryStatus && result.injuryStatus !== 'Active' && (
                                 <span className={`text-[10px] font-bold px-1 py-0.5 rounded shrink-0 ${
@@ -146,10 +146,10 @@ function PlayerPill({ result, onRemove, leagueSize }: { result: DtvResult; onRem
 const POS_ORDER: Record<string, number> = { QB: 0, RB: 1, WR: 2, TE: 3, K: 4, DEF: 5 };
 
 // Display label for a pick pill / search result.
-// - Exact slot current year "2026 1.04"  → "1.04"
-// - Exact slot future year  "2027 1.04"  → "2027 Early 1st" (tier-converted)
-// - Tier pick               "2027 Early 1st" → "Early 1st" (year stripped)
-function pickLabel(name: string, leagueSize: number): string {
+// - useBucketedPicks=false + current year exact slot "2026 1.04" → "1.04"
+// - useBucketedPicks=true  + any exact slot "2027 1.04"          → "2027 Early 1st"
+// - Tier pick "2027 Early 1st"                                   → "Early 1st" (year stripped)
+function pickLabel(name: string, leagueSize: number, useBucketedPicks = false): string {
     // Tier pick: "YYYY Early 1st" → strip year
     const tierM = name.match(/^\d{4} ((?:Early|Mid|Late) \w+)$/);
     if (tierM) return tierM[1];
@@ -159,8 +159,9 @@ function pickLabel(name: string, leagueSize: number): string {
     if (!m) return name;
     const year = parseInt(m[1]);
     const slot = m[2]; // e.g. "1.04"
-    if (year <= PICK_YEARS[0]) return slot;
-    // Future exact slot → convert to tier label
+    // Show raw slot only when not bucketed AND it's the current/past year
+    if (!useBucketedPicks && year <= PICK_YEARS[0]) return slot;
+    // Convert to tier label (with year prefix so search results are unambiguous)
     const [roundStr, pickStr] = slot.split('.');
     const round = parseInt(roundStr);
     const pick  = parseInt(pickStr);
@@ -170,19 +171,22 @@ function pickLabel(name: string, leagueSize: number): string {
     return `${year} ${tier} ${ord}`;
 }
 
-function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, leagueSize = 12, settings = DEFAULT_LEAGUE_SETTINGS, onAdd, rosterLabel = 'My Roster' }: {
-    players:      Player[];
-    picks?:       Player[];
-    excluded:     string[];
-    ppr:          PprFormat;
-    leagueType:   LeagueType;
-    leagueSize?:  number;
-    settings?:    LeagueSettings;
-    onAdd:        (p: Player) => void;
-    rosterLabel?: string;
+function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, leagueSize = 12, settings = DEFAULT_LEAGUE_SETTINGS, onAdd, rosterLabel = 'My Roster', pickYears: pickYearsProp, useBucketedPicks = false }: {
+    players:           Player[];
+    picks?:            Player[];
+    excluded:          string[];
+    ppr:               PprFormat;
+    leagueType:        LeagueType;
+    leagueSize?:       number;
+    settings?:         LeagueSettings;
+    onAdd:             (p: Player) => void;
+    rosterLabel?:      string;
+    pickYears?:        [number, number, number];
+    useBucketedPicks?: boolean;
 }) {
+    const effectivePickYears = pickYearsProp ?? PICK_YEARS;
     const [tab, setTab]           = useState<'roster' | 'picks'>(players.length === 0 && picks.length > 0 ? 'picks' : 'roster');
-    const [pickYear, setPickYear] = useState(PICK_YEARS[0]);
+    const [pickYear, setPickYear] = useState(effectivePickYears[0]);
 
     const sorted = useMemo(() =>
         [...players].sort((a, b) => {
@@ -283,7 +287,7 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, leagu
                 <div className="space-y-2">
                     {/* Year tabs */}
                     <div className="flex gap-1.5">
-                        {PICK_YEARS.map(y => (
+                        {effectivePickYears.map(y => (
                             <button key={y} type="button" onClick={() => setPickYear(y)}
                                 className={`px-2.5 py-0.5 rounded text-xs font-semibold border transition ${
                                     pickYear === y
@@ -296,7 +300,7 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, leagu
                     </div>
                     {/* Picks: future = flat tier list (no round headers); current = round-grouped slots */}
                     <div className="space-y-1.5">
-                        {pickYear > PICK_YEARS[0]
+                        {useBucketedPicks || pickYear > effectivePickYears[0]
                             ? /* Future picks: "Early 1st", "Mid 1st", "Late 1st", "Early 2nd" … — no "Rd X" */
                               <div className="flex flex-wrap gap-1.5">
                                   {tierPicksSorted.map((p, i) => {
@@ -356,15 +360,16 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, leagu
     );
 }
 
-function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEAGUE_SETTINGS, players, allPicks = [], leagueSize = 12 }: {
-    onAdd: (p: Player) => void;
-    excluded: string[];
-    ppr: PprFormat;
-    leagueType: LeagueType;
-    settings?: LeagueSettings;
-    players: Player[];
-    allPicks?: Player[];
-    leagueSize?: number;
+function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEAGUE_SETTINGS, players, allPicks = [], leagueSize = 12, useBucketedPicks = false }: {
+    onAdd:              (p: Player) => void;
+    excluded:           string[];
+    ppr:                PprFormat;
+    leagueType:         LeagueType;
+    settings?:          LeagueSettings;
+    players:            Player[];
+    allPicks?:          Player[];
+    leagueSize?:        number;
+    useBucketedPicks?:  boolean;
 }) {
     const [query, setQuery]     = useState('');
     const [results, setResults] = useState<Player[]>([]);
@@ -379,7 +384,7 @@ function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEA
             // Match picks: raw name or label (e.g. "early first", "mid 2nd", "2027", "1.04")
             const pickMatches = allPicks
                 .filter(p => {
-                    const label = pickLabel(p.name, leagueSize).toLowerCase();
+                    const label = pickLabel(p.name, leagueSize, useBucketedPicks).toLowerCase();
                     return (p.name.toLowerCase().includes(ql) || label.includes(ql)) && !excluded.includes(p.name);
                 })
                 .slice(0, 8);
@@ -436,7 +441,7 @@ function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEA
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-1.5">
                                                 <span className="text-white text-sm truncate">
-                                                    {p.position === 'PICK' ? pickLabel(p.name, leagueSize) : p.name}
+                                                    {p.position === 'PICK' ? pickLabel(p.name, leagueSize, useBucketedPicks) : p.name}
                                                 </span>
                                                 <span className="text-gray-500 text-xs">
                                                     {p.position === 'PICK' ? `${p.team} Draft` : p.team}
@@ -512,7 +517,10 @@ export default function TradeEvaluator({
     const [leagueSettings, setLeagueSettings]   = useState<LeagueSettings>(initialLeagueSettings);
     const superflex = leagueSettings.sfSlots > 0;
     const [posFilter, setPosFilter]   = useState('ALL');
-    const [pickYear, setPickYear]     = useState(PICK_YEARS[0]);
+    // Phase-aware pick years: use phaseResult.pickYears when available, fall back to calendar heuristic
+    const effectivePickYears   = phaseResult?.pickYears   ?? PICK_YEARS;
+    const effectiveUseBucketed = phaseResult?.useBucketedPicks ?? false;
+    const [pickYear, setPickYear]     = useState(effectivePickYears[0]);
     const [sideA, setSideA]           = useState<Player[]>([]);
     const [sideB, setSideB]           = useState<Player[]>([]);
     const [sideC, setSideC]           = useState<Player[]>([]);
@@ -823,12 +831,14 @@ export default function TradeEvaluator({
                             leagueSize={leagueSize}
                             settings={leagueSettings}
                             onAdd={p => setSideA(prev => prev.length < 5 ? [...prev, p] : prev)}
+                            pickYears={effectivePickYears}
+                            useBucketedPicks={effectiveUseBucketed}
                         />
                     )}
-                    <PlayerSearch onAdd={p => setSideA(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} settings={leagueSettings} players={allPlayers} allPicks={searchablePicks} leagueSize={leagueSize} />
+                    <PlayerSearch onAdd={p => setSideA(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} settings={leagueSettings} players={allPlayers} allPicks={searchablePicks} leagueSize={leagueSize} useBucketedPicks={effectiveUseBucketed} />
                     <div className="space-y-2">
                         {result?.sideA.map(r => (
-                            <PlayerPill key={r.name} result={r} leagueType={leagueType} leagueSize={leagueSize} onRemove={() => setSideA(prev => prev.filter(p => p.name !== r.name))} />
+                            <PlayerPill key={r.name} result={r} leagueType={leagueType} leagueSize={leagueSize} useBucketedPicks={effectiveUseBucketed} onRemove={() => setSideA(prev => prev.filter(p => p.name !== r.name))} />
                         ))}
                         {sideA.length === 0 && <p className="text-gray-600 text-sm text-center py-4">Search and add up to 5 players</p>}
                     </div>
@@ -864,12 +874,14 @@ export default function TradeEvaluator({
                             settings={leagueSettings}
                             rosterLabel={selectedTeam ? `${selectedTeam.teamName.split(' ')[0]}'s Roster` : 'Roster'}
                             onAdd={p => setSideB(prev => prev.length < 5 ? [...prev, p] : prev)}
+                            pickYears={effectivePickYears}
+                            useBucketedPicks={effectiveUseBucketed}
                         />
                     )}
-                    <PlayerSearch onAdd={p => setSideB(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} settings={leagueSettings} players={allPlayers} allPicks={searchablePicks} leagueSize={leagueSize} />
+                    <PlayerSearch onAdd={p => setSideB(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} settings={leagueSettings} players={allPlayers} allPicks={searchablePicks} leagueSize={leagueSize} useBucketedPicks={effectiveUseBucketed} />
                     <div className="space-y-2">
                         {result?.sideB.map(r => (
-                            <PlayerPill key={r.name} result={r} leagueType={leagueType} leagueSize={leagueSize} onRemove={() => setSideB(prev => prev.filter(p => p.name !== r.name))} />
+                            <PlayerPill key={r.name} result={r} leagueType={leagueType} leagueSize={leagueSize} useBucketedPicks={effectiveUseBucketed} onRemove={() => setSideB(prev => prev.filter(p => p.name !== r.name))} />
                         ))}
                         {sideB.length === 0 && <p className="text-gray-600 text-sm text-center py-4">Search and add up to 5 players</p>}
                     </div>
@@ -907,13 +919,15 @@ export default function TradeEvaluator({
                                 settings={leagueSettings}
                                 rosterLabel={selectedTeamC ? `${selectedTeamC.teamName.split(' ')[0]}'s Roster` : 'Roster'}
                                 onAdd={p => setSideC(prev => prev.length < 5 ? [...prev, p] : prev)}
+                                pickYears={effectivePickYears}
+                                useBucketedPicks={effectiveUseBucketed}
                             />
                         )}
-                        <PlayerSearch onAdd={p => setSideC(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} settings={leagueSettings} players={allPlayers} allPicks={searchablePicks} leagueSize={leagueSize} />
+                        <PlayerSearch onAdd={p => setSideC(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} settings={leagueSettings} players={allPlayers} allPicks={searchablePicks} leagueSize={leagueSize} useBucketedPicks={effectiveUseBucketed} />
                         <div className="space-y-2">
                             {sideC.map(p => {
                                 const r = calcDtv(p, ppr, leagueType, undefined, leagueSettings);
-                                return <PlayerPill key={p.name} result={r} leagueType={leagueType} leagueSize={leagueSize} onRemove={() => setSideC(prev => prev.filter(x => x.name !== p.name))} />;
+                                return <PlayerPill key={p.name} result={r} leagueType={leagueType} leagueSize={leagueSize} useBucketedPicks={effectiveUseBucketed} onRemove={() => setSideC(prev => prev.filter(x => x.name !== p.name))} />;
                             })}
                             {sideC.length === 0 && <p className="text-gray-600 text-sm text-center py-4">Search and add up to 5 players</p>}
                         </div>
@@ -1113,7 +1127,7 @@ export default function TradeEvaluator({
                     <div className="p-6 space-y-6">
                         {/* Year tabs */}
                         <div className="flex gap-2">
-                            {PICK_YEARS.map(y => (
+                            {effectivePickYears.map(y => (
                                 <button key={y} onClick={() => setPickYear(y)}
                                     className={`px-4 py-2 rounded-lg text-sm font-semibold transition border ${pickYear === y ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}>
                                     {y}
@@ -1123,7 +1137,7 @@ export default function TradeEvaluator({
 
                         {/* Rounds */}
                         {[1, 2, 3, 4, 5].map(round => {
-                            const isFutureChart = pickYear > PICK_YEARS[0];
+                            const isFutureChart = effectiveUseBucketed || pickYear > effectivePickYears[0];
                             const ord = ['1st','2nd','3rd','4th','5th'][round - 1] ?? `${round}th`;
                             const roundPicks = draftPicks.filter(p => {
                                 if (p.team !== String(pickYear)) return false;
