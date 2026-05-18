@@ -66,7 +66,14 @@ export async function loadDraftContext(params: {
     const tePremium  = rosterPositions.includes('TE_FLEX');
     const ppr        = dbLeague.scoringType === 'ppr';
     const bestBall   = (draft.metadata?.scoring_type ?? '').includes('best_ball');
-    const draftType: DraftType = resolveDraftType(draft) === 'rookie' ? 'rookie' : 'startup';
+
+    // If the league already has rosters it's an established dynasty — the only
+    // draft that runs each year is the rookie draft.  Use this as the primary
+    // signal rather than Sleeper metadata, which is unreliable across league types.
+    const leagueHasRosters = rosters.some(r => (r.players ?? []).length > 0);
+    const draftType: DraftType = leagueHasRosters
+        ? 'rookie'
+        : (resolveDraftType(draft) === 'rookie' ? 'rookie' : 'startup');
 
     const rosterSlots = rosterPositions.reduce<Record<string, number>>((acc, slot) => {
         acc[slot] = (acc[slot] ?? 0) + 1;
