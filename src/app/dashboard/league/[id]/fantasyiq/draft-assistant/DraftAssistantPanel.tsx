@@ -52,6 +52,13 @@ function fiqColor(score: number) {
     return 'text-gray-400';
 }
 
+function tierBadgeClass(tier: number) {
+    if (tier === 1) return 'bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/40';
+    if (tier === 2) return 'bg-green-900/40 text-green-300 border-green-700/60';
+    if (tier === 3) return 'bg-blue-900/40 text-blue-300 border-blue-700/60';
+    return 'bg-gray-800 text-gray-500 border-gray-700';
+}
+
 export default function DraftAssistantPanel({
     leagueId,
     draftOptions,
@@ -62,6 +69,7 @@ export default function DraftAssistantPanel({
     const [selectedRosterId, setSelectedRosterId] = useState(myRosterId ?? rosterOptions[0]?.rosterId ?? '');
     const [recommendations,  setRecommendations]  = useState<DraftRecommendation[] | null>(null);
     const [meta,             setMeta]             = useState<Meta | null>(null);
+    const [tradeDownNote,    setTradeDownNote]    = useState<string | null>(null);
     const [loading,          setLoading]          = useState(false);
     const [error,            setError]            = useState<string | null>(null);
 
@@ -77,6 +85,7 @@ export default function DraftAssistantPanel({
             if (!res.ok) throw new Error(data.error ?? 'Failed to load recommendations');
             setRecommendations(data.recommendations);
             setMeta(data.meta);
+            setTradeDownNote(data.tradeDownNote ?? null);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load recommendations');
         } finally {
@@ -191,6 +200,17 @@ export default function DraftAssistantPanel({
                 </div>
             )}
 
+            {/* Trade-down banner */}
+            {tradeDownNote && (
+                <div className="bg-amber-900/20 border border-amber-700/40 rounded-xl px-4 py-3 flex items-start gap-3">
+                    <span className="text-amber-400 text-base shrink-0 mt-0.5">⚡</span>
+                    <div>
+                        <p className="text-amber-300 text-xs font-bold uppercase tracking-wider mb-0.5">Trade-Down Opportunity</p>
+                        <p className="text-amber-200/80 text-xs">{tradeDownNote}</p>
+                    </div>
+                </div>
+            )}
+
             {/* Recommendations */}
             {recommendations && recommendations.length > 0 && (
                 <div className="space-y-3">
@@ -208,6 +228,9 @@ export default function DraftAssistantPanel({
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${posBadge(rec.position)}`}>
                                             {rec.position}
+                                        </span>
+                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${tierBadgeClass(rec.tier)}`}>
+                                            T{rec.tier}
                                         </span>
                                         <span className="text-white font-semibold text-sm truncate">{rec.name}</span>
                                         {rec.team && (

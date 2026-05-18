@@ -12,7 +12,7 @@ import {
     type SleeperDraftPickEntry,
 } from '@/lib/sleeper';
 import type { DraftContext, DraftType } from './context';
-import { normalizePosition } from './context';
+import { normalizePosition, getTier } from './context';
 
 // ── On-the-clock resolution ────────────────────────────────────────────────────
 
@@ -141,7 +141,7 @@ export async function loadDraftContext(params: {
         const rookies = await prisma.rookieRankingsPlayer.findMany({
             where:   { season: '2026' },
             orderBy: { fiqScore: 'desc' },
-            select:  { playerName: true, position: true, fiqScore: true },
+            select:  { playerName: true, position: true, fiqScore: true, fiqTier: true, opportunityScore: true },
         });
 
         const sleeperPlayers = await prisma.sleeperPlayer.findMany({
@@ -154,14 +154,20 @@ export async function loadDraftContext(params: {
         for (const r of rookies) {
             const sp = spByName.get(r.playerName);
             if (sp && draftedIds.has(sp.playerId)) continue;
+            const fiqScore = Math.round(r.fiqScore);
+            // Parse tier from stored string ("Tier 1" → 1) or derive from score
+            const tierMatch = r.fiqTier?.match(/(\d+)/);
+            const tier = tierMatch ? parseInt(tierMatch[1], 10) : getTier(fiqScore);
             availablePlayers.push({
-                sleeperPlayerId: sp?.playerId ?? '',
-                name:     r.playerName,
-                position: r.position,
-                team:     sp?.team ?? null,
-                age:      sp?.age ?? null,
-                fiqScore: Math.round(r.fiqScore),
-                adp:      sp?.searchRank ?? null,
+                sleeperPlayerId:  sp?.playerId ?? '',
+                name:             r.playerName,
+                position:         r.position,
+                team:             sp?.team ?? null,
+                age:              sp?.age ?? null,
+                fiqScore,
+                tier,
+                opportunityScore: r.opportunityScore ?? null,
+                adp:              sp?.searchRank ?? null,
             });
         }
     } else {
@@ -197,12 +203,14 @@ export async function loadDraftContext(params: {
 
             availablePlayers.push({
                 sleeperPlayerId: sp?.playerId ?? '',
-                name:     fcv.playerName,
-                position: fcv.position,
-                team:     sp?.team ?? null,
-                age:      sp?.age ?? null,
+                name:            fcv.playerName,
+                position:        fcv.position,
+                team:            sp?.team ?? null,
+                age:             sp?.age ?? null,
                 fiqScore,
-                adp:      sp?.searchRank ?? null,
+                tier:            getTier(fiqScore),
+                opportunityScore: null,
+                adp:             sp?.searchRank ?? null,
             });
         }
     }

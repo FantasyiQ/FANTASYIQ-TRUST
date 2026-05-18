@@ -5,7 +5,7 @@ import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { loadDraftContext } from '@/lib/draft/contextLoader';
-import { rankCandidates } from '@/lib/draft/scoring';
+import { rankCandidates, detectTradeDown } from '@/lib/draft/scoring';
 
 export const maxDuration = 30;
 
@@ -39,9 +39,11 @@ export async function GET(req: NextRequest): Promise<Response> {
     });
 
     const recommendations = rankCandidates(ctx);
+    const tradeDownNote   = detectTradeDown(ctx);
 
     return Response.json({
         recommendations,
+        tradeDownNote,
         meta: {
             currentPick:        ctx.draftMeta.currentPickOverall,
             currentRound:       ctx.draftMeta.currentRound,
