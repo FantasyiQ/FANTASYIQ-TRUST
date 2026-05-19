@@ -8,6 +8,7 @@ import RosterCards from './RosterCards';
 import type { SlimPlayer } from '@/lib/sleeper';
 import type { StandingRow, AnnouncementData, SleeperSettings } from './LeagueDetailTabs';
 import type { DuesManagerData } from './DuesManager';
+import MembersCard, { type LeagueMemberData } from './MembersCard';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -29,6 +30,7 @@ interface Props {
     announcements:          AnnouncementData[];
     isCommissioner:         boolean;
     currentUserId:          string;
+    membersData:            LeagueMemberData[];
 }
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
@@ -338,6 +340,7 @@ export default function LeagueOverviewCards({
     announcements,
     isCommissioner,
     currentUserId,
+    membersData,
 }: Props) {
 
     return (
@@ -345,6 +348,9 @@ export default function LeagueOverviewCards({
 
             {/* Dues & Payouts nav card */}
             <DuesNavCard leagueId={leagueId} duesData={duesData} isCommissioner={isCommissioner} leagueName={leagueName} />
+
+            {/* Members card */}
+            <MembersCard members={membersData} />
 
             {/* Announcements */}
             <AnnouncementsCard

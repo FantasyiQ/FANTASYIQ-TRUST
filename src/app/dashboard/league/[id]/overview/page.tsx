@@ -12,6 +12,7 @@ import {
 import type { TeamRosterData } from '../RosterCards';
 import { type StandingRow, type AnnouncementData, type SleeperSettings } from '../LeagueDetailTabs';
 import type { DuesManagerData } from '../DuesManager';
+import type { LeagueMemberData } from '../MembersCard';
 import LeagueOverviewCards from '../LeagueOverviewCards';
 
 const BENCH_SLOTS = new Set(['BN', 'IR']);
@@ -136,6 +137,7 @@ export default async function LeagueOverviewPage({
                 announcements={announcements}
                 isCommissioner={league.userId === session.user.id}
                 currentUserId={session.user.id}
+                membersData={[]}
             />
         );
     }
@@ -289,6 +291,44 @@ export default async function LeagueOverviewPage({
         authorName: a.author.name ?? null,
     }));
 
+    // ── Member credibility data ────────────────────────────────────────────────
+    // Match Sleeper members → registered users for PRS / trust scores.
+    const memberSleeperIds = members.map(m => m.user_id);
+
+    const [registeredUsers, commissionerLF] = await (async () => {
+        const dbUsers = await prisma.user.findMany({
+            where:  { sleeperUserId: { in: memberSleeperIds } },
+            select: { id: true, sleeperUserId: true, prsScore: true, trustScore: true },
+        });
+        const commUserId   = dbUsers.find(u => u.sleeperUserId === commissionerSleeperUserId)?.id;
+        const lfProfile    = commUserId
+            ? await prisma.lFCommissioner.findUnique({
+                where:  { ownerId: commUserId },
+                select: { id: true, avgRating: true, reviewsCount: true },
+            })
+            : null;
+        return [dbUsers, lfProfile] as const;
+    })();
+
+    const dbUserBySleeperId = new Map(registeredUsers.map(u => [u.sleeperUserId!, u]));
+
+    const membersData: LeagueMemberData[] = members.map(m => {
+        const dbUser = dbUserBySleeperId.get(m.user_id);
+        const isComm = !!m.is_owner;
+        return {
+            sleeperUserId:    m.user_id,
+            displayName:      m.display_name,
+            username:         m.username || null,
+            sleeperAvatarId:  m.avatar ?? null,
+            isCommissioner:   isComm,
+            isCoCommissioner: false,
+            userId:           dbUser?.id ?? null,
+            prsScore:         dbUser?.prsScore ?? null,
+            trustScore:       dbUser?.trustScore ?? null,
+            lfCommissioner:   (isComm && commissionerLF) ? commissionerLF : null,
+        };
+    });
+
     return (
         <>
         {showCommissionerPlanModal && (
@@ -376,6 +416,7 @@ export default async function LeagueOverviewPage({
             announcements={announcements}
             isCommissioner={isCommissioner}
             currentUserId={session.user.id}
+            membersData={membersData}
         />
         </>
     );
