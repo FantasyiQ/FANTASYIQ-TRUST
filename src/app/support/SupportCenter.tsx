@@ -124,7 +124,7 @@ export default function SupportCenter() {
 
                 {/* ── Header ─────────────────────────────────────────────── */}
                 <div className="text-center space-y-3">
-                    <p className="text-[10px] font-bold tracking-widest text-gray-500 uppercase">FantasyiQ Trust</p>
+                    <p className="text-[10px] font-bold tracking-widest text-gray-500 normal-case">FantasyiQ Trust</p>
                     <h1 className="text-3xl font-extrabold">Support Center</h1>
                     <p className="text-gray-400 text-sm max-w-md mx-auto">
                         Find answers, learn how FantasyiQ Trust works, or chat with our AI assistant.
