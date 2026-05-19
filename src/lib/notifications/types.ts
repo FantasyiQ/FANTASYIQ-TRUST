@@ -45,6 +45,29 @@ export const NotificationType = {
 
   // Identity
   IDENTITY_NEEDS_CONFIRMATION:  'identity.needs_confirmation',
+
+  // ── Phase 3 Automation & Intelligence Layer ───────────────────────────────
+
+  // Engine 1 — Sync Failure Auto-Recovery
+  SYNC_FAILURE:                 'sync_failure',
+
+  // Engine 2 — Commissioner Activation
+  COMMISSIONER_NUDGE:           'commissioner_nudge',
+
+  // Engine 3 — Churn Prevention
+  CHURN_NUDGE:                  'churn_nudge',
+
+  // Engine 4 — Upsell & Expansion
+  UPSELL_PROMPT:                'upsell_prompt',
+
+  // Engine 5 — League Health
+  LEAGUE_HEALTH:                'league_health',
+
+  // Engine 6 — Feature Intelligence
+  FEATURE_SUGGESTION:           'feature_suggestion',
+
+  // Engine 8 — Automated Messaging (new triggers)
+  LEAGUE_SYNC_REMINDER:         'league.sync.reminder',      // "sync now to keep PRS fresh"
 } as const;
 
 export type NotificationType = typeof NotificationType[keyof typeof NotificationType];
@@ -84,6 +107,15 @@ export const THROTTLE_MS: Partial<Record<NotificationType, number>> = {
   [NotificationType.SEASON_PLAYOFFS_RELEASED]:      7 * DAY,
   [NotificationType.SEASON_CHAMPIONSHIP_WEEK]:      7 * DAY,
   [NotificationType.SEASON_FINAL_RECAP]:            7 * DAY,
+
+  // Phase 3 engines — reasonable cooldowns to avoid spam
+  [NotificationType.SYNC_FAILURE]:                  DAY,
+  [NotificationType.COMMISSIONER_NUDGE]:            7 * DAY,
+  [NotificationType.CHURN_NUDGE]:                   3 * DAY,
+  [NotificationType.UPSELL_PROMPT]:                 7 * DAY,
+  [NotificationType.LEAGUE_HEALTH]:                 7 * DAY,
+  [NotificationType.FEATURE_SUGGESTION]:            14 * DAY,
+  [NotificationType.LEAGUE_SYNC_REMINDER]:          7 * DAY,
 
   // No throttle (undefined): dues.payment.confirmed, dues.payment.manual_recorded,
   // member.joined_league, member.linked_to_dues_slot, payouts.released,

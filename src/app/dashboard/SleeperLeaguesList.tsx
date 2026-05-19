@@ -31,7 +31,7 @@ interface Props {
     leagues: League[];
     playerTier: string;
     commSubs: CommSub[];
-    platform?: 'sleeper' | 'espn';
+    platform?: 'sleeper' | 'espn' | 'yahoo';
 }
 
 function tierLevel(tier: string): number {
@@ -68,16 +68,16 @@ export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier
     const [leagues] = useState<League[]>(initialLeagues);
 
     if (leagues.length === 0) {
-        const isEspn = platform === 'espn';
+        const syncHref  = platform === 'espn' ? '/dashboard/sync/espn' : platform === 'yahoo' ? '/dashboard/sync/yahoo' : '/dashboard/sync';
+        const syncLabel = platform === 'espn' ? 'Sync an ESPN League' : platform === 'yahoo' ? 'Connect Yahoo' : 'Sync a Sleeper League';
+        const desc      = platform === 'espn' ? 'Connect your ESPN league to get started.' : platform === 'yahoo' ? 'Connect your Yahoo account to get started.' : 'Connect your Sleeper account to get started.';
         return (
             <div className="px-6 py-14 text-center">
                 <p className="text-gray-400 mb-1">No leagues synced yet.</p>
-                <p className="text-gray-600 text-sm mb-4">
-                    {isEspn ? 'Connect your ESPN league to get started.' : 'Connect your Sleeper account to get started.'}
-                </p>
-                <Link href={isEspn ? '/dashboard/sync/espn' : '/dashboard/sync'}
+                <p className="text-gray-600 text-sm mb-4">{desc}</p>
+                <Link href={syncHref}
                     className="inline-block bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-5 py-2.5 rounded-lg transition text-sm">
-                    {isEspn ? 'Sync an ESPN League' : 'Sync a Sleeper League'}
+                    {syncLabel}
                 </Link>
             </div>
         );

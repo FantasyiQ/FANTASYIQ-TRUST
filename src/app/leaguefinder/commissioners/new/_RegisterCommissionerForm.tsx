@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-const PLATFORMS = ['sleeper', 'espn', 'yahoo', 'mfl', 'fleaflicker'];
+const PLATFORMS = ['sleeper', 'espn', 'yahoo'];
 
 export default function RegisterCommissionerForm() {
     const router = useRouter();

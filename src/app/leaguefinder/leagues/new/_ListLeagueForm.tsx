@@ -3,10 +3,10 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-const PLATFORMS   = ['Sleeper', 'ESPN', 'Yahoo', 'MFL', 'Fleaflicker'];
+const PLATFORMS   = ['Sleeper', 'ESPN', 'Yahoo'];
 const FORMATS     = ['Dynasty', 'Redraft', 'Best Ball'];
 const SCORINGS    = ['PPR', 'Half PPR', 'Standard', 'TE Premium'];
-const SIZES       = [8, 10, 12, 14, 16];
+const SIZES       = [8, 10, 12, 14, 16, 32];
 const ACTIVITY    = [
     { value: 1, label: '1 — Very low' },
     { value: 2, label: '2 — Low' },

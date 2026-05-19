@@ -145,6 +145,61 @@ export function renderTemplate(type: NotificationType | string, ctx: TemplateCon
       return baseLayout(title, bodyHtml, ctaButton('View League', leagueHref));
     }
 
+    // ── Plan renewal upcoming ─────────────────────────────────────────────────
+    case 'plan.renewal_upcoming': {
+      const renewDate = data?.deadline ? new Date(data.deadline).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : 'soon';
+      const bodyHtml = `<p style="margin:0 0 8px;">Your FiQ subscription renews on <strong style="color:#fff;">${escapeHtml(renewDate)}</strong>. No action needed — you&#39;ll continue to have full access.</p>
+      <p style="margin:8px 0 0;color:#71717a;">If you&#39;d like to update your plan or cancel, visit your account settings before the renewal date.</p>`;
+      return baseLayout(title, bodyHtml, ctaButton('Manage Subscription', `${appUrl}/dashboard/account`));
+    }
+
+    // ── Sync failure ──────────────────────────────────────────────────────────
+    case 'sync_failure': {
+      const bodyHtml = `<p style="margin:0 0 8px;">${escapeHtml(body)}</p>
+      <p style="margin:8px 0 0;color:#71717a;">Head to your dashboard and update your credentials to resume syncing.</p>`;
+      return baseLayout(title, bodyHtml, ctaButton('Go to Dashboard', `${appUrl}/dashboard`));
+    }
+
+    // ── Commissioner activation nudge ─────────────────────────────────────────
+    case 'commissioner_nudge': {
+      const bodyHtml = `<p style="margin:0 0 8px;">${escapeHtml(body)}</p>`;
+      return baseLayout(title, bodyHtml, ctaButton('Continue Setup', `${appUrl}/dashboard/commissioner`));
+    }
+
+    // ── Churn nudge ───────────────────────────────────────────────────────────
+    case 'churn_nudge': {
+      const bodyHtml = `<p style="margin:0 0 8px;">${escapeHtml(body)}</p>`;
+      return baseLayout(title, bodyHtml, ctaButton('Go to Dashboard', `${appUrl}/dashboard`));
+    }
+
+    // ── Upsell prompt ─────────────────────────────────────────────────────────
+    case 'upsell_prompt': {
+      const href = (data as Record<string, string> | undefined)?.href ?? `${appUrl}/pricing`;
+      const bodyHtml = `<p style="margin:0 0 8px;">${escapeHtml(body)}</p>`;
+      return baseLayout(title, bodyHtml, ctaButton('See Plans', `${appUrl}${href.startsWith('/') ? href : '/pricing'}`));
+    }
+
+    // ── League health alert ───────────────────────────────────────────────────
+    case 'league_health': {
+      const lid = (data as Record<string, string> | undefined)?.leagueId;
+      const href = lid ? `${appUrl}/dashboard/commissioner` : `${appUrl}/dashboard/commissioner`;
+      const bodyHtml = `<p style="margin:0 0 8px;">${escapeHtml(body)}</p>`;
+      return baseLayout(title, bodyHtml, ctaButton('Fix Now', href));
+    }
+
+    // ── Feature suggestion ────────────────────────────────────────────────────
+    case 'feature_suggestion': {
+      const bodyHtml = `<p style="margin:0 0 8px;">${escapeHtml(body)}</p>`;
+      return baseLayout(title, bodyHtml, ctaButton('Try It Now', `${appUrl}/dashboard`));
+    }
+
+    // ── Sync reminder (PRS staleness) ─────────────────────────────────────────
+    case 'league.sync.reminder': {
+      const bodyHtml = `<p style="margin:0 0 8px;">${escapeHtml(body)}</p>
+      <p style="margin:8px 0 0;color:#71717a;">Your Player Reliability Score and power rankings update automatically when your league syncs.</p>`;
+      return baseLayout(title, bodyHtml, ctaButton('Sync Now', `${appUrl}/dashboard`));
+    }
+
     // ── Generic fallback ─────────────────────────────────────────────────────
     default: {
       const bodyHtml = `<p style="margin:0 0 8px;">${escapeHtml(body)}</p>`;

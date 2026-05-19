@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { trackFeature } from '@/app/actions/analytics';
 import {
     detectEspnSeason,
     getEspnFullSync,
@@ -73,6 +74,8 @@ export async function POST(request: NextRequest): Promise<Response> {
                 data:  { espnS2, swid },
             }),
         ]);
+
+        void trackFeature('espn_sync', { leagueId });
 
         return Response.json({
             synced:     1,

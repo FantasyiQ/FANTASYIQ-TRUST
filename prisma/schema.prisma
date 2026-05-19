@@ -30,6 +30,11 @@ model User {
     sleeperUserId    String?          @unique
     espnS2           String?          // ESPN espn_s2 session cookie
     swid             String?          // ESPN SWID cookie
+    yahooUserId      String?          @unique  // Yahoo GUID
+    yahooAccessToken  String?
+    yahooRefreshToken String?
+    yahooTokenExpiresAt DateTime?
+    isAdmin          Boolean          @default(false)
     createdAt        DateTime         @default(now())
     updatedAt        DateTime         @updatedAt
 
@@ -47,6 +52,12 @@ model User {
     // Weekly DFS Challenge
     dfsLineups            DFSLineup[]
 
+    // IDS analytics
+    featureEvents         FeatureUsageEvent[]
+    syncRecoveryEvents    SyncRecoveryEvent[]
+    churnRiskEvents       ChurnRiskEvent[]
+    prediction            UserPrediction?
+
     // LeagueFinder
     trustScore            Int               @default(0)
     prsScore              Int               @default(0)  // Player Reliability Score (0-100)
@@ -57,10 +68,86 @@ model User {
     lfJoinRequests        LFJoinRequest[]   @relation("LeagueJoinRequests")
 }
 
+// ── Internal Data System (IDS) ───────────────────────────────────────────────
+
+model FeatureUsageEvent {
+    id        String   @id @default(cuid())
+    userId    String
+    feature   String   // e.g. "trade_evaluator" | "draft_report" | "roster_values" | "league_refresh"
+    metadata  Json?    // arbitrary context (platform, leagueId, etc.)
+    createdAt DateTime @default(now())
+
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+    @@index([feature])
+    @@index([createdAt])
+}
+
+model SyncRecoveryEvent {
+    id          String    @id @default(cuid())
+    userId      String
+    leagueDbId  String?   // League.id — null if failure before league identified
+    platform    String    // "sleeper" | "espn" | "yahoo"
+    // "auth" | "rate_limit" | "network" | "data" | "unknown"
+    errorType   String    @default("unknown")
+    errorMsg    String?
+    attempt     Int       @default(1)
+    resolved    Boolean   @default(false)
+    resolvedAt  DateTime?
+    createdAt   DateTime  @default(now())
+
+    user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+    @@index([platform, resolved])
+    @@index([leagueDbId])
+    @@index([createdAt])
+}
+
+model ChurnRiskEvent {
+    id          String    @id @default(cuid())
+    userId      String
+    riskScore   Int       // 0-100
+    riskTier    String    // "low" | "medium" | "high"
+    signals     Json      // string[] of which signals fired
+    nudgeSent   Boolean   @default(false)
+    nudgeSentAt DateTime?
+    resolved    Boolean   @default(false)
+    resolvedAt  DateTime?
+    createdAt   DateTime  @default(now())
+
+    user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+    @@index([riskTier, resolved])
+    @@index([createdAt])
+}
+
+// ── Predictive Models (Engine 7) ─────────────────────────────────────────────
+// One row per user, upserted daily by the predictive-models cron.
+
+model UserPrediction {
+    id                    String   @id @default(cuid())
+    userId                String   @unique
+    // All probabilities: 0.0–1.0 (store as float, display as %)
+    churnProbability      Float    @default(0)
+    conversionProbability Float    @default(0)  // FREE/Player → commissioner
+    upgradeProbability    Float    @default(0)  // current tier → next tier
+    modelVersion          String   @default("v1")
+    computedAt            DateTime @default(now())
+
+    user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([churnProbability])
+    @@index([conversionProbability])
+    @@index([computedAt])
+}
+
 model League {
     id              String    @id @default(cuid())
     userId          String
-    platform        String    // "sleeper" | "espn"
+    platform        String    // "sleeper" | "espn" | "yahoo"
     leagueId        String    // external platform ID
     leagueName      String
     season          String
@@ -82,6 +169,18 @@ model League {
     playoffWeekStart Int?      // week number when playoffs begin (from Sleeper or manual)
     champWeek        Int?      // week number of championship game (derived or manual)
     lastSyncedAt     DateTime?
+    // Sync health (Engine 1 — Sync Failure Auto-Recovery)
+    syncStatus       String    @default("ok")   // "ok" | "failing" | "failed"
+    syncErrorCount   Int       @default(0)
+    syncLastError    String?
+    syncLastErrorAt  DateTime?
+    // League health (Engine 5 — League Health Engine)
+    healthScore      Int       @default(0)      // 0-100 composite
+    healthTier       String    @default("unknown") // "healthy" | "fair" | "unhealthy" | "unknown"
+    healthSignals    Json?     // { syncScore, dataScore, draftScore, commScore }
+    healthCheckedAt  DateTime?
+    // Predictive models (Engine 7)
+    survivalProbability Float  @default(0.5)    // 0.0-1.0: probability league active next season
     createdAt       DateTime  @default(now())
     updatedAt       DateTime  @updatedAt
 

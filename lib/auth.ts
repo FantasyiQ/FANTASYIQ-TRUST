@@ -4,6 +4,13 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
 
+// Extend NextAuth types to carry isAdmin
+declare module "next-auth" {
+    interface Session {
+        user: { id: string; email?: string | null; name?: string | null; image?: string | null; isAdmin: boolean };
+    }
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
     adapter: PrismaAdapter(prisma),
     providers: [
@@ -32,11 +39,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     pages: { signIn: "/login" },
     callbacks: {
         async jwt({ token, user }) {
-            if (user) token.id = user.id;
+            if (user) {
+                token.id = user.id;
+                const dbUser = await prisma.user.findUnique({
+                    where:  { id: user.id },
+                    select: { isAdmin: true },
+                });
+                token.isAdmin = dbUser?.isAdmin ?? false;
+            }
             return token;
         },
         async session({ session, token }) {
-            if (session.user) session.user.id = token.id as string;
+            if (session.user) {
+                session.user.id      = token.id as string;
+                session.user.isAdmin = (token as Record<string, unknown>).isAdmin as boolean ?? false;
+            }
             return session;
         },
     },

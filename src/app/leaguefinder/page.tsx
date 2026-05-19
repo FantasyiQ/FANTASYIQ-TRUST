@@ -20,8 +20,8 @@ interface SearchParams {
 
 const FORMATS   = ['Dynasty', 'Redraft', 'Best Ball'];
 const SCORINGS  = ['PPR', 'Half PPR', 'Standard', 'TE Premium'];
-const SIZES     = ['8', '10', '12', '14'];
-const PLATFORMS = ['Sleeper', 'ESPN', 'Yahoo', 'MFL', 'Fleaflicker'];
+const SIZES     = ['8', '10', '12', '14', '16', '32'];
+const PLATFORMS = ['Sleeper', 'ESPN', 'Yahoo'];
 
 export default async function LeagueFinderPage({
     searchParams,

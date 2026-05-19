@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { getSleeperLeagues, getLeagueRosters, getLeagueDrafts, getNflState, deriveScoringType, rosterFpts, resolveDraftType } from '@/lib/sleeper';
 import { deriveChampWeek } from '@/lib/leaguePhase';
+import { shouldSkipLeague, withRetry, recordSyncFailure, recordSyncRecovered } from '@/lib/sync-recovery';
 
 export const maxDuration = 60;
 
@@ -13,26 +14,37 @@ export async function GET(request: Request): Promise<Response> {
         const [users, nflState] = await Promise.all([
             prisma.user.findMany({
                 where: { sleeperUserId: { not: null } },
-                select: { id: true, sleeperUserId: true, leagues: { select: { id: true, leagueId: true } } },
+                select: {
+                    id: true, sleeperUserId: true,
+                    leagues: {
+                        select: { id: true, leagueId: true, syncStatus: true, syncErrorCount: true, syncLastErrorAt: true },
+                    },
+                },
             }),
             getNflState(),
         ]);
 
-        let synced = 0;
+        let synced  = 0;
+        let skipped = 0;
 
         for (const user of users) {
             if (!user.sleeperUserId) continue;
 
+            let sleeperLeagues;
             try {
-                // Refresh league list in case user joined new leagues
-                const sleeperLeagues = await getSleeperLeagues(user.sleeperUserId, nflState.season);
-                const sleeperMap = new Map(sleeperLeagues.map((l) => [l.league_id, l]));
+                sleeperLeagues = await getSleeperLeagues(user.sleeperUserId, nflState.season);
+            } catch { continue; } // can't fetch league list — skip user entirely
 
-                for (const dbLeague of user.leagues) {
-                    const sleeperLeague = sleeperMap.get(dbLeague.leagueId);
-                    if (!sleeperLeague) continue;
+            const sleeperMap = new Map(sleeperLeagues.map((l) => [l.league_id, l]));
 
-                    try {
+            for (const dbLeague of user.leagues) {
+                const sleeperLeague = sleeperMap.get(dbLeague.leagueId);
+                if (!sleeperLeague) continue;
+
+                if (shouldSkipLeague(dbLeague)) { skipped++; continue; }
+
+                try {
+                    await withRetry(async () => {
                         const [rosters, drafts] = await Promise.all([
                             getLeagueRosters(dbLeague.leagueId),
                             getLeagueDrafts(dbLeague.leagueId),
@@ -46,8 +58,6 @@ export async function GET(request: Request): Promise<Response> {
                             fpts:      rosterFpts(r.settings),
                         })).sort((a, b) => b.wins - a.wins || b.fpts - a.fpts);
 
-                        // Resolve draft info using the league's own draft_id pointer.
-                        // Fall back to snake defaults if the league has no draft_id or no match.
                         const safeDrafts   = Array.isArray(drafts) ? drafts : [];
                         const currentDraft = sleeperLeague.draft_id
                             ? safeDrafts.find(d => d.draft_id === sleeperLeague.draft_id) ?? null
@@ -79,13 +89,17 @@ export async function GET(request: Request): Promise<Response> {
                                 lastSyncedAt: new Date(),
                             },
                         });
-                        synced++;
-                    } catch { /* skip this league, try next */ }
+                    });
+
+                    await recordSyncRecovered(dbLeague.id);
+                    synced++;
+                } catch (err) {
+                    await recordSyncFailure({ userId: user.id, leagueDbId: dbLeague.id, platform: 'sleeper', err });
                 }
-            } catch { /* skip this user, try next */ }
+            }
         }
 
-        return Response.json({ ok: true, synced, users: users.length });
+        return Response.json({ ok: true, synced, skipped, users: users.length });
     } catch (err) {
         const message = err instanceof Error ? err.message : 'Sync failed';
         return Response.json({ error: message }, { status: 500 });
