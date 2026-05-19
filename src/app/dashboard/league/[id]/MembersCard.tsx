@@ -113,7 +113,7 @@ function CommissionerProfile({ member }: { member: LeagueMemberData }) {
                     {member.prsScore != null && (
                         <span
                             className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border ${prsTierStyles(member.prsScore)}`}
-                            title={`Player Reliability Score: ${member.prsScore}/100 (${prsTierLabel(member.prsScore)})`}
+                            title={`Performance Rating Score: ${member.prsScore}/100 (${prsTierLabel(member.prsScore)})`}
                         >
                             PRS {member.prsScore}
                         </span>
@@ -177,7 +177,7 @@ function MemberRow({ member }: { member: LeagueMemberData }) {
                 {member.prsScore != null && (
                     <span
                         className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border ${prsTierStyles(member.prsScore)}`}
-                        title={`Player Reliability Score: ${member.prsScore}/100 (${prsTierLabel(member.prsScore)})`}
+                        title={`Performance Rating Score: ${member.prsScore}/100 (${prsTierLabel(member.prsScore)})`}
                     >
                         PRS {member.prsScore}
                     </span>
@@ -251,7 +251,7 @@ export default function MembersCard({ members }: Props) {
                     <span className="inline-flex items-center gap-1.5 text-[10px] text-gray-500 bg-gray-800 border border-gray-700 px-2.5 py-1 rounded-full leading-none">
                         <span className="font-bold text-gray-400">PRS</span>
                         <span className="text-gray-600">·</span>
-                        Player Reliability Score
+                        Performance Rating Score
                         <span className="text-gray-600">·</span>
                         {registeredCount}/{members.length} on FantasyiQ
                     </span>
@@ -273,7 +273,7 @@ export default function MembersCard({ members }: Props) {
                     <div className="px-6 py-3 border-t border-gray-800 bg-gray-800/20">
                         <div className="flex items-start justify-between gap-2 mb-1">
                             <p className="text-[10px] text-gray-600 leading-relaxed">
-                                <span className="font-bold text-gray-500">Player Reliability Score (PRS)</span> measures how dependably a manager fulfills their league commitments — dues payments, trade follow-through, FAAB activity, and roster management.
+                                <span className="font-bold text-gray-500">Performance Rating Score (PRS)</span> measures long-term dynasty performance — roster strength, draft efficiency, trade impact, lineup optimization, and season-over-season improvement.
                                 Scores range from 0–100. Only members who have joined FantasyiQ Trust show a score.
                             </p>
                             <a href="/support#faq-prs" className="text-[10px] text-gray-600 hover:text-[#D4AF37] transition shrink-0">Learn more →</a>

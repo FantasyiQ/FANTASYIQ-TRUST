@@ -171,7 +171,7 @@ function handlePRS(ctx: SupportContext): { content: string; faq: FAQItem | null 
         ? " Some members in your league don't have PRS scores yet — invite them to FantasyiQ Trust to unlock scores for the whole league."
         : '';
     return {
-        content: `PRS (Player Reliability Score) measures how consistently a manager fulfills league commitments — dues, lineup setting, trade follow-through, and FAAB activity. Scores range 0–100 across five tiers: Elite (81–100), Trusted (61–80), Reliable (41–60), Developing (21–40), Unproven (0–20).${suffix}`,
+        content: `PRS (Performance Rating Score) measures your long-term dynasty performance — roster strength, draft efficiency, trade impact, lineup optimization, and season-over-season improvement. It reflects dynasty skill, not just win totals.${suffix}`,
         faq:     FAQ_ITEMS.find(f => f.id === 'what-is-prs') ?? null,
     };
 }
@@ -212,7 +212,7 @@ export function generateAssistantReply(
             };
         }
         return {
-            content: "DTV (Dynasty Trade Value) uses KeepTradeCut data, updated daily. It's the same as KTC — just labeled DTV inside FantasyiQ Trust.",
+            content: "DTV (Dynasty Trade Value) is FantasyiQ Trust's unified dynasty value score. It powers roster evaluation, trade scoring, and draft analysis — and adjusts automatically for your league format (Superflex vs 1QB). Updates daily.",
             faq:     FAQ_ITEMS.find(f => f.id === 'what-is-dtv') ?? null,
         };
     }
