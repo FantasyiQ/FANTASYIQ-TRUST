@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -223,42 +224,95 @@ interface Props {
 }
 
 export default function MembersCard({ members }: Props) {
+    const [open, setOpen] = useState(false);
+
     if (members.length === 0) return null;
 
-    const sorted      = sortMembers(members);
+    const sorted       = sortMembers(members);
     const commissioner = sorted.find(m => m.isCommissioner);
-    const rest        = sorted.filter(m => !m.isCommissioner);
+    const rest         = sorted.filter(m => !m.isCommissioner);
+    const registeredCount = members.filter(m => m.userId != null).length;
 
     return (
         <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
-                <h2 className="font-semibold text-lg">
-                    Members
-                    <span className="text-gray-600 font-normal text-base ml-2">({members.length})</span>
-                </h2>
-            </div>
+            {/* ── Expandable header ─────────────────────────────────────────── */}
+            <button
+                type="button"
+                onClick={() => setOpen(o => !o)}
+                className="w-full text-left px-6 py-4 flex items-center justify-between hover:bg-gray-800/40 transition-colors"
+            >
+                <div className="flex items-center gap-3 flex-wrap">
+                    <h2 className="font-semibold text-lg leading-none">
+                        Members
+                        <span className="text-gray-600 font-normal text-base ml-2">({members.length})</span>
+                    </h2>
 
-            <div className="px-6 py-5 space-y-4">
-                {/* Commissioner profile */}
-                {commissioner && (
-                    <CommissionerProfile member={commissioner} />
-                )}
+                    {/* PRS explanation pill */}
+                    <span className="inline-flex items-center gap-1.5 text-[10px] text-gray-500 bg-gray-800 border border-gray-700 px-2.5 py-1 rounded-full leading-none">
+                        <span className="font-bold text-gray-400">PRS</span>
+                        <span className="text-gray-600">·</span>
+                        Player Reliability Score
+                        <span className="text-gray-600">·</span>
+                        {registeredCount}/{members.length} on FantasyiQ
+                    </span>
+                </div>
 
-                {/* Divider */}
-                {commissioner && rest.length > 0 && (
-                    <div className="border-t border-gray-800" />
-                )}
+                {/* Chevron */}
+                <svg
+                    className={`w-4 h-4 text-gray-500 shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+                    viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+                >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
 
-                {/* Member list */}
-                {rest.length > 0 && (
-                    <div className="space-y-0.5 -mx-2">
-                        {rest.map(m => (
-                            <MemberRow key={m.sleeperUserId} member={m} />
-                        ))}
+            {/* ── Expanded content ──────────────────────────────────────────── */}
+            {open && (
+                <>
+                    {/* PRS legend */}
+                    <div className="px-6 py-3 border-t border-gray-800 bg-gray-800/20">
+                        <p className="text-[10px] text-gray-600 leading-relaxed">
+                            <span className="font-bold text-gray-500">Player Reliability Score (PRS)</span> measures how dependably a manager fulfills their league commitments — dues payments, trade follow-through, FAAB activity, and roster management.
+                            Scores range from 0–100. Only members who have joined FantasyiQ Trust show a score.
+                        </p>
+                        <div className="flex items-center gap-3 mt-2 flex-wrap">
+                            {[
+                                { label: 'Elite', styles: 'bg-[#D4AF37]/10 border-[#D4AF37]/40 text-[#D4AF37]',           range: '81–100' },
+                                { label: 'Trusted', styles: 'bg-emerald-900/20 border-emerald-500/40 text-emerald-400',   range: '61–80'  },
+                                { label: 'Reliable', styles: 'bg-amber-900/20 border-amber-500/40 text-amber-400',        range: '41–60'  },
+                                { label: 'Developing', styles: 'bg-orange-900/20 border-orange-500/40 text-orange-400',   range: '21–40'  },
+                                { label: 'Unproven', styles: 'bg-gray-800/40 border-gray-700 text-gray-500',              range: '0–20'   },
+                            ].map(({ label, styles, range }) => (
+                                <span key={label} className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded border ${styles}`}>
+                                    {label}
+                                    <span className="font-normal opacity-70">{range}</span>
+                                </span>
+                            ))}
+                        </div>
                     </div>
-                )}
-            </div>
+
+                    <div className="px-6 py-5 space-y-4 border-t border-gray-800">
+                        {/* Commissioner profile */}
+                        {commissioner && (
+                            <CommissionerProfile member={commissioner} />
+                        )}
+
+                        {/* Divider */}
+                        {commissioner && rest.length > 0 && (
+                            <div className="border-t border-gray-800" />
+                        )}
+
+                        {/* Member list */}
+                        {rest.length > 0 && (
+                            <div className="space-y-0.5 -mx-2">
+                                {rest.map(m => (
+                                    <MemberRow key={m.sleeperUserId} member={m} />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </>
+            )}
         </div>
     );
 }

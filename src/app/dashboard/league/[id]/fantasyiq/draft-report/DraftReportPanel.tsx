@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import type { DraftReportCard, PickAlignment, PickGrade, ClassStrength } from '@/lib/draft/reportCard';
+import type { DraftReportCard, PickAlignment, PickGrade, ClassStrength, DraftIdentityLabel } from '@/lib/draft/reportCard';
 
 interface DraftOption {
     draftId: string;
@@ -34,6 +34,14 @@ const GRADE_BG: Record<PickGrade, string> = {
     'C':  'bg-gray-800 text-gray-300 border-gray-600',
     'D':  'bg-orange-900/30 text-orange-400 border-orange-700/40',
     'F':  'bg-red-900/30 text-red-400 border-red-700/40',
+};
+
+const IDENTITY_LABEL_COLOR: Record<DraftIdentityLabel, string> = {
+    'Upside Hunter':          'text-purple-300 border-purple-700/50 bg-purple-900/30',
+    'Value Sniper':           'text-yellow-300 border-yellow-700/50 bg-yellow-900/30',
+    'Positional Architect':   'text-blue-300 border-blue-700/50 bg-blue-900/30',
+    'Future-Focused Builder': 'text-emerald-300 border-emerald-700/50 bg-emerald-900/30',
+    'Balanced Builder':       'text-gray-300 border-gray-700 bg-gray-800',
 };
 
 // v3.3: human-readable window names
@@ -134,6 +142,32 @@ function PickCard({ pick, idx }: { pick: PickAlignment; idx: number }) {
 
             {open && (
                 <div className="border-t border-gray-800 px-4 pb-4 pt-3 space-y-3">
+                    {/* v3.4 Pick Commentary */}
+                    {pick.pickCommentary && (
+                        <p className="text-gray-400 text-xs leading-relaxed">{pick.pickCommentary}</p>
+                    )}
+
+                    {/* v3.4 tags: identity / roster fit / DTV */}
+                    {(pick.prospectIdentity || pick.rosterContextNote || pick.dtvNote) && (
+                        <div className="flex flex-wrap gap-2">
+                            {pick.prospectIdentity && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-900/40 text-cyan-300 border border-cyan-700/40">
+                                    {pick.prospectIdentity.split('—')[0].trim()}
+                                </span>
+                            )}
+                            {pick.rosterContextNote && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-900/30 text-amber-300 border border-amber-700/40">
+                                    Roster Fit
+                                </span>
+                            )}
+                            {pick.dtvNote && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/30 text-emerald-300 border border-emerald-700/40">
+                                    {pick.dtvNote}
+                                </span>
+                            )}
+                        </div>
+                    )}
+
                     {/* Alignment breakdown */}
                     <div className="grid grid-cols-5 gap-2">
                         {[
@@ -303,13 +337,25 @@ export default function DraftReportPanel({
                             <div className={`shrink-0 text-2xl font-black px-4 py-2 rounded-xl border ${GRADE_BG[report.identityGrade]}`}>
                                 {report.identityGrade}
                             </div>
-                            <div>
-                                <p className="text-white font-semibold text-sm">{report.identity}</p>
-                                <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                                    <p className="text-white font-semibold text-sm">{report.identity}</p>
+                                    {report.draftIdentityLabel && (
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${IDENTITY_LABEL_COLOR[report.draftIdentityLabel]}`}>
+                                            {report.draftIdentityLabel}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-3 mt-1 flex-wrap">
                                     <span className="text-gray-500 text-xs">Avg alignment: {report.avgScore}/25</span>
                                     <span className={`text-xs font-semibold ${report.totalVop >= 0 ? 'text-green-400' : 'text-orange-400'}`}>
                                         Total VOP: {report.totalVop >= 0 ? '+' : ''}{report.totalVop}
                                     </span>
+                                    {report.dtvSnapshot && report.dtvSnapshot.delta > 0 && (
+                                        <span className="text-xs font-semibold text-emerald-400">
+                                            {report.dtvSnapshot.deltaLabel}
+                                        </span>
+                                    )}
                                     {p && (
                                         <>
                                             <span className="text-xs text-gray-600">
@@ -324,6 +370,14 @@ export default function DraftReportPanel({
                             </div>
                         </div>
                     </div>
+
+                    {/* ── Draft Storyline ────────────────────────────────────────────────── */}
+                    {report.draftStoryline && (
+                        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+                            <p className="text-[10px] font-bold tracking-widest text-gray-500 uppercase mb-2">Draft Storyline</p>
+                            <p className="text-gray-300 text-sm leading-relaxed">{report.draftStoryline}</p>
+                        </div>
+                    )}
 
                     {/* ── Tier Distribution ─────────────────────────────────────────────── */}
                     <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
@@ -455,6 +509,21 @@ export default function DraftReportPanel({
                                 <p className="text-[10px] font-bold tracking-widest text-gray-500 uppercase mb-2">Dynasty Outlook</p>
                                 <p className="text-gray-300 text-sm leading-relaxed">{f.dynastyOutlook}</p>
                             </div>
+
+                            {/* What You Accomplished */}
+                            {f.accomplishments && f.accomplishments.length > 0 && (
+                                <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                                    <p className="text-[10px] font-bold tracking-widest text-gray-500 uppercase mb-3">What You Accomplished</p>
+                                    <ul className="space-y-2">
+                                        {f.accomplishments.map((item, i) => (
+                                            <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
+                                                <span className="shrink-0 text-[#D4AF37] mt-0.5">✓</span>
+                                                <span>{item}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
                         </div>
                     )}
                 </>

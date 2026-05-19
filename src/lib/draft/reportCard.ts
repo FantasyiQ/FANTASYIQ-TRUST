@@ -1,8 +1,14 @@
-// FantasyiQ Trust — FiQ Draft Report Card Engine v3.3
+// FantasyiQ Trust — FiQ Draft Report Card Engine v3.4
 // Post-draft audit: did you draft according to your Effective Mode and Trajectory?
 
 import type { DraftProfile, TrajectoryWindow } from './context';
 import { normalizePosition } from './context';
+import { computeProspectIdentity }                       from './prospectIdentity';
+import { computeRosterContextNote, type PreDraftPositionalState } from './rosterContext';
+import { computeDTVSnapshot, computePickDTVNote, type DTVSnapshot } from './teamDTVDelta';
+import { computePickCommentary }                         from './pickCommentary';
+import { computeDraftIdentityLabel, type DraftIdentityLabel, DRAFT_IDENTITY_DESC } from './draftIdentityLabel';
+import { computeDraftStoryline }                         from './draftStoryline';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -33,6 +39,11 @@ export interface PickAlignment {
     totalScore:      number;          // 0–25
     grade:           PickGrade;
     gradeNote:       string;
+    // v3.4 enrichments
+    prospectIdentity:  string;
+    rosterContextNote: string;
+    dtvNote:           string;
+    pickCommentary:    string;
 }
 
 export interface TierDistribution {
@@ -57,6 +68,7 @@ export interface FranchiseState {
     ageCurve:            { young: number; prime: number; aging: number };
     winProbabilityDelta: number;
     dynastyOutlook:      string;
+    accomplishments:     string[];   // v3.4 "What You Accomplished" bullets
 }
 
 export interface DraftReportCard {
@@ -70,7 +82,14 @@ export interface DraftReportCard {
     totalVop:         number;
     franchise:        FranchiseState;
     draftProfile:     DraftProfile;
+    // v3.4 additions
+    draftIdentityLabel: DraftIdentityLabel;
+    draftStoryline:     string;
+    dtvSnapshot:        DTVSnapshot | null;
 }
+
+// Re-export types that consumers need
+export type { DTVSnapshot, DraftIdentityLabel };
 
 // ── Player pool entry ─────────────────────────────────────────────────────────
 
@@ -245,7 +264,7 @@ function opportunityFitScore(
 //   5. fills === true OR it's already a tight BPA tie
 // Otherwise use positive/contextual framing.
 
-function gradeNote(pick: Omit<PickAlignment, 'gradeNote' | 'grade'>): string {
+function gradeNote(pick: Omit<PickAlignment, 'gradeNote' | 'grade' | 'prospectIdentity' | 'rosterContextNote' | 'dtvNote' | 'pickCommentary'>): string {
     const parts: string[] = [];
     const { tierFit, modeFit, trajectoryFit, needFit, opportunityFit } = pick;
     const top = Math.max(tierFit, modeFit, trajectoryFit);
@@ -341,9 +360,12 @@ function computeLeagueAvgTiers(
 // ── Franchise section ─────────────────────────────────────────────────────────
 
 export interface RichRosterPlayer {
-    position: string;
-    age:      number | null;
-    fiqScore: number;
+    position:    string;
+    age:         number | null;
+    fiqScore:    number;
+    rawValue?:   number;        // v3.4: KTC dynasty value (for DTV delta)
+    playerName?: string | null; // v3.4: for pre-pick positional state lookup
+    isDraftPick?: boolean;      // v3.4: true if added in this draft
 }
 
 const AGE_YOUNG: Record<string, number> = { QB: 25, RB: 23, WR: 24, TE: 24 };
@@ -538,6 +560,22 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
 
     const sortedAllPicks = [...allPicks].sort((a, b) => a.pickOverall - b.pickOverall);
 
+    // v3.4: build per-position pre-draft state for roster context
+    type PositionEntry = { name: string; fiqScore: number; rawValue: number };
+    const preStateMap: Record<string, PositionEntry[]> = {};
+    for (const p of rosterRich.filter(r => !r.isDraftPick)) {
+        const pos = normalizePosition(p.position);
+        if (!preStateMap[pos]) preStateMap[pos] = [];
+        preStateMap[pos].push({
+            name:     p.playerName ?? 'Unknown',
+            fiqScore: p.fiqScore,
+            rawValue: p.rawValue ?? 0,
+        });
+    }
+    for (const pos of Object.keys(preStateMap)) {
+        preStateMap[pos].sort((a, b) => b.fiqScore - a.fiqScore);
+    }
+
     const picks: PickAlignment[]  = [];
     let myTierDist = { T1: 0, T2: 0, T3: 0, T4: 0, T5: 0 };
 
@@ -603,7 +641,64 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
             grade:           gradeFromScore(total),
         };
 
-        picks.push({ ...alignmentNoNote, gradeNote: gradeNote(alignmentNoNote) });
+        // v3.4 enrichments
+        const posEntries  = preStateMap[pos] ?? [];
+        const preState: PreDraftPositionalState | null = posEntries.length > 0
+            ? { names: posEntries.map(e => e.name), values: posEntries.map(e => e.rawValue), fiqScores: posEntries.map(e => e.fiqScore) }
+            : null;
+
+        const prospectIdentity = computeProspectIdentity({
+            fiqScore:         player.fiqScore,
+            position:         normalizePosition(player.position),
+            opportunityScore: player.opportunityScore ?? null,
+            age:              player.age ?? null,
+            tier:             player.tier,
+        });
+
+        const rosterContextNote = computeRosterContextNote({
+            position:          normalizePosition(player.position),
+            playerName:        player.playerName,
+            playerFiqScore:    player.fiqScore,
+            fills,
+            deficit,
+            preState,
+            competitiveWindow: traj,
+            tier:              player.tier,
+            age:               player.age ?? null,
+        });
+
+        const pickRichPlayer = rosterRich.find(
+            r => r.isDraftPick && (r.playerName === player.playerName)
+        );
+        const dtvNote = computePickDTVNote(pickRichPlayer?.rawValue ?? 0, player.tier);
+
+        const pickCommentary = computePickCommentary({
+            playerName:        player.playerName,
+            prospectIdentity,
+            rosterContextNote,
+            dtvNote,
+        });
+
+        picks.push({
+            ...alignmentNoNote,
+            gradeNote: gradeNote(alignmentNoNote),
+            prospectIdentity,
+            rosterContextNote,
+            dtvNote,
+            pickCommentary,
+        });
+
+        // Add this pick to preStateMap for subsequent picks
+        const picked: PositionEntry = {
+            name:     player.playerName,
+            fiqScore: player.fiqScore,
+            rawValue: pickRichPlayer?.rawValue ?? 0,
+        };
+        if (!preStateMap[pos]) preStateMap[pos] = [];
+        const inserted = preStateMap[pos];
+        const insertAt = inserted.findIndex(e => e.fiqScore < player.fiqScore);
+        if (insertAt === -1) inserted.push(picked);
+        else inserted.splice(insertAt, 0, picked);
 
         const key = `T${player.tier}` as keyof typeof myTierDist;
         myTierDist[key] = (myTierDist[key] ?? 0) + 1;
@@ -621,9 +716,15 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
     );
 
     const tierDistribution: TierDistribution = { ...myTierDist, leagueAvg };
-    const draftStrategy = computeDraftStrategy(myTierDist);
-    const totalVop      = Math.round(picks.reduce((s, p) => s + p.vop, 0));
-    const identity      = draftIdentity(draftProfile, avgScore, classStrength);
+    const draftStrategy    = computeDraftStrategy(myTierDist);
+    const totalVop         = Math.round(picks.reduce((s, p) => s + p.vop, 0));
+    const identity         = draftIdentity(draftProfile, avgScore, classStrength);
+
+    // v3.4 draft-level outputs
+    const draftIdentityLabelValue = computeDraftIdentityLabel(picks);
+    const dtvSnapshot             = rosterRich.some(r => r.rawValue != null && r.rawValue > 0)
+        ? computeDTVSnapshot(rosterRich)
+        : null;
 
     // Franchise state
     const coreStrength      = computeCoreStrength(rosterRich);
@@ -648,6 +749,25 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
         avgScore,
     );
 
+    // v3.4: "What You Accomplished" bullets
+    const accomplishments: string[] = [];
+    const eliteAdded = picks.filter(p => p.tier <= 2).length;
+    if (eliteAdded > 0)       accomplishments.push(`Added ${eliteAdded} T${eliteAdded === 1 && picks.find(p => p.tier === 1) ? '1' : '1/T2'} playmaker${eliteAdded > 1 ? 's' : ''}`);
+    const gapsFilled = picks.filter(p => p.needFit >= 4).map(p => p.position);
+    const uniqueGaps = [...new Set(gapsFilled)];
+    if (uniqueGaps.length > 0) accomplishments.push(`Addressed ${uniqueGaps.join(' and ')} depth`);
+    if (dtvSnapshot && dtvSnapshot.delta > 0) {
+        const formatted = dtvSnapshot.delta >= 1000
+            ? `${(dtvSnapshot.delta / 1000).toFixed(1)}k`
+            : String(dtvSnapshot.delta);
+        accomplishments.push(`Added +${formatted} dynasty trade value`);
+    }
+    const trajLabel = franchiseTraj === 'WIN_NOW' ? 'Competitive Window'
+        : franchiseTraj === 'ASCENDING' ? 'Growth Window'
+        : franchiseTraj === 'REBUILD'   ? 'Rebuild Window'
+        : 'Stable Window';
+    accomplishments.push(`Strengthened your ${trajLabel}`);
+
     const franchise: FranchiseState = {
         trajectoryWindow:    franchiseTraj,
         horizonYears:        trajectoryData?.horizonYears ?? draftProfile.horizonYears,
@@ -657,7 +777,18 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
         ageCurve,
         winProbabilityDelta: winProbDelta,
         dynastyOutlook,
+        accomplishments,
     };
+
+    // v3.4: storyline (needs franchiseTraj, which is resolved above)
+    const draftStorylineValue = computeDraftStoryline({
+        picks,
+        identityLabel:    draftIdentityLabelValue,
+        trajectoryWindow: franchiseTraj,
+        avgScore,
+        dtvSnapshot,
+        classStrength,
+    });
 
     return {
         picks,
@@ -670,5 +801,8 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
         totalVop,
         franchise,
         draftProfile,
+        draftIdentityLabel: draftIdentityLabelValue,
+        draftStoryline:     draftStorylineValue,
+        dtvSnapshot,
     };
 }

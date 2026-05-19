@@ -233,17 +233,25 @@ export async function GET(req: NextRequest): Promise<Response> {
             const fc       = p.fullName ? fcByName.get(p.fullName) : undefined;
             const ktcValue = fc ? (superflex ? fc.dynastyValueSf : fc.dynastyValue) : null;
             return {
-                position: normalizePosition(p.position),
-                age:      p.age ?? null,
-                fiqScore: ktcValue != null ? Math.min(100, Math.round(ktcValue / 90)) : 50,
+                position:   normalizePosition(p.position),
+                age:        p.age ?? null,
+                fiqScore:   ktcValue != null ? Math.min(100, Math.round(ktcValue / 90)) : 50,
+                rawValue:   ktcValue ?? 0,
+                playerName: p.fullName ?? null,
+                isDraftPick: false,
             };
         }),
         ...myPickSleeper.map(p => {
             const poolPlayer = pool.find(pp => pp.sleeperPlayerId === p.playerId);
+            const fc         = p.fullName ? fcByName.get(p.fullName) : undefined;
+            const ktcValue   = fc ? (superflex ? fc.dynastyValueSf : fc.dynastyValue) : null;
             return {
-                position: normalizePosition(p.position),
-                age:      p.age ?? null,
-                fiqScore: poolPlayer?.fiqScore ?? 50,
+                position:   normalizePosition(p.position),
+                age:        p.age ?? null,
+                fiqScore:   poolPlayer?.fiqScore ?? 50,
+                rawValue:   ktcValue ?? (poolPlayer ? poolPlayer.fiqScore * 90 : 0),
+                playerName: p.fullName ?? null,
+                isDraftPick: true,
             };
         }),
     ];
