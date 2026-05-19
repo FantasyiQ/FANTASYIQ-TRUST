@@ -271,10 +271,13 @@ export default function MembersCard({ members }: Props) {
                 <>
                     {/* PRS legend */}
                     <div className="px-6 py-3 border-t border-gray-800 bg-gray-800/20">
-                        <p className="text-[10px] text-gray-600 leading-relaxed">
-                            <span className="font-bold text-gray-500">Player Reliability Score (PRS)</span> measures how dependably a manager fulfills their league commitments — dues payments, trade follow-through, FAAB activity, and roster management.
-                            Scores range from 0–100. Only members who have joined FantasyiQ Trust show a score.
-                        </p>
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                            <p className="text-[10px] text-gray-600 leading-relaxed">
+                                <span className="font-bold text-gray-500">Player Reliability Score (PRS)</span> measures how dependably a manager fulfills their league commitments — dues payments, trade follow-through, FAAB activity, and roster management.
+                                Scores range from 0–100. Only members who have joined FantasyiQ Trust show a score.
+                            </p>
+                            <a href="/support#faq-prs" className="text-[10px] text-gray-600 hover:text-[#D4AF37] transition shrink-0">Learn more →</a>
+                        </div>
                         <div className="flex items-center gap-3 mt-2 flex-wrap">
                             {[
                                 { label: 'Elite', styles: 'bg-[#D4AF37]/10 border-[#D4AF37]/40 text-[#D4AF37]',           range: '81–100' },

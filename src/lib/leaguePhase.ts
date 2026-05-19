@@ -1,5 +1,6 @@
-// FantasyiQ Trust — League Phase Engine
+// FantasyiQ Trust — League Phase Engine v3.5
 // Fully dynamic: no hardcoded week numbers. Everything derives from league settings.
+// v3.5: nullable currentWeek, explicit fallback defaults, cleaner guard ordering.
 
 export type LeaguePhase =
     | 'PRE_DRAFT'       // after NFL season ends, before the rookie draft
@@ -9,11 +10,11 @@ export type LeaguePhase =
     | 'CHAMPIONSHIP';   // champWeek
 
 export interface LeaguePhaseInput {
-    season:              string;    // e.g. "2026"
-    currentWeek:         number;    // 0 = offseason before Week 1
-    draftStatus:         string | null; // "complete" = rookie draft done
-    playoffWeekStart:    number | null; // null = unknown
-    champWeek:           number | null; // null = unknown
+    season:              string;          // e.g. "2026"
+    currentWeek:         number | null;   // null = pre-schedule / pre-season; 0 = same
+    draftStatus:         string | null;   // "complete" = rookie draft done
+    playoffWeekStart:    number | null;   // null = unknown / not configured
+    champWeek:           number | null;   // null = unknown / not configured
 }
 
 export interface LeaguePhaseResult {
@@ -47,15 +48,17 @@ export function deriveChampWeek(
     return playoffWeekStart + (rounds - 1) * weeksPerRound;
 }
 
-// ── Main phase resolver ───────────────────────────────────────────────────────
+// ── Main phase resolver v3.5 ─────────────────────────────────────────────────
 export function getLeaguePhaseResult(input: LeaguePhaseInput): LeaguePhaseResult {
     const {
         season,
-        currentWeek,
         draftStatus,
         playoffWeekStart,
         champWeek,
     } = input;
+
+    // Normalise currentWeek: null and 0 both mean "pre-season / no schedule yet"
+    const currentWeek = input.currentWeek ?? 0;
 
     const seasonYear  = parseInt(season, 10) || new Date().getFullYear();
     const draftDone   = draftStatus === 'complete';
@@ -64,24 +67,26 @@ export function getLeaguePhaseResult(input: LeaguePhaseInput): LeaguePhaseResult
     // Determine phase
     let phase: LeaguePhase;
 
-    if (!draftDone && currentWeek === 0) {
+    // Guard 1: no schedule yet (null or week 0)
+    if (currentWeek === 0) {
+        phase = draftDone ? 'OFFSEASON' : 'PRE_DRAFT';
+    }
+    // Guard 2: draft not complete — still pre-draft regardless of week
+    else if (!draftDone) {
         phase = 'PRE_DRAFT';
-    } else if (draftDone && currentWeek === 0) {
-        phase = 'OFFSEASON';
-    } else if (hasSettings && currentWeek === champWeek!) {
-        phase = 'CHAMPIONSHIP';
-    } else if (hasSettings && currentWeek >= playoffWeekStart! && currentWeek < champWeek!) {
-        phase = 'PLAYOFFS';
-    } else if (currentWeek >= 1) {
-        // If settings are missing we still know it's at least regular season
-        if (hasSettings && currentWeek >= playoffWeekStart!) {
-            // Shouldn't reach here but guard anyway
-            phase = 'PLAYOFFS';
-        } else {
-            phase = 'REGULAR_SEASON';
-        }
-    } else {
-        phase = 'OFFSEASON';
+    }
+    // Guard 3: settings present — use configured playoff weeks
+    else if (hasSettings) {
+        if (currentWeek >= champWeek!)                              phase = 'CHAMPIONSHIP';
+        else if (currentWeek >= playoffWeekStart!)                  phase = 'PLAYOFFS';
+        else                                                         phase = 'REGULAR_SEASON';
+    }
+    // Guard 4: settings missing — fall back to well-known NFL defaults
+    else {
+        if (currentWeek >= 15)       phase = 'CHAMPIONSHIP';
+        else if (currentWeek === 14) phase = 'PLAYOFFS';
+        else if (currentWeek >= 1)   phase = 'REGULAR_SEASON';
+        else                         phase = 'OFFSEASON';
     }
 
     // Active rookie class:

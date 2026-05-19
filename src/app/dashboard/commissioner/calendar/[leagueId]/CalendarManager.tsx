@@ -17,9 +17,12 @@ export interface CalendarEvent {
 }
 
 export interface CalendarManagerProps {
-    leagueId:   string;
-    leagueName: string;
-    initial:    CalendarEvent[];
+    leagueId:         string;
+    leagueName:       string;
+    initial:          CalendarEvent[];
+    platform:         string;               // "sleeper" | "espn" etc.
+    playoffWeekStart: number | null;
+    champWeek:        number | null;
 }
 
 type EventType = 'draft' | 'trade_deadline' | 'waiver_deadline' | 'regular_season_end' | 'playoff_start' | 'championship' | 'custom';
@@ -340,10 +343,170 @@ function AddEventForm({ leagueId, onAdd, onClose }: {
 }
 
 // ---------------------------------------------------------------------------
+// PlayoffScheduleSection
+// ---------------------------------------------------------------------------
+
+function PlayoffScheduleSection({
+    leagueId,
+    platform,
+    initialPws,
+    initialCw,
+}: {
+    leagueId:    string;
+    platform:    string;
+    initialPws:  number | null;
+    initialCw:   number | null;
+}) {
+    const isSleeper = platform.toLowerCase() === 'sleeper';
+    const isESPN    = platform.toLowerCase() === 'espn';
+
+    const [pws,    setPws]    = useState<number | ''>(initialPws ?? '');
+    const [cw,     setCw]     = useState<number | ''>(initialCw ?? '');
+    const [saving, setSaving] = useState(false);
+    const [saved,  setSaved]  = useState(false);
+    const [error,  setError]  = useState<string | null>(null);
+    // Track whether the commissioner has overridden the Sleeper values
+    const [overridden, setOverridden] = useState(false);
+
+    const configured = pws !== '' && cw !== '';
+
+    async function handleSave(e: React.FormEvent) {
+        e.preventDefault();
+        const pwsNum = Number(pws);
+        const cwNum  = Number(cw);
+        if (!pwsNum || !cwNum) { setError('Both weeks are required.'); return; }
+        if (pwsNum < 1 || pwsNum > 18 || cwNum < 1 || cwNum > 18) {
+            setError('Week numbers must be between 1 and 18.');
+            return;
+        }
+        if (pwsNum >= cwNum) {
+            setError('Championship Week must be after Playoff Start Week.');
+            return;
+        }
+        setSaving(true);
+        setError(null);
+        try {
+            const res = await fetch(`/api/leagues/${leagueId}/phase-settings`, {
+                method:  'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ playoffWeekStart: pwsNum, champWeek: cwNum }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error ?? 'Save failed');
+            setSaved(true);
+            setOverridden(true);
+            setTimeout(() => setSaved(false), 3000);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Save failed');
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    // Sync badge logic
+    const showAutoSynced = isSleeper && configured && !overridden;
+    const showManualOverride = isSleeper && configured && overridden;
+    const showESPNWarning = isESPN && !configured;
+
+    return (
+        <div className={`bg-gray-900 border rounded-2xl p-5 space-y-4 ${!configured && !isSleeper ? 'border-amber-700/40' : 'border-gray-800'}`}>
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div>
+                    <h3 className="font-semibold text-white text-sm">Playoff Schedule</h3>
+                    <p className="text-gray-500 text-xs mt-0.5">
+                        {configured
+                            ? `Playoffs start Week ${pws} · Championship Week ${cw}`
+                            : 'Set your playoff start week and championship week.'}
+                    </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                    {showAutoSynced && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-emerald-900/20 text-emerald-400 border-emerald-700/40">
+                            Auto-synced from Sleeper
+                        </span>
+                    )}
+                    {showManualOverride && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-blue-900/20 text-blue-400 border-blue-700/40">
+                            Manual override
+                        </span>
+                    )}
+                    {showESPNWarning && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-amber-900/20 text-amber-400 border-amber-700/40">
+                            Manual configuration required
+                        </span>
+                    )}
+                    {configured && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-green-900/20 text-green-400 border-green-700/40">
+                            Configured
+                        </span>
+                    )}
+                    {!configured && isSleeper && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-amber-900/20 text-amber-400 border-amber-700/40">
+                            Action Required
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            {/* Inputs */}
+            <form onSubmit={handleSave} className="flex items-end gap-3 flex-wrap">
+                <div className="space-y-1">
+                    <label className="text-gray-500 text-xs block">Playoff Start Week</label>
+                    <input
+                        type="number"
+                        min={1}
+                        max={18}
+                        value={pws}
+                        onChange={e => { setPws(e.target.value === '' ? '' : Number(e.target.value)); setOverridden(true); }}
+                        placeholder="e.g. 15"
+                        className="w-24 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/60"
+                    />
+                </div>
+                <div className="space-y-1">
+                    <label className="text-gray-500 text-xs block">Championship Week</label>
+                    <input
+                        type="number"
+                        min={1}
+                        max={18}
+                        value={cw}
+                        onChange={e => { setCw(e.target.value === '' ? '' : Number(e.target.value)); setOverridden(true); }}
+                        placeholder="e.g. 17"
+                        className="w-24 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/60"
+                    />
+                </div>
+                <button
+                    type="submit"
+                    disabled={saving || (pws === '' && cw === '')}
+                    className="px-4 py-1.5 rounded-lg bg-[#D4AF37] text-black text-xs font-bold hover:bg-[#BF9D2F] transition disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                    {saving ? 'Saving…' : 'Save'}
+                </button>
+                {saved && <span className="text-green-400 text-xs">Saved</span>}
+                {error && <span className="text-red-400 text-xs">{error}</span>}
+            </form>
+
+            {isSleeper && (
+                <p className="text-gray-600 text-[10px]">
+                    Playoff weeks are auto-populated from Sleeper when available. Edit to override.{' '}
+                    <a href="/support#faq-calendar-playoffs" className="text-gray-500 hover:text-[#D4AF37] transition">Need help?</a>
+                </p>
+            )}
+            {isESPN && (
+                <p className="text-gray-600 text-[10px]">
+                    ESPN doesn&apos;t provide playoff schedule data — set these manually for accurate phase detection and pick values.{' '}
+                    <a href="/support#faq-calendar-playoffs" className="text-gray-500 hover:text-[#D4AF37] transition">See guide →</a>
+                </p>
+            )}
+        </div>
+    );
+}
+
+// ---------------------------------------------------------------------------
 // CalendarManager
 // ---------------------------------------------------------------------------
 
-export default function CalendarManager({ leagueId, leagueName, initial }: CalendarManagerProps) {
+export default function CalendarManager({ leagueId, leagueName, initial, platform, playoffWeekStart, champWeek }: CalendarManagerProps) {
     const [events, setEvents]       = useState<CalendarEvent[]>(
         [...initial].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     );
@@ -373,6 +536,14 @@ export default function CalendarManager({ leagueId, leagueName, initial }: Calen
 
     return (
         <div className="space-y-6">
+
+            {/* ── Playoff Schedule (Core Dates) ───────────────────────────── */}
+            <PlayoffScheduleSection
+                leagueId={leagueId}
+                platform={platform}
+                initialPws={playoffWeekStart}
+                initialCw={champWeek}
+            />
 
             {/* Quick stats strip */}
             {events.length > 0 && (
@@ -455,6 +626,21 @@ export default function CalendarManager({ leagueId, leagueName, initial }: Calen
                     ))
                 )}
             </div>
+
+            {/* ── Season Phase Preview ─────────────────────────────────────── */}
+            {(playoffWeekStart || champWeek) && (
+                <div className="bg-gray-900 border border-gray-800 rounded-xl px-5 py-3">
+                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Season Phase Preview</p>
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                        {playoffWeekStart && champWeek
+                            ? `Your league will enter PLAYOFFS in Week ${playoffWeekStart} and conclude with CHAMPIONSHIP in Week ${champWeek}.`
+                            : playoffWeekStart
+                                ? `Your league will enter PLAYOFFS in Week ${playoffWeekStart}. Set Championship Week to complete phase detection.`
+                                : `Set Playoff Start Week to enable accurate season phase detection.`
+                        }
+                    </p>
+                </div>
+            )}
 
             {/* Legend */}
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">

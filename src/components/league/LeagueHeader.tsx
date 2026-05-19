@@ -8,6 +8,8 @@ import EspnRefreshButton from '@/app/dashboard/league/[id]/EspnRefreshButton';
 import { getNflState } from '@/lib/sleeper';
 import { getLeaguePhaseResult, phaseLabel } from '@/lib/leaguePhase';
 import type { LeaguePhase } from '@/lib/leaguePhase';
+import LeagueSupportContextPusher from '@/components/support/LeagueSupportContextPusher';
+import type { SupportPlatform, SupportSeasonPhase } from '@/lib/support/SupportContextStore';
 
 type DraftVariant = 'none' | 'upcoming' | 'urgent' | 'done';
 
@@ -117,6 +119,13 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
         playoffWeekStart: league.playoffWeekStart,
         champWeek:        league.champWeek,
     });
+
+    // Normalise for SupportContext
+    const supportPlatform: SupportPlatform =
+        league.platform === 'espn'    ? 'ESPN'   :
+        league.platform === 'sleeper' ? 'SLEEPER' : 'OTHER';
+    const supportPhase = phaseResult.phase as SupportSeasonPhase;
+    const draftCompleted = league.draftStatus === 'complete';
 
     const scoringDisplay =
         league.scoringType === 'ppr'      ? 'PPR'   :
@@ -257,6 +266,16 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
                     ) : null}
                 </div>
             </div>
+
+            {/* Push league context into FiQ Support Assistant */}
+            <LeagueSupportContextPusher
+                platform={supportPlatform}
+                seasonPhase={supportPhase}
+                draftCompleted={draftCompleted}
+                hasDraftReport={draftCompleted}
+                playoffStartWeek={league.playoffWeekStart ?? undefined}
+                championshipWeek={league.champWeek ?? undefined}
+            />
         </div>
     );
 }

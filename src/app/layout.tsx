@@ -3,6 +3,8 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import Navbar from '@/components/Navbar';
 import SessionProvider from '@/components/SessionProvider';
+import { SupportContextProvider } from '@/lib/support/SupportContextStore';
+import SupportAssistantLauncher from '@/components/support/SupportAssistantLauncher';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -16,8 +18,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className={inter.className + ' bg-gray-950'}>
         <SessionProvider>
-          <Navbar />
-          {children}
+          <SupportContextProvider>
+            <Navbar />
+            {children}
+            <SupportAssistantLauncher />
+          </SupportContextProvider>
         </SessionProvider>
       </body>
     </html>

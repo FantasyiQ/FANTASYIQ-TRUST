@@ -98,6 +98,9 @@ export default async function Navbar() {
               <Link href="/pricing" className="text-gray-300 hover:text-white transition text-sm whitespace-nowrap shrink-0">
                 Pricing
               </Link>
+              <Link href="/support" className="text-gray-300 hover:text-white transition text-sm whitespace-nowrap shrink-0">
+                Support
+              </Link>
               <Link
                 href="/sign-in"
                 className="bg-[#D4AF37] hover:bg-[#B8911F] text-gray-950 font-semibold px-3 sm:px-5 py-2 rounded-lg transition text-sm whitespace-nowrap shrink-0"

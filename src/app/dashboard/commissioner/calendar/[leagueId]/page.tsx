@@ -24,11 +24,14 @@ export default async function CommissionerLeagueCalendarPage({
     const league = await prisma.league.findFirst({
         where: { id: leagueId, userId: user.id },
         select: {
-            id:          true,
-            leagueName:  true,
-            season:      true,
-            totalRosters: true,
-            scoringType: true,
+            id:               true,
+            leagueName:       true,
+            season:           true,
+            totalRosters:     true,
+            scoringType:      true,
+            platform:         true,
+            playoffWeekStart: true,
+            champWeek:        true,
             calendarEvents: {
                 orderBy: { date: 'asc' },
                 select: {
@@ -73,6 +76,9 @@ export default async function CommissionerLeagueCalendarPage({
                     leagueId={leagueId}
                     leagueName={league.leagueName}
                     initial={events}
+                    platform={league.platform}
+                    playoffWeekStart={league.playoffWeekStart ?? null}
+                    champWeek={league.champWeek ?? null}
                 />
 
             </div>

@@ -281,7 +281,10 @@ export default function DraftReportPanel({
         <div className="space-y-4">
             {/* Controls */}
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-4">
-                <p className="text-[10px] font-bold tracking-widest text-gray-500 uppercase">FiQ Draft Report Card</p>
+                <div className="flex items-center justify-between gap-2">
+                    <p className="text-[10px] font-bold tracking-widest text-gray-500 uppercase">FiQ Draft Report Card</p>
+                    <a href="/support#faq-draft-reports" className="text-[10px] text-gray-600 hover:text-[#D4AF37] transition">Questions? Support Center →</a>
+                </div>
                 <div className="flex flex-wrap gap-3 items-end">
                     <div className="space-y-1">
                         <label className="text-gray-500 text-xs block">Draft</label>
@@ -314,7 +317,7 @@ export default function DraftReportPanel({
                         disabled={loading || !selectedDraftId || !selectedRosterId}
                         className="px-4 py-1.5 rounded-lg bg-[#D4AF37] text-black text-xs font-bold hover:bg-[#BF9D2F] transition disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                        {loading ? 'Generating…' : 'Generate Report'}
+                        {loading ? 'Generating…' : 'Generate FiQ Report'}
                     </button>
                     {report && (
                         <button
@@ -322,7 +325,7 @@ export default function DraftReportPanel({
                             disabled={loading}
                             className="px-3 py-1.5 rounded-lg border border-gray-700 text-gray-400 text-xs hover:text-white hover:border-gray-500 transition disabled:opacity-40"
                         >
-                            ↺ Refresh
+                            ↺ Refresh FiQ
                         </button>
                     )}
                 </div>
