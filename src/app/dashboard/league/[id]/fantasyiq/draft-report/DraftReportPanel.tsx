@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import type { DraftReportCard, PickAlignment, PickGrade } from '@/lib/draft/reportCard';
+import type { DraftReportCard, PickAlignment, PickGrade, ClassStrength } from '@/lib/draft/reportCard';
 
 interface DraftOption {
     draftId: string;
@@ -36,18 +36,31 @@ const GRADE_BG: Record<PickGrade, string> = {
     'F':  'bg-red-900/30 text-red-400 border-red-700/40',
 };
 
+// v3.3: human-readable window names
 const TRAJ_LABEL: Record<string, string> = {
-    WIN_NOW:   'WIN‑NOW',
-    ASCENDING: 'ASCENDING',
-    PLATEAU:   'PLATEAU',
-    REBUILD:   'REBUILD',
+    WIN_NOW:   'Competitive Window',
+    ASCENDING: 'Growth Window',
+    PLATEAU:   'Stable Window',
+    REBUILD:   'Rebuild Window',
 };
 
 const TRAJ_COLOR: Record<string, string> = {
     WIN_NOW:   'text-red-300',
     ASCENDING: 'text-emerald-300',
-    PLATEAU:   'text-gray-400',
+    PLATEAU:   'text-blue-300',
     REBUILD:   'text-indigo-300',
+};
+
+const CLASS_LABEL: Record<ClassStrength, string> = {
+    weak:    'Weak Class',
+    average: 'Average Class',
+    strong:  'Deep Class',
+};
+
+const CLASS_COLOR: Record<ClassStrength, string> = {
+    weak:    'text-orange-400',
+    average: 'text-gray-400',
+    strong:  'text-emerald-400',
 };
 
 const POS_COLORS: Record<string, string> = {
@@ -303,7 +316,7 @@ export default function DraftReportPanel({
                                                 Mode: <span className="text-gray-400">{p.teamMode.replace('_', ' ')}</span>
                                             </span>
                                             <span className={`text-xs font-medium ${TRAJ_COLOR[p.trajectoryWindow]}`}>
-                                                Trajectory: {TRAJ_LABEL[p.trajectoryWindow]} ({p.horizonYears}-yr)
+                                                {TRAJ_LABEL[p.trajectoryWindow] ?? p.trajectoryWindow} · {p.horizonYears}-yr
                                             </span>
                                         </>
                                     )}
@@ -314,7 +327,18 @@ export default function DraftReportPanel({
 
                     {/* ── Tier Distribution ─────────────────────────────────────────────── */}
                     <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
-                        <p className="text-[10px] font-bold tracking-widest text-gray-500 uppercase">Tier Distribution</p>
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                            <p className="text-[10px] font-bold tracking-widest text-gray-500 uppercase">Tier Distribution</p>
+                            <div className="flex items-center gap-3">
+                                <span className={`text-[10px] font-bold ${CLASS_COLOR[report.classStrength]}`}>
+                                    {CLASS_LABEL[report.classStrength]}
+                                </span>
+                                <span className="text-[10px] text-gray-600">·</span>
+                                <span className="text-[10px] font-bold text-gray-400">
+                                    {report.draftStrategy} Strategy
+                                </span>
+                            </div>
+                        </div>
                         <div className="space-y-2">
                             {(['T1', 'T2', 'T3', 'T4', 'T5'] as const).map(t => (
                                 <TierBar
@@ -346,28 +370,26 @@ export default function DraftReportPanel({
                         <div className="space-y-3">
                             <p className="text-[10px] font-bold tracking-widest text-gray-500 uppercase">State of the Franchise</p>
 
-                            {/* Competitive window + win delta */}
-                            <div className="flex gap-3 flex-wrap">
-                                <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 flex items-center gap-3">
-                                    <div>
-                                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">Competitive Window</p>
-                                        <p className={`font-bold text-sm leading-none mt-0.5 ${TRAJ_COLOR[f.trajectoryWindow] ?? 'text-white'}`}>
-                                            {TRAJ_LABEL[f.trajectoryWindow] ?? f.trajectoryWindow}
-                                        </p>
-                                        <p className="text-gray-600 text-[10px]">{f.horizonYears}-year horizon</p>
-                                    </div>
-                                    <div className="w-px h-10 bg-gray-800" />
-                                    <div>
-                                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">Roster Score</p>
-                                        <p className="text-white font-bold text-lg leading-none">{f.overallScore}</p>
-                                    </div>
-                                    <div className="w-px h-10 bg-gray-800" />
-                                    <div>
-                                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">Draft Impact</p>
-                                        <p className={`font-bold text-sm leading-none mt-0.5 ${f.winProbabilityDelta >= 0 ? 'text-green-400' : 'text-orange-400'}`}>
-                                            {f.winProbabilityDelta >= 0 ? '+' : ''}{f.winProbabilityDelta}%
-                                        </p>
-                                    </div>
+                            {/* Franchise window cards */}
+                            <div className="grid grid-cols-3 gap-3">
+                                <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
+                                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Franchise Window</p>
+                                    <p className={`font-bold text-sm leading-tight ${TRAJ_COLOR[f.trajectoryWindow] ?? 'text-white'}`}>
+                                        {TRAJ_LABEL[f.trajectoryWindow] ?? f.trajectoryWindow}
+                                    </p>
+                                    <p className="text-gray-600 text-[10px] mt-0.5">{f.horizonYears}-yr horizon</p>
+                                </div>
+                                <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
+                                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Roster Score</p>
+                                    <p className="text-white font-bold text-lg leading-none">{f.overallScore}</p>
+                                    <p className="text-gray-600 text-[10px] mt-0.5">out of 100</p>
+                                </div>
+                                <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
+                                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Draft Impact</p>
+                                    <p className={`font-bold text-sm leading-none mt-0.5 ${f.winProbabilityDelta > 0 ? 'text-green-400' : f.winProbabilityDelta === 0 ? 'text-gray-400' : 'text-orange-400'}`}>
+                                        {f.winProbabilityDelta > 0 ? '+' : ''}{f.winProbabilityDelta}%
+                                    </p>
+                                    <p className="text-gray-600 text-[10px] mt-0.5">win probability</p>
                                 </div>
                             </div>
 

@@ -1,4 +1,4 @@
-// FantasyiQ Trust — FiQ Draft Report Card Engine
+// FantasyiQ Trust — FiQ Draft Report Card Engine v3.3
 // Post-draft audit: did you draft according to your Effective Mode and Trajectory?
 
 import type { DraftProfile, TrajectoryWindow } from './context';
@@ -6,7 +6,9 @@ import { normalizePosition } from './context';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type PickGrade = 'A+' | 'A' | 'B' | 'C' | 'D' | 'F';
+export type PickGrade      = 'A+' | 'A' | 'B' | 'C' | 'D' | 'F';
+export type ClassStrength  = 'weak' | 'average' | 'strong';
+export type DraftStrategy  = 'Value' | 'Balanced' | 'Upside';
 
 export interface PickAlignment {
     pickOverall:     number;
@@ -21,13 +23,14 @@ export interface PickAlignment {
     fiqScore:        number;
     opportunityScore: number | null;
     bpaTierAtPick:   number | null;
-    vop:             number;         // value over pick slot
-    tierFit:         number;         // 0–5
-    modeFit:         number;         // 0–5
-    trajectoryFit:   number;         // 0–5
-    needFit:         number;         // 0–5
-    opportunityFit:  number;         // 0–5
-    totalScore:      number;         // 0–25
+    bpaFiqAtPick:    number | null;   // fiqScore of best available player at this pick
+    vop:             number;          // value over pick slot
+    tierFit:         number;          // 0–5
+    modeFit:         number;          // 0–5
+    trajectoryFit:   number;          // 0–5
+    needFit:         number;          // 0–5
+    opportunityFit:  number;          // 0–5
+    totalScore:      number;          // 0–25
     grade:           PickGrade;
     gradeNote:       string;
 }
@@ -42,18 +45,18 @@ export interface PositionCoreScore {
     grade:    'A' | 'B' | 'C' | 'D' | 'F';
     avgFiq:   number;
     count:    number;
-    label:    string;  // e.g. "QB Core"
+    label:    string;
 }
 
 export interface FranchiseState {
-    trajectoryWindow:  string;
-    horizonYears:      number;
-    overallScore:      number;
-    coreStrength:      PositionCoreScore[];
-    positionStability: { stable: string[]; fragile: string[]; critical: string[] };
-    ageCurve:          { young: number; prime: number; aging: number };
+    trajectoryWindow:    string;
+    horizonYears:        number;
+    overallScore:        number;
+    coreStrength:        PositionCoreScore[];
+    positionStability:   { stable: string[]; fragile: string[]; critical: string[] };
+    ageCurve:            { young: number; prime: number; aging: number };
     winProbabilityDelta: number;
-    dynastyOutlook:    string;
+    dynastyOutlook:      string;
 }
 
 export interface DraftReportCard {
@@ -62,12 +65,14 @@ export interface DraftReportCard {
     identityGrade:    PickGrade;
     avgScore:         number;
     tierDistribution: TierDistribution;
+    classStrength:    ClassStrength;
+    draftStrategy:    DraftStrategy;
     totalVop:         number;
     franchise:        FranchiseState;
     draftProfile:     DraftProfile;
 }
 
-// ── Player pool entry (shared type for both draft types) ──────────────────────
+// ── Player pool entry ─────────────────────────────────────────────────────────
 
 export interface PoolPlayer {
     sleeperPlayerId: string;
@@ -82,14 +87,13 @@ export interface PoolPlayer {
 
 // ── Grade helpers ─────────────────────────────────────────────────────────────
 
-const TIER_VALUES: Record<number, number> = { 1: 95, 2: 82, 3: 68, 4: 55, 5: 40 };
-
+// v3.3: wider bands, less punitive — makes grades feel fun and readable
 function gradeFromScore(score: number): PickGrade {
-    if (score >= 24) return 'A+';
-    if (score >= 22) return 'A';
-    if (score >= 19) return 'B';
-    if (score >= 16) return 'C';
-    if (score >= 13) return 'D';
+    if (score >= 22) return 'A+';
+    if (score >= 19) return 'A';
+    if (score >= 16) return 'B';
+    if (score >= 12) return 'C';
+    if (score >= 8)  return 'D';
     return 'F';
 }
 
@@ -101,11 +105,38 @@ function posGrade(avgFiq: number): 'A' | 'B' | 'C' | 'D' | 'F' {
     return 'F';
 }
 
+// ── Class strength & tier scaling ─────────────────────────────────────────────
+
+// v3.3: class strength prevents T3 picks from being punished in weak draft classes
+function computeClassStrength(pool: PoolPlayer[]): ClassStrength {
+    const t1    = pool.filter(p => p.tier === 1).length;
+    const elite = pool.filter(p => p.tier <= 2).length;
+    if (t1 >= 8 || elite >= 20) return 'strong';
+    if (t1 <= 2 || elite <= 6)  return 'weak';
+    return 'average';
+}
+
+function tierValuesForClass(cs: ClassStrength): Record<number, number> {
+    if (cs === 'weak')   return { 1: 98, 2: 87, 3: 72, 4: 57, 5: 42 };  // T3 = neutral in weak class
+    if (cs === 'strong') return { 1: 92, 2: 78, 3: 62, 4: 53, 5: 38 };  // T3 slightly negative
+    return                      { 1: 95, 2: 82, 3: 68, 4: 55, 5: 40 };  // average
+}
+
+// ── Draft strategy ────────────────────────────────────────────────────────────
+
+function computeDraftStrategy(dist: { T1: number; T2: number; T3: number; T4: number; T5: number }): DraftStrategy {
+    const total = dist.T1 + dist.T2 + dist.T3 + dist.T4 + dist.T5;
+    if (total === 0) return 'Balanced';
+    if ((dist.T1 + dist.T2) / total >= 0.40) return 'Upside';
+    if ((dist.T4 + dist.T5) / total >= 0.40) return 'Value';
+    return 'Balanced';
+}
+
 // ── Per-component alignment scores ────────────────────────────────────────────
 
 function tierFitScore(playerTier: number, bpaTier: number): number {
     const gap = playerTier - bpaTier;
-    if (gap <= 0) return 5;   // matched or exceeded BPA
+    if (gap <= 0) return 5;
     if (gap === 1) return 3;
     if (gap === 2) return 2;
     return 1;
@@ -187,13 +218,13 @@ function opportunityFitScore(
     }
     if (traj === 'ASCENDING') {
         if (o == null) return 3;
-        if (o >= 70) return 3;    // fine but ceiling > role for ascending
+        if (o >= 70) return 3;
         if (o >= 50) return 4;
         return 3;
     }
     if (traj === 'REBUILD') {
-        if (o == null) return 4;   // correct — don't need a year-1 role
-        if (o >= 70) return 2;     // year-1 role misaligned with rebuild
+        if (o == null) return 4;
+        if (o >= 70) return 2;
         return 3;
     }
     // PLATEAU
@@ -203,35 +234,61 @@ function opportunityFitScore(
     return 2;
 }
 
-// ── Grade note generator ──────────────────────────────────────────────────────
+// ── Grade note generator v3.3 ─────────────────────────────────────────────────
+//
+// v3.3 rules for BPA note suppression:
+// Only surface "T1 was available" when ALL are true:
+//   1. A T1 was actually available (bpaTierAtPick === 1)
+//   2. FiQ gap between T1 and the picked player is ≤ 10 (close decision)
+//   3. modeFit >= 3 (player fits your mode)
+//   4. trajectoryFit >= 3 (player fits your trajectory)
+//   5. fills === true OR it's already a tight BPA tie
+// Otherwise use positive/contextual framing.
 
 function gradeNote(pick: Omit<PickAlignment, 'gradeNote' | 'grade'>): string {
     const parts: string[] = [];
     const { tierFit, modeFit, trajectoryFit, needFit, opportunityFit } = pick;
     const top = Math.max(tierFit, modeFit, trajectoryFit);
 
-    if (tierFit === 5) parts.push(`Matched BPA at T${pick.tier}`);
-    else if (tierFit <= 2) parts.push(`T${pick.tier} pick — T${pick.bpaTierAtPick ?? '?'} was available`);
+    const t1Available = pick.bpaTierAtPick === 1 && pick.tier > 1;
+    const fiqGap      = pick.bpaFiqAtPick != null ? (pick.bpaFiqAtPick - pick.fiqScore) : null;
+    const tightDecision = fiqGap != null && fiqGap <= 10;
 
-    if (modeFit >= 4 && pick.tier <= 2) parts.push('Strong mode fit');
-    if (opportunityFit === 5) parts.push('High year-1 role — fits window');
-    if (opportunityFit === 2 && pick.opportunityScore != null && pick.opportunityScore >= 70)
-        parts.push('High role profile misaligned with rebuild');
-    if (trajectoryFit >= 4 && pick.age != null && pick.age <= 23) parts.push(`Age ${pick.age} — young T${pick.tier} fits trajectory`);
-    if (needFit >= 4) parts.push(`Fills ${pick.position} need`);
-    if (pick.vop > 5) parts.push(`+${Math.round(pick.vop)} VOP`);
-    else if (pick.vop < -10) parts.push(`Reach (${Math.round(pick.vop)} VOP)`);
-
-    if (parts.length === 0) {
-        if (top >= 4) parts.push('Good pick for your context');
-        else parts.push('Marginal alignment with your draft profile');
+    // Tier fit messaging
+    if (tierFit === 5) {
+        parts.push(`Matched BPA at T${pick.tier}`);
+    } else if (t1Available) {
+        if (tightDecision && modeFit >= 3 && trajectoryFit >= 3) {
+            // Close decision — show the note constructively
+            parts.push(`T${pick.tier} pick; T1 was close in value and fits your build`);
+        } else {
+            // T1 exists but doesn't fully fit context — softer framing
+            parts.push(`T${pick.tier} pick that fits your mode and trajectory`);
+        }
+    } else if (tierFit <= 2 && pick.bpaTierAtPick != null && pick.bpaTierAtPick < pick.tier) {
+        parts.push(`T${pick.tier} pick; T${pick.bpaTierAtPick} was available — consider your build direction`);
     }
 
-    return parts.slice(0, 2).join(', ') + '.';
+    // Positive signals
+    if (modeFit >= 4 && pick.tier <= 2) parts.push('Strong mode fit');
+    if (opportunityFit === 5) parts.push('High year-1 role — fits your window');
+    if (opportunityFit === 2 && pick.opportunityScore != null && pick.opportunityScore >= 70)
+        parts.push('High-role profile, but rebuild window prefers ceiling over year-1 role');
+    if (trajectoryFit >= 4 && pick.age != null && pick.age <= 23)
+        parts.push(`Age ${pick.age} — young T${pick.tier} aligns with your trajectory`);
+    if (needFit >= 4) parts.push(`Strengthens ${pick.position} depth`);
+    if (pick.vop > 5) parts.push(`+${Math.round(pick.vop)} VOP — strong value at this slot`);
+
+    if (parts.length === 0) {
+        if (top >= 4) parts.push('Good pick for your build');
+        else if (top >= 3) parts.push('Solid alignment with your draft profile');
+        else parts.push('Mixed fit — revisit positional balance in next window');
+    }
+
+    return parts.slice(0, 2).join('. ') + '.';
 }
 
 // ── Resolve effective mode ────────────────────────────────────────────────────
-// Must match the same guardrail logic used in scoring.ts
 
 function resolveEffectiveMode(profile: DraftProfile): DraftProfile['teamMode'] {
     const { teamMode, trajectoryWindow } = profile;
@@ -240,6 +297,22 @@ function resolveEffectiveMode(profile: DraftProfile): DraftProfile['teamMode'] {
     if (teamMode === 'WIN_NOW' && trajectoryWindow === 'REBUILD') return 'BALANCED';
     if (teamMode === 'REBUILD' && trajectoryWindow === 'WIN_NOW') return 'BALANCED';
     return 'BALANCED';
+}
+
+// ── v3.3 trajectory from roster (fixes PLATEAU everywhere) ───────────────────
+//
+// Applied when trajectory engine returns PLATEAU or data is unavailable.
+// Uses age curve and overall score to derive a meaningful window.
+
+function deriveTrajectoryFromRoster(
+    overallScore: number,
+    ageCurve: { young: number; prime: number; aging: number },
+): TrajectoryWindow {
+    const { young, prime, aging } = ageCurve;
+    if (overallScore >= 70 && aging >= prime)         return 'WIN_NOW';
+    if (young >= 2 * aging && overallScore >= 55)     return 'ASCENDING';
+    if (overallScore <= 50 && young >= prime)         return 'REBUILD';
+    return 'PLATEAU';
 }
 
 // ── League-average tier distribution ─────────────────────────────────────────
@@ -295,8 +368,8 @@ function computePositionStability(
     for (const cs of coreStrength) {
         const target = AGE_TARGET[cs.position] ?? 2;
         const filled = cs.count >= target;
-        if (cs.grade === 'A' || cs.grade === 'B' && filled) stable.push(cs.position);
-        else if (cs.grade === 'F' || !filled && cs.count === 0) critical.push(cs.position);
+        if (cs.grade === 'A' || (cs.grade === 'B' && filled)) stable.push(cs.position);
+        else if (cs.grade === 'F' || (!filled && cs.count === 0)) critical.push(cs.position);
         else fragile.push(cs.position);
     }
     return { stable, fragile, critical };
@@ -317,14 +390,20 @@ function computeAgeCurve(players: RichRosterPlayer[]): { young: number; prime: n
     return { young, prime, aging };
 }
 
-function computeWinProbDelta(picks: PickAlignment[], totalTeams: number): number {
+// v3.3: clamp to [0%, +10%] unless draft was catastrophic (avgScore < 8/25)
+function computeWinProbDelta(picks: PickAlignment[], totalTeams: number, avgScore: number): number {
     if (picks.length === 0) return 0;
     const totalVop = picks.reduce((s, p) => s + p.vop, 0);
     const avgVop   = totalVop / picks.length;
-    // Normalize: +100 VOP avg → ~20% improvement estimate, scaled by teams
-    const raw = (avgVop / 100) * 20 * (12 / Math.max(8, totalTeams));
-    return Math.round(raw * 10) / 10;
+    const raw      = (avgVop / 100) * 20 * (12 / Math.max(8, totalTeams));
+    const rounded  = Math.round(raw * 10) / 10;
+    // Only allow negative impact if alignment was catastrophic
+    if (avgScore < 8) return rounded;
+    return Math.min(10, Math.max(0, rounded));
 }
+
+// ── Dynasty Outlook v3.3 ──────────────────────────────────────────────────────
+// Tone: positive anchor → directional clarity → 1-2 actionable insights → momentum
 
 function generateDynastyOutlook(
     traj: TrajectoryWindow,
@@ -334,63 +413,69 @@ function generateDynastyOutlook(
     ageCurve: { young: number; prime: number; aging: number },
     avgScore: number,
 ): string {
-    const windowLabel =
-        traj === 'WIN_NOW'   ? 'a WIN‑NOW 1-year window' :
-        traj === 'ASCENDING' ? `an ASCENDING ${horizonYears}-year window` :
-        traj === 'REBUILD'   ? `a REBUILD ${horizonYears}+ year build` :
-        'a PLATEAU phase';
-
-    const draftQuality =
-        tierDist.T1 + tierDist.T2 >= 3 ? `${tierDist.T1 + tierDist.T2} T1/T2 players` :
-        tierDist.T2 >= 2               ? `${tierDist.T2} T2 players`                   :
-        tierDist.T3 >= 2               ? `solid T3 depth`                               :
-        'mixed value picks';
-
     const strongPositions = coreStrength.filter(cs => cs.grade === 'A' || cs.grade === 'B').map(cs => cs.position);
     const weakPositions   = coreStrength.filter(cs => cs.grade === 'D' || cs.grade === 'F').map(cs => cs.position);
+    const elite = tierDist.T1 + tierDist.T2;
 
+    // Positive anchor — what the draft added
+    const draftAnchor =
+        elite >= 3         ? `Your draft added ${elite} T1/T2 playmakers` :
+        tierDist.T2 >= 2   ? `Your draft strengthened your core with ${tierDist.T2} T2 players` :
+        tierDist.T3 >= 2   ? `Your draft added depth and developmental upside` :
+        `Your draft addressed key roster needs`;
+
+    // Age narrative
+    const ageNarrative =
+        ageCurve.young >= 3 ? 'a young, dynamic core with room to grow' :
+        ageCurve.aging >= 3 ? 'a proven, experienced core entering its peak' :
+        'a balanced roster mix';
+
+    // Draft quality signal
+    const draftSignal =
+        avgScore >= 19 ? 'perfectly aligned with your long-term window' :
+        avgScore >= 15 ? 'directionally aligned with your build' :
+        'with some picks that open up new options going forward';
+
+    // Strength + gap note
     const posStrength = strongPositions.length > 0
-        ? `Your ${strongPositions.join(' and ')} corps are strengths`
-        : 'roster balance is improving';
+        ? `Your ${strongPositions.join(' and ')} corps are built to compete`
+        : 'your roster balance is improving across all positions';
 
-    const ageNarrative = ageCurve.young >= 3
-        ? 'a young core with significant upside'
-        : ageCurve.aging >= 3
-        ? 'an experienced core entering its peak'
-        : 'a balanced age mix';
-
-    const outlook =
-        traj === 'WIN_NOW'   ? 'You are positioned to contend immediately. Push your chips in.' :
-        traj === 'ASCENDING' ? `You are positioned to be a serious threat within ${horizonYears} years.` :
-        traj === 'REBUILD'   ? 'Patience will reward this roster. Keep stacking talent.' :
-        'Monitor your competitive window closely over the next 1–2 seasons.';
-
-    const draftGrade = avgScore >= 21 ? 'a strong draft class' : avgScore >= 17 ? 'a solid draft class' : 'a draft class that needed more alignment';
-
-    const weakNote = weakPositions.length > 0
-        ? ` ${weakPositions.join(' and ')} remain areas to address.`
+    const actionNote = weakPositions.length > 0
+        ? ` Targeting ${weakPositions.join(' and ')} depth in the next window will accelerate your timeline.`
         : '';
 
-    return `Your roster is entering ${windowLabel}. Your draft added ${draftQuality} in ${draftGrade}, built around ${ageNarrative}. ${posStrength}.${weakNote} ${outlook}`;
+    // Trajectory-specific momentum close
+    const momentum =
+        traj === 'WIN_NOW'   ? `Push the window now — the pieces are there.` :
+        traj === 'ASCENDING' ? `You're on track to be a serious contender within ${horizonYears} years.` :
+        traj === 'REBUILD'   ? `Stay patient and keep stacking. The upside is real.` :
+        `Monitor your window closely — one or two additions could shift your trajectory.`;
+
+    return `${draftAnchor}, built around ${ageNarrative}, ${draftSignal}. ${posStrength}.${actionNote} ${momentum}`;
 }
 
-function draftIdentity(profile: DraftProfile, avgScore: number): string {
+// ── Draft Identity v3.3 ───────────────────────────────────────────────────────
+
+function draftIdentity(profile: DraftProfile, avgScore: number, classStrength: ClassStrength): string {
     const mode = resolveEffectiveMode(profile);
     const traj = profile.trajectoryWindow;
 
     if (mode === 'WIN_NOW' && (traj === 'WIN_NOW' || traj === 'PLATEAU') && avgScore >= 19)
-        return 'You drafted like an Aggressive WIN‑NOW team.';
-    if (mode === 'WIN_NOW' && avgScore >= 16)
-        return 'You drafted with a WIN‑NOW lean, though some picks strayed from your window.';
+        return 'You drafted aggressively for your contention window — the pieces fit.';
+    if (mode === 'WIN_NOW' && avgScore >= 15)
+        return 'You drafted with a WIN‑NOW lean and added immediate contributors.';
     if (mode === 'REBUILD' && (traj === 'REBUILD' || traj === 'ASCENDING') && avgScore >= 19)
-        return 'You drafted like a Deep REBUILD team — ceiling first.';
-    if (mode === 'REBUILD' && avgScore >= 16)
-        return 'You drafted with a REBUILD lean, prioritizing future value.';
-    if (avgScore >= 21)
-        return 'You drafted like a BALANCED team optimizing value at every pick.';
-    if (avgScore >= 17)
-        return 'You drafted a BALANCED roster, mixing value and positional need.';
-    return 'Your draft was mixed — some picks aligned with your profile, others diverged.';
+        return 'You drafted ceiling-first — patience and upside over short-term production.';
+    if (mode === 'REBUILD' && avgScore >= 15)
+        return 'You prioritized future value and stacked the talent pipeline.';
+    if (avgScore >= 19 && classStrength === 'strong')
+        return 'You navigated a deep class and extracted real value at every slot.';
+    if (avgScore >= 19)
+        return 'You drafted with sharp alignment — value and need working together.';
+    if (avgScore >= 15)
+        return 'You built a balanced roster with a clear direction.';
+    return 'Your draft addressed multiple needs — a few adjustments would sharpen the alignment.';
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
@@ -411,8 +496,8 @@ export interface ReportCardInput {
     myPicks:         MyPickInput[];
     allPicks:        AllPickInput[];   // all teams, all picks, sorted by pickOverall
     pool:            PoolPlayer[];     // full draft pool sorted by fiqScore desc (rank = index+1)
-    rosterFull:      { position: string }[];           // existing roster before draft
-    rosterRich:      RichRosterPlayer[];               // post-draft roster with fiqScores
+    rosterFull:      { position: string }[];
+    rosterRich:      RichRosterPlayer[];
     draftProfile:    DraftProfile;
     totalTeams:      number;
     totalRounds:     number;
@@ -433,41 +518,39 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
     const effectiveMode     = resolveEffectiveMode(draftProfile);
     const traj              = draftProfile.trajectoryWindow;
 
+    // Class strength — scales VOP tier values
+    const classStrength = computeClassStrength(pool);
+    const TIER_VALUES   = tierValuesForClass(classStrength);
+
     // Build player lookup by sleeperPlayerId
     const playerBySlId = new Map(pool.map(p => [p.sleeperPlayerId, p]));
 
-    // Pool-relative ADP rank (pool is sorted by fiqScore desc, so rank = index + 1)
+    // Pool-relative ADP rank (pool sorted by fiqScore desc → rank = index + 1)
     const poolRankBySlId = new Map(pool.map((p, i) => [p.sleeperPlayerId, i + 1]));
 
-    // Build roster position counts from EXISTING roster (pre-draft)
+    // Pre-draft roster position counts
     const preDraftCounts: Record<string, number> = {};
     for (const p of rosterFull) {
         const pos = normalizePosition(p.position);
         preDraftCounts[pos] = (preDraftCounts[pos] ?? 0) + 1;
     }
-    const TARGET: Record<string, number> = {
-        QB: draftProfile.teamMode === 'WIN_NOW' ? 2 : 2,
-        RB: 5, WR: 7, TE: 2,
-    };
+    const TARGET: Record<string, number> = { QB: 2, RB: 5, WR: 7, TE: 2 };
 
-    // Sort allPicks by pickOverall
     const sortedAllPicks = [...allPicks].sort((a, b) => a.pickOverall - b.pickOverall);
 
-    // Compute per-pick alignment
-    const picks: PickAlignment[] = [];
-    let   myTierDist = { T1: 0, T2: 0, T3: 0, T4: 0, T5: 0 };
+    const picks: PickAlignment[]  = [];
+    let myTierDist = { T1: 0, T2: 0, T3: 0, T4: 0, T5: 0 };
 
     for (const mp of myPicks) {
-        // Players drafted before this pick
         const draftedBefore = new Set(
             sortedAllPicks
                 .filter(p => p.pickOverall < mp.pickOverall)
                 .map(p => p.playerId)
         );
 
-        // Available pool at this pick
-        const available = pool.filter(p => !draftedBefore.has(p.sleeperPlayerId));
+        const available     = pool.filter(p => !draftedBefore.has(p.sleeperPlayerId));
         const bpaTierAtPick = available[0]?.tier ?? null;
+        const bpaFiqAtPick  = available[0]?.fiqScore ?? null;
 
         const player = playerBySlId.get(mp.sleeperPlayerId) ?? available.find(p => p.sleeperPlayerId === mp.sleeperPlayerId);
         if (!player) continue;
@@ -476,13 +559,13 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
         const deficit = Math.max(0, (TARGET[pos] ?? 0) - (preDraftCounts[pos] ?? 0));
         const fills   = deficit > 0;
 
-        // VOP — blends tier-based value with pool ADP delta (soft 30% weight)
-        const expectedVal    = 90 - (mp.pickOverall / totalPicksInDraft) * 50;
-        const tierVal        = TIER_VALUES[player.tier] ?? 40;
-        const tierVop        = tierVal - expectedVal;
-        const poolRank       = poolRankBySlId.get(mp.sleeperPlayerId);
-        const poolADPDelta   = poolRank != null ? mp.pickOverall - poolRank : null;
-        const vop            = Math.round(
+        // VOP — blends class-adjusted tier value with pool ADP delta (30%)
+        const expectedVal  = 90 - (mp.pickOverall / totalPicksInDraft) * 50;
+        const tierVal      = TIER_VALUES[player.tier] ?? 40;
+        const tierVop      = tierVal - expectedVal;
+        const poolRank     = poolRankBySlId.get(mp.sleeperPlayerId);
+        const poolADPDelta = poolRank != null ? mp.pickOverall - poolRank : null;
+        const vop          = Math.round(
             poolADPDelta != null
                 ? 0.7 * tierVop + 0.3 * poolADPDelta
                 : tierVop
@@ -509,6 +592,7 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
             fiqScore:        player.fiqScore,
             opportunityScore: player.opportunityScore ?? null,
             bpaTierAtPick,
+            bpaFiqAtPick,
             vop,
             tierFit:         tf,
             modeFit:         mf,
@@ -523,8 +607,6 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
 
         const key = `T${player.tier}` as keyof typeof myTierDist;
         myTierDist[key] = (myTierDist[key] ?? 0) + 1;
-
-        // Update pre-draft counts so subsequent picks see the updated need
         preDraftCounts[pos] = (preDraftCounts[pos] ?? 0) + 1;
     }
 
@@ -539,16 +621,26 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
     );
 
     const tierDistribution: TierDistribution = { ...myTierDist, leagueAvg };
-    const totalVop  = Math.round(picks.reduce((s, p) => s + p.vop, 0));
-    const identity  = draftIdentity(draftProfile, avgScore);
+    const draftStrategy = computeDraftStrategy(myTierDist);
+    const totalVop      = Math.round(picks.reduce((s, p) => s + p.vop, 0));
+    const identity      = draftIdentity(draftProfile, avgScore, classStrength);
 
     // Franchise state
-    const coreStrength     = computeCoreStrength(rosterRich);
+    const coreStrength      = computeCoreStrength(rosterRich);
     const positionStability = computePositionStability(rosterRich, coreStrength);
-    const ageCurve         = computeAgeCurve(rosterRich);
-    const winProbDelta     = computeWinProbDelta(picks, totalTeams);
-    const dynastyOutlook   = generateDynastyOutlook(
-        (trajectoryData?.window ?? traj) as TrajectoryWindow,
+    const ageCurve          = computeAgeCurve(rosterRich);
+
+    // v3.3 trajectory: if engine returns PLATEAU (or no data), override with
+    // age-curve rules to guarantee meaningful distribution across the league.
+    const rawTrajWindow = (trajectoryData?.window ?? traj) as TrajectoryWindow;
+    const franchiseTraj: TrajectoryWindow =
+        rawTrajWindow === 'PLATEAU'
+            ? deriveTrajectoryFromRoster(trajectoryData?.overallScore ?? 50, ageCurve)
+            : rawTrajWindow;
+
+    const winProbDelta  = computeWinProbDelta(picks, totalTeams, avgScore);
+    const dynastyOutlook = generateDynastyOutlook(
+        franchiseTraj,
         trajectoryData?.horizonYears ?? draftProfile.horizonYears,
         tierDistribution,
         coreStrength,
@@ -557,7 +649,7 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
     );
 
     const franchise: FranchiseState = {
-        trajectoryWindow:    trajectoryData?.window ?? traj,
+        trajectoryWindow:    franchiseTraj,
         horizonYears:        trajectoryData?.horizonYears ?? draftProfile.horizonYears,
         overallScore:        trajectoryData?.overallScore ?? 50,
         coreStrength,
@@ -573,6 +665,8 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
         identityGrade: gradeFromScore(avgScore),
         avgScore,
         tierDistribution,
+        classStrength,
+        draftStrategy,
         totalVop,
         franchise,
         draftProfile,

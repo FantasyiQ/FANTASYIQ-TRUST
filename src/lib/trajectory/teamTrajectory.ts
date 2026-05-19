@@ -8,19 +8,20 @@ import type {
 } from './types';
 import { computePickCapitalScores } from './pickCapital';
 
+// v3.3: wider thresholds guarantee distribution — no more "everyone is STUCK/FLAT"
 function deriveMode(overall: number, age: number, pickCapital: number): TrajectoryMode {
-    if (overall >= 75 && age >= 55)               return 'CONTENDER';
-    if (overall >= 65 && pickCapital >= 70)        return 'ASCENDING';
-    if (overall <= 40 && pickCapital >= 80)        return 'REBUILDER';
-    if (overall <= 45 && age <= 45 && pickCapital <= 50) return 'DECLINING';
+    if (overall >= 70 && age >= 50)                    return 'CONTENDER';
+    if (overall >= 60 && pickCapital >= 65)            return 'ASCENDING';
+    if (overall <= 40 && pickCapital >= 75)            return 'REBUILDER';
+    if (overall <= 45 && age <= 40 && pickCapital <= 50) return 'DECLINING';
     return 'STUCK';
 }
 
 function deriveWinCurve(age: number, pickCapital: number): WinCurve {
-    // age: higher = younger / better curve
-    if (age >= 70 && pickCapital <= 50) return 'PEAKING_NOW';  // young, no picks to trade → window is now
-    if (age >= 60 && pickCapital >= 60) return 'PEAK_AHEAD';   // young + picks → ascending toward peak
-    if (age <= 45 && pickCapital <= 40) return 'FALLING';       // old, no capital → declining
+    // age: higher = younger / better curve (0-100, higher = younger)
+    if (age >= 60 && pickCapital <= 55) return 'PEAKING_NOW';  // young core, limited picks → window is now
+    if (age >= 55 && pickCapital >= 55) return 'PEAK_AHEAD';   // young + picks → ascending toward peak
+    if (age <= 40 && pickCapital <= 45) return 'FALLING';       // aging, limited capital → declining
     return 'FLAT';
 }
 
