@@ -1,0 +1,16 @@
+{
+  "name": "fiq-espn-connector",
+  "version": "1.0.0",
+  "description": "FiQ ESPN Connector Chrome extension",
+  "private": true,
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.300",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.0.0"
+  }
+}
