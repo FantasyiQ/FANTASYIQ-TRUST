@@ -210,7 +210,10 @@ export async function runPredictiveModels(): Promise<{
             createdAt: true,
             subscriptionTier: true,
             leagues: {
-                select:  { lastSyncedAt: true },
+                select: {
+                    id: true, lastSyncedAt: true,
+                    _count: { select: { calendarEvents: true, announcements: true } },
+                },
                 orderBy: { lastSyncedAt: 'desc' },
                 take:    1,
             },
@@ -230,12 +233,6 @@ export async function runPredictiveModels(): Promise<{
             ownedCommissioner:{ select: { id: true } },
             commissionerDues: { select: { id: true }, take: 1 },
             duesMemberships:  { select: { id: true }, take: 1 },
-            leagues: {
-                select: {
-                    id: true, lastSyncedAt: true,
-                    _count: { select: { calendarEvents: true, announcements: true } },
-                },
-            },
         },
     });
 

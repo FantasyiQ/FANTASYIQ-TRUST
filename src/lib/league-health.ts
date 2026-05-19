@@ -168,7 +168,7 @@ export async function runLeagueHealthCheck(): Promise<{
                 data:  {
                     healthScore:     l.score,
                     healthTier:      l.tier,
-                    healthSignals:   l.signals,
+                    healthSignals:   l.signals as unknown as Record<string, number>,
                     healthCheckedAt: new Date(),
                 },
             })
@@ -204,7 +204,7 @@ export async function runLeagueHealthCheck(): Promise<{
                     type:   'league_health',
                     title:  msg.title,
                     body:   msg.body,
-                    data:   { leagueId: l.id, tier: l.tier, signals: l.signals },
+                    data:   { leagueId: l.id, tier: l.tier, signals: l.signals as unknown as Record<string, number> },
                 };
             })
             .filter((n): n is NonNullable<typeof n> => n !== null);
