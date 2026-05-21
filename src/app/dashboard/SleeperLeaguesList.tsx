@@ -31,7 +31,7 @@ interface Props {
     leagues: League[];
     playerTier: string;
     commSubs: CommSub[];
-    platform?: 'sleeper' | 'espn' | 'yahoo';
+    platform?: 'sleeper' | 'espn' | 'yahoo' | 'nfl';
 }
 
 function tierLevel(tier: string): number {
@@ -68,9 +68,9 @@ export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier
     const [leagues] = useState<League[]>(initialLeagues);
 
     if (leagues.length === 0) {
-        const syncHref  = platform === 'espn' ? '/dashboard/sync/espn' : platform === 'yahoo' ? '/dashboard/sync/yahoo' : '/dashboard/sync';
-        const syncLabel = platform === 'espn' ? 'Sync an ESPN League' : platform === 'yahoo' ? 'Connect Yahoo' : 'Sync a Sleeper League';
-        const desc      = platform === 'espn' ? 'Connect your ESPN league to get started.' : platform === 'yahoo' ? 'Connect your Yahoo account to get started.' : 'Connect your Sleeper account to get started.';
+        const syncHref  = platform === 'espn' ? '/dashboard/sync/espn' : platform === 'yahoo' ? '/dashboard/sync/yahoo' : platform === 'nfl' ? '/dashboard/sync/nfl' : '/dashboard/sync';
+        const syncLabel = platform === 'espn' ? 'Sync an ESPN League' : platform === 'yahoo' ? 'Connect Yahoo' : platform === 'nfl' ? 'Connect NFL.com' : 'Sync a Sleeper League';
+        const desc      = platform === 'espn' ? 'Connect your ESPN league to get started.' : platform === 'yahoo' ? 'Connect your Yahoo account to get started.' : platform === 'nfl' ? 'Connect your NFL.com account to get started.' : 'Connect your Sleeper account to get started.';
         return (
             <div className="px-6 py-14 text-center">
                 <p className="text-gray-400 mb-1">No leagues synced yet.</p>

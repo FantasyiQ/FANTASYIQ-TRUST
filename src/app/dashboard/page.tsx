@@ -303,7 +303,7 @@ export default async function DashboardPage({
                                 <span className="mt-0.5 w-5 h-5 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37] text-xs flex items-center justify-center shrink-0 font-bold">2</span>
                                 <div>
                                     <p className="text-sm font-semibold text-white">Connect your leagues</p>
-                                    <p className="text-xs text-gray-500 mb-2">Sync from Sleeper, ESPN, or Yahoo to see standings, rosters, and trade values.</p>
+                                    <p className="text-xs text-gray-500 mb-2">Sync from Sleeper, ESPN, Yahoo, or NFL.com to see standings, rosters, and trade values.</p>
                                     <div className="flex flex-wrap gap-2">
                                         <Link href="/dashboard/sync" className="inline-flex items-center gap-1.5 bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold text-xs px-3 py-1.5 rounded-lg transition">
                                             Sync Sleeper →
@@ -313,6 +313,9 @@ export default async function DashboardPage({
                                         </Link>
                                         <Link href="/dashboard/sync/yahoo" className="inline-flex items-center gap-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold text-xs px-3 py-1.5 rounded-lg transition">
                                             Sync Yahoo
+                                        </Link>
+                                        <Link href="/dashboard/sync/nfl" className="inline-flex items-center gap-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold text-xs px-3 py-1.5 rounded-lg transition">
+                                            Sync NFL
                                         </Link>
                                     </div>
                                 </div>
@@ -487,6 +490,7 @@ export default async function DashboardPage({
                     const sleeperLeagues = leagues.filter(l => l.platform === 'sleeper');
                     const espnLeagues    = leagues.filter(l => l.platform === 'espn');
                     const yahooLeagues   = leagues.filter(l => l.platform === 'yahoo');
+                    const nflLeagues     = leagues.filter(l => l.platform === 'nfl');
                     return (
                         <>
                             <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
@@ -542,6 +546,25 @@ export default async function DashboardPage({
                                     playerTier={playerSubTier}
                                     commSubs={commSubs.map(s => ({ leagueName: s.leagueName, tier: s.tier }))}
                                     platform="yahoo"
+                                />
+                            </div>
+
+                            <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+                                <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+                                    <div>
+                                        <h2 className="font-semibold text-lg">NFL Fantasy Leagues</h2>
+                                        <p className="text-gray-500 text-sm">{nflLeagues.length} league{nflLeagues.length !== 1 ? 's' : ''} · syncs hourly</p>
+                                    </div>
+                                    <Link href="/dashboard/sync/nfl"
+                                        className="text-sm bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold px-4 py-2 rounded-lg transition">
+                                        + Sync League
+                                    </Link>
+                                </div>
+                                <SleeperLeaguesList
+                                    leagues={nflLeagues}
+                                    playerTier={playerSubTier}
+                                    commSubs={commSubs.map(s => ({ leagueName: s.leagueName, tier: s.tier }))}
+                                    platform="nfl"
                                 />
                             </div>
                         </>
