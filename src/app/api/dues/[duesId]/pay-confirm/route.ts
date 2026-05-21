@@ -27,6 +27,14 @@ export async function GET(
             expand: ['payment_intent.latest_charge'],
         });
         if (cs.payment_status === 'paid') {
+            // Validate the session was created for this exact member/dues combination.
+            // Prevents an attacker from reusing their own paid session_id to mark a
+            // different member as paid (IDOR). Metadata is set server-side at checkout
+            // creation and cannot be tampered with by the client.
+            if (cs.metadata?.memberId !== memberId || cs.metadata?.duesId !== duesId) {
+                redirect(fallback);
+            }
+
             const member = await prisma.duesMember.findUnique({
                 where: { id: memberId },
                 select: { duesStatus: true, leagueDuesId: true, userId: true, displayName: true },

@@ -14,6 +14,12 @@ export async function GET(request: NextRequest): Promise<Response> {
     const cs = await stripe.checkout.sessions.retrieve(sessionId);
     if (cs.payment_status !== 'paid') redirect(`/dashboard/commissioner/dues/${duesId}?error=payment-failed`);
 
+    // Validate the session was created for this exact member/dues combination.
+    // Prevents reusing a valid paid session_id to mark a different member as paid.
+    if (cs.metadata?.memberId !== memberId || cs.metadata?.duesId !== duesId) {
+        redirect('/dashboard/commissioner/dues');
+    }
+
     const member = await prisma.duesMember.findUnique({
         where: { id: memberId },
         select: { duesStatus: true, leagueDuesId: true },

@@ -9,19 +9,21 @@ export async function GET(request: NextRequest): Promise<Response> {
 
     const item = await prisma.payoutProposalItem.findUnique({
         where: { id: itemId },
-        select: { id: true, status: true, proposal: { select: { leagueDuesId: true } } },
+        select: { id: true, proposalId: true, status: true, proposal: { select: { leagueDuesId: true } } },
     });
     if (!item) redirect('/dashboard');
 
-    if (item.status !== 'paid_out') {
+    // Only allow claiming if the payment link was actually sent and payment was completed.
+    // Prevents directly hitting this URL to mark arbitrary payouts as claimed.
+    if (item.status === 'payment_link_sent') {
         await prisma.payoutProposalItem.update({
             where: { id: itemId },
             data: { status: 'paid_out', claimedAt: new Date() },
         });
 
-        // Check if all items are paid out — if so, mark dues as paid_out
+        // Check if all items in the proposal are paid out — if so, mark dues as paid_out
         const allItems = await prisma.payoutProposalItem.findMany({
-            where: { proposalId: item.id },
+            where: { proposalId: item.proposalId },
             select: { status: true },
         });
         if (allItems.every(i => i.status === 'paid_out')) {
