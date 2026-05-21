@@ -107,6 +107,7 @@ export async function runLeagueHealthCheck(): Promise<{
 
     // Fetch all leagues with health-relevant relations
     const leagues = await prisma.league.findMany({
+        take: 1000,
         select: {
             id:           true,
             userId:       true,

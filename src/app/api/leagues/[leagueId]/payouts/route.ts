@@ -109,5 +109,7 @@ export async function GET(
         }),
     ]);
 
-    return NextResponse.json({ payouts, winners });
+    return NextResponse.json({ payouts, winners }, {
+        headers: { 'Cache-Control': 'private, max-age=60' },
+    });
 }

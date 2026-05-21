@@ -5,8 +5,11 @@ export default async function UpgradePage({
 }: {
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-    const sp     = await searchParams;
-    const reason = sp.reason as string | undefined;
+    const sp       = await searchParams;
+    const reason   = sp.reason as string | undefined;
+    const rawReturn = sp.returnTo as string | undefined;
+    // Only allow relative paths
+    const returnTo = rawReturn?.startsWith('/') ? rawReturn : null;
 
     const isPlanLimit = reason === 'player_plan_limit';
 
@@ -52,7 +55,7 @@ export default async function UpgradePage({
 
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <Link
-                        href="/pricing?tab=player"
+                        href={`/pricing?tab=player${returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : ''}`}
                         className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-6 py-3 rounded-xl transition text-sm"
                     >
                         View Player Plans →

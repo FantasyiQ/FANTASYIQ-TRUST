@@ -272,6 +272,11 @@ export default function TradePartnersPanel({
                 <div className="px-6 py-8 text-center">
                     <p className="text-red-400 text-sm">Failed to load trade partners.</p>
                     <p className="text-gray-600 text-xs mt-1">{error}</p>
+                    <button
+                        onClick={() => { setError(null); setFetched(false); }}
+                        className="mt-4 px-4 py-1.5 text-xs font-semibold border border-gray-700 hover:border-[#D4AF37]/50 text-gray-400 hover:text-white rounded-lg transition">
+                        Try again
+                    </button>
                 </div>
             );
         }
@@ -302,12 +307,12 @@ export default function TradePartnersPanel({
                     <table className="w-full text-sm min-w-[750px]">
                         <thead>
                             <tr className="border-b border-gray-800">
-                                <th className="text-left px-4 py-3 text-gray-500 font-medium w-10">#</th>
-                                <th className="text-left px-3 py-3 text-gray-500 font-medium">Team</th>
-                                <th className="text-left px-3 py-3 text-gray-500 font-medium">Fit Score</th>
-                                <th className="text-left px-3 py-3 text-gray-500 font-medium">Tier</th>
-                                <th className="text-left px-3 py-3 text-gray-500 font-medium">Your Needs</th>
-                                <th className="text-left px-4 py-3 text-gray-500 font-medium">Their Needs</th>
+                                <th scope="col" className="text-left px-4 py-3 text-gray-500 font-medium w-10">#</th>
+                                <th scope="col" className="text-left px-3 py-3 text-gray-500 font-medium">Team</th>
+                                <th scope="col" className="text-left px-3 py-3 text-gray-500 font-medium">Fit Score</th>
+                                <th scope="col" className="text-left px-3 py-3 text-gray-500 font-medium">Tier</th>
+                                <th scope="col" className="text-left px-3 py-3 text-gray-500 font-medium">Your Needs</th>
+                                <th scope="col" className="text-left px-4 py-3 text-gray-500 font-medium">Their Needs</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-800/50">

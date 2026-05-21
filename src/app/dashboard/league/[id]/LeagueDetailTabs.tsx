@@ -209,12 +209,12 @@ function PlayerRankingsCard({
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="text-gray-500 text-left border-b border-gray-800">
-                            <th className="text-left px-4 py-3 font-medium w-10">#</th>
-                            <th className="text-left px-3 py-3 font-medium">Player</th>
-                            <th className="text-left px-3 py-3 font-medium">Pos</th>
-                            <th className="text-left px-3 py-3 font-medium">Team</th>
-                            <th className="text-right px-3 py-3 font-medium">DTV</th>
-                            <th className="text-right px-4 py-3 font-medium">Tier</th>
+                            <th scope="col" className="text-left px-4 py-3 font-medium w-10">#</th>
+                            <th scope="col" className="text-left px-3 py-3 font-medium">Player</th>
+                            <th scope="col" className="text-left px-3 py-3 font-medium">Pos</th>
+                            <th scope="col" className="text-left px-3 py-3 font-medium">Team</th>
+                            <th scope="col" className="text-right px-3 py-3 font-medium">DTV</th>
+                            <th scope="col" className="text-right px-4 py-3 font-medium">Tier</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -444,12 +444,12 @@ export default function LeagueDetailTabs({
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="text-gray-400 text-left border-b border-gray-800">
-                                        <th className="px-6 py-3 font-medium w-12">#</th>
-                                        <th className="px-4 py-3 font-medium">Team</th>
-                                        <th className="px-4 py-3 font-medium text-center">W</th>
-                                        <th className="px-4 py-3 font-medium text-center">L</th>
-                                        {hasTies && <th className="px-4 py-3 font-medium text-center">T</th>}
-                                        {hasPA && <th className="px-4 py-3 font-medium text-right pr-6">PF</th>}
+                                        <th scope="col" className="px-6 py-3 font-medium w-12">#</th>
+                                        <th scope="col" className="px-4 py-3 font-medium">Team</th>
+                                        <th scope="col" className="px-4 py-3 font-medium text-center">W</th>
+                                        <th scope="col" className="px-4 py-3 font-medium text-center">L</th>
+                                        {hasTies && <th scope="col" className="px-4 py-3 font-medium text-center">T</th>}
+                                        {hasPA && <th scope="col" className="px-4 py-3 font-medium text-right pr-6">PF</th>}
                                     </tr>
                                 </thead>
                                 <tbody>

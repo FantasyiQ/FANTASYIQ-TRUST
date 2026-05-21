@@ -9,9 +9,10 @@ export const dynamic = 'force-dynamic';
 export default async function PricingPage({
     searchParams,
 }: {
-    searchParams: Promise<{ tab?: string; error?: string; detail?: string; size?: string; leagueName?: string; mode?: string }>;
+    searchParams: Promise<{ tab?: string; error?: string; detail?: string; size?: string; leagueName?: string; mode?: string; returnTo?: string }>;
 }) {
-    const { tab, error, detail, size, leagueName: leagueNameParam, mode } = await searchParams;
+    const { tab, error, detail, size, leagueName: leagueNameParam, mode, returnTo: rawReturnTo } = await searchParams;
+    const returnTo = rawReturnTo?.startsWith('/') ? rawReturnTo : null;
     const defaultTab = tab === 'commissioner' ? 'commissioner' : 'player';
     const defaultSize = size ? parseInt(size) : null;
     const defaultLeagueName = leagueNameParam ? decodeURIComponent(leagueNameParam) : '';
@@ -101,6 +102,7 @@ export default async function PricingPage({
             newLeague={mode === 'new'}
             alreadySubscribed={alreadySubscribed}
             checkoutError={checkoutError}
+            returnTo={returnTo}
         />
     );
 }

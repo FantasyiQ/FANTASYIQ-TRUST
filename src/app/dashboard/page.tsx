@@ -246,6 +246,50 @@ export default async function DashboardPage({
                     </form>
                 </div>
 
+                {/* ── Onboarding (new users with no leagues) ───────────── */}
+                {leagues.length === 0 && !hasAnyActiveSub && (
+                    <div className="bg-gradient-to-br from-[#D4AF37]/10 to-gray-900 border border-[#D4AF37]/30 rounded-2xl p-6 space-y-5">
+                        <div>
+                            <h2 className="text-lg font-bold text-white">Get started with FiQ</h2>
+                            <p className="text-gray-400 text-sm mt-1">Follow these steps to unlock your full fantasy edge.</p>
+                        </div>
+                        <ol className="space-y-3">
+                            <li className="flex items-start gap-3">
+                                <span className="mt-0.5 w-5 h-5 rounded-full bg-green-500/20 border border-green-500/40 text-green-400 text-xs flex items-center justify-center shrink-0">✓</span>
+                                <div>
+                                    <p className="text-sm font-semibold text-white">Create your account</p>
+                                    <p className="text-xs text-gray-500">Done — you&apos;re in.</p>
+                                </div>
+                            </li>
+                            <li className="flex items-start gap-3">
+                                <span className="mt-0.5 w-5 h-5 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37] text-xs flex items-center justify-center shrink-0 font-bold">2</span>
+                                <div>
+                                    <p className="text-sm font-semibold text-white">Connect your leagues</p>
+                                    <p className="text-xs text-gray-500 mb-2">Sync from Sleeper, ESPN, or Yahoo to see standings, rosters, and trade values.</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        <Link href="/dashboard/sync" className="inline-flex items-center gap-1.5 bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold text-xs px-3 py-1.5 rounded-lg transition">
+                                            Sync Sleeper →
+                                        </Link>
+                                        <Link href="/dashboard/sync/espn" className="inline-flex items-center gap-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold text-xs px-3 py-1.5 rounded-lg transition">
+                                            Sync ESPN
+                                        </Link>
+                                        <Link href="/dashboard/sync/yahoo" className="inline-flex items-center gap-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold text-xs px-3 py-1.5 rounded-lg transition">
+                                            Sync Yahoo
+                                        </Link>
+                                    </div>
+                                </div>
+                            </li>
+                            <li className="flex items-start gap-3">
+                                <span className="mt-0.5 w-5 h-5 rounded-full bg-gray-800 border border-gray-700 text-gray-600 text-xs flex items-center justify-center shrink-0 font-bold">3</span>
+                                <div>
+                                    <p className="text-sm font-semibold text-gray-400">Explore trade values &amp; analytics</p>
+                                    <p className="text-xs text-gray-600">Dynasty trade values, roster grades, start/sit — powered by live KTC data.</p>
+                                </div>
+                            </li>
+                        </ol>
+                    </div>
+                )}
+
                 {/* ── Player Plan ───────────────────────────────────────── */}
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
                     <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-4">Player Plan</p>

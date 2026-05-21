@@ -31,6 +31,7 @@ interface Props {
     newLeague?: boolean;
     alreadySubscribed?: boolean;
     checkoutError?: string | null;
+    returnTo?: string | null;
 }
 
 /* ── Tier helpers ─────────────────────────────────────────────────── */
@@ -277,9 +278,10 @@ interface CardProps {
     sourceStripeSubId?: string;
     leagueLimitNote?: string;  // e.g. "Up to 2 Leagues"
     atLeagueLimit?: boolean;   // true when user has maxed leagues on this tier
+    returnTo?: string | null;
 }
 
-function PlanCard({ name, price, period, badge, badgeGold, ring, features, priceId, tier, cardStatus, onUpgrade, sourceStripeSubId, leagueLimitNote, atLeagueLimit }: CardProps) {
+function PlanCard({ name, price, period, badge, badgeGold, ring, features, priceId, tier, cardStatus, onUpgrade, sourceStripeSubId, leagueLimitNote, atLeagueLimit, returnTo }: CardProps) {
     return (
         <div className={`relative flex flex-col bg-gray-900 rounded-2xl p-6 border transition-shadow hover:shadow-lg hover:shadow-[#D4AF37]/5 ${
             ring ? 'border-[#D4AF37] shadow-md shadow-[#D4AF37]/10' : 'border-gray-800'
@@ -321,6 +323,7 @@ function PlanCard({ name, price, period, badge, badgeGold, ring, features, price
                         <input type="hidden" name="priceId" value={priceId} />
                         <input type="hidden" name="tier" value={tier} />
                         <input type="hidden" name="leagueName" value="" />
+                        {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
                         <button type="submit" disabled={!priceId}
                             className="w-full py-3 rounded-xl font-bold transition-colors bg-[#D4AF37] text-black hover:bg-[#b8912a] disabled:opacity-50 disabled:cursor-not-allowed">
                             Get Started
@@ -364,9 +367,10 @@ interface CommCardProps {
     cardStatus: CardStatus;
     sourceStripeSubId?: string;
     onUpgrade: (upgrade: PendingUpgrade) => void;
+    returnTo?: string | null;
 }
 
-function CommPlanCard({ name, price, period, badge, badgeGold, ring, features, priceId, tier, leagueName, cardStatus, sourceStripeSubId, onUpgrade }: CommCardProps) {
+function CommPlanCard({ name, price, period, badge, badgeGold, ring, features, priceId, tier, leagueName, cardStatus, sourceStripeSubId, onUpgrade, returnTo }: CommCardProps) {
     const canCheckout = leagueName.trim().length > 0 && !!priceId;
 
     return (
@@ -396,6 +400,7 @@ function CommPlanCard({ name, price, period, badge, badgeGold, ring, features, p
                             <input type="hidden" name="priceId" value={priceId} />
                             <input type="hidden" name="tier" value={tier} />
                             <input type="hidden" name="leagueName" value={leagueName.trim()} />
+                            {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
                             <button type="submit" disabled={!canCheckout}
                                 className="w-full py-3 rounded-xl font-bold transition-colors bg-[#D4AF37] text-black hover:bg-[#b8912a] disabled:opacity-40 disabled:cursor-not-allowed"
                                 title={!leagueName.trim() ? 'Enter your league name above' : undefined}>
@@ -451,7 +456,7 @@ function resolveCommCardStatus(cardTier: string, size: TeamSize, commSubs: CommS
 }
 
 /* ── Main component ───────────────────────────────────────────────── */
-export default function PricingClient({ playerSub, commSubs, activeCommCount, activePlayerLeagueCount, defaultTab, defaultSize, defaultLeagueName, newLeague, alreadySubscribed, checkoutError }: Props) {
+export default function PricingClient({ playerSub, commSubs, activeCommCount, activePlayerLeagueCount, defaultTab, defaultSize, defaultLeagueName, newLeague, alreadySubscribed, checkoutError, returnTo }: Props) {
     const { update: updateSession } = useSession();
     const [tab, setTab]       = useState<Tab>(defaultTab);
     const [size, setSize]     = useState<TeamSize>((TEAM_SIZES.includes(defaultSize as TeamSize) ? defaultSize : 12) as TeamSize);
@@ -618,6 +623,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     onUpgrade={handleUpgradeClick}
                                     leagueLimitNote="Up to 2 Leagues"
                                     atLeagueLimit={resolvePlayerCardStatus('PLAYER_PRO', playerSub) === 'current' && activePlayerLeagueCount >= 2}
+                                    returnTo={returnTo}
                                 />
                                 <PlanCard
                                     name="All-Pro" price="17.99" period="/yr"
@@ -629,6 +635,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     onUpgrade={handleUpgradeClick}
                                     leagueLimitNote="Up to 5 Leagues"
                                     atLeagueLimit={resolvePlayerCardStatus('PLAYER_ALL_PRO', playerSub) === 'current' && activePlayerLeagueCount >= 5}
+                                    returnTo={returnTo}
                                 />
                                 <PlanCard
                                     name="Elite" price="24.99" period="/yr"
@@ -639,6 +646,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     sourceStripeSubId={playerSub?.stripeSubscriptionId}
                                     onUpgrade={handleUpgradeClick}
                                     leagueLimitNote="Unlimited Leagues"
+                                    returnTo={returnTo}
                                 />
                             </>
                         ) : (
@@ -651,6 +659,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     cardStatus={proAvailable(size) ? resolveCommCardStatus('COMMISSIONER_PRO', size, commSubs, newLeague) : 'unavailable'}
                                     sourceStripeSubId={commSubs.find(s => s.leagueSize === size)?.stripeSubscriptionId}
                                     onUpgrade={handleUpgradeClick}
+                                    returnTo={returnTo}
                                 />
                                 <CommPlanCard
                                     name="Commissioner All-Pro" price={apPx} period="/year"
@@ -661,6 +670,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     cardStatus={resolveCommCardStatus('COMMISSIONER_ALL_PRO', size, commSubs, newLeague)}
                                     sourceStripeSubId={commSubs.find(s => s.leagueSize === size)?.stripeSubscriptionId}
                                     onUpgrade={handleUpgradeClick}
+                                    returnTo={returnTo}
                                 />
                                 <CommPlanCard
                                     name="Commissioner Elite" price={elPx} period="/year"
@@ -671,6 +681,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     cardStatus={resolveCommCardStatus('COMMISSIONER_ELITE', size, commSubs, newLeague)}
                                     sourceStripeSubId={commSubs.find(s => s.leagueSize === size)?.stripeSubscriptionId}
                                     onUpgrade={handleUpgradeClick}
+                                    returnTo={returnTo}
                                 />
                             </>
                         )}

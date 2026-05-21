@@ -47,6 +47,11 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
         ? (formData.get('leagueName') as string | null)?.trim() ?? ''
         : '';
 
+    // Optional return-to URL — send the user back to the feature they came from
+    // after a successful checkout. Must be a relative path to prevent open redirects.
+    const rawReturnTo = (formData.get('returnTo') as string | null)?.trim() ?? '';
+    const returnTo = rawReturnTo.startsWith('/') ? rawReturnTo : '';
+
     if (info.type === 'commissioner' && !leagueName) {
         redirect('/pricing?tab=commissioner&error=league-name-required');
     }
@@ -129,7 +134,7 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
             // so we always use allow_promotion_codes and apply multi-league discounts
             // to the subscription after checkout via the webhook.
             allow_promotion_codes: true,
-            success_url: `${appUrl()}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+            success_url: `${appUrl()}/checkout/success?session_id={CHECKOUT_SESSION_ID}${returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : ''}`,
             cancel_url:  `${appUrl()}/pricing?tab=${info.type === 'commissioner' ? 'commissioner' : 'player'}`,
             metadata: sharedMeta,
             subscription_data: {

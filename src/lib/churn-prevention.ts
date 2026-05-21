@@ -137,6 +137,7 @@ export async function runChurnDetection(): Promise<{
                 { subscriptions: { some: { type: 'commissioner' } } },
             ],
         },
+        take: 500,
         select: {
             id: true,
             leagues: {

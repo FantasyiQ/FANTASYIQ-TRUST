@@ -131,7 +131,9 @@ function PostCard({ post, leagueId, onPin, onDelete }: {
                     </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={handlePin} disabled={busy} title={post.pinned ? 'Unpin' : 'Pin to top'}
+                    <button onClick={handlePin} disabled={busy}
+                        aria-label={post.pinned ? 'Unpin announcement' : 'Pin announcement to top'}
+                        title={post.pinned ? 'Unpin' : 'Pin to top'}
                         className={`p-1.5 rounded-lg text-sm transition disabled:opacity-40 ${
                             post.pinned
                                 ? 'text-[#D4AF37] hover:bg-[#D4AF37]/10'
@@ -139,7 +141,9 @@ function PostCard({ post, leagueId, onPin, onDelete }: {
                         }`}>
                         📌
                     </button>
-                    <button onClick={handleDelete} disabled={busy} title="Delete"
+                    <button onClick={handleDelete} disabled={busy}
+                        aria-label="Delete announcement"
+                        title="Delete"
                         className="p-1.5 rounded-lg text-sm text-gray-700 hover:text-red-400 hover:bg-red-400/10 transition disabled:opacity-40">
                         🗑️
                     </button>
@@ -300,6 +304,7 @@ export default function AnnouncementsManager({ leagueId, leagueName, initial }: 
                 <div className="px-5 pt-5 pb-3 border-b border-gray-800">
                     <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-3">{leagueName}</p>
                     <textarea
+                        aria-label="Write an announcement"
                         value={body}
                         onChange={e => setBody(e.target.value)}
                         onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handlePost(); }}
@@ -314,6 +319,7 @@ export default function AnnouncementsManager({ leagueId, leagueName, initial }: 
                         <div className="mt-3 relative inline-block">
                             <MediaPreview url={selectedMedia.url} alt="selected media" />
                             <button
+                                aria-label="Remove selected media"
                                 onClick={() => setSelectedMedia(null)}
                                 className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-black/70 text-white text-xs flex items-center justify-center hover:bg-black/90 transition">
                                 ×
@@ -344,6 +350,7 @@ export default function AnnouncementsManager({ leagueId, leagueName, initial }: 
                             <div className="px-5 py-4 space-y-3">
                                 <input
                                     type="text"
+                                    aria-label="Search GIFs"
                                     value={gifQuery}
                                     onChange={e => setGifQuery(e.target.value)}
                                     placeholder="Search Giphy… (e.g. touchdown, trade, sad)"
@@ -366,7 +373,7 @@ export default function AnnouncementsManager({ leagueId, leagueName, initial }: 
                                                 }}
                                                 className="aspect-square rounded-lg overflow-hidden border border-transparent hover:border-[#D4AF37]/60 transition focus:outline-none">
                                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                <img src={gif.previewUrl} alt="gif" className="w-full h-full object-cover" />
+                                                <img src={gif.previewUrl} alt="GIF preview" className="w-full h-full object-cover" />
                                             </button>
                                         ))}
                                     </div>

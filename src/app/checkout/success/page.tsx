@@ -20,9 +20,11 @@ function resolveSubType(
 export default async function CheckoutSuccessPage({
     searchParams,
 }: {
-    searchParams: Promise<{ session_id?: string }>;
+    searchParams: Promise<{ session_id?: string; returnTo?: string }>;
 }) {
-    const { session_id } = await searchParams;
+    const { session_id, returnTo: rawReturnTo } = await searchParams;
+    // Only allow relative paths to prevent open redirects
+    const returnTo = rawReturnTo?.startsWith('/') ? rawReturnTo : null;
     if (!session_id) redirect('/pricing');
 
     // Expand subscription so we have all the data we need in one call.
@@ -101,6 +103,6 @@ export default async function CheckoutSuccessPage({
         }
     }
 
-    // DB is now up to date — redirect straight to dashboard.
-    redirect('/dashboard');
+    // DB is now up to date — redirect to the feature the user came from, or dashboard.
+    redirect(returnTo ?? '/dashboard');
 }

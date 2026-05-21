@@ -203,6 +203,7 @@ export async function nudgeStuckCommissioners(): Promise<{ nudged: number; skipp
 
         const candidates = await prisma.user.findMany({
             where:  stageWhere,
+            take:   500,
             select: { id: true },
         });
 

@@ -92,6 +92,7 @@ export async function analyzeFeatureTrends(): Promise<FeatureTrend[]> {
             where:    { createdAt: { gte: thisWeekAgo } },
             select:   { feature: true, userId: true },
             distinct: ['feature', 'userId'],
+            take:     5000,
         }),
     ]);
 
@@ -149,6 +150,7 @@ export async function runFeatureIntelligence(): Promise<{
             where:    { feature: combo.trigger, createdAt: { gte: thirtyDaysAgo } },
             select:   { userId: true },
             distinct: ['userId'],
+            take:     1000,
         });
 
         if (triggerUsers.length === 0) continue;

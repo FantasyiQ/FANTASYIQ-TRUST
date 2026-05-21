@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface SyncedLeague {
@@ -12,8 +12,37 @@ interface SyncedLeague {
 }
 
 export default function SyncedLeaguePicker({ leagues }: { leagues: SyncedLeague[] }) {
-    const router = useRouter();
+    const router  = useRouter();
     const [open, setOpen] = useState(false);
+    const dialogRef = useRef<HTMLDivElement>(null);
+
+    // Focus the dialog when it opens; restore focus when it closes
+    useEffect(() => {
+        if (open) {
+            dialogRef.current?.focus();
+        }
+    }, [open]);
+
+    // Close on Escape; trap Tab within the dialog
+    useEffect(() => {
+        if (!open) return;
+        function onKey(e: KeyboardEvent) {
+            if (e.key === 'Escape') { setOpen(false); return; }
+            if (e.key !== 'Tab' || !dialogRef.current) return;
+            const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            );
+            const first = focusable[0];
+            const last  = focusable[focusable.length - 1];
+            if (e.shiftKey) {
+                if (document.activeElement === first) { e.preventDefault(); last?.focus(); }
+            } else {
+                if (document.activeElement === last) { e.preventDefault(); first?.focus(); }
+            }
+        }
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [open]);
 
     if (leagues.length === 0) return null;
 
@@ -34,9 +63,19 @@ export default function SyncedLeaguePicker({ leagues }: { leagues: SyncedLeague[
 
             {open && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-                    <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setOpen(false)} />
-                    <div className="relative bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
-                        <h2 className="text-lg font-bold text-white mb-1">Pick a Synced League</h2>
+                    {/* Accessible backdrop */}
+                    <button
+                        aria-label="Close dialog"
+                        onClick={() => setOpen(false)}
+                        className="absolute inset-0 bg-black/70 backdrop-blur-sm cursor-default" />
+                    <div
+                        ref={dialogRef}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="league-picker-title"
+                        tabIndex={-1}
+                        className="relative bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md shadow-2xl focus:outline-none">
+                        <h2 id="league-picker-title" className="text-lg font-bold text-white mb-1">Pick a Synced League</h2>
                         <p className="text-gray-400 text-sm mb-4">Select a league to start a commissioner plan for.</p>
 
                         <div className="space-y-2 max-h-72 overflow-y-auto pr-1">

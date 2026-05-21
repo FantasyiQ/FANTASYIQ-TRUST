@@ -48,7 +48,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ due
         orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
         include: { author: { select: { name: true, image: true } } },
     });
-    return Response.json(announcements);
+    return Response.json(announcements, {
+        headers: { 'Cache-Control': 'private, max-age=30' },
+    });
 }
 
 // POST — create a new announcement

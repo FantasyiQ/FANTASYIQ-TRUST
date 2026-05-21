@@ -1293,13 +1293,13 @@ export default function TradeEvaluator({
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="border-b border-gray-800">
-                                    <th className="text-left px-4 py-3 text-gray-500 font-medium w-10">#</th>
-                                    <th className="text-left px-3 py-3 text-gray-500 font-medium">Player</th>
-                                    <th className="text-left px-3 py-3 text-gray-500 font-medium">Pos</th>
-                                    <th className="text-left px-3 py-3 text-gray-500 font-medium">Team</th>
-                                    <th className="text-right px-3 py-3 text-gray-500 font-medium">DTV</th>
-                                    <th className="text-right px-3 py-3 text-gray-500 font-medium">Tier</th>
-                                    <th className="text-right px-4 py-3 text-gray-500 font-medium">Add</th>
+                                    <th scope="col" className="text-left px-4 py-3 text-gray-500 font-medium w-10">#</th>
+                                    <th scope="col" className="text-left px-3 py-3 text-gray-500 font-medium">Player</th>
+                                    <th scope="col" className="text-left px-3 py-3 text-gray-500 font-medium">Pos</th>
+                                    <th scope="col" className="text-left px-3 py-3 text-gray-500 font-medium">Team</th>
+                                    <th scope="col" className="text-right px-3 py-3 text-gray-500 font-medium">DTV</th>
+                                    <th scope="col" className="text-right px-3 py-3 text-gray-500 font-medium">Tier</th>
+                                    <th scope="col" className="text-right px-4 py-3 text-gray-500 font-medium">Add</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-800/50">

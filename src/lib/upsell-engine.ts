@@ -65,6 +65,7 @@ export async function runUpsellEngine(): Promise<{
                 { leagues:       { some: {} } },
             ],
         },
+        take: 500,
         select: {
             id: true,
             leagues:      { select: { id: true } },
@@ -88,6 +89,7 @@ export async function runUpsellEngine(): Promise<{
                 { leagues: { some: { announcements:  { some: {} } } } },
             ],
         },
+        take: 200,
         select: {
             id: true,
             ownedCommissioner: { select: { id: true } },
@@ -114,6 +116,7 @@ export async function runUpsellEngine(): Promise<{
                 },
             },
         },
+        take: 200,
         select: {
             id: true,
             leagues: { select: { id: true } },

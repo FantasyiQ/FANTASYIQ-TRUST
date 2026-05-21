@@ -117,10 +117,10 @@ function TeamRow({
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="border-b border-gray-800/60">
-                                    <th className="pl-10 pr-3 py-2 text-left text-gray-600 text-xs font-medium">Player</th>
-                                    <th className="px-3 py-2 text-left text-gray-600 text-xs font-medium">Pos</th>
-                                    <th className="px-3 py-2 text-left text-gray-600 text-xs font-medium">Team</th>
-                                    <th className="px-3 py-2 text-right text-gray-600 text-xs font-medium">DTV</th>
+                                    <th scope="col" className="pl-10 pr-3 py-2 text-left text-gray-600 text-xs font-medium">Player</th>
+                                    <th scope="col" className="px-3 py-2 text-left text-gray-600 text-xs font-medium">Pos</th>
+                                    <th scope="col" className="px-3 py-2 text-left text-gray-600 text-xs font-medium">Team</th>
+                                    <th scope="col" className="px-3 py-2 text-right text-gray-600 text-xs font-medium">DTV</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-800/30">
@@ -142,7 +142,9 @@ export default function RosterValuesPanel({ sleeperLeagueId }: { sleeperLeagueId
     const [error,    setError]    = useState<string | null>(null);
     const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
-    useEffect(() => {
+    function load() {
+        setLoading(true);
+        setError(null);
         fetch(`/api/leagues/${sleeperLeagueId}/roster-values`)
             .then(r => {
                 if (!r.ok) throw new Error(`${r.status}`);
@@ -150,7 +152,9 @@ export default function RosterValuesPanel({ sleeperLeagueId }: { sleeperLeagueId
             })
             .then(d => { setData(d); setLoading(false); })
             .catch(e => { setError(String(e)); setLoading(false); });
-    }, [sleeperLeagueId]);
+    }
+
+    useEffect(() => { load(); }, [sleeperLeagueId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const toggle = (rosterId: number) => {
         setExpanded(prev => {
@@ -174,6 +178,9 @@ export default function RosterValuesPanel({ sleeperLeagueId }: { sleeperLeagueId
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center">
                 <p className="text-red-400 text-sm">Failed to load roster values.</p>
                 <p className="text-gray-600 text-xs mt-1">{error}</p>
+                <button onClick={load} className="mt-4 px-4 py-1.5 text-xs font-semibold border border-gray-700 hover:border-[#D4AF37]/50 text-gray-400 hover:text-white rounded-lg transition">
+                    Try again
+                </button>
             </div>
         );
     }
@@ -207,15 +214,15 @@ export default function RosterValuesPanel({ sleeperLeagueId }: { sleeperLeagueId
                 <table className="w-full text-sm min-w-[700px]">
                     <thead>
                         <tr className="border-b border-gray-800">
-                            <th className="text-left px-4 py-3 text-gray-500 font-medium w-10">#</th>
-                            <th className="text-left px-3 py-3 text-gray-500 font-medium">Team</th>
-                            <th className="text-right px-3 py-3 text-gray-500 font-medium">Total DTV</th>
-                            <th className="text-right px-3 py-3 text-gray-500 font-medium">Tier</th>
-                            <th className="text-right px-3 py-3 text-gray-500 font-medium">QB</th>
-                            <th className="text-right px-3 py-3 text-gray-500 font-medium">RB</th>
-                            <th className="text-right px-3 py-3 text-gray-500 font-medium">WR</th>
-                            <th className="text-right px-3 py-3 text-gray-500 font-medium">TE</th>
-                            <th className="text-right px-4 py-3 text-gray-500 font-medium">Bench</th>
+                            <th scope="col" className="text-left px-4 py-3 text-gray-500 font-medium w-10">#</th>
+                            <th scope="col" className="text-left px-3 py-3 text-gray-500 font-medium">Team</th>
+                            <th scope="col" className="text-right px-3 py-3 text-gray-500 font-medium">Total DTV</th>
+                            <th scope="col" className="text-right px-3 py-3 text-gray-500 font-medium">Tier</th>
+                            <th scope="col" className="text-right px-3 py-3 text-gray-500 font-medium">QB</th>
+                            <th scope="col" className="text-right px-3 py-3 text-gray-500 font-medium">RB</th>
+                            <th scope="col" className="text-right px-3 py-3 text-gray-500 font-medium">WR</th>
+                            <th scope="col" className="text-right px-3 py-3 text-gray-500 font-medium">TE</th>
+                            <th scope="col" className="text-right px-4 py-3 text-gray-500 font-medium">Bench</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-800/50">
