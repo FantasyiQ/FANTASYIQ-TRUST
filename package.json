@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "node scripts/kill-orphan-next.mjs && next dev",
-    "build": "prisma generate && node scripts/migrate.mjs && next build",
+    "build": "npm audit --audit-level=high --omit=dev && prisma generate && node scripts/migrate.mjs && next build",
     "start": "next start",
     "lint": "eslint",
     "db:generate": "dotenv -e .env.local -- prisma generate",
@@ -25,10 +25,10 @@
     "@upstash/redis": "^1.38.0",
     "@vercel/blob": "^2.3.3",
     "bcryptjs": "^3.0.3",
-    "next": "16.2.2",
+    "next": "^16.2.6",
     "next-auth": "^5.0.0-beta.30",
     "pg": "^8.20.0",
-    "prisma": "^7.7.0",
+    "prisma": "^6.19.3",
     "pusher": "^5.3.3",
     "pusher-js": "^8.5.0",
     "react": "18.2.0",
@@ -44,7 +44,7 @@
     "@types/react-dom": "^18.2.0",
     "dotenv-cli": "^11.0.0",
     "eslint": "^9",
-    "eslint-config-next": "16.2.2",
-    "vercel": "^53.1.0"
+    "eslint-config-next": "^16.2.6",
+    "vercel": "^53.4.0"
   }
 }
