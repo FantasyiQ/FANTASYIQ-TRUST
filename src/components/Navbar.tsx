@@ -63,12 +63,6 @@ export default async function Navbar() {
               <span className="shrink-0">
                 <NotificationBell userId={session?.user?.id ?? undefined} />
               </span>
-              <Link
-                href="/dashboard/account"
-                className="text-gray-300 hover:text-white transition text-sm whitespace-nowrap shrink-0"
-              >
-                Account
-              </Link>
               {navBadge ? (
                 <Link
                   href="/pricing"
@@ -81,6 +75,12 @@ export default async function Navbar() {
                   Upgrade
                 </Link>
               )}
+              <Link
+                href="/dashboard/account"
+                className="text-gray-300 hover:text-white transition text-sm whitespace-nowrap shrink-0"
+              >
+                Account
+              </Link>
               <form
                 action={async () => {
                   'use server';
