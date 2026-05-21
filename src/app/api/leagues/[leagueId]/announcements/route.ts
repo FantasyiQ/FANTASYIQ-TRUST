@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
 
 function normalizeMediaUrl(raw: string): string | null {
     try {
@@ -27,6 +28,8 @@ export async function GET(
     _req: NextRequest,
     { params }: { params: Promise<{ leagueId: string }> },
 ): Promise<Response> {
+
+
     const { leagueId } = await params;
     const session = await auth();
     if (!session?.user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -45,6 +48,10 @@ export async function POST(
     req: NextRequest,
     { params }: { params: Promise<{ leagueId: string }> },
 ): Promise<Response> {
+    const rl = await checkMutationLimit(getClientIp(req));
+    if (rl.limited) return rl.response!;
+
+
     const { leagueId } = await params;
     const session = await auth();
     if (!session?.user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });

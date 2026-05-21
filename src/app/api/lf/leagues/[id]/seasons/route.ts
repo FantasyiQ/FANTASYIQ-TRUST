@@ -1,5 +1,6 @@
 import { auth }   from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
 
 // POST — commissioner adds a season record
 export async function POST(

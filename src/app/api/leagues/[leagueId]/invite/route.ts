@@ -4,11 +4,16 @@ import { prisma } from '@/lib/prisma';
 import { getLeagueUsers } from '@/lib/sleeper';
 import { notify } from '@/lib/notifications/service';
 import { NotificationType } from '@/lib/notifications/types';
+import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
 
 export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ leagueId: string }> },
 ): Promise<Response> {
+
+    const rl = await checkMutationLimit(getClientIp(request));
+    if (rl.limited) return rl.response!;
+
     const { leagueId } = await params;
     const session = await auth();
     if (!session?.user?.email) return Response.json({ error: 'Unauthorized' }, { status: 401 });

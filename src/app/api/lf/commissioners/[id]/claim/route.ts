@@ -1,5 +1,6 @@
 import { auth }   from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
 
 // POST — claim an unclaimed commissioner profile
 export async function POST(

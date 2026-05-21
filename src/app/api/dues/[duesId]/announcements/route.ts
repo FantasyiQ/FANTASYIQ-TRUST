@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
 
 /** Convert a Giphy share URL to a direct media URL if possible. Only allows http/https. */
 function normalizeMediaUrl(raw: string): string | null {
@@ -53,6 +54,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ due
 
 // POST — create a new announcement
 export async function POST(req: NextRequest, { params }: { params: Promise<{ duesId: string }> }): Promise<Response> {
+
     const { duesId } = await params;
     const session = await auth();
     if (!session?.user?.email) return Response.json({ error: 'Unauthorized' }, { status: 401 });

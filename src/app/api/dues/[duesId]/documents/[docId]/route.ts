@@ -1,12 +1,17 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
 
 // DELETE — remove a document link
 export async function DELETE(
     _request: NextRequest,
     { params }: { params: Promise<{ duesId: string; docId: string }> },
 ): Promise<Response> {
+    const rl = await checkMutationLimit(getClientIp(_request));
+    if (rl.limited) return rl.response!;
+
+
     const { duesId, docId } = await params;
     const session = await auth();
     if (!session?.user?.email) return Response.json({ error: 'Unauthorized' }, { status: 401 });

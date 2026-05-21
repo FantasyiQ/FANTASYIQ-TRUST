@@ -3,11 +3,16 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { notify } from '@/lib/notifications/service';
 import { NotificationType } from '@/lib/notifications/types';
+import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
 
 export async function PATCH(
     request: NextRequest,
     { params }: { params: Promise<{ duesId: string }> },
 ): Promise<Response> {
+
+    const rl = await checkMutationLimit(getClientIp(request));
+    if (rl.limited) return rl.response!;
+
     const { duesId } = await params;
     const session = await auth();
     if (!session?.user?.email) return Response.json({ error: 'Unauthorized' }, { status: 401 });

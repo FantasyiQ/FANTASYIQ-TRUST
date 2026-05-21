@@ -1,6 +1,7 @@
 // GET /api/cron/feature-intelligence
 // Weekly cron — analyses WoW feature trends and sends personalised feature suggestions to users.
 import { runFeatureIntelligence } from '@/lib/feature-intelligence';
+import { captureError } from '@/lib/sentry';
 
 export const maxDuration = 300;
 
@@ -9,11 +10,17 @@ export async function GET(request: Request): Promise<Response> {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { trends, nudged, analyzed } = await runFeatureIntelligence();
-
-    const rising   = trends.filter(t => t.direction === 'rising').map(t => t.feature);
-    const declining= trends.filter(t => t.direction === 'declining').map(t => t.feature);
-    const abandoned= trends.filter(t => t.direction === 'abandoned').map(t => t.feature);
-
-    return Response.json({ ok: true, analyzed, nudged, rising, declining, abandoned });
+    try {
+    
+        const { trends, nudged, analyzed } = await runFeatureIntelligence();
+    
+        const rising   = trends.filter(t => t.direction === 'rising').map(t => t.feature);
+        const declining= trends.filter(t => t.direction === 'declining').map(t => t.feature);
+        const abandoned= trends.filter(t => t.direction === 'abandoned').map(t => t.feature);
+    
+        return Response.json({ ok: true, analyzed, nudged, rising, declining, abandoned });
+    } catch (err) {
+        captureError(err, { cron: 'feature-intelligence' });
+        return Response.json({ error: 'Cron failed' }, { status: 500 });
+    }
 }

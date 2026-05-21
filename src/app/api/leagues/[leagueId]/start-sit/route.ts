@@ -12,6 +12,7 @@ import {
     winProbability,
     buildOpponentDefRankMap,
 } from '@/lib/projection-engine';
+import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -187,6 +188,10 @@ export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ leagueId: string }> },
 ): Promise<Response> {
+
+    const rl = await checkMutationLimit(getClientIp(request));
+    if (rl.limited) return rl.response!;
+
     const session = await auth();
     if (!session?.user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
     const deny = await requirePaidTier(session.user.id);

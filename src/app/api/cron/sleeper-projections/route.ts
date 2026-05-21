@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { captureError } from '@/lib/sentry';
 
 export const maxDuration = 300;
 
@@ -32,44 +33,50 @@ export async function GET(request: NextRequest): Promise<Response> {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { season, week } = currentNflWeek();
-
-    // Try the current week; fall back to week 1 if no projection data found
-    let data: Record<string, SleeperProjection> = {};
-    for (const tryWeek of [week, 1]) {
-        const res = await fetch(
-            `https://api.sleeper.app/v1/projections/nfl/regular/${season}/${tryWeek}`,
-            { cache: 'no-store' }
-        );
-        if (!res.ok) continue;
-        const raw = await res.json() as Record<string, SleeperProjection>;
-        const hasData = Object.values(raw).some(p => p?.pts_ppr != null || p?.pts_std != null);
-        if (hasData) { data = raw; break; }
+    try {
+    
+        const { season, week } = currentNflWeek();
+    
+        // Try the current week; fall back to week 1 if no projection data found
+        let data: Record<string, SleeperProjection> = {};
+        for (const tryWeek of [week, 1]) {
+            const res = await fetch(
+                `https://api.sleeper.app/v1/projections/nfl/regular/${season}/${tryWeek}`,
+                { cache: 'no-store' }
+            );
+            if (!res.ok) continue;
+            const raw = await res.json() as Record<string, SleeperProjection>;
+            const hasData = Object.values(raw).some(p => p?.pts_ppr != null || p?.pts_std != null);
+            if (hasData) { data = raw; break; }
+        }
+    
+        const rows = Object.entries(data)
+            .filter(([, p]) => p?.pts_ppr != null || p?.pts_std != null)
+            .map(([playerId, p]) => ({
+                playerId,
+                season,
+                week,
+                pointsPpr:     p.pts_ppr      ?? 0,
+                pointsStd:     p.pts_std      ?? 0,
+                pointsHalfPpr: p.pts_half_ppr ?? 0,
+            }));
+    
+        // Upsert in batches of 200
+        const BATCH = 200;
+        for (let i = 0; i < rows.length; i += BATCH) {
+            const batch = rows.slice(i, i + BATCH);
+            await Promise.all(batch.map(r =>
+                prisma.playerProjection.upsert({
+                    where: { playerId_season_week: { playerId: r.playerId, season: r.season, week: r.week } },
+                    create: r,
+                    update: { pointsPpr: r.pointsPpr, pointsStd: r.pointsStd, pointsHalfPpr: r.pointsHalfPpr },
+                }).catch(() => null) // skip if playerId doesn't exist in SleeperPlayer
+            ));
+        }
+    
+        return Response.json({ ok: true, season, week, upserted: rows.length });
+    } catch (err) {
+        captureError(err, { cron: 'sleeper-projections' });
+        return Response.json({ error: 'Cron failed' }, { status: 500 });
     }
-
-    const rows = Object.entries(data)
-        .filter(([, p]) => p?.pts_ppr != null || p?.pts_std != null)
-        .map(([playerId, p]) => ({
-            playerId,
-            season,
-            week,
-            pointsPpr:     p.pts_ppr      ?? 0,
-            pointsStd:     p.pts_std      ?? 0,
-            pointsHalfPpr: p.pts_half_ppr ?? 0,
-        }));
-
-    // Upsert in batches of 200
-    const BATCH = 200;
-    for (let i = 0; i < rows.length; i += BATCH) {
-        const batch = rows.slice(i, i + BATCH);
-        await Promise.all(batch.map(r =>
-            prisma.playerProjection.upsert({
-                where: { playerId_season_week: { playerId: r.playerId, season: r.season, week: r.week } },
-                create: r,
-                update: { pointsPpr: r.pointsPpr, pointsStd: r.pointsStd, pointsHalfPpr: r.pointsHalfPpr },
-            }).catch(() => null) // skip if playerId doesn't exist in SleeperPlayer
-        ));
-    }
-
-    return Response.json({ ok: true, season, week, upserted: rows.length });
 }

@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { captureError } from '@/lib/sentry';
 
 export const maxDuration = 300;
 
@@ -42,85 +43,91 @@ export async function GET(request: Request): Promise<Response> {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const res = await fetch('https://api.sleeper.app/v1/players/nfl', { cache: 'no-store' });
-    if (!res.ok) {
-        return Response.json({ error: `Sleeper responded ${res.status}` }, { status: 502 });
+    try {
+    
+        const res = await fetch('https://api.sleeper.app/v1/players/nfl', { cache: 'no-store' });
+        if (!res.ok) {
+            return Response.json({ error: `Sleeper responded ${res.status}` }, { status: 502 });
+        }
+    
+        const data: Record<string, RawPlayer> = await res.json() as Record<string, RawPlayer>;
+    
+        const rows = Object.entries(data)
+            .filter(([, p]) => p.position)
+            .map(([id, p]) => ({
+                playerId:       id,
+                fullName:       p.full_name || `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim(),
+                position:       p.position!,
+                team:           p.team ?? 'FA',
+                active:         p.active ?? false,
+                espnId:         p.espn_id ? String(p.espn_id) : null,
+                injuryStatus:   p.injury_status ?? null,
+                injuryBodyPart: p.injury_body_part ?? null,
+                jerseyNumber:   p.number ? parseInt(String(p.number)) || null : null,
+                height:         formatHeight(p.height),
+                weight:         p.weight ? parseInt(String(p.weight)) || null : null,
+                birthDate:      p.birth_date ?? null,
+                age:            p.age ?? null,
+                yearsExp:       p.years_exp ?? null,
+                rookieYear:     p.metadata?.rookie_year ?? null,
+                searchRank:      p.search_rank ?? null,
+                depthChartOrder: p.depth_chart_order ?? null,
+                depthChartPos:   p.depth_chart_position ?? null,
+                // Official NFL draft data — null if undrafted or not yet available
+                draftRound:     p.draft_pick?.round ?? null,
+                draftPick:      p.draft_pick?.pick_no ?? p.draft_pick?.slot ?? null,
+                // FiQ Draft Capital Engine v2.0 — derived draft capital fields
+                draftTeam:      (p.draft_pick?.round != null) ? (p.team ?? null) : null,
+                overallPick:    (p.draft_pick?.round != null && (p.draft_pick?.pick_no ?? p.draft_pick?.slot) != null)
+                                    ? (p.draft_pick.round - 1) * 32 + (p.draft_pick.pick_no ?? p.draft_pick.slot ?? 1)
+                                    : null,
+                draftDay:       p.draft_pick?.round != null
+                                    ? (p.draft_pick.round === 1 ? 1 : p.draft_pick.round <= 3 ? 2 : 3)
+                                    : null,
+            }));
+    
+        // Upsert in batches of 500 to stay within statement limits
+        const BATCH = 500;
+        for (let i = 0; i < rows.length; i += BATCH) {
+            const batch = rows.slice(i, i + BATCH);
+            await Promise.all(
+                batch.map((r) =>
+                    prisma.sleeperPlayer.upsert({
+                        where:  { playerId: r.playerId },
+                        create: r,
+                        update: {
+                            fullName:       r.fullName,
+                            position:       r.position,
+                            team:           r.team,
+                            active:         r.active,
+                            espnId:         r.espnId,
+                            injuryStatus:   r.injuryStatus,
+                            injuryBodyPart: r.injuryBodyPart,
+                            jerseyNumber:   r.jerseyNumber,
+                            height:         r.height,
+                            weight:         r.weight,
+                            birthDate:      r.birthDate,
+                            age:            r.age,
+                            yearsExp:        r.yearsExp,
+                            rookieYear:      r.rookieYear,
+                            searchRank:      r.searchRank,
+                            depthChartOrder: r.depthChartOrder,
+                            depthChartPos:   r.depthChartPos,
+                            // Always overwrite draft data — official beats any prior estimate
+                            draftRound:     r.draftRound,
+                            draftPick:      r.draftPick,
+                            draftTeam:      r.draftTeam,
+                            overallPick:    r.overallPick,
+                            draftDay:       r.draftDay,
+                        },
+                    })
+                )
+            );
+        }
+    
+        return Response.json({ ok: true, upserted: rows.length });
+    } catch (err) {
+        captureError(err, { cron: 'sleeper-players' });
+        return Response.json({ error: 'Cron failed' }, { status: 500 });
     }
-
-    const data: Record<string, RawPlayer> = await res.json() as Record<string, RawPlayer>;
-
-    const rows = Object.entries(data)
-        .filter(([, p]) => p.position)
-        .map(([id, p]) => ({
-            playerId:       id,
-            fullName:       p.full_name || `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim(),
-            position:       p.position!,
-            team:           p.team ?? 'FA',
-            active:         p.active ?? false,
-            espnId:         p.espn_id ? String(p.espn_id) : null,
-            injuryStatus:   p.injury_status ?? null,
-            injuryBodyPart: p.injury_body_part ?? null,
-            jerseyNumber:   p.number ? parseInt(String(p.number)) || null : null,
-            height:         formatHeight(p.height),
-            weight:         p.weight ? parseInt(String(p.weight)) || null : null,
-            birthDate:      p.birth_date ?? null,
-            age:            p.age ?? null,
-            yearsExp:       p.years_exp ?? null,
-            rookieYear:     p.metadata?.rookie_year ?? null,
-            searchRank:      p.search_rank ?? null,
-            depthChartOrder: p.depth_chart_order ?? null,
-            depthChartPos:   p.depth_chart_position ?? null,
-            // Official NFL draft data — null if undrafted or not yet available
-            draftRound:     p.draft_pick?.round ?? null,
-            draftPick:      p.draft_pick?.pick_no ?? p.draft_pick?.slot ?? null,
-            // FiQ Draft Capital Engine v2.0 — derived draft capital fields
-            draftTeam:      (p.draft_pick?.round != null) ? (p.team ?? null) : null,
-            overallPick:    (p.draft_pick?.round != null && (p.draft_pick?.pick_no ?? p.draft_pick?.slot) != null)
-                                ? (p.draft_pick.round - 1) * 32 + (p.draft_pick.pick_no ?? p.draft_pick.slot ?? 1)
-                                : null,
-            draftDay:       p.draft_pick?.round != null
-                                ? (p.draft_pick.round === 1 ? 1 : p.draft_pick.round <= 3 ? 2 : 3)
-                                : null,
-        }));
-
-    // Upsert in batches of 500 to stay within statement limits
-    const BATCH = 500;
-    for (let i = 0; i < rows.length; i += BATCH) {
-        const batch = rows.slice(i, i + BATCH);
-        await Promise.all(
-            batch.map((r) =>
-                prisma.sleeperPlayer.upsert({
-                    where:  { playerId: r.playerId },
-                    create: r,
-                    update: {
-                        fullName:       r.fullName,
-                        position:       r.position,
-                        team:           r.team,
-                        active:         r.active,
-                        espnId:         r.espnId,
-                        injuryStatus:   r.injuryStatus,
-                        injuryBodyPart: r.injuryBodyPart,
-                        jerseyNumber:   r.jerseyNumber,
-                        height:         r.height,
-                        weight:         r.weight,
-                        birthDate:      r.birthDate,
-                        age:            r.age,
-                        yearsExp:        r.yearsExp,
-                        rookieYear:      r.rookieYear,
-                        searchRank:      r.searchRank,
-                        depthChartOrder: r.depthChartOrder,
-                        depthChartPos:   r.depthChartPos,
-                        // Always overwrite draft data — official beats any prior estimate
-                        draftRound:     r.draftRound,
-                        draftPick:      r.draftPick,
-                        draftTeam:      r.draftTeam,
-                        overallPick:    r.overallPick,
-                        draftDay:       r.draftDay,
-                    },
-                })
-            )
-        );
-    }
-
-    return Response.json({ ok: true, upserted: rows.length });
 }

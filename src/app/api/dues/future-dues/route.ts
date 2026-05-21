@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
 
 async function getCommissioner(email: string) {
     return prisma.user.findUnique({ where: { email }, select: { id: true } });
@@ -17,6 +18,9 @@ async function assertCommissionerOwns(duesId: string, userId: string) {
 
 // POST — add a future dues obligation
 export async function POST(request: NextRequest): Promise<Response> {
+
+    const rl = await checkMutationLimit(getClientIp(request));
+    if (rl.limited) return rl.response!;
     const session = await auth();
     if (!session?.user?.email) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -57,6 +61,9 @@ export async function POST(request: NextRequest): Promise<Response> {
 
 // DELETE — remove a pending obligation
 export async function DELETE(request: NextRequest): Promise<Response> {
+
+    const rl = await checkMutationLimit(getClientIp(request));
+    if (rl.limited) return rl.response!;
     const session = await auth();
     if (!session?.user?.email) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -80,6 +87,9 @@ export async function DELETE(request: NextRequest): Promise<Response> {
 
 // PATCH — mark as paid manually
 export async function PATCH(request: NextRequest): Promise<Response> {
+
+    const rl = await checkMutationLimit(getClientIp(request));
+    if (rl.limited) return rl.response!;
     const session = await auth();
     if (!session?.user?.email) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 

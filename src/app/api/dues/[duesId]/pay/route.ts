@@ -5,7 +5,7 @@ import { stripe } from '@/lib/stripe';
 import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
 
 function appUrl() {
-    return process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? 'http://localhost:3000';
+    return (() => { const u = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL; if (!u) throw new Error('NEXTAUTH_URL is not configured'); return u; })();
 }
 
 // POST /api/dues/[duesId]/pay

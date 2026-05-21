@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { put } from '@vercel/blob';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
 
 const MAX_BYTES   = 10 * 1024 * 1024; // 10 MB
 const ALLOWED_TYPES = new Set([
@@ -22,6 +23,10 @@ export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ duesId: string }> }
 ): Promise<Response> {
+
+    const rl = await checkMutationLimit(getClientIp(request));
+    if (rl.limited) return rl.response!;
+
     const { duesId } = await params;
     const session = await auth();
     if (!session?.user?.email) return Response.json({ error: 'Unauthorized' }, { status: 401 });

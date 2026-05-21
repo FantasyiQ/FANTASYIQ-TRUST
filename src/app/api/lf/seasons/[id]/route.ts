@@ -1,5 +1,6 @@
 import { auth }   from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
 
 // PATCH — update a season record
 export async function PATCH(

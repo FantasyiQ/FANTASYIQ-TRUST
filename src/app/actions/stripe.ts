@@ -7,9 +7,11 @@ import { stripe, planInfo } from '@/lib/stripe';
 
 function appUrl(): string {
     return (
-        process.env.NEXTAUTH_URL ??
-        process.env.AUTH_URL ??
-        'http://localhost:3000'
+        (() => {
+        const u = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL;
+        if (!u) throw new Error('NEXTAUTH_URL is not configured');
+        return u;
+    })()
     );
 }
 

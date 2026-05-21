@@ -19,6 +19,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { computeRookieFiQTier } from '@/lib/dynasty/rookieRankings';
+import { captureError } from '@/lib/sentry';
 
 export const maxDuration = 300;
 
@@ -93,120 +94,126 @@ export async function GET(request: Request): Promise<Response> {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Fetch all rookies for this season
-    const rookies = await prisma.rookieRankingsPlayer.findMany({
-        where: { season: SEASON },
-    });
-
-    if (rookies.length === 0) {
-        return Response.json({ ok: true, updated: 0, message: `No rookies found for season ${SEASON}` });
-    }
-
-    // Fetch matching Sleeper players in one query
-    const names = rookies.map(r => r.playerName);
-    const sleeperMap = new Map(
-        (await prisma.sleeperPlayer.findMany({
-            where:  { fullName: { in: names } },
-            select: {
-                fullName:        true,
-                position:        true,
-                depthChartOrder: true,
-                searchRank:      true,
-                injuryStatus:    true,
-                active:          true,
-                playerId:        true,
-            },
-        })).map(sp => [sp.fullName, sp])
-    );
-
-    // Fetch season projections for all matched players in one query
-    const playerIds = [...sleeperMap.values()].map(sp => sp.playerId);
-    const projRows  = await prisma.playerProjection.findMany({
-        where:  { season: SEASON, playerId: { in: playerIds } },
-        select: { playerId: true, pointsPpr: true },
-    });
-
-    // Sum PPR projections per player
-    const projByPlayerId = new Map<string, number>();
-    for (const row of projRows) {
-        projByPlayerId.set(row.playerId, (projByPlayerId.get(row.playerId) ?? 0) + row.pointsPpr);
-    }
-
-    // Process each rookie
-    let updated = 0;
-    let noMatch = 0;
-
-    for (const rookie of rookies) {
-        const sp = sleeperMap.get(rookie.playerName);
-
-        // If baseFiQScore hasn't been set yet (existing rows seeded before this feature),
-        // treat the current fiqScore as the base.
-        const base = rookie.baseFiQScore > 0 ? rookie.baseFiQScore : rookie.fiqScore;
-
-        if (!sp) {
-            // No Sleeper match — if a manual depth order is set, apply it with no other signals
-            if (rookie.manualDepthOrder != null) {
-                const opportunityScore = calcOpportunityScore({
-                    depthChartOrder: rookie.manualDepthOrder,
-                    searchRank:      null,
-                    injuryStatus:    null,
-                    active:          true,
-                    projectedPts:    0,
-                    position:        rookie.position,
-                });
-                const rawAdjusted = (base * 0.75) + (opportunityScore * 0.25);
-                const adjustedFiQ = parseFloat(Math.max(rawAdjusted, base).toFixed(2));
-                const newTier     = computeRookieFiQTier(adjustedFiQ);
-                await prisma.rookieRankingsPlayer.update({
-                    where: { id: rookie.id },
-                    data:  { baseFiQScore: base, opportunityScore, fiqScore: adjustedFiQ, fiqTier: newTier },
-                });
-                updated++;
-            } else if (rookie.baseFiQScore === 0) {
-                await prisma.rookieRankingsPlayer.update({
-                    where: { id: rookie.id },
-                    data:  { baseFiQScore: rookie.fiqScore },
-                });
-            }
-            noMatch++;
-            continue;
+    try {
+    
+        // Fetch all rookies for this season
+        const rookies = await prisma.rookieRankingsPlayer.findMany({
+            where: { season: SEASON },
+        });
+    
+        if (rookies.length === 0) {
+            return Response.json({ ok: true, updated: 0, message: `No rookies found for season ${SEASON}` });
         }
-
-        const projectedPts    = projByPlayerId.get(sp.playerId) ?? 0;
-        // Use Sleeper depth chart if available; fall back to manual override
-        const depthChartOrder = sp.depthChartOrder ?? rookie.manualDepthOrder ?? null;
-        const opportunityScore = calcOpportunityScore({
-            depthChartOrder,
-            searchRank:      sp.searchRank,
-            injuryStatus:    sp.injuryStatus,
-            active:          sp.active,
-            projectedPts,
-            position:        sp.position,
+    
+        // Fetch matching Sleeper players in one query
+        const names = rookies.map(r => r.playerName);
+        const sleeperMap = new Map(
+            (await prisma.sleeperPlayer.findMany({
+                where:  { fullName: { in: names } },
+                select: {
+                    fullName:        true,
+                    position:        true,
+                    depthChartOrder: true,
+                    searchRank:      true,
+                    injuryStatus:    true,
+                    active:          true,
+                    playerId:        true,
+                },
+            })).map(sp => [sp.fullName, sp])
+        );
+    
+        // Fetch season projections for all matched players in one query
+        const playerIds = [...sleeperMap.values()].map(sp => sp.playerId);
+        const projRows  = await prisma.playerProjection.findMany({
+            where:  { season: SEASON, playerId: { in: playerIds } },
+            select: { playerId: true, pointsPpr: true },
         });
-
-        // Floor at base — opportunity can only raise the score, never lower it
-        const rawAdjusted = (base * 0.75) + (opportunityScore * 0.25);
-        const adjustedFiQ = parseFloat(Math.max(rawAdjusted, base).toFixed(2));
-        const newTier     = computeRookieFiQTier(adjustedFiQ);
-
-        await prisma.rookieRankingsPlayer.update({
-            where: { id: rookie.id },
-            data: {
-                baseFiQScore:    base,
-                opportunityScore,
-                fiqScore:        adjustedFiQ,
-                fiqTier:         newTier,
-            },
+    
+        // Sum PPR projections per player
+        const projByPlayerId = new Map<string, number>();
+        for (const row of projRows) {
+            projByPlayerId.set(row.playerId, (projByPlayerId.get(row.playerId) ?? 0) + row.pointsPpr);
+        }
+    
+        // Process each rookie
+        let updated = 0;
+        let noMatch = 0;
+    
+        for (const rookie of rookies) {
+            const sp = sleeperMap.get(rookie.playerName);
+    
+            // If baseFiQScore hasn't been set yet (existing rows seeded before this feature),
+            // treat the current fiqScore as the base.
+            const base = rookie.baseFiQScore > 0 ? rookie.baseFiQScore : rookie.fiqScore;
+    
+            if (!sp) {
+                // No Sleeper match — if a manual depth order is set, apply it with no other signals
+                if (rookie.manualDepthOrder != null) {
+                    const opportunityScore = calcOpportunityScore({
+                        depthChartOrder: rookie.manualDepthOrder,
+                        searchRank:      null,
+                        injuryStatus:    null,
+                        active:          true,
+                        projectedPts:    0,
+                        position:        rookie.position,
+                    });
+                    const rawAdjusted = (base * 0.75) + (opportunityScore * 0.25);
+                    const adjustedFiQ = parseFloat(Math.max(rawAdjusted, base).toFixed(2));
+                    const newTier     = computeRookieFiQTier(adjustedFiQ);
+                    await prisma.rookieRankingsPlayer.update({
+                        where: { id: rookie.id },
+                        data:  { baseFiQScore: base, opportunityScore, fiqScore: adjustedFiQ, fiqTier: newTier },
+                    });
+                    updated++;
+                } else if (rookie.baseFiQScore === 0) {
+                    await prisma.rookieRankingsPlayer.update({
+                        where: { id: rookie.id },
+                        data:  { baseFiQScore: rookie.fiqScore },
+                    });
+                }
+                noMatch++;
+                continue;
+            }
+    
+            const projectedPts    = projByPlayerId.get(sp.playerId) ?? 0;
+            // Use Sleeper depth chart if available; fall back to manual override
+            const depthChartOrder = sp.depthChartOrder ?? rookie.manualDepthOrder ?? null;
+            const opportunityScore = calcOpportunityScore({
+                depthChartOrder,
+                searchRank:      sp.searchRank,
+                injuryStatus:    sp.injuryStatus,
+                active:          sp.active,
+                projectedPts,
+                position:        sp.position,
+            });
+    
+            // Floor at base — opportunity can only raise the score, never lower it
+            const rawAdjusted = (base * 0.75) + (opportunityScore * 0.25);
+            const adjustedFiQ = parseFloat(Math.max(rawAdjusted, base).toFixed(2));
+            const newTier     = computeRookieFiQTier(adjustedFiQ);
+    
+            await prisma.rookieRankingsPlayer.update({
+                where: { id: rookie.id },
+                data: {
+                    baseFiQScore:    base,
+                    opportunityScore,
+                    fiqScore:        adjustedFiQ,
+                    fiqTier:         newTier,
+                },
+            });
+    
+            updated++;
+        }
+    
+        return Response.json({
+            ok:      true,
+            season:  SEASON,
+            updated,
+            noMatch,
+            total:   rookies.length,
         });
-
-        updated++;
+    } catch (err) {
+        captureError(err, { cron: 'rookie-opportunity-sync' });
+        return Response.json({ error: 'Cron failed' }, { status: 500 });
     }
-
-    return Response.json({
-        ok:      true,
-        season:  SEASON,
-        updated,
-        noMatch,
-        total:   rookies.length,
-    });
 }

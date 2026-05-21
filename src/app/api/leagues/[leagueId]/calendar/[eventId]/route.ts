@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
 
 const VALID_TYPES = new Set([
     'draft', 'trade_deadline', 'waiver_deadline',
@@ -22,6 +23,10 @@ export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ leagueId: string; eventId: string }> },
 ): Promise<Response> {
+    const rl = await checkMutationLimit(getClientIp(req));
+    if (rl.limited) return rl.response!;
+
+
     const { leagueId, eventId } = await params;
     const session = await auth();
     if (!session?.user?.email) return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -66,6 +71,10 @@ export async function DELETE(
     _req: NextRequest,
     { params }: { params: Promise<{ leagueId: string; eventId: string }> },
 ): Promise<Response> {
+    const rl = await checkMutationLimit(getClientIp(_req));
+    if (rl.limited) return rl.response!;
+
+
     const { leagueId, eventId } = await params;
     const session = await auth();
     if (!session?.user?.email) return Response.json({ error: 'Unauthorized' }, { status: 401 });

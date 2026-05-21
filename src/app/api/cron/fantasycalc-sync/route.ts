@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { captureError } from '@/lib/sentry';
 
 export const maxDuration = 300;
 
@@ -55,130 +56,136 @@ export async function GET(request: Request): Promise<Response> {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // ── Step 1: Snapshot current values (before today's update) ──────────────
-    // Merge with Sleeper for accurate team/injury at snapshot time.
-    const [currentRows, sleeperPlayers] = await Promise.all([
-        prisma.fantasyCalcValue.findMany({
-            where: { OR: [{ dynastyValue: { gt: 0 } }, { redraftValue: { gt: 0 } }] },
-            select: { nameLower: true, position: true, dynastyValue: true, dynastyValueSf: true, redraftValue: true, redraftValueSf: true, team: true },
-        }),
-        prisma.sleeperPlayer.findMany({
-            where:  { active: true },
-            select: { fullName: true, team: true, injuryStatus: true },
-        }),
-    ]);
-
-    const sleeperExact      = new Map<string, { team: string; injuryStatus: string | null }>();
-    const sleeperNormalized = new Map<string, { team: string; injuryStatus: string | null }>();
-    for (const p of sleeperPlayers) {
-        const exact = p.fullName.toLowerCase();
-        const normd = normalizeName(p.fullName);
-        const val   = { team: p.team, injuryStatus: p.injuryStatus };
-        if (!sleeperExact.has(exact))      sleeperExact.set(exact, val);
-        if (!sleeperNormalized.has(normd)) sleeperNormalized.set(normd, val);
-    }
-
-    const snapshotRows = currentRows.map(r => {
-        const sl = sleeperExact.get(r.nameLower) ?? sleeperNormalized.get(normalizeName(r.nameLower)) ?? null;
-        const rawTeam = sl?.team ?? r.team ?? null;
-        return {
-            nameLower:      r.nameLower,
-            position:       r.position,
-            dynastyValue:   r.dynastyValue,
-            dynastyValueSf: r.dynastyValueSf,
-            redraftValue:   r.redraftValue,
-            redraftValueSf: r.redraftValueSf,
-            team:           (rawTeam && rawTeam !== 'FA') ? rawTeam : null,
-            injuryStatus:   sl?.injuryStatus ?? null,
-        };
-    });
-
-    const SNAP_BATCH = 500;
-    for (let i = 0; i < snapshotRows.length; i += SNAP_BATCH) {
-        await prisma.fantasyCalcSnapshot.createMany({ data: snapshotRows.slice(i, i + SNAP_BATCH) });
-    }
-
-    // Prune snapshots older than 7 days
-    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    await prisma.fantasyCalcSnapshot.deleteMany({ where: { takenAt: { lt: cutoff } } });
-
-    // ── Step 2: Fetch fresh KTC values ────────────────────────────────────────
-    let dynastyPlayers: KtcPlayer[], redraftPlayers: KtcPlayer[];
     try {
-        [dynastyPlayers, redraftPlayers] = await Promise.all([
-            fetchKtcPage('https://keeptradecut.com/dynasty-rankings'),
-            fetchKtcPage('https://keeptradecut.com/fantasy-rankings'),
+    
+        // ── Step 1: Snapshot current values (before today's update) ──────────────
+        // Merge with Sleeper for accurate team/injury at snapshot time.
+        const [currentRows, sleeperPlayers] = await Promise.all([
+            prisma.fantasyCalcValue.findMany({
+                where: { OR: [{ dynastyValue: { gt: 0 } }, { redraftValue: { gt: 0 } }] },
+                select: { nameLower: true, position: true, dynastyValue: true, dynastyValueSf: true, redraftValue: true, redraftValueSf: true, team: true },
+            }),
+            prisma.sleeperPlayer.findMany({
+                where:  { active: true },
+                select: { fullName: true, team: true, injuryStatus: true },
+            }),
         ]);
-    } catch (err) {
-        return Response.json({ error: String(err) }, { status: 502 });
-    }
-
-    // KTC uses different playerIDs for the same player on dynasty vs redraft pages.
-    // Match by name (lowercased) to correctly link redraft values.
-    const redraftMap = new Map<string, number>();
-    const redraftSfMap = new Map<string, number>();
-    for (const p of redraftPlayers) {
-        const key = p.playerName.toLowerCase();
-        redraftMap.set(key, p.oneQBValues?.value ?? 0);
-        redraftSfMap.set(key, p.superflexValues?.value ?? 0);
-    }
-
-    const entries = dynastyPlayers.filter(p => p.playerName && p.playerID);
-
-    const BATCH = 50;
-    let upserted = 0;
-
-    // Upsert by nameLower (not fcId) so that rows originally created with old
-    // FantasyCalc IDs get updated correctly — KTC uses different playerIDs.
-    // Also update fcId so it reflects the current KTC ID.
-    for (let i = 0; i < entries.length; i += BATCH) {
-        const batch = entries.slice(i, i + BATCH);
-        await Promise.all(batch.map(async p => {
-            const nameLower      = p.playerName.toLowerCase();
-            const normdLower     = normalizeName(nameLower);
-            const redraftValue   = redraftMap.get(nameLower)   ?? 0;
-            const redraftValueSf = redraftSfMap.get(nameLower) ?? 0;
-
-            // If the canonical name has punctuation (e.g. "d.j. moore"), delete any
-            // stale de-punctuated duplicate (e.g. "dj moore") so it can't shadow the
-            // real entry in name-matching lookups.
-            if (normdLower !== nameLower) {
-                await prisma.fantasyCalcValue.deleteMany({
-                    where: { nameLower: normdLower },
+    
+        const sleeperExact      = new Map<string, { team: string; injuryStatus: string | null }>();
+        const sleeperNormalized = new Map<string, { team: string; injuryStatus: string | null }>();
+        for (const p of sleeperPlayers) {
+            const exact = p.fullName.toLowerCase();
+            const normd = normalizeName(p.fullName);
+            const val   = { team: p.team, injuryStatus: p.injuryStatus };
+            if (!sleeperExact.has(exact))      sleeperExact.set(exact, val);
+            if (!sleeperNormalized.has(normd)) sleeperNormalized.set(normd, val);
+        }
+    
+        const snapshotRows = currentRows.map(r => {
+            const sl = sleeperExact.get(r.nameLower) ?? sleeperNormalized.get(normalizeName(r.nameLower)) ?? null;
+            const rawTeam = sl?.team ?? r.team ?? null;
+            return {
+                nameLower:      r.nameLower,
+                position:       r.position,
+                dynastyValue:   r.dynastyValue,
+                dynastyValueSf: r.dynastyValueSf,
+                redraftValue:   r.redraftValue,
+                redraftValueSf: r.redraftValueSf,
+                team:           (rawTeam && rawTeam !== 'FA') ? rawTeam : null,
+                injuryStatus:   sl?.injuryStatus ?? null,
+            };
+        });
+    
+        const SNAP_BATCH = 500;
+        for (let i = 0; i < snapshotRows.length; i += SNAP_BATCH) {
+            await prisma.fantasyCalcSnapshot.createMany({ data: snapshotRows.slice(i, i + SNAP_BATCH) });
+        }
+    
+        // Prune snapshots older than 7 days
+        const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        await prisma.fantasyCalcSnapshot.deleteMany({ where: { takenAt: { lt: cutoff } } });
+    
+        // ── Step 2: Fetch fresh KTC values ────────────────────────────────────────
+        let dynastyPlayers: KtcPlayer[], redraftPlayers: KtcPlayer[];
+        try {
+            [dynastyPlayers, redraftPlayers] = await Promise.all([
+                fetchKtcPage('https://keeptradecut.com/dynasty-rankings'),
+                fetchKtcPage('https://keeptradecut.com/fantasy-rankings'),
+            ]);
+        } catch (err) {
+            return Response.json({ error: String(err) }, { status: 502 });
+        }
+    
+        // KTC uses different playerIDs for the same player on dynasty vs redraft pages.
+        // Match by name (lowercased) to correctly link redraft values.
+        const redraftMap = new Map<string, number>();
+        const redraftSfMap = new Map<string, number>();
+        for (const p of redraftPlayers) {
+            const key = p.playerName.toLowerCase();
+            redraftMap.set(key, p.oneQBValues?.value ?? 0);
+            redraftSfMap.set(key, p.superflexValues?.value ?? 0);
+        }
+    
+        const entries = dynastyPlayers.filter(p => p.playerName && p.playerID);
+    
+        const BATCH = 50;
+        let upserted = 0;
+    
+        // Upsert by nameLower (not fcId) so that rows originally created with old
+        // FantasyCalc IDs get updated correctly — KTC uses different playerIDs.
+        // Also update fcId so it reflects the current KTC ID.
+        for (let i = 0; i < entries.length; i += BATCH) {
+            const batch = entries.slice(i, i + BATCH);
+            await Promise.all(batch.map(async p => {
+                const nameLower      = p.playerName.toLowerCase();
+                const normdLower     = normalizeName(nameLower);
+                const redraftValue   = redraftMap.get(nameLower)   ?? 0;
+                const redraftValueSf = redraftSfMap.get(nameLower) ?? 0;
+    
+                // If the canonical name has punctuation (e.g. "d.j. moore"), delete any
+                // stale de-punctuated duplicate (e.g. "dj moore") so it can't shadow the
+                // real entry in name-matching lookups.
+                if (normdLower !== nameLower) {
+                    await prisma.fantasyCalcValue.deleteMany({
+                        where: { nameLower: normdLower },
+                    }).catch(() => null);
+                }
+    
+                return prisma.fantasyCalcValue.upsert({
+                    where:  { nameLower },
+                    create: {
+                        fcId:           p.playerID,
+                        playerName:     p.playerName,
+                        nameLower,
+                        position:       p.position,
+                        team:           p.team              ?? null,
+                        age:            p.age               ?? null,
+                        dynastyValue:   p.oneQBValues?.value   ?? 0,
+                        dynastyValueSf: p.superflexValues?.value ?? 0,
+                        redraftValue,
+                        redraftValueSf,
+                        trend30Day:     null,
+                    },
+                    update: {
+                        fcId:           p.playerID,
+                        playerName:     p.playerName,
+                        position:       p.position,
+                        team:           p.team              ?? null,
+                        age:            p.age               ?? null,
+                        dynastyValue:   p.oneQBValues?.value   ?? 0,
+                        dynastyValueSf: p.superflexValues?.value ?? 0,
+                        redraftValue,
+                        redraftValueSf,
+                        trend30Day:     null,
+                    },
                 }).catch(() => null);
-            }
-
-            return prisma.fantasyCalcValue.upsert({
-                where:  { nameLower },
-                create: {
-                    fcId:           p.playerID,
-                    playerName:     p.playerName,
-                    nameLower,
-                    position:       p.position,
-                    team:           p.team              ?? null,
-                    age:            p.age               ?? null,
-                    dynastyValue:   p.oneQBValues?.value   ?? 0,
-                    dynastyValueSf: p.superflexValues?.value ?? 0,
-                    redraftValue,
-                    redraftValueSf,
-                    trend30Day:     null,
-                },
-                update: {
-                    fcId:           p.playerID,
-                    playerName:     p.playerName,
-                    position:       p.position,
-                    team:           p.team              ?? null,
-                    age:            p.age               ?? null,
-                    dynastyValue:   p.oneQBValues?.value   ?? 0,
-                    dynastyValueSf: p.superflexValues?.value ?? 0,
-                    redraftValue,
-                    redraftValueSf,
-                    trend30Day:     null,
-                },
-            }).catch(() => null);
-        }));
-        upserted += batch.length;
+            }));
+            upserted += batch.length;
+        }
+    
+        return Response.json({ ok: true, source: 'KTC', upserted });
+    } catch (err) {
+        captureError(err, { cron: 'fantasycalc-sync' });
+        return Response.json({ error: 'Cron failed' }, { status: 500 });
     }
-
-    return Response.json({ ok: true, source: 'KTC', upserted });
 }

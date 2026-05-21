@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { currentNflWeek, scoreLineup, type DFSEntry } from '@/lib/dfs';
+import { captureError } from '@/lib/sentry';
 
 export const maxDuration = 300;
 
@@ -25,47 +26,53 @@ export async function GET(request: NextRequest): Promise<Response> {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { week: currentWeek, season: currentSeason } = currentNflWeek();
-
-    // Load all non-FINAL contests
-    const contests = await prisma.dFSContest.findMany({
-        where:   { status: { not: 'FINAL' } },
-        include: {
-            lineups:     { select: { id: true, userId: true, entriesJson: true } },
-            sourceLeague: { select: { scoringType: true } },
-        },
-    });
-
-    let totalScored = 0;
-    let finalised   = 0;
-
-    for (const contest of contests) {
-        const isPastWeek =
-            contest.season < currentSeason ||
-            (contest.season === currentSeason && contest.week < currentWeek);
-
-        // Score every lineup
-        for (const lineup of contest.lineups) {
-            const entries = lineup.entriesJson as DFSEntry[];
-            const pts     = await scoreLineup(entries, contest.season, contest.week, contest.sourceLeague.scoringType);
-            await prisma.dFSLineup.update({
-                where: { id: lineup.id },
-                data:  { totalPoints: pts, locked: isPastWeek },
-            });
-            totalScored++;
+    try {
+    
+        const { week: currentWeek, season: currentSeason } = currentNflWeek();
+    
+        // Load all non-FINAL contests
+        const contests = await prisma.dFSContest.findMany({
+            where:   { status: { not: 'FINAL' } },
+            include: {
+                lineups:     { select: { id: true, userId: true, entriesJson: true } },
+                sourceLeague: { select: { scoringType: true } },
+            },
+        });
+    
+        let totalScored = 0;
+        let finalised   = 0;
+    
+        for (const contest of contests) {
+            const isPastWeek =
+                contest.season < currentSeason ||
+                (contest.season === currentSeason && contest.week < currentWeek);
+    
+            // Score every lineup
+            for (const lineup of contest.lineups) {
+                const entries = lineup.entriesJson as DFSEntry[];
+                const pts     = await scoreLineup(entries, contest.season, contest.week, contest.sourceLeague.scoringType);
+                await prisma.dFSLineup.update({
+                    where: { id: lineup.id },
+                    data:  { totalPoints: pts, locked: isPastWeek },
+                });
+                totalScored++;
+            }
+    
+            // Past weeks → FINAL; current week → LOCKED (lineups in progress)
+            if (isPastWeek) {
+                await prisma.dFSContest.update({
+                    where: { id: contest.id },
+                    data:  { status: 'FINAL' },
+                });
+                finalised++;
+            } else if (contest.status === 'OPEN' && contest.week === currentWeek && contest.season === currentSeason) {
+                // Keep OPEN; scores are live estimates only
+            }
         }
-
-        // Past weeks → FINAL; current week → LOCKED (lineups in progress)
-        if (isPastWeek) {
-            await prisma.dFSContest.update({
-                where: { id: contest.id },
-                data:  { status: 'FINAL' },
-            });
-            finalised++;
-        } else if (contest.status === 'OPEN' && contest.week === currentWeek && contest.season === currentSeason) {
-            // Keep OPEN; scores are live estimates only
-        }
+    
+        return Response.json({ ok: true, scored: totalScored, finalised });
+    } catch (err) {
+        captureError(err, { cron: 'dfs-score' });
+        return Response.json({ error: 'Cron failed' }, { status: 500 });
     }
-
-    return Response.json({ ok: true, scored: totalScored, finalised });
 }

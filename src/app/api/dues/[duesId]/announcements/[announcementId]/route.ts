@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
 
 async function assertCommissioner(duesId: string, email: string) {
     const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
@@ -15,6 +16,10 @@ export async function PATCH(
     _req: NextRequest,
     { params }: { params: Promise<{ duesId: string; announcementId: string }> }
 ): Promise<Response> {
+    const rl = await checkMutationLimit(getClientIp(_req));
+    if (rl.limited) return rl.response!;
+
+
     const { duesId, announcementId } = await params;
     const session = await auth();
     if (!session?.user?.email) return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -43,6 +48,10 @@ export async function DELETE(
     _req: NextRequest,
     { params }: { params: Promise<{ duesId: string; announcementId: string }> }
 ): Promise<Response> {
+    const rl = await checkMutationLimit(getClientIp(_req));
+    if (rl.limited) return rl.response!;
+
+
     const { duesId, announcementId } = await params;
     const session = await auth();
     if (!session?.user?.email) return Response.json({ error: 'Unauthorized' }, { status: 401 });
