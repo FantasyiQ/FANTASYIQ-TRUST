@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import Stripe from 'stripe';
 import { stripe, planInfo } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
+import { captureError } from '@/lib/sentry';
 import type { SubscriptionTier } from '@prisma/client';
 
 const PLAYER_TIERS = new Set<SubscriptionTier>(['PLAYER_PRO', 'PLAYER_ALL_PRO', 'PLAYER_ELITE']);
@@ -211,6 +212,45 @@ export async function POST(request: NextRequest): Promise<Response> {
                 break;
             }
 
+            case 'invoice.payment_failed': {
+                const invoice = event.data.object as Stripe.Invoice;
+                const customerId = typeof invoice.customer === 'string' ? invoice.customer : null;
+                if (!customerId) break;
+
+                const user = await prisma.user.findUnique({
+                    where: { stripeCustomerId: customerId },
+                    select: { id: true },
+                });
+                if (!user) break;
+
+                // Mark subscription past_due
+                const rawSub = invoice.parent?.subscription_details?.subscription;
+                const subId  = typeof rawSub === 'string' ? rawSub : (rawSub as Stripe.Subscription | undefined)?.id ?? null;
+                if (subId) {
+                    await prisma.subscription.updateMany({
+                        where: { stripeSubscriptionId: subId, userId: user.id },
+                        data:  { status: 'past_due' },
+                    });
+                }
+
+                // Notify the user
+                await prisma.notification.create({
+                    data: {
+                        userId: user.id,
+                        type:   'PLAN_PAYMENT_FAILED',
+                        title:  'Payment failed',
+                        body:   'We couldn\'t process your subscription payment. Please update your payment method to keep your plan active.',
+                        data: {
+                            invoiceId:   invoice.id,
+                            amountDue:   invoice.amount_due,
+                            currency:    invoice.currency,
+                            nextAttempt: invoice.next_payment_attempt ?? null,
+                        },
+                    },
+                });
+                break;
+            }
+
             case 'customer.subscription.deleted': {
                 const sub = event.data.object as Stripe.Subscription;
                 const customerId = sub.customer as string;
@@ -256,7 +296,7 @@ export async function POST(request: NextRequest): Promise<Response> {
             }
         }
     } catch (err) {
-        console.error(`Webhook handler error [${event.type}]:`, err);
+        captureError(err, { event: event.type });
         return Response.json({ error: 'Webhook handler failed' }, { status: 500 });
     }
 

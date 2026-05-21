@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { notify } from '@/lib/notifications/service';
 import { NotificationType } from '@/lib/notifications/types';
+import { captureError } from '@/lib/sentry';
 
 export const maxDuration = 300;
 
@@ -59,6 +60,7 @@ export async function GET(request: Request): Promise<Response> {
 
         return Response.json({ ok: true, leagues: activeDues.length, sent });
     } catch (err) {
+        captureError(err, { cron: 'notifications-commissioner-digest' });
         const message = err instanceof Error ? err.message : 'Cron failed';
         return Response.json({ error: message }, { status: 500 });
     }

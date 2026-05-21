@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { getSleeperLeagues, getLeagueRosters, getLeagueDrafts, getNflState, deriveScoringType, rosterFpts, resolveDraftType } from '@/lib/sleeper';
 import { deriveChampWeek } from '@/lib/leaguePhase';
 import { shouldSkipLeague, withRetry, recordSyncFailure, recordSyncRecovered } from '@/lib/sync-recovery';
+import { captureError } from '@/lib/sentry';
 
 export const maxDuration = 300;
 
@@ -101,6 +102,7 @@ export async function GET(request: Request): Promise<Response> {
 
         return Response.json({ ok: true, synced, skipped, users: users.length });
     } catch (err) {
+        captureError(err, { cron: 'sleeper-sync' });
         const message = err instanceof Error ? err.message : 'Sync failed';
         return Response.json({ error: message }, { status: 500 });
     }

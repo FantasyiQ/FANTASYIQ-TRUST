@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { getLeagueMatchups, getNflState, isGameWindow } from '@/lib/sleeper';
+import { captureError } from '@/lib/sentry';
 
 export const maxDuration = 300;
 
@@ -63,6 +64,7 @@ export async function GET(request: Request): Promise<Response> {
 
         return Response.json({ ok: true, updated, week: nflState.week });
     } catch (err) {
+        captureError(err, { cron: 'sleeper-matchups' });
         const message = err instanceof Error ? err.message : 'Matchup poll failed';
         return Response.json({ error: message }, { status: 500 });
     }
