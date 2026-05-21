@@ -262,6 +262,36 @@ export async function POST(request: NextRequest): Promise<Response> {
                 break;
             }
 
+            case 'invoice.payment_succeeded': {
+                const invoice    = event.data.object as Stripe.Invoice;
+                const customerId = typeof invoice.customer === 'string' ? invoice.customer : null;
+                // Only notify on subscription renewals, not the initial checkout payment
+                // (checkout.session.completed handles that welcome flow)
+                if (!customerId || invoice.billing_reason === 'subscription_create') break;
+
+                const user = await prisma.user.findUnique({
+                    where:  { stripeCustomerId: customerId },
+                    select: { id: true },
+                });
+                if (!user) break;
+
+                await notify({
+                    userId:     user.id,
+                    type:       NotificationType.PLAN_RENEWAL_UPCOMING,
+                    title:      'Payment received',
+                    body:       `Your subscription payment of ${invoice.amount_paid ? `$${(invoice.amount_paid / 100).toFixed(2)}` : ''} has been processed successfully.`,
+                    inApp:      true,
+                    email:      false,
+                    throttleMs: 0,
+                    data: {
+                        invoiceId: invoice.id,
+                        amount:    invoice.amount_paid ? invoice.amount_paid / 100 : undefined,
+                        currency:  invoice.currency,
+                    },
+                }).catch(() => {});
+                break;
+            }
+
             case 'invoice.payment_action_required': {
                 const invoice = event.data.object as Stripe.Invoice;
                 const customerId = typeof invoice.customer === 'string' ? invoice.customer : null;

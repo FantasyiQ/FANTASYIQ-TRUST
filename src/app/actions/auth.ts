@@ -3,10 +3,13 @@
 import { redirect } from 'next/navigation';
 import { AuthError } from 'next-auth';
 import bcrypt from 'bcryptjs';
+import { randomBytes } from 'crypto';
 import { signIn } from '@/lib/auth';
 import { prisma } from '../../../lib/prisma';
 import { notify } from '@/lib/notifications/service';
 import { NotificationType } from '@/lib/notifications/types';
+import { sendEmail } from '@/lib/notifications/email';
+import { renderTemplate } from '@/lib/notifications/templates';
 
 export type AuthActionState = { error: string } | null;
 
@@ -56,6 +59,23 @@ export async function signUpAction(
         inApp:   true,
         email:   true,
         throttleMs: 0,
+    }).catch(() => {});
+
+    // Send email verification (non-blocking)
+    const verifyToken  = randomBytes(32).toString('hex');
+    const expiresAt    = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const appUrl       = process.env.NEXTAUTH_URL ?? 'https://fantasyiq.app';
+    const verifyUrl    = `${appUrl}/api/auth/verify-email?token=${verifyToken}`;
+
+    prisma.emailVerificationToken.create({
+        data: { userId: newUser.id, token: verifyToken, expiresAt },
+    }).then(() => {
+        const html = renderTemplate('account.email_verification', {
+            title: 'Verify your FantasyIQ email',
+            body:  'Click below to verify your email address.',
+            data:  { verifyUrl },
+        });
+        return sendEmail({ to: email, subject: 'Verify your FantasyIQ email address', html });
     }).catch(() => {});
 
     // Auto sign-in after account creation — signIn throws a redirect internally.

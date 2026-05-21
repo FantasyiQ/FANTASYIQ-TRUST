@@ -235,6 +235,24 @@ export function renderTemplate(type: NotificationType | string, ctx: TemplateCon
       return baseLayout(title, bodyHtml, ctaButton('See Plans', `${appUrl}/pricing`));
     }
 
+    // ── Password reset ────────────────────────────────────────────────────────
+    case 'account.password_reset': {
+      const resetUrl = data?.resetUrl as string ?? `${appUrl}/reset-password`;
+      const bodyHtml = `<p style="margin:0 0 12px;">We received a request to reset the password for your FantasyIQ account.</p>
+      <p style="margin:0 0 8px;">Click the button below to choose a new password. This link expires in <strong style="color:#fff;">1 hour</strong>.</p>
+      <p style="margin:16px 0 0;color:#52525b;font-size:13px;">If you didn&#39;t request a password reset, you can safely ignore this email. Your password will not be changed.</p>`;
+      return baseLayout(title, bodyHtml, ctaButton('Reset Password', resetUrl));
+    }
+
+    // ── Email verification ────────────────────────────────────────────────────
+    case 'account.email_verification': {
+      const verifyUrl = data?.verifyUrl as string ?? `${appUrl}/dashboard`;
+      const bodyHtml = `<p style="margin:0 0 12px;">Thanks for signing up for <strong style="color:#fff;">FantasyIQ Trust</strong>.</p>
+      <p style="margin:0 0 8px;">Please verify your email address to confirm your account. This link expires in <strong style="color:#fff;">24 hours</strong>.</p>
+      <p style="margin:16px 0 0;color:#52525b;font-size:13px;">If you didn&#39;t create a FantasyIQ account, you can safely ignore this email.</p>`;
+      return baseLayout(title, bodyHtml, ctaButton('Verify Email', verifyUrl));
+    }
+
     // ── Generic fallback ─────────────────────────────────────────────────────
     default: {
       const bodyHtml = `<p style="margin:0 0 8px;">${escapeHtml(body)}</p>`;

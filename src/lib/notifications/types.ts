@@ -43,6 +43,8 @@ export const NotificationType = {
 
   // Onboarding
   ACCOUNT_WELCOME:              'account.welcome',
+  ACCOUNT_PASSWORD_RESET:       'account.password_reset',
+  ACCOUNT_EMAIL_VERIFICATION:   'account.email_verification',
 
   // Invite
   INVITE_PROGRESS:              'invite.progress',

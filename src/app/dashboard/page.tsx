@@ -64,6 +64,8 @@ export default async function DashboardPage({
         select: {
             name: true,
             image: true,
+            emailVerified: true,
+            hashedPassword: true,
             subscriptionTier: true,
             subscriptions: {
                 select: {
@@ -96,7 +98,9 @@ export default async function DashboardPage({
 
     if (!user) redirect('/sign-in');
 
-    const { name, image, subscriptionTier, subscriptions, leagues } = user;
+    const { name, image, emailVerified, hashedPassword, subscriptionTier, subscriptions, leagues } = user;
+    // Show verification banner only to credentials users who haven't verified yet
+    const needsVerification = !emailVerified && !!hashedPassword;
 
     // Enrich connected leagues with the matching League.id so links always work
     const syncedIdByNameServer = new Map(leagues.map(l => [l.leagueName.toLowerCase().trim(), l.id]));
@@ -218,6 +222,27 @@ export default async function DashboardPage({
                         </p>
                         <a href="/dashboard/plan/player" className="text-yellow-300 font-semibold text-sm hover:underline shrink-0">
                             Update payment →
+                        </a>
+                    </div>
+                )}
+
+                {/* Email verified success banner */}
+                {params.verified === '1' && (
+                    <div className="rounded-xl bg-[#0F3D2E] border border-emerald-500/40 px-5 py-3.5">
+                        <p className="text-emerald-400 font-medium text-sm">
+                            Email verified — your account is confirmed.
+                        </p>
+                    </div>
+                )}
+
+                {/* Email verification nudge */}
+                {needsVerification && params.verified !== '1' && (
+                    <div className="rounded-xl bg-blue-900/20 border border-blue-700/50 px-5 py-3.5 flex items-center justify-between gap-4 flex-wrap">
+                        <p className="text-blue-300 text-sm">
+                            Please verify your email address to secure your account.
+                        </p>
+                        <a href="/dashboard/account" className="text-blue-200 font-semibold text-sm hover:underline shrink-0">
+                            Verify email →
                         </a>
                     </div>
                 )}

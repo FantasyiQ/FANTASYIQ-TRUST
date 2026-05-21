@@ -16,7 +16,7 @@ export default async function AccountPage() {
 
     const user = await prisma.user.findUnique({
         where:  { id: session.user.id },
-        select: { name: true, email: true },
+        select: { name: true, email: true, emailVerified: true, hashedPassword: true },
     });
     if (!user) redirect('/sign-in');
 
@@ -32,7 +32,12 @@ export default async function AccountPage() {
                     <p className="text-gray-400 text-sm mt-1">Manage your profile and personal data.</p>
                 </div>
 
-                <AccountSettings name={user.name} email={user.email!} />
+                <AccountSettings
+                    name={user.name}
+                    email={user.email!}
+                    emailVerified={user.emailVerified}
+                    hasPassword={!!user.hashedPassword}
+                />
 
             </div>
         </main>

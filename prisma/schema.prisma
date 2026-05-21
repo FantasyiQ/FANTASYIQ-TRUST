@@ -67,6 +67,10 @@ model User {
     ownedCommissioner     LFCommissioner?   @relation("CommissionerOwner")
     lfReplies             LFReviewReply[]   @relation("ReviewReplies")
     lfJoinRequests        LFJoinRequest[]   @relation("LeagueJoinRequests")
+
+    // Auth tokens
+    passwordResetTokens      PasswordResetToken[]
+    emailVerificationTokens  EmailVerificationToken[]
 }
 
 // ── Internal Data System (IDS) ───────────────────────────────────────────────
@@ -733,6 +737,31 @@ model NotificationPreference {
 model ProcessedStripeEvent {
     id          String   @id                         // Stripe event ID (evt_...)
     processedAt DateTime @default(now())
+}
+
+model PasswordResetToken {
+    id        String    @id @default(cuid())
+    userId    String
+    token     String    @unique
+    expiresAt DateTime
+    usedAt    DateTime?
+    createdAt DateTime  @default(now())
+
+    user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+}
+
+model EmailVerificationToken {
+    id        String   @id @default(cuid())
+    userId    String
+    token     String   @unique
+    expiresAt DateTime
+    createdAt DateTime @default(now())
+
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
 }
 
 // ── LeagueFinder ─────────────────────────────────────────────────────────────
