@@ -15,7 +15,7 @@ export default function PrivacyPolicyPage() {
                 <div className="space-y-2 border-b border-gray-800 pb-8">
                     <p className="text-[10px] font-bold tracking-widest text-[#D4AF37] uppercase">Legal</p>
                     <h1 className="text-3xl font-bold text-white">Privacy Policy</h1>
-                    <p className="text-gray-500 text-sm">Last updated: May 8, 2026</p>
+                    <p className="text-gray-500 text-sm">Last updated: May 21, 2026</p>
                 </div>
 
                 <LegalSection title="1. Introduction">
@@ -30,9 +30,7 @@ export default function PrivacyPolicyPage() {
                 <LegalSection title="2. Information We Do Not Collect">
                     <p>FantasyiQ is designed with data minimisation as a core principle. <strong className="text-white">We do not collect:</strong></p>
                     <ul>
-                        <li>Email addresses or contact information</li>
-                        <li>Passwords or authentication credentials for third-party platforms</li>
-                        <li>Payment card numbers, bank account details, or billing addresses</li>
+                        <li>Payment card numbers, bank account details, or billing addresses (handled directly by Stripe)</li>
                         <li>Government-issued identification numbers</li>
                         <li>Physical addresses or precise geolocation data</li>
                         <li>Any sensitive personal information as defined under applicable privacy law</li>
@@ -50,20 +48,28 @@ export default function PrivacyPolicyPage() {
                             chosen by you on those platforms may be incidentally included.
                         </p>
                     </Subsection>
-                    <Subsection title="3.2 Account Identifiers">
+                    <Subsection title="3.2 Account Information">
                         <p>
-                            If you create a FantasyiQ account, we store an internal account identifier, your display name as you
-                            provide it, and a securely hashed authentication token. We do not store plain-text passwords.
+                            If you create a FantasyiQ account, we store your email address, display name, and a securely hashed
+                            password (if you register with email and password). If you sign in via Google, we receive and store
+                            the name and email address associated with your Google account. We do not store plain-text passwords.
                         </p>
                     </Subsection>
-                    <Subsection title="3.3 Usage and Analytics Data">
+                    <Subsection title="3.3 Payment and Billing Data">
+                        <p>
+                            Subscription payments are processed by Stripe, Inc. FantasyiQ does not store your payment card details.
+                            We do store subscription status, plan tier, and Stripe customer and subscription identifiers so we can
+                            manage your access and send billing-related notifications.
+                        </p>
+                    </Subsection>
+                    <Subsection title="3.4 Usage and Analytics Data">
                         <p>
                             We collect anonymised usage data (pages visited, feature interactions, session duration) via
                             privacy-respecting analytics tools. This data is aggregated and cannot reasonably be used to
                             identify you individually.
                         </p>
                     </Subsection>
-                    <Subsection title="3.4 Log Data">
+                    <Subsection title="3.5 Log Data">
                         <p>
                             Our hosting infrastructure automatically records standard server log data (IP address, browser type,
                             referring URL, timestamp) for security and operational purposes. Log data is retained for no more
@@ -92,6 +98,8 @@ export default function PrivacyPolicyPage() {
                         <li>Provide, operate, and improve the Service</li>
                         <li>Compute analytics, projections, and intelligence features for your leagues</li>
                         <li>Authenticate your account and maintain security</li>
+                        <li>Send transactional and service emails (dues reminders, payment confirmations, subscription updates)</li>
+                        <li>Process subscription payments and manage billing through Stripe</li>
                         <li>Diagnose technical issues and ensure platform stability</li>
                         <li>Comply with applicable legal obligations</li>
                     </ul>
@@ -105,8 +113,10 @@ export default function PrivacyPolicyPage() {
                     </p>
                     <ul>
                         <li>
-                            <strong className="text-white">Service Providers:</strong> We engage a small number of infrastructure providers
-                            (e.g., database hosting, analytics) who process data solely on our behalf under strict data-processing agreements.
+                            <strong className="text-white">Service Providers:</strong> We engage a small number of infrastructure
+                            providers who process data solely on our behalf, including: Vercel (hosting), Neon (database), Stripe
+                            (payment processing), Pusher (real-time notifications), and Sentry (error monitoring). Each provider
+                            is bound by a data-processing agreement or equivalent contractual obligation.
                         </li>
                         <li>
                             <strong className="text-white">Legal Requirements:</strong> We may disclose data if required by law, court order,
@@ -122,16 +132,21 @@ export default function PrivacyPolicyPage() {
 
                 <LegalSection title="7. Third-Party Platforms">
                     <p>
-                        FantasyiQ integrates with Sleeper and ESPN to retrieve your fantasy league data. Each of these platforms
-                        operates under its own privacy policy, which governs how your data is collected and used by them:
+                        FantasyiQ integrates with third-party platforms to provide its features. Each operates under its own
+                        privacy policy, which governs how your data is collected and used by them:
                     </p>
                     <ul>
-                        <li><strong className="text-white">Sleeper:</strong> <span className="text-gray-400">sleeper.com/privacy</span></li>
-                        <li><strong className="text-white">ESPN:</strong> <span className="text-gray-400">espn.com/espn/editorial/story/_/id/privacy</span></li>
+                        <li><strong className="text-white">Sleeper</strong> — fantasy league data sync</li>
+                        <li><strong className="text-white">ESPN</strong> — fantasy league data sync</li>
+                        <li><strong className="text-white">Yahoo Sports</strong> — fantasy league data sync</li>
+                        <li><strong className="text-white">NFL.com</strong> — fantasy league data sync</li>
+                        <li><strong className="text-white">Stripe</strong> — payment processing; Stripe&apos;s privacy policy governs how it handles your payment information</li>
+                        <li><strong className="text-white">Pusher</strong> — real-time in-app notifications</li>
+                        <li><strong className="text-white">Sentry</strong> — error and performance monitoring; error reports may include anonymised request context</li>
                     </ul>
                     <p className="mt-3">
-                        We recommend reviewing those policies before connecting a league. FantasyiQ is not responsible for the
-                        data practices of third-party platforms.
+                        We recommend reviewing those platforms&apos; privacy policies. FantasyiQ is not responsible for the
+                        data practices of third-party services.
                     </p>
                 </LegalSection>
 
@@ -153,8 +168,17 @@ export default function PrivacyPolicyPage() {
                         <li>Data portability</li>
                     </ul>
                     <p className="mt-3">
-                        To exercise any of these rights, contact us using the information in Section 13. We will respond within
-                        30 days. We may need to verify your identity before fulfilling a request.
+                        You can exercise many of these rights directly from your account:
+                    </p>
+                    <ul>
+                        <li><strong className="text-white">Export:</strong> Download a copy of your data from <span className="text-[#D4AF37]">Account Settings → Download my data</span>.</li>
+                        <li><strong className="text-white">Deletion:</strong> Permanently delete your account and all associated data from <span className="text-[#D4AF37]">Account Settings → Delete my account</span>.</li>
+                        <li><strong className="text-white">Correction:</strong> Update your email address from <span className="text-[#D4AF37]">Account Settings → Email</span>.</li>
+                    </ul>
+                    <p className="mt-3">
+                        For any rights not covered by the above self-service tools, or for questions about your data, contact us
+                        using the information in Section 13. We will respond within 30 days. We may need to verify your identity
+                        before fulfilling a request.
                     </p>
                 </LegalSection>
 

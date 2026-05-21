@@ -15,7 +15,7 @@ export default function CookieNoticePage() {
                 <div className="space-y-2 border-b border-gray-800 pb-8">
                     <p className="text-[10px] font-bold tracking-widest text-[#D4AF37] uppercase">Legal</p>
                     <h1 className="text-3xl font-bold text-white">Cookie Notice</h1>
-                    <p className="text-gray-500 text-sm">Last updated: May 8, 2026</p>
+                    <p className="text-gray-500 text-sm">Last updated: May 21, 2026</p>
                 </div>
 
                 <LegalSection title="1. What Are Cookies">
