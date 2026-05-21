@@ -1,6 +1,7 @@
 // FantasyiQ Trust — Sync Failure Auto-Recovery Engine (Phase 3, Engine 1)
 
 import { prisma } from '@/lib/prisma';
+import { captureError } from '@/lib/sentry';
 
 // ── Error classification ──────────────────────────────────────────────────────
 
@@ -117,6 +118,11 @@ export async function recordSyncFailure({
 }): Promise<void> {
     const errorType = classifyError(err);
     const errorMsg  = err instanceof Error ? err.message.slice(0, 500) : String(err).slice(0, 500);
+
+    // Report unknown / data errors to Sentry — transient network/rate-limit errors are expected
+    if (errorType === 'unknown' || errorType === 'data') {
+        captureError(err, { userId, leagueDbId, platform, errorType, attempt });
+    }
 
     await Promise.all([
         // Log the recovery event

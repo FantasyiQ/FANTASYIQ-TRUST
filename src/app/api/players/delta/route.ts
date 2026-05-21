@@ -1,12 +1,16 @@
+import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import type { DeltaEntry, DeltaResponse } from '@/lib/player-universe';
+import { checkPublicLimit, getClientIp } from '@/lib/ratelimit';
 
 const KTC_CAP = 9999;
 function normalise(raw: number): number {
     return Math.min(100, Math.max(1, Math.round((raw / KTC_CAP) * 100)));
 }
 
-export async function GET(): Promise<Response> {
+export async function GET(request: NextRequest): Promise<Response> {
+    const rl = await checkPublicLimit(getClientIp(request));
+    if (rl.limited) return rl.response;
     // Fetch current values and the most recent snapshot in parallel
     const [currentRows, sleeperPlayers, snapshot] = await Promise.all([
         prisma.fantasyCalcValue.findMany({

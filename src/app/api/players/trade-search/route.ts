@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { calculateAge } from '@/lib/calculateAge';
 import type { Player } from '@/lib/trade-engine';
+import { checkSearchLimit, getClientIp } from '@/lib/ratelimit';
 
 const KTC_CAP = 9999;
 function normaliseFc(raw: number): number {
@@ -25,7 +26,10 @@ function relevanceScore(name: string, q: string): number {
 }
 
 export async function GET(request: NextRequest): Promise<Response> {
-    const q = request.nextUrl.searchParams.get('q')?.trim() ?? '';
+    const rl = await checkSearchLimit(getClientIp(request));
+    if (rl.limited) return rl.response;
+
+    const q = (request.nextUrl.searchParams.get('q')?.trim() ?? '').slice(0, 100);
     if (q.length < 2) return Response.json([]);
 
     const ql = q.toLowerCase();
