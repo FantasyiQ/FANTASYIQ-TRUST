@@ -1,12 +1,12 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { checkMutationLimit } from '@/lib/ratelimit';
+import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // PATCH /api/user/profile — update mutable profile fields (currently: email, name)
 export async function PATCH(request: Request): Promise<Response> {
-    const limited = await checkMutationLimit(request);
+    const limited = await checkMutationLimit(getClientIp(request));
     if (limited) return limited;
 
     const session = await auth();
