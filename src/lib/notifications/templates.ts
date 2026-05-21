@@ -230,7 +230,8 @@ export function renderTemplate(type: NotificationType | string, ctx: TemplateCon
     // ── Plan cancelled ────────────────────────────────────────────────────────
     case 'plan.cancelled': {
       const bodyHtml = `<p style="margin:0 0 12px;">Your FiQ subscription has been cancelled. You&#39;ll retain access until the end of your current billing period.</p>
-      <p style="margin:0 0 8px;color:#71717a;">Changed your mind? You can re-subscribe any time from the pricing page.</p>`;
+      <p style="margin:0 0 8px;color:#71717a;">Changed your mind? You can re-subscribe any time from the pricing page.</p>
+      <p style="margin:16px 0 0;color:#52525b;font-size:13px;">Per our <a href="${appUrl}/terms" style="color:#71717a;text-decoration:underline;">Terms of Service</a>, subscription fees are non-refundable. Access continues through the end of your paid period.</p>`;
       return baseLayout(title, bodyHtml, ctaButton('See Plans', `${appUrl}/pricing`));
     }
 
