@@ -27,6 +27,15 @@ export async function POST(_req: NextRequest) {
 
     const userId = session.user.id;
 
+    // Always check isAdmin from DB — never trust the JWT for admin privilege
+    const dbUser = await prisma.user.findUnique({
+        where:  { id: userId },
+        select: { isAdmin: true },
+    });
+    if (!dbUser?.isAdmin) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     if (!isAllowed(userId)) {
         return NextResponse.json(
             { error: 'Reset not enabled. Set DEV_RESET_ENABLED=true in your environment.' },

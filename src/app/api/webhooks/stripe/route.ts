@@ -42,6 +42,15 @@ export async function POST(request: NextRequest): Promise<Response> {
         return Response.json({ error: 'Invalid webhook signature' }, { status: 400 });
     }
 
+    // ── Idempotency: skip already-processed events (Stripe retries / replays) ──
+    const alreadyDone = await prisma.processedStripeEvent.findUnique({
+        where: { id: event.id },
+        select: { id: true },
+    });
+    if (alreadyDone) {
+        return Response.json({ received: true });
+    }
+
     try {
         switch (event.type) {
             case 'checkout.session.completed': {
@@ -364,6 +373,9 @@ export async function POST(request: NextRequest): Promise<Response> {
         captureError(err, { event: event.type });
         return Response.json({ error: 'Webhook handler failed' }, { status: 500 });
     }
+
+    // Mark event as processed (best-effort — don't fail the response if this write fails)
+    prisma.processedStripeEvent.create({ data: { id: event.id } }).catch(() => {});
 
     return Response.json({ received: true });
 }

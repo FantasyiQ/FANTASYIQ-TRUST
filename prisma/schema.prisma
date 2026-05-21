@@ -366,6 +366,7 @@ model DuesMember {
     pollVotes       PollVote[]
     futureDues      FutureDuesObligation[]
 
+    @@unique([leagueDuesId, userId])
     @@index([leagueDuesId])
     @@index([userId])
 }
@@ -723,6 +724,15 @@ model NotificationPreference {
 
     @@unique([userId, type])
     @@index([userId])
+}
+
+// ── Stripe webhook deduplication ────────────────────────────────────────────
+// Keyed on Stripe event ID. Processed before each webhook handler runs to
+// prevent double-processing replays or retries.
+
+model ProcessedStripeEvent {
+    id          String   @id                         // Stripe event ID (evt_...)
+    processedAt DateTime @default(now())
 }
 
 // ── LeagueFinder ─────────────────────────────────────────────────────────────
