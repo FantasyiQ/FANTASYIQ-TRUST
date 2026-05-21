@@ -2,7 +2,7 @@
 // Daily cron — scores every synced league for health and nudges commissioners of unhealthy leagues.
 import { runLeagueHealthCheck } from '@/lib/league-health';
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function GET(request: Request): Promise<Response> {
     if (request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {

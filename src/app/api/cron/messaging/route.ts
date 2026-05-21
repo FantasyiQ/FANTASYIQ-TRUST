@@ -10,7 +10,7 @@ import { prisma } from '@/lib/prisma';
 import { notify } from '@/lib/notifications/service';
 import { NotificationType } from '@/lib/notifications/types';
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

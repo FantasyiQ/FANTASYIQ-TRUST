@@ -1,4 +1,6 @@
+import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { checkPublicLimit, getClientIp } from '@/lib/ratelimit';
 
 // Normalise KTC raw value (0–9999) to our 0–100 DTV scale.
 const KTC_CAP = 9999;
@@ -24,7 +26,9 @@ function normalizeName(name: string): string {
 
 // Returns a map of lowercase player name → { dynasty, redraft, team, age, trend, injuryStatus }
 // Used by TradeEvaluator to overlay live KTC values onto hardcoded baseValues.
-export async function GET(): Promise<Response> {
+export async function GET(request: NextRequest): Promise<Response> {
+    const rl = await checkPublicLimit(getClientIp(request));
+    if (rl.limited) return rl.response;
     const [rows, sleeperPlayers] = await Promise.all([
         prisma.fantasyCalcValue.findMany({
             select: {

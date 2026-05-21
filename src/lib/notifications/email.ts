@@ -20,7 +20,45 @@ export interface EmailOptions {
   from?:   string;
 }
 
-export async function sendEmail({ to, subject, html, from }: EmailOptions) {
-  const sender = from ?? process.env.EMAIL_FROM ?? 'FantasyIQ <noreply@fantasyiq.app>';
-  return getResend().emails.send({ from: sender, to, subject, html });
+// Errors that are not worth retrying (permanent failures).
+const PERMANENT_ERRORS = ['invalid_api_key', 'invalid_to', 'domain_not_verified'];
+
+function isPermanent(err: unknown): boolean {
+  if (err instanceof Error) {
+    const msg = err.message.toLowerCase();
+    return PERMANENT_ERRORS.some(e => msg.includes(e));
+  }
+  return false;
+}
+
+/**
+ * Send a transactional email via Resend with up to 3 attempts (exponential backoff).
+ * Delays: 1 s → 2 s → give up.
+ * Permanent errors (invalid key, bad address) are not retried.
+ */
+export async function sendEmail({ to, subject, html, from }: EmailOptions): Promise<void> {
+  const sender  = from ?? process.env.EMAIL_FROM ?? 'FantasyIQ <noreply@fantasyiq.app>';
+  const delays  = [1_000, 2_000];
+  let   lastErr: unknown;
+
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
+    try {
+      const { error } = await getResend().emails.send({ from: sender, to, subject, html });
+      if (error) throw new Error(`Resend error: ${error.message ?? JSON.stringify(error)}`);
+      return; // success
+    } catch (err) {
+      lastErr = err;
+      if (isPermanent(err)) {
+        console.error('[email] permanent failure — not retrying', { to, subject, err });
+        return;
+      }
+      if (attempt < delays.length) {
+        console.warn(`[email] attempt ${attempt + 1} failed — retrying in ${delays[attempt]}ms`, err);
+        await new Promise(r => setTimeout(r, delays[attempt]));
+      }
+    }
+  }
+
+  // All attempts exhausted — log and move on (don't throw; caller shouldn't crash)
+  console.error('[email] all retry attempts failed', { to, subject, err: lastErr });
 }

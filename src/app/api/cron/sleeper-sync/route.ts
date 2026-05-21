@@ -3,7 +3,7 @@ import { getSleeperLeagues, getLeagueRosters, getLeagueDrafts, getNflState, deri
 import { deriveChampWeek } from '@/lib/leaguePhase';
 import { shouldSkipLeague, withRetry, recordSyncFailure, recordSyncRecovered } from '@/lib/sync-recovery';
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function GET(request: Request): Promise<Response> {
     if (request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {

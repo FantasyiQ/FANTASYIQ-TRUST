@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 type KtcPlayer = {
     playerID:        number;

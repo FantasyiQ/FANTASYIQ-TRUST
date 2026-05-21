@@ -20,6 +20,8 @@
     "@prisma/adapter-pg": "^7.7.0",
     "@prisma/client": "^7.7.0",
     "@types/pg": "^8.20.0",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.38.0",
     "@vercel/blob": "^2.3.3",
     "bcryptjs": "^3.0.3",
     "next": "16.2.2",

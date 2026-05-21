@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // Sleeper's public projections endpoint — returns points for all players
 // for a given NFL season + week.

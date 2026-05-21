@@ -2,7 +2,7 @@
 // Weekly cron — analyses WoW feature trends and sends personalised feature suggestions to users.
 import { runFeatureIntelligence } from '@/lib/feature-intelligence';
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function GET(request: Request): Promise<Response> {
     if (request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {

@@ -2,7 +2,7 @@
 // Daily cron — identifies high-value upsell targets and sends targeted in-app prompts.
 import { runUpsellEngine } from '@/lib/upsell-engine';
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function GET(request: Request): Promise<Response> {
     if (request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {

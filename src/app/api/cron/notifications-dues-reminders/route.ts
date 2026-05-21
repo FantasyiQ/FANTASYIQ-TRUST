@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { notify } from '@/lib/notifications/service';
 import { NotificationType } from '@/lib/notifications/types';
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function GET(request: Request): Promise<Response> {
     if (request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {

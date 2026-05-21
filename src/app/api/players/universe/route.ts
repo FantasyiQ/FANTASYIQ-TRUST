@@ -1,6 +1,8 @@
+import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import type { UniversePlayer, UniverseResponse } from '@/lib/player-universe';
 import { calculateAge } from '@/lib/calculateAge';
+import { checkPublicLimit, getClientIp } from '@/lib/ratelimit';
 
 const KTC_CAP = 9999;
 const SKILL_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE']);
@@ -20,7 +22,9 @@ function normalizeName(name: string): string {
 
 // Returns the full dynamic player universe: all KTC-ranked skill-position players
 // merged with live Sleeper team/injury/age data, sorted by dynasty value desc.
-export async function GET(): Promise<Response> {
+export async function GET(request: NextRequest): Promise<Response> {
+    const rl = await checkPublicLimit(getClientIp(request));
+    if (rl.limited) return rl.response;
     const [ktcRows, sleeperPlayers, latestSync] = await Promise.all([
         prisma.fantasyCalcValue.findMany({
             where: {

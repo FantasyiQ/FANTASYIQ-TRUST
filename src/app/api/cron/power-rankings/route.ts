@@ -6,7 +6,7 @@ import { computePlayerBaseValue } from '@/lib/player-universe';
 import type { UniversePlayer } from '@/lib/player-universe';
 import { calculateAge } from '@/lib/calculateAge';
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

@@ -1,11 +1,15 @@
 import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { checkSearchLimit, getClientIp } from '@/lib/ratelimit';
 
 // GET /api/players/search?q=mahomes&position=QB&season=2025&week=1
 // Returns players with injury status and (optionally) weekly projection.
 export async function GET(request: NextRequest): Promise<Response> {
+    const rl = await checkSearchLimit(getClientIp(request));
+    if (rl.limited) return rl.response;
+
     const { searchParams } = request.nextUrl;
-    const q        = searchParams.get('q')?.trim() ?? '';
+    const q        = (searchParams.get('q')?.trim() ?? '').slice(0, 100); // cap length
     const position = searchParams.get('position') ?? '';
     const season   = searchParams.get('season') ?? '';
     const week     = searchParams.get('week') ? parseInt(searchParams.get('week')!) : null;

@@ -20,7 +20,7 @@
 import { prisma } from '@/lib/prisma';
 import { computeRookieFiQTier } from '@/lib/dynasty/rookieRankings';
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // ── Opportunity Score ─────────────────────────────────────────────────────────
 
