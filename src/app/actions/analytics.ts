@@ -16,7 +16,8 @@ export type FeatureName =
     | 'calendar_saved'
     | 'espn_sync'
     | 'sleeper_sync'
-    | 'yahoo_sync';
+    | 'yahoo_sync'
+    | 'nfl_sync';
 
 /**
  * Fire-and-forget feature usage event.

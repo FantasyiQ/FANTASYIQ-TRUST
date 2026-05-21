@@ -34,6 +34,7 @@ model User {
     yahooAccessToken  String?
     yahooRefreshToken String?
     yahooTokenExpiresAt DateTime?
+    nflSid           String?          // NFL.com session cookie (sid)
     isAdmin          Boolean          @default(false)
     createdAt        DateTime         @default(now())
     updatedAt        DateTime         @updatedAt
