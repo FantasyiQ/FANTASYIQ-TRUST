@@ -15,7 +15,7 @@ export default function TermsOfServicePage() {
                 <div className="space-y-2 border-b border-gray-800 pb-8">
                     <p className="text-[10px] font-bold tracking-widest text-[#D4AF37] uppercase">Legal</p>
                     <h1 className="text-3xl font-bold text-white">Terms of Service</h1>
-                    <p className="text-gray-500 text-sm">Last updated: May 8, 2026</p>
+                    <p className="text-gray-500 text-sm">Last updated: May 21, 2026</p>
                 </div>
 
                 <LegalSection title="1. Acceptance of Terms">
@@ -161,12 +161,38 @@ export default function TermsOfServicePage() {
                         access poses a risk to the Service, other users, or FantasyiQ.
                     </p>
                     <p>
-                        You may terminate your account at any time by contacting us. Upon termination, your right to use the Service
-                        ceases immediately. Sections 6, 7, 8, 9, 10, 12, and 13 of these Terms survive termination.
+                        You may terminate your account at any time by contacting us or by using the account deletion feature in your
+                        account settings. Upon termination, your right to use the Service ceases immediately. Sections 6, 7, 8, 9,
+                        10, 13, and 14 of these Terms survive termination.
                     </p>
                 </LegalSection>
 
-                <LegalSection title="12. Governing Law and Dispute Resolution">
+                <LegalSection title="12. Subscriptions, Billing, and Refunds">
+                    <p>
+                        Certain features of the Service are available only through a paid subscription (&ldquo;Plan&rdquo;). By subscribing
+                        to a Plan, you authorise FantasyiQ to charge your payment method on a recurring basis at the then-current
+                        rate until you cancel.
+                    </p>
+                    <p><strong className="text-white">Billing cycle.</strong> Subscriptions are billed in advance on a monthly or
+                        annual basis, depending on the plan you select. Your billing date is set at the time of purchase and recurs
+                        on the same date each period.</p>
+                    <p><strong className="text-white">Cancellation.</strong> You may cancel your subscription at any time through
+                        the Stripe billing portal accessible from your account settings. Cancellation takes effect at the end of
+                        the current billing period. You will retain full access to paid features until that date.</p>
+                    <p><strong className="text-white">No refunds.</strong> All subscription fees are non-refundable. We do not
+                        issue refunds or credits for partial billing periods, unused time, or any portion of a subscription period
+                        following cancellation. This applies to both monthly and annual plans.</p>
+                    <p><strong className="text-white">Failed payments.</strong> If a payment fails, we will notify you by email
+                        and your subscription may be suspended until payment is received. We may retry failed charges in accordance
+                        with Stripe&apos;s standard retry schedule.</p>
+                    <p><strong className="text-white">Price changes.</strong> We reserve the right to change subscription pricing
+                        at any time. We will provide at least 30 days&apos; advance notice of any price increase. Continued use of the
+                        Service after the effective date of a price change constitutes your acceptance of the new pricing.</p>
+                    <p><strong className="text-white">Taxes.</strong> Prices are exclusive of applicable taxes. You are responsible
+                        for any sales, use, value-added, or similar taxes imposed by your jurisdiction.</p>
+                </LegalSection>
+
+                <LegalSection title="13. Governing Law and Dispute Resolution">
                     <p>
                         These Terms are governed by and construed in accordance with the laws of the State of Delaware, United States,
                         without regard to its conflict-of-law principles. Any dispute arising out of or related to these Terms or your
@@ -179,7 +205,7 @@ export default function TermsOfServicePage() {
                     </p>
                 </LegalSection>
 
-                <LegalSection title="13. Changes to These Terms">
+                <LegalSection title="14. Changes to These Terms">
                     <p>
                         We may modify these Terms at any time by posting the revised Terms on the Service and updating the
                         &ldquo;Last updated&rdquo; date. For material changes, we will provide additional notice. Your continued use of the
@@ -188,7 +214,7 @@ export default function TermsOfServicePage() {
                     </p>
                 </LegalSection>
 
-                <LegalSection title="14. Miscellaneous">
+                <LegalSection title="15. Miscellaneous">
                     <p>
                         These Terms, together with our <Link href="/privacy" className="text-[#D4AF37] hover:underline">Privacy Policy</Link> and{' '}
                         <Link href="/cookies" className="text-[#D4AF37] hover:underline">Cookie Notice</Link>, constitute the entire agreement
@@ -199,7 +225,7 @@ export default function TermsOfServicePage() {
                     </p>
                 </LegalSection>
 
-                <LegalSection title="15. Contact">
+                <LegalSection title="16. Contact">
                     <p>If you have questions about these Terms, please contact us at:</p>
                     <div className="mt-3 bg-gray-900 border border-gray-800 rounded-xl px-5 py-4 text-sm text-gray-300">
                         <p className="font-semibold text-white">FantasyiQ</p>
