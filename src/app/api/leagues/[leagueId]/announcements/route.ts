@@ -2,15 +2,17 @@ import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
-function normalizeMediaUrl(raw: string): string {
+function normalizeMediaUrl(raw: string): string | null {
     try {
         const url = new URL(raw);
+        // Only allow http/https — block javascript:, data:, etc.
+        if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
         if (url.hostname === 'giphy.com') {
             const match = url.pathname.match(/\/gifs\/(?:[^/]+-)?([a-zA-Z0-9]+)\/?$/);
             if (match) return `https://media.giphy.com/media/${match[1]}/giphy.gif`;
         }
-    } catch { /* invalid URL — return as-is */ }
-    return raw;
+        return url.toString();
+    } catch { return null; }
 }
 
 async function assertCommissioner(leagueId: string, userId: string) {
@@ -53,6 +55,7 @@ export async function POST(
     const body = await req.json() as { body?: string; mediaUrl?: string };
     const text = body.body?.trim();
     if (!text) return Response.json({ error: 'body is required' }, { status: 400 });
+    if (text.length > 2000) return Response.json({ error: 'body too long' }, { status: 400 });
 
     const mediaUrl = body.mediaUrl?.trim()
         ? normalizeMediaUrl(body.mediaUrl.trim())

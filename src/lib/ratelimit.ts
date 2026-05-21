@@ -8,8 +8,9 @@ import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 
 // Shared limiter instances (lazily created, reused across warm invocations)
-let _search: Ratelimit | null = null;
-let _public: Ratelimit | null = null;
+let _search:   Ratelimit | null = null;
+let _public:   Ratelimit | null = null;
+let _mutation: Ratelimit | null = null;
 
 function isConfigured(): boolean {
     return !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
@@ -33,6 +34,19 @@ function getSearchLimiter(): Ratelimit {
         });
     }
     return _search;
+}
+
+/** Financial mutations — 10 req / 60 s per IP */
+function getMutationLimiter(): Ratelimit {
+    if (!_mutation) {
+        _mutation = new Ratelimit({
+            redis:     getRedis(),
+            limiter:   Ratelimit.slidingWindow(10, '60 s'),
+            prefix:    'rl:mutation',
+            analytics: false,
+        });
+    }
+    return _mutation;
 }
 
 /** General public endpoints — 60 req / 60 s per IP */
@@ -87,6 +101,26 @@ export async function checkPublicLimit(ip: string): Promise<RateLimitResult> {
                 'X-RateLimit-Remaining': String(remaining),
                 'X-RateLimit-Reset': String(reset),
                 'Retry-After': String(Math.ceil((reset - Date.now()) / 1000)),
+            },
+        }),
+    };
+}
+
+/** Apply financial-mutation rate limit (10/min). Returns a 429 Response if exceeded. */
+export async function checkMutationLimit(ip: string): Promise<RateLimitResult> {
+    if (!isConfigured()) return { limited: false };
+    const { success, limit, remaining, reset } = await getMutationLimiter().limit(ip);
+    if (success) return { limited: false };
+    return {
+        limited: true,
+        response: new Response(JSON.stringify({ error: 'Too many requests' }), {
+            status:  429,
+            headers: {
+                'Content-Type':          'application/json',
+                'X-RateLimit-Limit':     String(limit),
+                'X-RateLimit-Remaining': String(remaining),
+                'X-RateLimit-Reset':     String(reset),
+                'Retry-After':           String(Math.ceil((reset - Date.now()) / 1000)),
             },
         }),
     };

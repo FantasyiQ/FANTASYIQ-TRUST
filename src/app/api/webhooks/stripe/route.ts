@@ -3,6 +3,8 @@ import Stripe from 'stripe';
 import { stripe, planInfo } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 import { captureError } from '@/lib/sentry';
+import { notify } from '@/lib/notifications/service';
+import { NotificationType } from '@/lib/notifications/types';
 import type { SubscriptionTier } from '@prisma/client';
 
 const PLAYER_TIERS = new Set<SubscriptionTier>(['PLAYER_PRO', 'PLAYER_ALL_PRO', 'PLAYER_ELITE']);
@@ -292,6 +294,17 @@ export async function POST(request: NextRequest): Promise<Response> {
                         },
                     }),
                 ]);
+
+                // Send cancellation confirmation (non-blocking)
+                notify({
+                    userId:  user.id,
+                    type:    NotificationType.PLAN_CANCELLED,
+                    title:   'Your subscription has been cancelled',
+                    body:    'Your FiQ subscription has been cancelled. You\'ll retain access until the end of your billing period.',
+                    email:   true,
+                    inApp:   true,
+                    throttleMs: 0,
+                }).catch(() => {});
                 break;
             }
         }

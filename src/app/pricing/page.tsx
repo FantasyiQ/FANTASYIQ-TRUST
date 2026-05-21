@@ -1,4 +1,22 @@
+import type { Metadata } from 'next';
 import { auth } from '@/lib/auth';
+
+export const metadata: Metadata = {
+    title: 'Pricing — FantasyIQ Trust',
+    description: 'Simple, transparent pricing for fantasy football commissioners and players. No hidden fees.',
+    openGraph: {
+        title:       'Pricing — FantasyIQ Trust',
+        description: 'Simple, transparent pricing for fantasy football commissioners and players. No hidden fees.',
+        url:         'https://fantasyiq.app/pricing',
+        siteName:    'FantasyIQ Trust',
+        type:        'website',
+    },
+    twitter: {
+        card:        'summary',
+        title:       'Pricing — FantasyIQ Trust',
+        description: 'Simple, transparent pricing for fantasy football commissioners and players.',
+    },
+};
 import { prisma } from '@/lib/prisma';
 import { stripe, priceIdToTier } from '@/lib/stripe';
 import PricingClient from './PricingClient';

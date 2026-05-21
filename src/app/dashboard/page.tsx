@@ -155,6 +155,7 @@ export default async function DashboardPage({
         leagues.map(l => [l.leagueName.toLowerCase().trim(), l.id])
     );
 
+    const hasPastDueSub = subscriptions.some(s => s.status === 'past_due');
     const hasAnyActiveSub = activeSubs.length > 0;
     const displayTier = (playerSubTier !== 'FREE' ? playerSubTier : subscriptionTier) as SubscriptionTier;
     const isElite = displayTier === 'PLAYER_ELITE' || displayTier === 'COMMISSIONER_ELITE';
@@ -208,6 +209,18 @@ export default async function DashboardPage({
     return (
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
             <div className="max-w-5xl mx-auto space-y-8">
+
+                {/* Payment failed banner */}
+                {hasPastDueSub && (
+                    <div className="rounded-xl bg-yellow-900/20 border border-yellow-700/50 px-5 py-3.5 flex items-center justify-between gap-4 flex-wrap">
+                        <p className="text-yellow-400 font-medium text-sm">
+                            ⚠️ Your last payment failed. Update your payment method to keep your plan active.
+                        </p>
+                        <a href="/dashboard/plan/player" className="text-yellow-300 font-semibold text-sm hover:underline shrink-0">
+                            Update payment →
+                        </a>
+                    </div>
+                )}
 
                 {/* Test data reset banner */}
                 {testDataReset && (

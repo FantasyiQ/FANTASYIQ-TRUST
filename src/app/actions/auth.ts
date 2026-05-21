@@ -5,6 +5,8 @@ import { AuthError } from 'next-auth';
 import bcrypt from 'bcryptjs';
 import { signIn } from '@/lib/auth';
 import { prisma } from '../../../lib/prisma';
+import { notify } from '@/lib/notifications/service';
+import { NotificationType } from '@/lib/notifications/types';
 
 export type AuthActionState = { error: string } | null;
 
@@ -26,6 +28,9 @@ export async function signUpAction(
     if (!name || !email || !password) {
         return { error: 'All fields are required.' };
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return { error: 'Please enter a valid email address.' };
+    }
     if (password.length < 8) {
         return { error: 'Password must be at least 8 characters.' };
     }
@@ -37,9 +42,21 @@ export async function signUpAction(
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    await prisma.user.create({
+    const newUser = await prisma.user.create({
         data: { name, email, hashedPassword },
+        select: { id: true },
     });
+
+    // Fire welcome notification (non-blocking)
+    notify({
+        userId:  newUser.id,
+        type:    NotificationType.ACCOUNT_WELCOME,
+        title:   'Welcome to FantasyIQ Trust!',
+        body:    'Your account is ready. Sync your league and set up dues in minutes.',
+        inApp:   true,
+        email:   true,
+        throttleMs: 0,
+    }).catch(() => {});
 
     // Auto sign-in after account creation — signIn throws a redirect internally.
     await signIn('credentials', { email, password, redirectTo });

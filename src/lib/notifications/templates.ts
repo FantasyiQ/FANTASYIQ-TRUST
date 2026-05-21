@@ -200,6 +200,33 @@ export function renderTemplate(type: NotificationType | string, ctx: TemplateCon
       return baseLayout(title, bodyHtml, ctaButton('Sync Now', `${appUrl}/dashboard`));
     }
 
+    // ── Welcome ───────────────────────────────────────────────────────────────
+    case 'account.welcome': {
+      const bodyHtml = `<p style="margin:0 0 12px;">Welcome to <strong style="color:#fff;">FantasyIQ Trust</strong> — your league&#39;s financial command center.</p>
+      <p style="margin:0 0 8px;">Here&#39;s how to get started:</p>
+      <ol style="margin:12px 0;padding-left:20px;">
+        <li style="margin-bottom:6px;">Sync your Sleeper, ESPN, or Yahoo league</li>
+        <li style="margin-bottom:6px;">Set up dues tracking for your league</li>
+        <li style="margin-bottom:6px;">Invite your league members</li>
+      </ol>
+      <p style="margin:8px 0 0;color:#71717a;">Need help? Check out the dashboard to get started in minutes.</p>`;
+      return baseLayout(title, bodyHtml, ctaButton('Go to Dashboard', `${appUrl}/dashboard`));
+    }
+
+    // ── Payment failed ────────────────────────────────────────────────────────
+    case 'plan.payment_failed': {
+      const bodyHtml = `<p style="margin:0 0 12px;">${escapeHtml(body)}</p>
+      <p style="margin:0 0 8px;color:#71717a;">To keep your plan active, please update your payment method before your next retry.</p>`;
+      return baseLayout(title, bodyHtml, ctaButton('Update Payment Method', `${appUrl}/dashboard/plan/player`));
+    }
+
+    // ── Plan cancelled ────────────────────────────────────────────────────────
+    case 'plan.cancelled': {
+      const bodyHtml = `<p style="margin:0 0 12px;">Your FiQ subscription has been cancelled. You&#39;ll retain access until the end of your current billing period.</p>
+      <p style="margin:0 0 8px;color:#71717a;">Changed your mind? You can re-subscribe any time from the pricing page.</p>`;
+      return baseLayout(title, bodyHtml, ctaButton('See Plans', `${appUrl}/pricing`));
+    }
+
     // ── Generic fallback ─────────────────────────────────────────────────────
     default: {
       const bodyHtml = `<p style="margin:0 0 8px;">${escapeHtml(body)}</p>`;

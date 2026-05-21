@@ -1,8 +1,12 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
 
 export async function POST(request: NextRequest): Promise<Response> {
+    const rl = await checkMutationLimit(getClientIp(request));
+    if (rl.limited) return rl.response;
+
     const session = await auth();
     if (!session?.user?.email) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -23,6 +27,9 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     if (!leagueName || !seasons?.length || !buyInAmount || !teamCount) {
         return Response.json({ error: 'All fields are required.' }, { status: 400 });
+    }
+    if (leagueName.length > 100) {
+        return Response.json({ error: 'League name must be 100 characters or fewer.' }, { status: 400 });
     }
     if (buyInAmount <= 0 || teamCount < 2) {
         return Response.json({ error: 'Invalid buy-in or team count.' }, { status: 400 });

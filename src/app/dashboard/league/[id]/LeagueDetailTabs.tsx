@@ -202,7 +202,7 @@ function PlayerRankingsCard({
                     placeholder="Search players…"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
-                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-gray-500 w-48"
+                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-gray-500 w-full sm:w-48"
                 />
             </div>
             <div className="overflow-x-auto">

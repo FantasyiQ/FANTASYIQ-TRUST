@@ -2,19 +2,17 @@ import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
-/** Convert a Giphy share URL to a direct media URL if possible. */
-function normalizeMediaUrl(raw: string): string {
+/** Convert a Giphy share URL to a direct media URL if possible. Only allows http/https. */
+function normalizeMediaUrl(raw: string): string | null {
     try {
         const url = new URL(raw);
-        // https://giphy.com/gifs/something-GIFID  →  direct GIF
+        if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
         if (url.hostname === 'giphy.com') {
             const match = url.pathname.match(/\/gifs\/(?:[^/]+-)?([a-zA-Z0-9]+)\/?$/);
             if (match) return `https://media.giphy.com/media/${match[1]}/giphy.gif`;
         }
-        // https://media.giphy.com/… — already direct
-        // https://tenor.com/… — leave as-is; users should paste direct media URL
-    } catch { /* invalid URL — let the API validate it */ }
-    return raw;
+        return url.toString();
+    } catch { return null; }
 }
 
 async function assertCommissioner(duesId: string, email: string) {
@@ -65,6 +63,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ due
     const body = await req.json() as { body?: string; mediaUrl?: string };
     const text = body.body?.trim();
     if (!text) return Response.json({ error: 'body is required' }, { status: 400 });
+    if (text.length > 2000) return Response.json({ error: 'body too long' }, { status: 400 });
 
     const mediaUrl = body.mediaUrl?.trim()
         ? normalizeMediaUrl(body.mediaUrl.trim())

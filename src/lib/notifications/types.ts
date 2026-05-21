@@ -38,6 +38,10 @@ export const NotificationType = {
   PLAN_LIMIT_REACHED:           'plan.limit_reached',
   PLAN_RENEWAL_UPCOMING:        'plan.renewal_upcoming',
   PLAN_PAYMENT_FAILED:          'plan.payment_failed',
+  PLAN_CANCELLED:               'plan.cancelled',
+
+  // Onboarding
+  ACCOUNT_WELCOME:              'account.welcome',
 
   // Invite
   INVITE_PROGRESS:              'invite.progress',
