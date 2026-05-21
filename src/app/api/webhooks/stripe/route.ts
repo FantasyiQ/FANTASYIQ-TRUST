@@ -253,6 +253,58 @@ export async function POST(request: NextRequest): Promise<Response> {
                 break;
             }
 
+            case 'invoice.payment_action_required': {
+                const invoice = event.data.object as Stripe.Invoice;
+                const customerId = typeof invoice.customer === 'string' ? invoice.customer : null;
+                if (!customerId) break;
+
+                const user = await prisma.user.findUnique({
+                    where: { stripeCustomerId: customerId },
+                    select: { id: true },
+                });
+                if (!user) break;
+
+                await prisma.notification.create({
+                    data: {
+                        userId: user.id,
+                        type:   NotificationType.PLAN_ACTION_REQUIRED,
+                        title:  'Action required: complete your payment',
+                        body:   'Your bank requires additional verification to process your subscription payment. Please authorize the payment to keep your plan active.',
+                        data: {
+                            invoiceId: invoice.id,
+                            amountDue: invoice.amount_due,
+                            currency:  invoice.currency,
+                        },
+                    },
+                });
+                break;
+            }
+
+            case 'customer.subscription.trial_will_end': {
+                const sub = event.data.object as Stripe.Subscription;
+                const customerId = sub.customer as string;
+                if (!customerId) break;
+
+                const user = await prisma.user.findUnique({
+                    where: { stripeCustomerId: customerId },
+                    select: { id: true },
+                });
+                if (!user) break;
+
+                const trialEnd = sub.trial_end ? new Date(sub.trial_end * 1000) : null;
+                await notify({
+                    userId:     user.id,
+                    type:       NotificationType.PLAN_RENEWAL_UPCOMING,
+                    title:      'Your free trial ends soon',
+                    body:       `Your FiQ trial ${trialEnd ? `ends on ${trialEnd.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}` : 'is ending soon'}. After that, you'll be billed at your plan's regular rate.`,
+                    email:      true,
+                    inApp:      true,
+                    throttleMs: 0,
+                    data:       { deadline: trialEnd?.toISOString() },
+                }).catch(() => {});
+                break;
+            }
+
             case 'customer.subscription.deleted': {
                 const sub = event.data.object as Stripe.Subscription;
                 const customerId = sub.customer as string;

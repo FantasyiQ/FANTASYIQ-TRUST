@@ -220,6 +220,13 @@ export function renderTemplate(type: NotificationType | string, ctx: TemplateCon
       return baseLayout(title, bodyHtml, ctaButton('Update Payment Method', `${appUrl}/dashboard/plan/player`));
     }
 
+    // ── Payment action required (3D Secure / SCA) ────────────────────────────
+    case 'plan.action_required': {
+      const bodyHtml = `<p style="margin:0 0 12px;">${escapeHtml(body)}</p>
+      <p style="margin:0 0 8px;color:#71717a;">Your bank requires additional verification to process your payment. Click below to complete the authorization — it only takes a moment.</p>`;
+      return baseLayout(title, bodyHtml, ctaButton('Authorize Payment', `${appUrl}/dashboard/plan/player`));
+    }
+
     // ── Plan cancelled ────────────────────────────────────────────────────────
     case 'plan.cancelled': {
       const bodyHtml = `<p style="margin:0 0 12px;">Your FiQ subscription has been cancelled. You&#39;ll retain access until the end of your current billing period.</p>

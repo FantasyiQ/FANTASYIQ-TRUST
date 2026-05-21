@@ -5,6 +5,7 @@ import { THROTTLE_MS } from './types';
 import { sendEmail } from './email';
 import { renderTemplate } from './templates';
 import { getPusherServer, userChannel } from '@/lib/pusher';
+import { captureError } from '@/lib/sentry';
 
 export interface CreateNotificationOptions {
   userId:      string;
@@ -84,7 +85,7 @@ export async function notify(opts: CreateNotificationOptions): Promise<void> {
         subject: title,
         html,
       }).catch(err => {
-        console.error('[notify] email failed', type, userId, err);
+        captureError(err, { context: 'notify:email', type, userId });
       });
 
       if (notifId) {
