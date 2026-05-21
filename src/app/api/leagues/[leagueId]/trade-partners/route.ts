@@ -1,4 +1,6 @@
 import { type NextRequest } from 'next/server';
+import { auth } from '@/lib/auth';
+import { requirePaidTier } from '@/lib/access';
 import { prisma } from '@/lib/prisma';
 import { calculateAge } from '@/lib/calculateAge';
 import { getLeagueRosters, getLeagueUsers, getPlayers } from '@/lib/sleeper';
@@ -127,11 +129,24 @@ export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ leagueId: string }> },
 ): Promise<Response> {
+    // Auth + tier check
+    const session = await auth();
+    if (!session?.user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    const deny = await requirePaidTier(session.user.id);
+    if (deny) return deny;
+
     const { leagueId } = await params;
-    const ownerId = request.nextUrl.searchParams.get('ownerId');
+
+    // Resolve the caller's Sleeper user ID from DB — never trust the query param
+    // to prevent user A from requesting trade analysis as user B.
+    const user = await prisma.user.findUnique({
+        where:  { id: session.user.id },
+        select: { sleeperUserId: true },
+    });
+    const ownerId = user?.sleeperUserId ?? request.nextUrl.searchParams.get('ownerId');
 
     if (!ownerId) {
-        return Response.json({ error: 'ownerId query param required' }, { status: 400 });
+        return Response.json({ error: 'Sleeper account not connected' }, { status: 400 });
     }
 
     // 1. Load league config from DB

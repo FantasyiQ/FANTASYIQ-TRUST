@@ -5,6 +5,7 @@
 
 import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
+import { requirePaidTier } from '@/lib/access';
 import { prisma } from '@/lib/prisma';
 import { getNflState, getLeagueMatchups, getLeagueUsers } from '@/lib/sleeper';
 import {
@@ -34,6 +35,8 @@ export async function GET(
 ): Promise<Response> {
     const session = await auth();
     if (!session?.user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    const deny = await requirePaidTier(session.user.id);
+    if (deny) return deny;
 
     const { leagueId: dbLeagueId } = await params;
 

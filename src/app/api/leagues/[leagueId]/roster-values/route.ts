@@ -1,4 +1,6 @@
 import { type NextRequest } from 'next/server';
+import { auth } from '@/lib/auth';
+import { requirePaidTier } from '@/lib/access';
 import { prisma } from '@/lib/prisma';
 import { calculateAge } from '@/lib/calculateAge';
 import { getLeagueRosters, getLeagueUsers, getPlayers } from '@/lib/sleeper';
@@ -138,6 +140,11 @@ export async function GET(
     _request: NextRequest,
     { params }: { params: Promise<{ leagueId: string }> },
 ): Promise<Response> {
+    const session = await auth();
+    if (!session?.user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    const deny = await requirePaidTier(session.user.id);
+    if (deny) return deny;
+
     const { leagueId } = await params;
 
     // 1. Load league config from DB (settings stored by sleeper-sync cron)

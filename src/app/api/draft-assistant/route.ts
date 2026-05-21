@@ -3,6 +3,7 @@
 
 import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
+import { requirePaidTier } from '@/lib/access';
 import { prisma } from '@/lib/prisma';
 import { loadDraftContext } from '@/lib/draft/contextLoader';
 import { rankCandidates, detectTradeDown } from '@/lib/draft/scoring';
@@ -12,6 +13,8 @@ export const maxDuration = 30;
 export async function GET(req: NextRequest): Promise<Response> {
     const session = await auth();
     if (!session?.user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    const deny = await requirePaidTier(session.user.id);
+    if (deny) return deny;
 
     const { searchParams } = new URL(req.url);
     const leagueId      = searchParams.get('leagueId');
