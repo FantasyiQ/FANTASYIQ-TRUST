@@ -6,8 +6,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // PATCH /api/user/profile — update mutable profile fields (currently: email, name)
 export async function PATCH(request: Request): Promise<Response> {
-    const limited = await checkMutationLimit(getClientIp(request));
-    if (limited) return limited;
+    const rl = await checkMutationLimit(getClientIp(request));
+    if (rl.limited) return rl.response!;
 
     const session = await auth();
     if (!session?.user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
