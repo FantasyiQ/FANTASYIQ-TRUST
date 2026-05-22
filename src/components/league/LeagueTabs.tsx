@@ -25,10 +25,10 @@ export default function LeagueTabs({ leagueId }: { leagueId: string; isCommissio
     return (
         <nav className="flex gap-4 border-b border-gray-800 pb-2">
             <Tab href={`/dashboard/league/${leagueId}/overview`}      label="Overview"         />
-            <Tab href={`/dashboard/league/${leagueId}/commissioner`}  label="Commissioner Hub"  />
             <Tab href={`/dashboard/league/${leagueId}/fantasyiq`}     label="FantasyiQ Hub"     />
             <Tab href={`/dashboard/league/${leagueId}/rankings`}      label="Rankings"          />
-            <Tab href={`/dashboard/league/${leagueId}/trade`}         label="Trade Evaluator"  />
+            <Tab href={`/dashboard/league/${leagueId}/trade`}         label="Trade Evaluator"   />
+            <Tab href={`/dashboard/league/${leagueId}/commissioner`}  label="Commissioner Hub"  />
         </nav>
     );
 }
