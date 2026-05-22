@@ -124,16 +124,16 @@ export const FAQ_ITEMS: FAQItem[] = [
     {
         id:       'what-is-prs',
         category: 'prs',
-        question: 'What is PRS?',
-        answer:   'PRS (Performance Rating Score) measures your long-term dynasty performance using:\n• Roster strength\n• Draft efficiency\n• Trade impact\n• Lineup optimization\n• Season-over-season improvement\n\nIt is a holistic score designed to reflect dynasty skill, not just win totals.',
-        tags:     ['prs', 'performance', 'score', 'members', 'tiers', 'dynasty'],
+        question: 'What is DSS?',
+        answer:   'DSS (Dynasty Skill Score) measures your long-term dynasty performance using:\n• Roster strength\n• Draft efficiency\n• Trade impact\n• Lineup optimization\n• Season-over-season improvement\n\nIt is a holistic score designed to reflect dynasty skill, not just win totals.',
+        tags:     ['dss', 'dynasty skill', 'score', 'members', 'tiers', 'dynasty'],
     },
     {
         id:       'how-prs-calculated',
         category: 'prs',
-        question: 'How is PRS calculated?',
-        answer:   'PRS blends multiple weighted components:\n• DTV-based roster value\n• Draft value added\n• Trade efficiency\n• Lineup decisions\n• Playoff performance\n• Consistency over time\n\nEach component updates automatically as your league syncs.',
-        tags:     ['prs', 'calculation', 'formula', 'how', 'score'],
+        question: 'How is DSS calculated?',
+        answer:   'DSS blends multiple weighted components:\n• DTV-based roster value\n• Draft value added\n• Trade efficiency\n• Lineup decisions\n• Playoff performance\n• Consistency over time\n\nEach component updates automatically as your league syncs.',
+        tags:     ['dss', 'dynasty skill', 'calculation', 'formula', 'how', 'score'],
     },
     {
         id:       'low-prs',

@@ -44,7 +44,7 @@ function buildLeagueTag(context: SupportContext): string {
 
 const PAGE_BASE_HINTS: Partial<Record<SupportPage, string>> = {
     'draft-report': 'Draft Report · Ask about grades, DTV, or Draft Identity.',
-    'members':      'Members · Ask about PRS scores or member profiles.',
+    'members':      'Members · Ask about DSS scores or member profiles.',
     'calendar':     'Calendar Manager · Ask about playoff weeks or season phase.',
     'commissioner': 'Commissioner Hub · Ask about dues, announcements, or settings.',
     'league-sync':  'League · Ask about syncing, roster data, or credentials.',
@@ -77,7 +77,7 @@ export function detectIntent(query: string): Intent {
     ) {
         return 'playoff-weeks';
     }
-    if (q.includes('prs') || q.includes('reliability score') || q.includes('player reliability')) {
+    if (q.includes('dss') || q.includes('dynasty skill') || q.includes('performance rating')) {
         return 'prs';
     }
 
@@ -168,10 +168,10 @@ function handlePlayoffWeeks(ctx: SupportContext): { content: string; faq: FAQIte
 
 function handlePRS(ctx: SupportContext): { content: string; faq: FAQItem | null } {
     const suffix = ctx.hasPRS === false
-        ? " Some members in your league don't have PRS scores yet — invite them to FantasyiQ Trust to unlock scores for the whole league."
+        ? " Some members in your league don't have DSS scores yet — invite them to FantasyiQ Trust to unlock scores for the whole league."
         : '';
     return {
-        content: `PRS (Performance Rating Score) measures your long-term dynasty performance — roster strength, draft efficiency, trade impact, lineup optimization, and season-over-season improvement. It reflects dynasty skill, not just win totals.${suffix}`,
+        content: `DSS (Dynasty Skill Score) measures your long-term dynasty performance — roster strength, draft efficiency, trade impact, lineup optimization, and season-over-season improvement. It reflects dynasty skill, not just win totals.${suffix}`,
         faq:     FAQ_ITEMS.find(f => f.id === 'what-is-prs') ?? null,
     };
 }

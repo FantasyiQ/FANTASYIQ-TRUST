@@ -16,7 +16,7 @@ export interface LeagueMemberData {
     isCoCommissioner: boolean;
     /** Our platform user ID — null if not registered. */
     userId:           string | null;
-    /** Player Reliability Score 0–100, null if not registered. */
+    /** Dynasty Skill Score 0–100, null if not registered. */
     prsScore:         number | null;
     /** Basic trust score, null if not registered. */
     trustScore:       number | null;
@@ -113,9 +113,9 @@ function CommissionerProfile({ member }: { member: LeagueMemberData }) {
                     {member.prsScore != null && (
                         <span
                             className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border ${prsTierStyles(member.prsScore)}`}
-                            title={`Performance Rating Score: ${member.prsScore}/100 (${prsTierLabel(member.prsScore)})`}
+                            title={`Dynasty Skill Score (DSS): ${member.prsScore}/100 (${prsTierLabel(member.prsScore)})`}
                         >
-                            PRS {member.prsScore}
+                            DSS {member.prsScore}
                         </span>
                     )}
                     {member.lfCommissioner && member.lfCommissioner.reviewsCount > 0 && (
@@ -177,9 +177,9 @@ function MemberRow({ member }: { member: LeagueMemberData }) {
                 {member.prsScore != null && (
                     <span
                         className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border ${prsTierStyles(member.prsScore)}`}
-                        title={`Performance Rating Score: ${member.prsScore}/100 (${prsTierLabel(member.prsScore)})`}
+                        title={`Dynasty Skill Score (DSS): ${member.prsScore}/100 (${prsTierLabel(member.prsScore)})`}
                     >
-                        PRS {member.prsScore}
+                        DSS {member.prsScore}
                     </span>
                 )}
             </div>
@@ -247,11 +247,11 @@ export default function MembersCard({ members }: Props) {
                         <span className="text-gray-600 font-normal text-base ml-2">({members.length})</span>
                     </h2>
 
-                    {/* PRS explanation pill */}
+                    {/* DSS explanation pill */}
                     <span className="inline-flex items-center gap-1.5 text-[10px] text-gray-500 bg-gray-800 border border-gray-700 px-2.5 py-1 rounded-full leading-none">
-                        <span className="font-bold text-gray-400">PRS</span>
+                        <span className="font-bold text-gray-400">DSS</span>
                         <span className="text-gray-600">·</span>
-                        Performance Rating Score
+                        Dynasty Skill Score
                         <span className="text-gray-600">·</span>
                         {registeredCount}/{members.length} on FantasyiQ
                     </span>
@@ -269,11 +269,11 @@ export default function MembersCard({ members }: Props) {
             {/* ── Expanded content ──────────────────────────────────────────── */}
             {open && (
                 <>
-                    {/* PRS legend */}
+                    {/* DSS legend */}
                     <div className="px-6 py-3 border-t border-gray-800 bg-gray-800/20">
                         <div className="flex items-start justify-between gap-2 mb-1">
                             <p className="text-[10px] text-gray-600 leading-relaxed">
-                                <span className="font-bold text-gray-500">Performance Rating Score (PRS)</span> measures long-term dynasty performance — roster strength, draft efficiency, trade impact, lineup optimization, and season-over-season improvement.
+                                <span className="font-bold text-gray-500">Dynasty Skill Score (DSS)</span> measures long-term dynasty performance — roster strength, draft efficiency, trade impact, lineup optimization, and season-over-season improvement.
                                 Scores range from 0–100. Only members who have joined FantasyiQ Trust show a score.
                             </p>
                             <a href="/support#faq-prs" className="text-[10px] text-gray-600 hover:text-[#D4AF37] transition shrink-0">Learn more →</a>
