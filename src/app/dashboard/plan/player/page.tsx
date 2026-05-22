@@ -20,10 +20,11 @@ const STATUS_STYLES: Record<string, string> = {
 
 function formatTier(tier: string): string {
     switch (tier) {
-        case 'PLAYER_PRO':     return 'Player Pro';
-        case 'PLAYER_ALL_PRO': return 'Player All-Pro';
-        case 'PLAYER_ELITE':   return 'Player Elite';
-        default:               return tier;
+        case 'PLAYER_PRO':      return 'Player Pro';
+        case 'PLAYER_ALL_PRO':  return 'Player All-Pro';
+        case 'PLAYER_ELITE':    return 'Player Elite';
+        case 'PLAYER_ELITEIQ':  return 'Player ELITEiQ';
+        default:                return tier;
     }
 }
 

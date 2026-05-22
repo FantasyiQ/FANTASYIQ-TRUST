@@ -17,6 +17,7 @@ function formatTier(tier: SubscriptionTier | string): string {
         case 'PLAYER_PRO':           return 'Player Pro';
         case 'PLAYER_ALL_PRO':       return 'Player All-Pro';
         case 'PLAYER_ELITE':         return 'Player Elite';
+        case 'PLAYER_ELITEIQ':       return 'Player ELITEiQ';
         case 'COMMISSIONER_PRO':     return 'Commissioner Pro';
         case 'COMMISSIONER_ALL_PRO': return 'Commissioner All-Pro';
         case 'COMMISSIONER_ELITE':   return 'Commissioner Elite';
@@ -162,7 +163,7 @@ export default async function DashboardPage({
     const hasPastDueSub = subscriptions.some(s => s.status === 'past_due');
     const hasAnyActiveSub = activeSubs.length > 0;
     const displayTier = (playerSubTier !== 'FREE' ? playerSubTier : subscriptionTier) as SubscriptionTier;
-    const isElite = displayTier === 'PLAYER_ELITE' || displayTier === 'COMMISSIONER_ELITE';
+    const isElite = displayTier === 'PLAYER_ELITE' || displayTier === 'PLAYER_ELITEIQ' || displayTier === 'COMMISSIONER_ELITE';
 
     const leagueLimitKey = tierToLimitKey(displayTier);
     const leagueLimit    = getLeagueLimit(leagueLimitKey);

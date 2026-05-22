@@ -10,6 +10,7 @@ function tierRank(info: PlanInfo): number {
         PLAYER_PRO:           10,
         PLAYER_ALL_PRO:       20,
         PLAYER_ELITE:         30,
+        PLAYER_ELITEIQ:       35,
         COMMISSIONER_PRO:     40,
         COMMISSIONER_ALL_PRO: 50,
         COMMISSIONER_ELITE:   60,

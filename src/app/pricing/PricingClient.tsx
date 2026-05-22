@@ -39,9 +39,10 @@ function tierGroupRank(tier: string): number {
     if (tier === 'PLAYER_PRO')           return 1;
     if (tier === 'PLAYER_ALL_PRO')       return 2;
     if (tier === 'PLAYER_ELITE')         return 3;
-    if (tier === 'COMMISSIONER_PRO')     return 4;
-    if (tier === 'COMMISSIONER_ALL_PRO') return 5;
-    if (tier === 'COMMISSIONER_ELITE')   return 6;
+    if (tier === 'PLAYER_ELITEIQ')       return 4;
+    if (tier === 'COMMISSIONER_PRO')     return 5;
+    if (tier === 'COMMISSIONER_ALL_PRO') return 6;
+    if (tier === 'COMMISSIONER_ELITE')   return 7;
     return 0;
 }
 
@@ -50,12 +51,12 @@ const TEAM_SIZES: TeamSize[] = [8, 10, 12, 14, 16, 32];
 
 // [Pro, All-Pro, Elite]
 const COMM_PRICES: Record<TeamSize, [string, string, string]> = {
-    8:  ['54.99',  '64.99',  '74.99' ],
-    10: ['64.99',  '74.99',  '84.99' ],
-    12: ['74.99',  '84.99',  '94.99' ],
-    14: ['84.99',  '94.99',  '104.99'],
-    16: ['94.99',  '104.99', '114.99'],
-    32: ['174.99', '184.99', '194.99'],
+    8:  ['44.99',  '54.99',  '64.99' ],
+    10: ['54.99',  '64.99',  '74.99' ],
+    12: ['64.99',  '74.99',  '84.99' ],
+    14: ['74.99',  '84.99',  '94.99' ],
+    16: ['84.99',  '94.99',  '104.99'],
+    32: ['164.99', '174.99', '184.99'],
 };
 
 // Index 0=Pro, 1=All-Pro, 2=Elite
@@ -77,9 +78,10 @@ function findPriceId(name: string): string {
 }
 
 const PLAYER_PRICE_IDS = {
-    pro:     findPriceId('Player Pro'),
-    all_pro: findPriceId('Player All-Pro'),
-    elite:   findPriceId('Player Elite'),
+    pro:      findPriceId('Player Pro'),
+    all_pro:  findPriceId('Player All-Pro'),
+    elite:    findPriceId('Player Elite'),
+    eliteiq:  findPriceId('Player ELITEiQ'),
 };
 
 function commPriceId(tier: 'Pro' | 'All-Pro' | 'Elite', size: TeamSize): string {
@@ -111,7 +113,7 @@ const PLAYER_ALL_PRO_FEATURES: Feature[] = [
     { name: 'League Dues & Payouts Tracked',     included: true  },
     { name: 'Immediate Payouts',                 included: true  },
     { name: 'Commissioner Hub',                  included: true  },
-    { name: 'Sync Up to 5 Leagues',              included: true  },
+    { name: 'Sync Up to 4 Leagues',              included: true  },
     { name: 'Optimized Lineups',                 included: true  },
     { name: 'Player Rankings',                   included: true  },
     { name: 'Auction Values',                    included: true  },
@@ -124,6 +126,24 @@ const PLAYER_ALL_PRO_FEATURES: Feature[] = [
 ];
 
 const PLAYER_ELITE_FEATURES: Feature[] = [
+    { name: 'Zero Fees',                         included: true },
+    { name: 'League Funds Secured',              included: true },
+    { name: 'League Dues & Payouts Tracked',     included: true },
+    { name: 'Immediate Payouts',                 included: true },
+    { name: 'Commissioner Hub',                  included: true },
+    { name: 'Sync Up to 7 Leagues',              included: true },
+    { name: 'Optimized Lineups',                 included: true },
+    { name: 'Player Rankings',                   included: true },
+    { name: 'Auction Values',                    included: true },
+    { name: 'Personalized Waiver Wire Strategy', included: true },
+    { name: 'Dynamic Trade Calculator',          included: true },
+    { name: 'Power League Rankings',             included: true },
+    { name: 'Dynamic Mock Drafts',               included: true },
+    { name: 'League Analysis',                   included: true },
+    { name: 'Team Builder',                      included: true },
+];
+
+const PLAYER_ELITEIQ_FEATURES: Feature[] = [
     { name: 'Zero Fees',                         included: true },
     { name: 'League Funds Secured',              included: true },
     { name: 'League Dues & Payouts Tracked',     included: true },
@@ -615,7 +635,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                         {tab === 'player' ? (
                             <>
                                 <PlanCard
-                                    name="Pro" price="9.99" period="/yr"
+                                    name="Pro" price="9.99" period="/mo"
                                     features={PLAYER_PRO_FEATURES}
                                     priceId={PLAYER_PRICE_IDS.pro} tier="PLAYER_PRO"
                                     cardStatus={resolvePlayerCardStatus('PLAYER_PRO', playerSub)}
@@ -626,23 +646,35 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     returnTo={returnTo}
                                 />
                                 <PlanCard
-                                    name="All-Pro" price="17.99" period="/yr"
+                                    name="All-Pro" price="19.99" period="/mo"
                                     badge="Most Popular" badgeGold ring
                                     features={PLAYER_ALL_PRO_FEATURES}
                                     priceId={PLAYER_PRICE_IDS.all_pro} tier="PLAYER_ALL_PRO"
                                     cardStatus={resolvePlayerCardStatus('PLAYER_ALL_PRO', playerSub)}
                                     sourceStripeSubId={playerSub?.stripeSubscriptionId}
                                     onUpgrade={handleUpgradeClick}
-                                    leagueLimitNote="Up to 5 Leagues"
-                                    atLeagueLimit={resolvePlayerCardStatus('PLAYER_ALL_PRO', playerSub) === 'current' && activePlayerLeagueCount >= 5}
+                                    leagueLimitNote="Up to 4 Leagues"
+                                    atLeagueLimit={resolvePlayerCardStatus('PLAYER_ALL_PRO', playerSub) === 'current' && activePlayerLeagueCount >= 4}
                                     returnTo={returnTo}
                                 />
                                 <PlanCard
-                                    name="Elite" price="24.99" period="/yr"
+                                    name="Elite" price="34.99" period="/mo"
                                     badge="Full Access"
                                     features={PLAYER_ELITE_FEATURES}
                                     priceId={PLAYER_PRICE_IDS.elite} tier="PLAYER_ELITE"
                                     cardStatus={resolvePlayerCardStatus('PLAYER_ELITE', playerSub)}
+                                    sourceStripeSubId={playerSub?.stripeSubscriptionId}
+                                    onUpgrade={handleUpgradeClick}
+                                    leagueLimitNote="Up to 7 Leagues"
+                                    atLeagueLimit={resolvePlayerCardStatus('PLAYER_ELITE', playerSub) === 'current' && activePlayerLeagueCount >= 7}
+                                    returnTo={returnTo}
+                                />
+                                <PlanCard
+                                    name="ELITEiQ" price="59.99" period="/mo"
+                                    badge="Whales Only"
+                                    features={PLAYER_ELITEIQ_FEATURES}
+                                    priceId={PLAYER_PRICE_IDS.eliteiq} tier="PLAYER_ELITEIQ"
+                                    cardStatus={resolvePlayerCardStatus('PLAYER_ELITEIQ', playerSub)}
                                     sourceStripeSubId={playerSub?.stripeSubscriptionId}
                                     onUpgrade={handleUpgradeClick}
                                     leagueLimitNote="Unlimited Leagues"

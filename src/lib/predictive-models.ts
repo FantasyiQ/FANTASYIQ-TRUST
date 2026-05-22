@@ -125,7 +125,7 @@ interface UpgradeInputs {
 
 export function predictUpgrade(inp: UpgradeInputs): number {
     // Already on top tiers — unlikely to upgrade further
-    if (inp.currentTier === 'COMMISSIONER_ELITE' || inp.currentTier === 'PLAYER_ELITE') return prob(-3.5);
+    if (inp.currentTier === 'COMMISSIONER_ELITE' || inp.currentTier === 'PLAYER_ELITE' || inp.currentTier === 'PLAYER_ELITEIQ') return prob(-3.5);
 
     let z = -2.8;
 
