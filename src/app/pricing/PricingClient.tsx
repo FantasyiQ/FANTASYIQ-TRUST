@@ -95,6 +95,7 @@ const FEATURE_TOOLTIPS: Record<string, string> = {
     'League Dues & Payouts Tracked': 'Full visibility into who has paid, who owes, and a complete audit trail of every dollar.',
     'Immediate Payouts':             'Once the commissioner approves payouts, winners are paid out instantly with no delays.',
     'Commissioner Hub':              'Full commissioner toolset — manage dues, payouts, polls, announcements, and league documents.',
+    'League Finder':                 'Discover and join new fantasy leagues, or list yours to attract competitive players from the FiQ community.',
     'Weekly DFS Challenge':          'Compete in weekly DFS contests against other FiQ members for bragging rights and leaderboard glory.',
     'Optimized Lineups':             'Every week FiQ scans your roster and surfaces the highest-projected valid lineup — with a one-click swap summary.',
     'Waiver Wire Intelligence':      'Every week FiQ scans every free agent in your league and tells you exactly which pickups would improve your optimized lineup — and by how much.',
@@ -120,6 +121,7 @@ const PLAYER_PRO_FEATURES: Feature[] = [
     { name: 'League Dues & Payouts Tracked', included: true,  tooltip: tip('League Dues & Payouts Tracked') },
     { name: 'Immediate Payouts',             included: true,  tooltip: tip('Immediate Payouts') },
     { name: 'Sync Up to 2 Leagues',          included: true,  tooltip: 'Connect up to 2 fantasy leagues from Sleeper, ESPN, Yahoo, or NFL.' },
+    { name: 'League Finder',                 included: true,  tooltip: tip('League Finder') },
     { name: 'Weekly DFS Challenge',          included: true,  tooltip: tip('Weekly DFS Challenge') },
     { name: 'Optimized Lineups',             included: false, tooltip: tip('Optimized Lineups') },
     { name: 'Waiver Wire Intelligence',      included: false, tooltip: tip('Waiver Wire Intelligence') },
@@ -140,6 +142,7 @@ const PLAYER_ALL_PRO_FEATURES: Feature[] = [
     { name: 'League Dues & Payouts Tracked', included: true,  tooltip: tip('League Dues & Payouts Tracked') },
     { name: 'Immediate Payouts',             included: true,  tooltip: tip('Immediate Payouts') },
     { name: 'Sync Up to 4 Leagues',          included: true,  tooltip: 'Connect up to 4 fantasy leagues from Sleeper, ESPN, Yahoo, or NFL.' },
+    { name: 'League Finder',                 included: true,  tooltip: tip('League Finder') },
     { name: 'Weekly DFS Challenge',          included: true,  tooltip: tip('Weekly DFS Challenge') },
     { name: 'Optimized Lineups',             included: true,  tooltip: tip('Optimized Lineups') },
     { name: 'Waiver Wire Intelligence',      included: true,  tooltip: tip('Waiver Wire Intelligence') },
@@ -161,6 +164,7 @@ const PLAYER_ELITE_FEATURES: Feature[] = [
     { name: 'League Dues & Payouts Tracked', included: true, tooltip: tip('League Dues & Payouts Tracked') },
     { name: 'Immediate Payouts',             included: true, tooltip: tip('Immediate Payouts') },
     { name: 'Sync Up to 7 Leagues',          included: true, tooltip: 'Connect up to 7 fantasy leagues from Sleeper, ESPN, Yahoo, or NFL.' },
+    { name: 'League Finder',                 included: true, tooltip: tip('League Finder') },
     { name: 'Weekly DFS Challenge',          included: true, tooltip: tip('Weekly DFS Challenge') },
     { name: 'Optimized Lineups',             included: true, tooltip: tip('Optimized Lineups') },
     { name: 'Waiver Wire Intelligence',      included: true, tooltip: tip('Waiver Wire Intelligence') },
@@ -182,6 +186,7 @@ const PLAYER_ELITEIQ_FEATURES: Feature[] = [
     { name: 'League Dues & Payouts Tracked', included: true, tooltip: tip('League Dues & Payouts Tracked') },
     { name: 'Immediate Payouts',             included: true, tooltip: tip('Immediate Payouts') },
     { name: 'Unlimited League Syncs',        included: true, tooltip: 'Connect unlimited fantasy leagues from Sleeper, ESPN, Yahoo, or NFL.' },
+    { name: 'League Finder',                 included: true, tooltip: tip('League Finder') },
     { name: 'Weekly DFS Challenge',          included: true, tooltip: tip('Weekly DFS Challenge') },
     { name: 'Optimized Lineups',             included: true, tooltip: tip('Optimized Lineups') },
     { name: 'Waiver Wire Intelligence',      included: true, tooltip: tip('Waiver Wire Intelligence') },
@@ -203,6 +208,7 @@ const COMM_PRO_FEATURES: Feature[] = [
     { name: 'League Dues & Payouts Tracked', included: true,  tooltip: tip('League Dues & Payouts Tracked') },
     { name: 'Immediate Payouts',             included: true,  tooltip: tip('Immediate Payouts') },
     { name: 'Commissioner Hub',              included: true,  tooltip: tip('Commissioner Hub') },
+    { name: 'League Finder',                 included: true,  tooltip: tip('League Finder') },
     { name: 'Optimized Lineups',             included: false, tooltip: tip('Optimized Lineups') },
     { name: 'Waiver Wire Intelligence',      included: false, tooltip: tip('Waiver Wire Intelligence') },
     { name: 'Start/Sit Intelligence',        included: false, tooltip: tip('Start/Sit Intelligence') },
@@ -221,6 +227,7 @@ const COMM_ALL_PRO_FEATURES: Feature[] = [
     { name: 'League Dues & Payouts Tracked', included: true,  tooltip: tip('League Dues & Payouts Tracked') },
     { name: 'Immediate Payouts',             included: true,  tooltip: tip('Immediate Payouts') },
     { name: 'Commissioner Hub',              included: true,  tooltip: tip('Commissioner Hub') },
+    { name: 'League Finder',                 included: true,  tooltip: tip('League Finder') },
     { name: 'Optimized Lineups',             included: true,  tooltip: tip('Optimized Lineups') },
     { name: 'Waiver Wire Intelligence',      included: true,  tooltip: tip('Waiver Wire Intelligence') },
     { name: 'Start/Sit Intelligence',        included: true,  tooltip: tip('Start/Sit Intelligence') },
@@ -239,6 +246,7 @@ const COMM_ELITE_FEATURES: Feature[] = [
     { name: 'League Dues & Payouts Tracked', included: true, tooltip: tip('League Dues & Payouts Tracked') },
     { name: 'Immediate Payouts',             included: true, tooltip: tip('Immediate Payouts') },
     { name: 'Commissioner Hub',              included: true, tooltip: tip('Commissioner Hub') },
+    { name: 'League Finder',                 included: true, tooltip: tip('League Finder') },
     { name: 'Optimized Lineups',             included: true, tooltip: tip('Optimized Lineups') },
     { name: 'Waiver Wire Intelligence',      included: true, tooltip: tip('Waiver Wire Intelligence') },
     { name: 'Start/Sit Intelligence',        included: true, tooltip: tip('Start/Sit Intelligence') },
@@ -715,7 +723,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     returnTo={returnTo}
                                 />
                                 <PlanCard
-                                    name="ELITEiQ" price="59.99" period="/mo"
+                                    name=\"EliteiQ\" price="59.99" period="/mo"
                                     badge="Shot Caller"
                                     features={PLAYER_ELITEIQ_FEATURES}
                                     priceId={PLAYER_PRICE_IDS.eliteiq} tier="PLAYER_ELITEIQ"
