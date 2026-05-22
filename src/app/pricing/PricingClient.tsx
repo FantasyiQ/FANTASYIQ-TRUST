@@ -101,7 +101,7 @@ const FEATURE_TOOLTIPS: Record<string, string> = {
     'Draft Report':                  'Post-draft grade card analyzing your picks against ADP and projected value.',
     'Player Rankings':               'Dynamic player rankings updated weekly based on performance, usage, and opportunity score.',
     'Team DTV Rankings':             'Dynamic Trade Value rankings for every team in your league — know who is buying and who is selling.',
-    'League Power Rankings':         'Weekly power rankings for your league based on points scored, strength of schedule, and roster ratings.',
+    'League Power Rankings':         'Weekly power rankings for your league based on record, points scored, strength of schedule, and roster composition.',
     'Dynamic Trade Evaluator':       'Real-time trade analysis that shows you exactly who wins and loses before you accept.',
     'Roster Intelligence':           'RosteriQ grades your team A–D each week, maps positional strengths and weaknesses against league averages, tracks bench depth, and recommends your best path forward.',
     'Live Draft':                    'Real-time draft board that ranks available players by FiQ score so you always know who the best pick is.',
