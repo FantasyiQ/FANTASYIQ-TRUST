@@ -105,8 +105,10 @@ export async function POST(request: NextRequest): Promise<Response> {
         const connectedExtIds   = new Set(existingCL.map(cl => cl.leagueExtId).filter(Boolean));
         const connectedNames    = new Set(existingCL.map(cl => cl.leagueName.toLowerCase().trim()));
 
-        // Track how many player plan slots are already consumed
-        let playerSlotsUsed = existingCL.length;
+        // Track how many player plan slots are already consumed (commissioner leagues don't count)
+        let playerSlotsUsed = await prisma.league.count({
+            where: { userId, assignedPlanType: 'player' },
+        });
 
         // For the invite path: check if the commissioner has paid for this Sleeper league
         let inviteCommissionerPaid = false;

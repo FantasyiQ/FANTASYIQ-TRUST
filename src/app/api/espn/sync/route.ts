@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { trackFeature } from '@/app/actions/analytics';
+import { computeAutoAssignments } from '@/lib/auto-assign';
 import {
     detectEspnSeason,
     getEspnFullSync,
@@ -76,6 +77,36 @@ export async function POST(request: NextRequest): Promise<Response> {
         ]);
 
         void trackFeature('espn_sync', { leagueId });
+
+        // ── Auto-assign if not already assigned ───────────────────────────────
+        const fullLeague = await prisma.league.findUnique({
+            where:  { id: league.id },
+            select: { assignedPlanId: true, assignedPlanType: true, leagueName: true },
+        });
+        if (fullLeague && !fullLeague.assignedPlanId && !fullLeague.assignedPlanType) {
+            const [subscriptions, playerSlotsUsed] = await Promise.all([
+                prisma.subscription.findMany({
+                    where:  { userId, status: { in: ['active', 'trialing'] } },
+                    select: { id: true, type: true, tier: true, leagueName: true },
+                }),
+                prisma.league.count({ where: { userId, assignedPlanType: 'player' } }),
+            ]);
+            const planOptions = subscriptions.map(s => ({
+                id: s.id, type: s.type as 'player' | 'commissioner',
+                tier: s.tier, leagueName: s.leagueName ?? null,
+            }));
+            const [assignment] = computeAutoAssignments(
+                [{ id: league.id, leagueName: fullLeague.leagueName }],
+                planOptions,
+                playerSlotsUsed,
+            );
+            if (assignment?.planId) {
+                await prisma.league.update({
+                    where: { id: league.id },
+                    data:  { assignedPlanId: assignment.planId, assignedPlanType: assignment.planType },
+                });
+            }
+        }
 
         return Response.json({
             synced:     1,

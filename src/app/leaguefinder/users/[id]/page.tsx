@@ -54,11 +54,16 @@ export default async function UserProfilePage({
     }
     const returnedLeagues   = Array.from(leagueReviewCounts.values()).filter(c => c >= 2).length;
     const totalHelpful      = user.lfReviews.reduce((s, r) => s + r.helpfulCount, 0);
-    const acceptedRequests  = await prisma.lFJoinRequest.count({ where: { userId: id, status: 'ACCEPTED' } });
-    const prsBreakdown      = computePRS(verifiedCount, returnedLeagues, totalHelpful, acceptedRequests);
+    const [acceptedRequests, connectedSeasons] = await Promise.all([
+        prisma.lFJoinRequest.count({ where: { userId: id, status: 'ACCEPTED' } }),
+        prisma.connectedLeague.count({ where: { userId: id } }),
+    ]);
+    const prsBreakdown      = computePRS(verifiedCount, connectedSeasons, returnedLeagues, totalHelpful, acceptedRequests);
+    const totalVerified     = prsBreakdown.verifiedSeasons + prsBreakdown.connectedSeasons;
     const prsTooltip        =
         `Player Reliability Score: ${prsBreakdown.total}/100\n\n` +
-        `Verified seasons  +${prsBreakdown.pts.verified}  (${prsBreakdown.verifiedSeasons} × 8)\n` +
+        `Verified seasons  +${prsBreakdown.pts.verified}  (${totalVerified} × 8)\n` +
+        `  ↳ LF reviews: ${prsBreakdown.verifiedSeasons}, invite leagues: ${prsBreakdown.connectedSeasons}\n` +
         `League retention  +${prsBreakdown.pts.retention}  (${prsBreakdown.returnedLeagues} multi-season leagues × 5)\n` +
         `Helpful votes     +${prsBreakdown.pts.helpful}  (${prsBreakdown.totalHelpful} votes × 2)\n` +
         `Comm. approvals   +${prsBreakdown.pts.accepted}  (${prsBreakdown.acceptedRequests} accepted requests × 3)`;

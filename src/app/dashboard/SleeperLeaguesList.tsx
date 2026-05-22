@@ -32,6 +32,8 @@ interface Props {
     playerTier: string;
     commSubs: CommSub[];
     platform?: 'sleeper' | 'espn' | 'yahoo' | 'nfl';
+    hasPlayerPlan?: boolean;
+    limitReachedIds?: Set<string>;
 }
 
 function tierLevel(tier: string): number {
@@ -64,7 +66,7 @@ function formatSyncTime(date: Date | null): string {
     return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier, commSubs, platform = 'sleeper' }: Props) {
+export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier, commSubs, platform = 'sleeper', hasPlayerPlan = false, limitReachedIds = new Set() }: Props) {
     const [leagues] = useState<League[]>(initialLeagues);
 
     if (leagues.length === 0) {
@@ -129,10 +131,24 @@ export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier
                                         {badge.label}
                                     </span>
                                 )}
-                                {!league.assignedPlanId && (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border bg-yellow-900/30 text-yellow-400 border-yellow-800">
-                                        Unassigned
-                                    </span>
+                                {!league.assignedPlanId && !league.assignedPlanType && (
+                                    limitReachedIds.has(league.id) ? (
+                                        <Link
+                                            href="/pricing"
+                                            onClick={e => e.stopPropagation()}
+                                            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border bg-yellow-900/30 text-yellow-400 border-yellow-800 hover:bg-yellow-900/50 transition"
+                                        >
+                                            Upgrade to activate
+                                        </Link>
+                                    ) : hasPlayerPlan ? null : (
+                                        <Link
+                                            href="/pricing"
+                                            onClick={e => e.stopPropagation()}
+                                            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border bg-gray-800 text-gray-400 border-gray-700 hover:border-[#D4AF37]/50 hover:text-[#D4AF37] transition"
+                                        >
+                                            Add a plan
+                                        </Link>
+                                    )
                                 )}
                                 <span className="text-[#D4AF37] text-sm font-semibold whitespace-nowrap">View →</span>
                             </div>

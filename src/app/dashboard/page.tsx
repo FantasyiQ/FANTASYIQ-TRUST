@@ -9,6 +9,7 @@ import ConnectedLeagues from '@/components/ConnectedLeagues';
 import SleeperLeaguesList from './SleeperLeaguesList';
 import SyncedLeaguePicker from './SyncedLeaguePicker';
 import { getLeagueLimit, tierToLimitKey, nextTierName } from '@/lib/league-limits';
+import { computeAutoAssignments } from '@/lib/auto-assign';
 import type { SubscriptionTier } from '@prisma/client';
 
 function formatTier(tier: SubscriptionTier | string): string {
@@ -155,6 +156,60 @@ export default async function DashboardPage({
         }
     }
     const playerSub = rawPlayerSub ? { ...rawPlayerSub, tier: playerSubTier } : null;
+
+    // ── Silent auto-assign ────────────────────────────────────────────────────
+    // Any league that slipped through sync-time assignment (ESPN, cron-synced,
+    // or old records) gets silently assigned here so the user never sees
+    // "Unassigned" if a plan slot is available.
+    const unassignedLeagues = leagues.filter(l => !l.assignedPlanId && !l.assignedPlanType);
+    const leagueAssignmentOverrides = new Map<string, { assignedPlanId: string; assignedPlanType: string }>();
+
+    if (unassignedLeagues.length > 0 && activeSubs.length > 0) {
+        const playerSlotsUsed = leagues.filter(l => l.assignedPlanType === 'player').length;
+        const planOptions = activeSubs.map(s => ({
+            id: s.id, type: s.type as 'player' | 'commissioner',
+            tier: s.tier, leagueName: s.leagueName ?? null,
+        }));
+        const assignments = computeAutoAssignments(unassignedLeagues, planOptions, playerSlotsUsed);
+        const toUpdate = assignments.filter(a => a.planId !== null);
+
+        for (const a of toUpdate) {
+            leagueAssignmentOverrides.set(a.leagueDbId, {
+                assignedPlanId:   a.planId!,
+                assignedPlanType: a.planType!,
+            });
+        }
+
+        // Persist in the background — don't block render
+        if (toUpdate.length > 0) {
+            prisma.$transaction(
+                toUpdate.map(a => prisma.league.update({
+                    where: { id: a.leagueDbId },
+                    data:  { assignedPlanId: a.planId, assignedPlanType: a.planType },
+                }))
+            ).catch(err => console.error('[dashboard] auto-assign failed', err));
+        }
+    }
+
+    // Enrich leagues array with any auto-assignments computed above
+    const enrichedLeagues = leagues.map(l => {
+        const override = leagueAssignmentOverrides.get(l.id);
+        return override ? { ...l, ...override } : l;
+    });
+
+    // Build a set of league IDs that are over the plan limit (for UI hint)
+    const limitReachedIds = new Set(
+        unassignedLeagues
+            .filter(l => {
+                const a = computeAutoAssignments(
+                    [l],
+                    activeSubs.map(s => ({ id: s.id, type: s.type as 'player' | 'commissioner', tier: s.tier, leagueName: s.leagueName ?? null })),
+                    enrichedLeagues.filter(x => x.assignedPlanType === 'player').length,
+                ).at(0);
+                return a?.limitReached;
+            })
+            .map(l => l.id)
+    );
 
     const syncedLeagueIdByName = new Map(
         leagues.map(l => [l.leagueName.toLowerCase().trim(), l.id])
@@ -488,10 +543,10 @@ export default async function DashboardPage({
 
                 {/* ── Synced Leagues ────────────────────────────────────── */}
                 {(() => {
-                    const sleeperLeagues = leagues.filter(l => l.platform === 'sleeper');
-                    const espnLeagues    = leagues.filter(l => l.platform === 'espn');
-                    const yahooLeagues   = leagues.filter(l => l.platform === 'yahoo');
-                    const nflLeagues     = leagues.filter(l => l.platform === 'nfl');
+                    const sleeperLeagues = enrichedLeagues.filter(l => l.platform === 'sleeper');
+                    const espnLeagues    = enrichedLeagues.filter(l => l.platform === 'espn');
+                    const yahooLeagues   = enrichedLeagues.filter(l => l.platform === 'yahoo');
+                    const nflLeagues     = enrichedLeagues.filter(l => l.platform === 'nfl');
                     return (
                         <>
                             <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
@@ -509,6 +564,8 @@ export default async function DashboardPage({
                                     leagues={sleeperLeagues}
                                     playerTier={playerSubTier}
                                     commSubs={commSubs.map(s => ({ leagueName: s.leagueName, tier: s.tier }))}
+                                    hasPlayerPlan={!!playerSub}
+                                    limitReachedIds={limitReachedIds}
                                 />
                             </div>
 
@@ -528,6 +585,8 @@ export default async function DashboardPage({
                                     playerTier={playerSubTier}
                                     commSubs={commSubs.map(s => ({ leagueName: s.leagueName, tier: s.tier }))}
                                     platform="espn"
+                                    hasPlayerPlan={!!playerSub}
+                                    limitReachedIds={limitReachedIds}
                                 />
                             </div>
 
@@ -547,6 +606,8 @@ export default async function DashboardPage({
                                     playerTier={playerSubTier}
                                     commSubs={commSubs.map(s => ({ leagueName: s.leagueName, tier: s.tier }))}
                                     platform="yahoo"
+                                    hasPlayerPlan={!!playerSub}
+                                    limitReachedIds={limitReachedIds}
                                 />
                             </div>
 
@@ -566,6 +627,8 @@ export default async function DashboardPage({
                                     playerTier={playerSubTier}
                                     commSubs={commSubs.map(s => ({ leagueName: s.leagueName, tier: s.tier }))}
                                     platform="nfl"
+                                    hasPlayerPlan={!!playerSub}
+                                    limitReachedIds={limitReachedIds}
                                 />
                             </div>
                         </>

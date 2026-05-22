@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getLeague, deriveScoringType } from '@/lib/sleeper';
+import { recalcPRS } from '@/lib/lf-prs';
 
 // Auto-accept an invite for a logged-in user:
 // 1. Fetch the Sleeper league (public API — no user credentials needed)
@@ -69,6 +70,8 @@ async function acceptInvite(
                 leagueExtId: invite.sleeperLeagueId,
             },
         });
+        // New ConnectedLeague = new verified season for PRS — recalc async, don't block redirect.
+        recalcPRS(userId).catch(err => console.error('[invite] recalcPRS failed', err));
     }
 
     return dbLeagueId;
@@ -111,6 +114,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
                         leagueExtId: invite.sleeperLeagueId,
                     },
                 });
+                recalcPRS(dbUser.id).catch(err => console.error('[invite] recalcPRS failed', err));
             }
 
             if (existing) {

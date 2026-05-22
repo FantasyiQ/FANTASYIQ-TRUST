@@ -15,11 +15,12 @@ export type { PRSTier } from '@/lib/lf-prs-display';
  */
 
 export interface PRSBreakdown {
-    total:            number;
-    verifiedSeasons:  number;  // raw count
-    returnedLeagues:  number;  // raw count
-    totalHelpful:     number;  // raw count
-    acceptedRequests: number;  // raw count
+    total:             number;
+    verifiedSeasons:   number;  // raw count from LF reviews
+    connectedSeasons:  number;  // raw count from invite-accepted leagues
+    returnedLeagues:   number;  // raw count
+    totalHelpful:      number;  // raw count
+    acceptedRequests:  number;  // raw count
     pts: {
         verified:  number;
         retention: number;
@@ -29,39 +30,45 @@ export interface PRSBreakdown {
 }
 
 export function computePRS(
-    verifiedSeasons:  number,
-    returnedLeagues:  number,
-    totalHelpful:     number,
-    acceptedRequests: number,
+    verifiedSeasons:   number,
+    connectedSeasons:  number,
+    returnedLeagues:   number,
+    totalHelpful:      number,
+    acceptedRequests:  number,
 ): PRSBreakdown {
+    const totalVerified = verifiedSeasons + connectedSeasons;
     const pts = {
-        verified:  Math.min(40, verifiedSeasons  * 8),
+        verified:  Math.min(40, totalVerified    * 8),
         retention: Math.min(25, returnedLeagues  * 5),
         helpful:   Math.min(20, totalHelpful     * 2),
         accepted:  Math.min(15, acceptedRequests * 3),
     };
     const total = Math.min(100, pts.verified + pts.retention + pts.helpful + pts.accepted);
-    return { total, verifiedSeasons, returnedLeagues, totalHelpful, acceptedRequests, pts };
+    return { total, verifiedSeasons, connectedSeasons, returnedLeagues, totalHelpful, acceptedRequests, pts };
 }
 
 /** Fetch the inputs, compute PRS, persist it, and return the breakdown. */
 export async function recalcPRS(userId: string): Promise<PRSBreakdown> {
-    const user = await prisma.user.findUnique({
-        where:   { id: userId },
-        select: {
-            lfReviews: {
-                select: { verified: true, leagueId: true, helpfulCount: true },
+    const [user, connectedCount] = await Promise.all([
+        prisma.user.findUnique({
+            where:  { id: userId },
+            select: {
+                lfReviews: {
+                    select: { verified: true, leagueId: true, helpfulCount: true },
+                },
+                lfJoinRequests: {
+                    where:  { status: 'ACCEPTED' },
+                    select: { id: true },
+                },
             },
-            lfJoinRequests: {
-                where:  { status: 'ACCEPTED' },
-                select: { id: true },
-            },
-        },
-    });
+        }),
+        // Each ConnectedLeague = a league the user joined via commissioner invite.
+        // Counts as a verified season — the commissioner vouched for them by inviting them.
+        prisma.connectedLeague.count({ where: { userId } }),
+    ]);
 
     if (!user) {
-        const empty = computePRS(0, 0, 0, 0);
-        return empty;
+        return computePRS(0, connectedCount, 0, 0, 0);
     }
 
     const reviews          = user.lfReviews;
@@ -77,7 +84,7 @@ export async function recalcPRS(userId: string): Promise<PRSBreakdown> {
     const totalHelpful     = reviews.reduce((sum, r) => sum + r.helpfulCount, 0);
     const acceptedRequests = user.lfJoinRequests.length;
 
-    const breakdown = computePRS(verifiedSeasons, returnedLeagues, totalHelpful, acceptedRequests);
+    const breakdown = computePRS(verifiedSeasons, connectedCount, returnedLeagues, totalHelpful, acceptedRequests);
 
     await prisma.user.update({
         where: { id: userId },
