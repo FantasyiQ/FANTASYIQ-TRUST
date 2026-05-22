@@ -93,7 +93,7 @@ const FEATURE_TOOLTIPS: Record<string, string> = {
     'Zero Fees':                     'No transaction fees on dues collection or payouts. What your league collects is what it keeps.',
     'League Funds Secured':          'League money is held securely through Stripe with bank-level, 256-bit encryption.',
     'League Dues & Payouts Tracked': 'Full visibility into who has paid, who owes, and a complete audit trail of every dollar.',
-    'Immediate Payouts':             'Winners get paid out instantly — no waiting on the commissioner to manually send money.',
+    'Immediate Payouts':             'Once the commissioner approves payouts, winners are paid out instantly with no delays.',
     'Commissioner Hub':              'Full commissioner toolset — manage dues, payouts, polls, announcements, and league documents.',
     'Weekly DFS Challenge':          'Compete in weekly DFS contests against other FiQ members for prizes and bragging rights.',
     'Start/Sit Intelligence':        'AI-powered weekly lineup recommendations based on matchups, recent trends, and projections.',
