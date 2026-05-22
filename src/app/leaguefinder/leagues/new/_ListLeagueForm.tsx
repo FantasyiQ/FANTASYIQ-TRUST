@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-const PLATFORMS   = ['Sleeper', 'ESPN', 'Yahoo'];
+const PLATFORMS   = ['Sleeper', 'ESPN', 'Yahoo', 'NFL Fantasy'];
 const FORMATS     = ['Dynasty', 'Redraft', 'Best Ball'];
 const SCORINGS    = ['PPR', 'Half PPR', 'Standard', 'TE Premium'];
 const SIZES       = [8, 10, 12, 14, 16, 32];
