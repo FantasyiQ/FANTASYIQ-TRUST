@@ -42,8 +42,12 @@ export default withSentryConfig(nextConfig, {
     sourcemaps: {
         disable: !process.env.SENTRY_AUTH_TOKEN,
     },
-    // Automatically tree-shake Sentry logger statements
-    disableLogger: true,
     // Hides Sentry telemetry from build logs
     telemetry: false,
+    // Tree-shake Sentry logger statements from bundle
+    webpack: {
+        treeshake: {
+            removeDebugLogging: true,
+        },
+    },
 });
