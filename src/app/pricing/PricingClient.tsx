@@ -9,7 +9,7 @@ import type { PlayerSub, CommSub } from './types';
 /* ── Types ────────────────────────────────────────────────────────── */
 type Tab = 'player' | 'commissioner';
 type TeamSize = 8 | 10 | 12 | 14 | 16 | 32;
-interface Feature { name: string; included: boolean }
+interface Feature { name: string; included: boolean; tooltip?: string }
 type CardStatus = 'checkout' | 'upgrade' | 'current' | 'unavailable';
 
 interface PendingUpgrade {
@@ -89,120 +89,142 @@ function commPriceId(tier: 'Pro' | 'All-Pro' | 'Elite', size: TeamSize): string 
 }
 
 /* ── Feature lists ────────────────────────────────────────────────── */
+const FEATURE_TOOLTIPS: Record<string, string> = {
+    'Zero Fees':                     'No transaction fees on dues collection or payouts. What your league collects is what it keeps.',
+    'League Funds Secured':          'League money is held securely through FiQ — not in a personal Venmo or PayPal account.',
+    'League Dues & Payouts Tracked': 'Full visibility into who has paid, who owes, and a complete audit trail of every dollar.',
+    'Immediate Payouts':             'Winners get paid out instantly — no waiting on the commissioner to manually send money.',
+    'Commissioner Hub':              'Full commissioner toolset — manage dues, payouts, polls, announcements, and league documents.',
+    'Weekly DFS Challenge':          'Compete in weekly DFS contests against other FiQ members for prizes and bragging rights.',
+    'Start/Sit Intelligence':        'AI-powered weekly lineup recommendations based on matchups, recent trends, and projections.',
+    'Draft Strategy':                'Personalized draft prep — tier rankings, positional scarcity alerts, and round-by-round guidance.',
+    'Draft Report':                  'Post-draft grade card analyzing your picks against ADP and projected value.',
+    'Player Rankings':               'Dynamic player rankings updated weekly based on performance, usage, and opportunity score.',
+    'Team DTV Rankings':             'Dynamic Trade Value rankings for every team in your league — know who is buying and who is selling.',
+    'League Power Rankings':         'Weekly power rankings for your league based on points scored, strength of schedule, and roster ratings.',
+    'Dynamic Trade Evaluator':       'Real-time trade analysis that shows you exactly who wins and loses before you accept.',
+    'Roster Intelligence':           'Deep roster analysis — identifies weak spots, breakout candidates, and optimal roster construction.',
+    'Live Draft':                    'Real-time draft board with AI pick suggestions, live ADP, and instant alerts on reaching picks.',
+};
+
+function tip(name: string): string | undefined {
+    return FEATURE_TOOLTIPS[name];
+}
+
 const PLAYER_PRO_FEATURES: Feature[] = [
-    { name: 'Zero Fees',                     included: true  },
-    { name: 'League Funds Secured',          included: true  },
-    { name: 'League Dues & Payouts Tracked', included: true  },
-    { name: 'Immediate Payouts',             included: true  },
-    { name: 'Sync Up to 2 Leagues',          included: true  },
-    { name: 'Weekly DFS Challenge',          included: true  },
-    { name: 'Start/Sit Intelligence',        included: false },
-    { name: 'Draft Strategy',                included: false },
-    { name: 'Player Rankings',               included: false },
-    { name: 'Team DTV Rankings',             included: false },
-    { name: 'League Power Rankings',         included: false },
-    { name: 'Dynamic Trade Evaluator',       included: false },
-    { name: 'Roster Intelligence',           included: false },
-    { name: 'Live Draft',                    included: false },
+    { name: 'Zero Fees',                     included: true,  tooltip: tip('Zero Fees') },
+    { name: 'League Funds Secured',          included: true,  tooltip: tip('League Funds Secured') },
+    { name: 'League Dues & Payouts Tracked', included: true,  tooltip: tip('League Dues & Payouts Tracked') },
+    { name: 'Immediate Payouts',             included: true,  tooltip: tip('Immediate Payouts') },
+    { name: 'Sync Up to 2 Leagues',          included: true,  tooltip: 'Connect up to 2 fantasy leagues from Sleeper, ESPN, Yahoo, or NFL.' },
+    { name: 'Weekly DFS Challenge',          included: true,  tooltip: tip('Weekly DFS Challenge') },
+    { name: 'Start/Sit Intelligence',        included: false, tooltip: tip('Start/Sit Intelligence') },
+    { name: 'Draft Strategy',                included: false, tooltip: tip('Draft Strategy') },
+    { name: 'Player Rankings',               included: false, tooltip: tip('Player Rankings') },
+    { name: 'Team DTV Rankings',             included: false, tooltip: tip('Team DTV Rankings') },
+    { name: 'League Power Rankings',         included: false, tooltip: tip('League Power Rankings') },
+    { name: 'Dynamic Trade Evaluator',       included: false, tooltip: tip('Dynamic Trade Evaluator') },
+    { name: 'Roster Intelligence',           included: false, tooltip: tip('Roster Intelligence') },
+    { name: 'Live Draft',                    included: false, tooltip: tip('Live Draft') },
 ];
 
 const PLAYER_ALL_PRO_FEATURES: Feature[] = [
-    { name: 'Zero Fees',                     included: true  },
-    { name: 'League Funds Secured',          included: true  },
-    { name: 'League Dues & Payouts Tracked', included: true  },
-    { name: 'Immediate Payouts',             included: true  },
-    { name: 'Sync Up to 4 Leagues',          included: true  },
-    { name: 'Weekly DFS Challenge',          included: true  },
-    { name: 'Start/Sit Intelligence',        included: true  },
-    { name: 'Draft Strategy',                included: true  },
-    { name: 'Draft Report',                  included: true  },
-    { name: 'Player Rankings',               included: true  },
-    { name: 'Team DTV Rankings',             included: true  },
-    { name: 'League Power Rankings',         included: true  },
-    { name: 'Dynamic Trade Evaluator',       included: true  },
-    { name: 'Roster Intelligence',           included: false },
-    { name: 'Live Draft',                    included: false },
+    { name: 'Zero Fees',                     included: true,  tooltip: tip('Zero Fees') },
+    { name: 'League Funds Secured',          included: true,  tooltip: tip('League Funds Secured') },
+    { name: 'League Dues & Payouts Tracked', included: true,  tooltip: tip('League Dues & Payouts Tracked') },
+    { name: 'Immediate Payouts',             included: true,  tooltip: tip('Immediate Payouts') },
+    { name: 'Sync Up to 4 Leagues',          included: true,  tooltip: 'Connect up to 4 fantasy leagues from Sleeper, ESPN, Yahoo, or NFL.' },
+    { name: 'Weekly DFS Challenge',          included: true,  tooltip: tip('Weekly DFS Challenge') },
+    { name: 'Start/Sit Intelligence',        included: true,  tooltip: tip('Start/Sit Intelligence') },
+    { name: 'Draft Strategy',                included: true,  tooltip: tip('Draft Strategy') },
+    { name: 'Draft Report',                  included: true,  tooltip: tip('Draft Report') },
+    { name: 'Player Rankings',               included: true,  tooltip: tip('Player Rankings') },
+    { name: 'Team DTV Rankings',             included: true,  tooltip: tip('Team DTV Rankings') },
+    { name: 'League Power Rankings',         included: true,  tooltip: tip('League Power Rankings') },
+    { name: 'Dynamic Trade Evaluator',       included: true,  tooltip: tip('Dynamic Trade Evaluator') },
+    { name: 'Roster Intelligence',           included: false, tooltip: tip('Roster Intelligence') },
+    { name: 'Live Draft',                    included: false, tooltip: tip('Live Draft') },
 ];
 
 const PLAYER_ELITE_FEATURES: Feature[] = [
-    { name: 'Zero Fees',                     included: true },
-    { name: 'League Funds Secured',          included: true },
-    { name: 'League Dues & Payouts Tracked', included: true },
-    { name: 'Immediate Payouts',             included: true },
-    { name: 'Sync Up to 7 Leagues',          included: true },
-    { name: 'Weekly DFS Challenge',          included: true },
-    { name: 'Start/Sit Intelligence',        included: true },
-    { name: 'Draft Strategy',                included: true },
-    { name: 'Draft Report',                  included: true },
-    { name: 'Player Rankings',               included: true },
-    { name: 'Team DTV Rankings',             included: true },
-    { name: 'League Power Rankings',         included: true },
-    { name: 'Dynamic Trade Evaluator',       included: true },
-    { name: 'Roster Intelligence',           included: true },
-    { name: 'Live Draft',                    included: true },
+    { name: 'Zero Fees',                     included: true, tooltip: tip('Zero Fees') },
+    { name: 'League Funds Secured',          included: true, tooltip: tip('League Funds Secured') },
+    { name: 'League Dues & Payouts Tracked', included: true, tooltip: tip('League Dues & Payouts Tracked') },
+    { name: 'Immediate Payouts',             included: true, tooltip: tip('Immediate Payouts') },
+    { name: 'Sync Up to 7 Leagues',          included: true, tooltip: 'Connect up to 7 fantasy leagues from Sleeper, ESPN, Yahoo, or NFL.' },
+    { name: 'Weekly DFS Challenge',          included: true, tooltip: tip('Weekly DFS Challenge') },
+    { name: 'Start/Sit Intelligence',        included: true, tooltip: tip('Start/Sit Intelligence') },
+    { name: 'Draft Strategy',                included: true, tooltip: tip('Draft Strategy') },
+    { name: 'Draft Report',                  included: true, tooltip: tip('Draft Report') },
+    { name: 'Player Rankings',               included: true, tooltip: tip('Player Rankings') },
+    { name: 'Team DTV Rankings',             included: true, tooltip: tip('Team DTV Rankings') },
+    { name: 'League Power Rankings',         included: true, tooltip: tip('League Power Rankings') },
+    { name: 'Dynamic Trade Evaluator',       included: true, tooltip: tip('Dynamic Trade Evaluator') },
+    { name: 'Roster Intelligence',           included: true, tooltip: tip('Roster Intelligence') },
+    { name: 'Live Draft',                    included: true, tooltip: tip('Live Draft') },
 ];
 
 const PLAYER_ELITEIQ_FEATURES: Feature[] = [
-    { name: 'Zero Fees',                     included: true },
-    { name: 'League Funds Secured',          included: true },
-    { name: 'League Dues & Payouts Tracked', included: true },
-    { name: 'Immediate Payouts',             included: true },
-    { name: 'Unlimited League Syncs',        included: true },
-    { name: 'Weekly DFS Challenge',          included: true },
-    { name: 'Start/Sit Intelligence',        included: true },
-    { name: 'Draft Strategy',                included: true },
-    { name: 'Draft Report',                  included: true },
-    { name: 'Player Rankings',               included: true },
-    { name: 'Team DTV Rankings',             included: true },
-    { name: 'League Power Rankings',         included: true },
-    { name: 'Dynamic Trade Evaluator',       included: true },
-    { name: 'Roster Intelligence',           included: true },
-    { name: 'Live Draft',                    included: true },
+    { name: 'Zero Fees',                     included: true, tooltip: tip('Zero Fees') },
+    { name: 'League Funds Secured',          included: true, tooltip: tip('League Funds Secured') },
+    { name: 'League Dues & Payouts Tracked', included: true, tooltip: tip('League Dues & Payouts Tracked') },
+    { name: 'Immediate Payouts',             included: true, tooltip: tip('Immediate Payouts') },
+    { name: 'Unlimited League Syncs',        included: true, tooltip: 'Connect unlimited fantasy leagues from Sleeper, ESPN, Yahoo, or NFL.' },
+    { name: 'Weekly DFS Challenge',          included: true, tooltip: tip('Weekly DFS Challenge') },
+    { name: 'Start/Sit Intelligence',        included: true, tooltip: tip('Start/Sit Intelligence') },
+    { name: 'Draft Strategy',                included: true, tooltip: tip('Draft Strategy') },
+    { name: 'Draft Report',                  included: true, tooltip: tip('Draft Report') },
+    { name: 'Player Rankings',               included: true, tooltip: tip('Player Rankings') },
+    { name: 'Team DTV Rankings',             included: true, tooltip: tip('Team DTV Rankings') },
+    { name: 'League Power Rankings',         included: true, tooltip: tip('League Power Rankings') },
+    { name: 'Dynamic Trade Evaluator',       included: true, tooltip: tip('Dynamic Trade Evaluator') },
+    { name: 'Roster Intelligence',           included: true, tooltip: tip('Roster Intelligence') },
+    { name: 'Live Draft',                    included: true, tooltip: tip('Live Draft') },
 ];
 
 const COMM_PRO_FEATURES: Feature[] = [
-    { name: 'Zero Fees',                     included: true  },
-    { name: 'League Funds Secured',          included: true  },
-    { name: 'League Dues & Payouts Tracked', included: true  },
-    { name: 'Immediate Payouts',             included: true  },
-    { name: 'Commissioner Hub',              included: true  },
-    { name: 'Start/Sit Intelligence',        included: false },
-    { name: 'Player Rankings',               included: false },
-    { name: 'Team DTV Rankings',             included: false },
-    { name: 'League Power Rankings',         included: false },
-    { name: 'Dynamic Trade Evaluator',       included: false },
-    { name: 'Roster Intelligence',           included: false },
-    { name: 'Live Draft',                    included: false },
+    { name: 'Zero Fees',                     included: true,  tooltip: tip('Zero Fees') },
+    { name: 'League Funds Secured',          included: true,  tooltip: tip('League Funds Secured') },
+    { name: 'League Dues & Payouts Tracked', included: true,  tooltip: tip('League Dues & Payouts Tracked') },
+    { name: 'Immediate Payouts',             included: true,  tooltip: tip('Immediate Payouts') },
+    { name: 'Commissioner Hub',              included: true,  tooltip: tip('Commissioner Hub') },
+    { name: 'Start/Sit Intelligence',        included: false, tooltip: tip('Start/Sit Intelligence') },
+    { name: 'Player Rankings',               included: false, tooltip: tip('Player Rankings') },
+    { name: 'Team DTV Rankings',             included: false, tooltip: tip('Team DTV Rankings') },
+    { name: 'League Power Rankings',         included: false, tooltip: tip('League Power Rankings') },
+    { name: 'Dynamic Trade Evaluator',       included: false, tooltip: tip('Dynamic Trade Evaluator') },
+    { name: 'Roster Intelligence',           included: false, tooltip: tip('Roster Intelligence') },
+    { name: 'Live Draft',                    included: false, tooltip: tip('Live Draft') },
 ];
 
 const COMM_ALL_PRO_FEATURES: Feature[] = [
-    { name: 'Zero Fees',                     included: true  },
-    { name: 'League Funds Secured',          included: true  },
-    { name: 'League Dues & Payouts Tracked', included: true  },
-    { name: 'Immediate Payouts',             included: true  },
-    { name: 'Commissioner Hub',              included: true  },
-    { name: 'Start/Sit Intelligence',        included: true  },
-    { name: 'Player Rankings',               included: true  },
-    { name: 'Team DTV Rankings',             included: true  },
-    { name: 'League Power Rankings',         included: true  },
-    { name: 'Dynamic Trade Evaluator',       included: true  },
-    { name: 'Roster Intelligence',           included: false },
-    { name: 'Live Draft',                    included: false },
+    { name: 'Zero Fees',                     included: true,  tooltip: tip('Zero Fees') },
+    { name: 'League Funds Secured',          included: true,  tooltip: tip('League Funds Secured') },
+    { name: 'League Dues & Payouts Tracked', included: true,  tooltip: tip('League Dues & Payouts Tracked') },
+    { name: 'Immediate Payouts',             included: true,  tooltip: tip('Immediate Payouts') },
+    { name: 'Commissioner Hub',              included: true,  tooltip: tip('Commissioner Hub') },
+    { name: 'Start/Sit Intelligence',        included: true,  tooltip: tip('Start/Sit Intelligence') },
+    { name: 'Player Rankings',               included: true,  tooltip: tip('Player Rankings') },
+    { name: 'Team DTV Rankings',             included: true,  tooltip: tip('Team DTV Rankings') },
+    { name: 'League Power Rankings',         included: true,  tooltip: tip('League Power Rankings') },
+    { name: 'Dynamic Trade Evaluator',       included: true,  tooltip: tip('Dynamic Trade Evaluator') },
+    { name: 'Roster Intelligence',           included: false, tooltip: tip('Roster Intelligence') },
+    { name: 'Live Draft',                    included: false, tooltip: tip('Live Draft') },
 ];
 
 const COMM_ELITE_FEATURES: Feature[] = [
-    { name: 'Zero Fees',                     included: true },
-    { name: 'League Funds Secured',          included: true },
-    { name: 'League Dues & Payouts Tracked', included: true },
-    { name: 'Immediate Payouts',             included: true },
-    { name: 'Commissioner Hub',              included: true },
-    { name: 'Start/Sit Intelligence',        included: true },
-    { name: 'Player Rankings',               included: true },
-    { name: 'Team DTV Rankings',             included: true },
-    { name: 'League Power Rankings',         included: true },
-    { name: 'Dynamic Trade Evaluator',       included: true },
-    { name: 'Roster Intelligence',           included: true },
-    { name: 'Live Draft',                    included: true },
+    { name: 'Zero Fees',                     included: true, tooltip: tip('Zero Fees') },
+    { name: 'League Funds Secured',          included: true, tooltip: tip('League Funds Secured') },
+    { name: 'League Dues & Payouts Tracked', included: true, tooltip: tip('League Dues & Payouts Tracked') },
+    { name: 'Immediate Payouts',             included: true, tooltip: tip('Immediate Payouts') },
+    { name: 'Commissioner Hub',              included: true, tooltip: tip('Commissioner Hub') },
+    { name: 'Start/Sit Intelligence',        included: true, tooltip: tip('Start/Sit Intelligence') },
+    { name: 'Player Rankings',               included: true, tooltip: tip('Player Rankings') },
+    { name: 'Team DTV Rankings',             included: true, tooltip: tip('Team DTV Rankings') },
+    { name: 'League Power Rankings',         included: true, tooltip: tip('League Power Rankings') },
+    { name: 'Dynamic Trade Evaluator',       included: true, tooltip: tip('Dynamic Trade Evaluator') },
+    { name: 'Roster Intelligence',           included: true, tooltip: tip('Roster Intelligence') },
+    { name: 'Live Draft',                    included: true, tooltip: tip('Live Draft') },
 ];
 
 /* ── Feature row ──────────────────────────────────────────────────── */
@@ -210,19 +232,25 @@ function FeatureRow({ f }: { f: Feature }) {
     return (
         <li className="flex items-center gap-2.5 py-1.5">
             {f.included ? (
-                <>
-                    <svg className="w-4 h-4 text-green-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-gray-200 text-sm">{f.name}</span>
-                </>
+                <svg className="w-4 h-4 text-green-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
             ) : (
-                <>
-                    <svg className="w-4 h-4 text-red-500/60 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                <svg className="w-4 h-4 text-red-500/60 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            )}
+            <span className={`text-sm ${f.included ? 'text-gray-200' : 'text-gray-600'}`}>{f.name}</span>
+            {f.tooltip && (
+                <span className="relative group ml-auto shrink-0">
+                    <svg className="w-3.5 h-3.5 text-gray-600 hover:text-gray-400 cursor-default transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <circle cx="12" cy="12" r="10" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01" />
                     </svg>
-                    <span className="text-gray-600 text-sm">{f.name}</span>
-                </>
+                    <span className="pointer-events-none absolute bottom-full right-0 mb-1.5 w-52 rounded-lg bg-gray-800 border border-gray-700 px-3 py-2 text-xs text-gray-300 leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-xl">
+                        {f.tooltip}
+                    </span>
+                </span>
             )}
         </li>
     );
@@ -664,7 +692,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                 />
                                 <PlanCard
                                     name="ELITEiQ" price="59.99" period="/mo"
-                                    badge="Whales Only"
+                                    badge="Shot Caller"
                                     features={PLAYER_ELITEIQ_FEATURES}
                                     priceId={PLAYER_PRICE_IDS.eliteiq} tier="PLAYER_ELITEIQ"
                                     cardStatus={resolvePlayerCardStatus('PLAYER_ELITEIQ', playerSub)}
