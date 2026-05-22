@@ -91,7 +91,7 @@ function commPriceId(tier: 'Pro' | 'All-Pro' | 'Elite', size: TeamSize): string 
 /* ── Feature lists ────────────────────────────────────────────────── */
 const FEATURE_TOOLTIPS: Record<string, string> = {
     'Zero Fees':                     'No transaction fees on dues collection or payouts. What your league collects is what it keeps.',
-    'League Funds Secured':          'League money is held securely through Stripe with bank-level, 256-bit encryption — not in a personal Venmo or PayPal account.',
+    'League Funds Secured':          'League money is held securely through Stripe with bank-level, 256-bit encryption.',
     'League Dues & Payouts Tracked': 'Full visibility into who has paid, who owes, and a complete audit trail of every dollar.',
     'Immediate Payouts':             'Winners get paid out instantly — no waiting on the commissioner to manually send money.',
     'Commissioner Hub':              'Full commissioner toolset — manage dues, payouts, polls, announcements, and league documents.',
