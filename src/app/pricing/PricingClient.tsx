@@ -723,7 +723,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     returnTo={returnTo}
                                 />
                                 <PlanCard
-                                    name=\"EliteiQ\" price="59.99" period="/mo"
+                                    name="EliteiQ" price="59.99" period="/mo"
                                     badge="Shot Caller"
                                     features={PLAYER_ELITEIQ_FEATURES}
                                     priceId={PLAYER_PRICE_IDS.eliteiq} tier="PLAYER_ELITEIQ"
