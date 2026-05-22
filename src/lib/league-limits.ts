@@ -30,7 +30,7 @@ export function nextTierName(tier: string): string | null {
     switch (tier) {
         case 'PLAYER_PRO':     return 'All-Pro';
         case 'PLAYER_ALL_PRO': return 'Elite';
-        case 'PLAYER_ELITE':   return 'ELITEiQ';
+        case 'PLAYER_ELITE':   return 'EliteiQ';
         default:               return null;
     }
 }

@@ -23,7 +23,7 @@ function formatTier(tier: string): string {
         case 'PLAYER_PRO':      return 'Player Pro';
         case 'PLAYER_ALL_PRO':  return 'Player All-Pro';
         case 'PLAYER_ELITE':    return 'Player Elite';
-        case 'PLAYER_ELITEIQ':  return 'Player ELITEiQ';
+        case 'PLAYER_ELITEIQ':  return 'Player EliteiQ';
         default:                return tier;
     }
 }

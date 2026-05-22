@@ -81,7 +81,7 @@ const PLAYER_PRICE_IDS = {
     pro:      findPriceId('Player Pro'),
     all_pro:  findPriceId('Player All-Pro'),
     elite:    findPriceId('Player Elite'),
-    eliteiq:  findPriceId('Player ELITEiQ'),
+    eliteiq:  findPriceId('Player EliteiQ'),
 };
 
 function commPriceId(tier: 'Pro' | 'All-Pro' | 'Elite', size: TeamSize): string {

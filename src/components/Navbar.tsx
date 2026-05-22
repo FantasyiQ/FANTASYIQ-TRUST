@@ -27,7 +27,7 @@ export default async function Navbar() {
       .filter(s => s.tier.startsWith('PLAYER_'))
       .map(s => s.tier);
     if (tiers.includes('PLAYER_ELITEIQ')) {
-      navBadge = { label: 'ELITEiQ ✦', className: 'bg-purple-900/30 border border-purple-500/50 text-purple-300' };
+      navBadge = { label: 'EliteiQ ✦', className: 'bg-purple-900/30 border border-purple-500/50 text-purple-300' };
     } else if (tiers.includes('PLAYER_ELITE')) {
       navBadge = { label: 'ELITE ✦',   className: 'bg-[#D4AF37]/15 border border-[#D4AF37]/50 text-[#D4AF37]' };
     } else if (tiers.includes('PLAYER_ALL_PRO')) {

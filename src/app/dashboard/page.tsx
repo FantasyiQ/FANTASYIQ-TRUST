@@ -17,7 +17,7 @@ function formatTier(tier: SubscriptionTier | string): string {
         case 'PLAYER_PRO':           return 'Player Pro';
         case 'PLAYER_ALL_PRO':       return 'Player All-Pro';
         case 'PLAYER_ELITE':         return 'Player Elite';
-        case 'PLAYER_ELITEIQ':       return 'Player ELITEiQ';
+        case 'PLAYER_ELITEIQ':       return 'Player EliteiQ';
         case 'COMMISSIONER_PRO':     return 'Commissioner Pro';
         case 'COMMISSIONER_ALL_PRO': return 'Commissioner All-Pro';
         case 'COMMISSIONER_ELITE':   return 'Commissioner Elite';
