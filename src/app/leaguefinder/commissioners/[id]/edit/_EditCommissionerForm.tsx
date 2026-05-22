@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-const PLATFORMS = ['sleeper', 'espn', 'yahoo', 'nfl fantasy'];
+const PLATFORMS = ['sleeper', 'espn', 'yahoo', 'NFL Fantasy'];
 
 interface Props {
     commissionerId:     string;
