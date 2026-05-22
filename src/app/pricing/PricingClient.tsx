@@ -99,7 +99,7 @@ const FEATURE_TOOLTIPS: Record<string, string> = {
     'Start/Sit Intelligence':        'Compares projections, matchup difficulty, injury risk, volatility, and win probability impact to recommend your best lineup each week.',
     'Draft Strategy':                'Personalized draft prep — tier-based rankings and round-by-round guidance to help you draft with confidence.',
     'Draft Report':                  'Post-draft grade card analyzing your picks against ADP and projected value.',
-    'Player Rankings':               'Dynamic player rankings updated weekly based on performance, usage, and opportunity score.',
+    'Player Rankings':               'Values adjust for age curve, position scarcity, and your league\'s scoring format — updated regularly throughout the season.',
     'Team DTV Rankings':             'Dynamic Trade Value rankings for every team in your league — know who is buying and who is selling.',
     'League Power Rankings':         'Weekly power rankings for your league based on record, points scored, strength of schedule, and roster composition.',
     'Dynamic Trade Evaluator':       'Real-time trade analysis that shows you exactly who wins and loses before you accept.',
