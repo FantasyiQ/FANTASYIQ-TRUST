@@ -95,16 +95,16 @@ const FEATURE_TOOLTIPS: Record<string, string> = {
     'League Dues & Payouts Tracked': 'Full visibility into who has paid, who owes, and a complete audit trail of every dollar.',
     'Immediate Payouts':             'Once the commissioner approves payouts, winners are paid out instantly with no delays.',
     'Commissioner Hub':              'Full commissioner toolset — manage dues, payouts, polls, announcements, and league documents.',
-    'Weekly DFS Challenge':          'Compete in weekly DFS contests against other FiQ members for prizes and bragging rights.',
-    'Start/Sit Intelligence':        'AI-powered weekly lineup recommendations based on matchups, recent trends, and projections.',
-    'Draft Strategy':                'Personalized draft prep — tier rankings, positional scarcity alerts, and round-by-round guidance.',
+    'Weekly DFS Challenge':          'Compete in weekly DFS contests against other FiQ members for bragging rights and leaderboard glory.',
+    'Start/Sit Intelligence':        'Compares projections, matchup difficulty, injury risk, volatility, and win probability impact to recommend your best lineup each week.',
+    'Draft Strategy':                'Personalized draft prep — tier-based rankings and round-by-round guidance to help you draft with confidence.',
     'Draft Report':                  'Post-draft grade card analyzing your picks against ADP and projected value.',
     'Player Rankings':               'Dynamic player rankings updated weekly based on performance, usage, and opportunity score.',
     'Team DTV Rankings':             'Dynamic Trade Value rankings for every team in your league — know who is buying and who is selling.',
     'League Power Rankings':         'Weekly power rankings for your league based on points scored, strength of schedule, and roster ratings.',
     'Dynamic Trade Evaluator':       'Real-time trade analysis that shows you exactly who wins and loses before you accept.',
-    'Roster Intelligence':           'Deep roster analysis — identifies weak spots, breakout candidates, and optimal roster construction.',
-    'Live Draft':                    'Real-time draft board with AI pick suggestions, live ADP, and instant alerts on reaching picks.',
+    'Roster Intelligence':           'RosteriQ grades your team A–D each week, maps positional strengths and weaknesses against league averages, tracks bench depth, and recommends your best path forward.',
+    'Live Draft':                    'Real-time draft board that ranks available players by FiQ score so you always know who the best pick is.',
 };
 
 function tip(name: string): string | undefined {
