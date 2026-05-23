@@ -932,7 +932,7 @@ model DFSContest {
     createdAt        DateTime         @default(now())
     updatedAt        DateTime         @updatedAt
 
-    sourceLeague     League      @relation("DFSSourceLeague", fields: [sourceLeagueId], references: [id])
+    sourceLeague     League      @relation("DFSSourceLeague", fields: [sourceLeagueId], references: [id], onDelete: Cascade)
     lineups          DFSLineup[]
 
     @@unique([platform, externalLeagueId, season, week])
