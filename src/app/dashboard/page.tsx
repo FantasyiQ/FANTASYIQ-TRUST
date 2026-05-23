@@ -180,14 +180,15 @@ export default async function DashboardPage({
             });
         }
 
-        // Persist in the background — don't block render
+        // Persist in the background — individual updates (not a transaction) to avoid
+        // row lock contention if the user deletes a league before the update completes.
         if (toUpdate.length > 0) {
-            prisma.$transaction(
+            Promise.all(
                 toUpdate.map(a => prisma.league.update({
                     where: { id: a.leagueDbId },
                     data:  { assignedPlanId: a.planId, assignedPlanType: a.planType },
-                }))
-            ).catch(err => console.error('[dashboard] auto-assign failed', err));
+                }).catch(() => {}))
+            ).catch(() => {});
         }
     }
 
