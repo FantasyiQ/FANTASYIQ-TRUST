@@ -135,7 +135,7 @@ export default function OnboardingWizard({ userName }: { userName: string | null
                     <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 space-y-6">
                         <div>
                             <h2 className="text-xl font-bold text-white">What best describes you?</h2>
-                            <p className="text-gray-500 text-sm mt-1">Select all that apply — many people are both.</p>
+                            <p className="text-gray-500 text-sm mt-1">Select all that apply — you may select both.</p>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <RoleCard
