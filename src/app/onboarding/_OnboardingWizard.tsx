@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-type Role = 'commissioner' | 'player' | null;
+type Role = 'commissioner' | 'player';
 type Step = 'welcome' | 'role' | 'connect';
 
 const PLATFORMS = [
@@ -43,9 +43,17 @@ const PLATFORMS = [
 
 export default function OnboardingWizard({ userName }: { userName: string | null }) {
     const router   = useRouter();
-    const [step,   setStep]   = useState<Step>('welcome');
-    const [role,   setRole]   = useState<Role>(null);
+    const [step,     setStep]    = useState<Step>('welcome');
+    const [roles,    setRoles]   = useState<Set<Role>>(new Set());
     const [skipping, setSkipping] = useState(false);
+
+    function toggleRole(r: Role) {
+        setRoles(prev => {
+            const next = new Set(prev);
+            next.has(r) ? next.delete(r) : next.add(r);
+            return next;
+        });
+    }
 
     async function handleSkip() {
         setSkipping(true);
@@ -127,22 +135,22 @@ export default function OnboardingWizard({ userName }: { userName: string | null
                     <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 space-y-6">
                         <div>
                             <h2 className="text-xl font-bold text-white">What best describes you?</h2>
-                            <p className="text-gray-500 text-sm mt-1">We&apos;ll tailor the experience to fit your role.</p>
+                            <p className="text-gray-500 text-sm mt-1">Select all that apply — many people are both.</p>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <RoleCard
                                 icon="📋"
                                 title="Commissioner"
                                 desc="I run one or more leagues"
-                                selected={role === 'commissioner'}
-                                onClick={() => setRole('commissioner')}
+                                selected={roles.has('commissioner')}
+                                onClick={() => toggleRole('commissioner')}
                             />
                             <RoleCard
                                 icon="🏅"
                                 title="Player"
                                 desc="I play in leagues run by others"
-                                selected={role === 'player'}
-                                onClick={() => setRole('player')}
+                                selected={roles.has('player')}
+                                onClick={() => toggleRole('player')}
                             />
                         </div>
                         <div className="flex gap-3">
@@ -154,7 +162,7 @@ export default function OnboardingWizard({ userName }: { userName: string | null
                             </button>
                             <button
                                 onClick={() => setStep('connect')}
-                                disabled={!role}
+                                disabled={roles.size === 0}
                                 className="flex-1 bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-40 disabled:cursor-not-allowed text-gray-950 font-bold py-2.5 rounded-xl transition text-sm"
                             >
                                 Continue →
@@ -176,7 +184,9 @@ export default function OnboardingWizard({ userName }: { userName: string | null
                         <div>
                             <h2 className="text-xl font-bold text-white">Connect your first league</h2>
                             <p className="text-gray-500 text-sm mt-1">
-                                {role === 'commissioner'
+                                {roles.has('commissioner') && roles.has('player')
+                                    ? 'Sync your leagues to unlock analytics, dues tracking, and commissioner tools.'
+                                    : roles.has('commissioner')
                                     ? 'Sync the league you run to unlock dues tracking and commissioner tools.'
                                     : 'Sync the league you play in to see analytics, projections, and standings.'}
                             </p>
