@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-    title: 'Privacy Policy — FantasyiQ',
-    description: 'How FantasyiQ collects, uses, and protects your data.',
+    title: 'Privacy Policy — FantasyiQ Trust',
+    description: 'How FantasyiQ Trust collects, uses, and protects your data.',
 };
 
 export default function PrivacyPolicyPage() {
@@ -20,7 +20,7 @@ export default function PrivacyPolicyPage() {
 
                 <LegalSection title="1. Introduction">
                     <p>
-                        FantasyiQ (&ldquo;we,&rdquo; &ldquo;us,&rdquo; or &ldquo;our&rdquo;) operates the FantasyiQ platform, accessible at{' '}
+                        FantasyiQ Trust (&ldquo;we,&rdquo; &ldquo;us,&rdquo; or &ldquo;our&rdquo;) operates the FantasyiQ Trust platform, accessible at{' '}
                         <span className="text-[#D4AF37]">fantasyiq.app</span> (the &ldquo;Service&rdquo;). This Privacy Policy explains how we collect,
                         use, disclose, and safeguard information when you use our Service. Please read this policy carefully. If you do not
                         agree with its terms, please discontinue use of the Service.
@@ -28,7 +28,7 @@ export default function PrivacyPolicyPage() {
                 </LegalSection>
 
                 <LegalSection title="2. Information We Do Not Collect">
-                    <p>FantasyiQ is designed with data minimisation as a core principle. <strong className="text-white">We do not collect:</strong></p>
+                    <p>FantasyiQ Trust is designed with data minimisation as a core principle. <strong className="text-white">We do not collect:</strong></p>
                     <ul>
                         <li>Payment card numbers, bank account details, or billing addresses (handled directly by Stripe)</li>
                         <li>Government-issued identification numbers</li>
@@ -41,7 +41,7 @@ export default function PrivacyPolicyPage() {
                     <p>To provide the Service, we process the following limited categories of information:</p>
                     <Subsection title="3.1 Fantasy League Data">
                         <p>
-                            When you connect a Sleeper or ESPN league, we receive and store fantasy-football league data transmitted
+                            When you connect a Sleeper, ESPN, NFL Fantasy, or Yahoo Fantasy league, we receive and store fantasy-football league data transmitted
                             by those platforms via their public APIs. This data includes league IDs, roster IDs, matchup data,
                             weekly projections, player statistics, standings, and scoring settings. This data does not constitute
                             personally identifiable information under most privacy frameworks; however, team names or usernames
@@ -50,14 +50,14 @@ export default function PrivacyPolicyPage() {
                     </Subsection>
                     <Subsection title="3.2 Account Information">
                         <p>
-                            If you create a FantasyiQ account, we store your email address, display name, and a securely hashed
+                            If you create a FantasyiQ Trust account, we store your email address, display name, and a securely hashed
                             password (if you register with email and password). If you sign in via Google, we receive and store
                             the name and email address associated with your Google account. We do not store plain-text passwords.
                         </p>
                     </Subsection>
                     <Subsection title="3.3 Payment and Billing Data">
                         <p>
-                            Subscription payments are processed by Stripe, Inc. FantasyiQ does not store your payment card details.
+                            Subscription payments are processed by Stripe, Inc. FantasyiQ Trust does not store your payment card details.
                             We do store subscription status, plan tier, and Stripe customer and subscription identifiers so we can
                             manage your access and send billing-related notifications.
                         </p>
@@ -87,7 +87,7 @@ export default function PrivacyPolicyPage() {
                     </ul>
                     <p className="mt-3">
                         We do <strong className="text-white">not</strong> use advertising cookies, cross-site tracking pixels, or any cookie
-                        that builds a profile of your browsing behaviour outside of FantasyiQ. For a full description of the cookies
+                        that builds a profile of your browsing behaviour outside of FantasyiQ Trust. For a full description of the cookies
                         we use, please review our <Link href="/cookies" className="text-[#D4AF37] hover:underline">Cookie Notice</Link>.
                     </p>
                 </LegalSection>
@@ -120,7 +120,7 @@ export default function PrivacyPolicyPage() {
                         </li>
                         <li>
                             <strong className="text-white">Legal Requirements:</strong> We may disclose data if required by law, court order,
-                            or to protect the rights, property, or safety of FantasyiQ, its users, or the public.
+                            or to protect the rights, property, or safety of FantasyiQ Trust, its users, or the public.
                         </li>
                         <li>
                             <strong className="text-white">Business Transfer:</strong> In the event of a merger, acquisition, or sale of
@@ -132,7 +132,7 @@ export default function PrivacyPolicyPage() {
 
                 <LegalSection title="7. Third-Party Platforms">
                     <p>
-                        FantasyiQ integrates with third-party platforms to provide its features. Each operates under its own
+                        FantasyiQ Trust integrates with third-party platforms to provide its features. Each operates under its own
                         privacy policy, which governs how your data is collected and used by them:
                     </p>
                     <ul>
@@ -145,7 +145,7 @@ export default function PrivacyPolicyPage() {
                         <li><strong className="text-white">Sentry</strong> — error and performance monitoring; error reports may include anonymised request context</li>
                     </ul>
                     <p className="mt-3">
-                        We recommend reviewing those platforms&apos; privacy policies. FantasyiQ is not responsible for the
+                        We recommend reviewing those platforms&apos; privacy policies. FantasyiQ Trust is not responsible for the
                         data practices of third-party services.
                     </p>
                 </LegalSection>
@@ -184,7 +184,7 @@ export default function PrivacyPolicyPage() {
 
                 <LegalSection title="10. Age Restriction">
                     <p>
-                        FantasyiQ is intended for users who are at least 13 years of age. We do not knowingly collect or process
+                        FantasyiQ Trust is intended for users who are at least 13 years of age. We do not knowingly collect or process
                         data from children under 13. If you believe a child under 13 has provided us with data, please contact us
                         immediately and we will take steps to delete that information.
                     </p>
@@ -192,8 +192,8 @@ export default function PrivacyPolicyPage() {
 
                 <LegalSection title="11. Security">
                     <p>
-                        We implement commercially reasonable technical and organisational measures to protect data against
-                        unauthorised access, alteration, disclosure, or destruction. These include encrypted data transmission
+                        We implement commercially reasonable technical and organizational measures to protect data against
+                        unauthorized access, alteration, disclosure, or destruction. These include encrypted data transmission
                         (TLS), access controls, and regular security reviews. No method of transmission over the internet is
                         completely secure; we cannot guarantee absolute security.
                     </p>
@@ -213,8 +213,8 @@ export default function PrivacyPolicyPage() {
                         If you have questions about this Privacy Policy or wish to exercise your data rights, please contact us at:
                     </p>
                     <div className="mt-3 bg-gray-900 border border-gray-800 rounded-xl px-5 py-4 text-sm text-gray-300">
-                        <p className="font-semibold text-white">FantasyiQ</p>
-                        <p className="text-gray-400 mt-1">privacy@fantasyiq.app</p>
+                        <p className="font-semibold text-white">FantasyiQ Trust</p>
+                        <p className="text-gray-400 mt-1">Legal@FantasyiQTrust.com</p>
                     </div>
                 </LegalSection>
 
@@ -222,7 +222,7 @@ export default function PrivacyPolicyPage() {
                 <div className="border-t border-gray-800 pt-8 flex flex-wrap gap-4 text-xs text-gray-600">
                     <Link href="/terms"   className="hover:text-gray-400 transition">Terms of Service</Link>
                     <Link href="/cookies" className="hover:text-gray-400 transition">Cookie Notice</Link>
-                    <Link href="/"        className="hover:text-gray-400 transition">← Back to FantasyiQ</Link>
+                    <Link href="/"        className="hover:text-gray-400 transition">← Back to FantasyiQ Trust</Link>
                 </div>
 
             </div>
