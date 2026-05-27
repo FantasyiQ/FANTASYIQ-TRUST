@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
 import SessionProvider from '@/components/SessionProvider';
 import { SupportContextProvider } from '@/lib/support/SupportContextStore';
 import SupportAssistantLauncher from '@/components/support/SupportAssistantLauncher';
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </a>
             <Navbar />
             <div id="main-content">{children}</div>
+            <Footer />
             <SupportAssistantLauncher />
           </SupportContextProvider>
         </SessionProvider>
