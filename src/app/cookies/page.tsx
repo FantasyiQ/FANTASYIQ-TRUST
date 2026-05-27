@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-    title: 'Cookie Notice — FantasyiQ',
-    description: 'How FantasyiQ uses cookies and similar technologies.',
+    title: 'Cookie Notice — FantasyiQ Trust',
+    description: 'How FantasyiQ Trust uses cookies and similar technologies.',
 };
 
 export default function CookieNoticePage() {
@@ -27,11 +27,11 @@ export default function CookieNoticePage() {
                     </p>
                 </LegalSection>
 
-                <LegalSection title="2. How FantasyiQ Uses Cookies">
+                <LegalSection title="2. How FantasyiQ Trust Uses Cookies">
                     <p>
-                        FantasyiQ uses cookies and similar storage technologies exclusively for the purposes described below.
+                        FantasyiQ Trust uses cookies and similar storage technologies exclusively for the purposes described below.
                         We do <strong className="text-white">not</strong> use advertising cookies, cross-site tracking pixels,
-                        or any technology that builds a profile of your browsing behaviour outside of FantasyiQ.
+                        or any technology that builds a profile of your browsing behaviour outside of FantasyiQ Trust.
                     </p>
 
                     <div className="mt-4 space-y-4">
@@ -39,7 +39,7 @@ export default function CookieNoticePage() {
                             name="Authentication"
                             type="Strictly Necessary"
                             duration="Session / up to 30 days"
-                            purpose="Keeps you signed in to your FantasyiQ account across page loads. Without this cookie you would be signed out on every navigation."
+                            purpose="Keeps you signed in to your FantasyiQ Trust account across page loads. Without this cookie you would be signed out on every navigation."
                         />
                         <CookieRow
                             name="Session Management"
@@ -57,7 +57,7 @@ export default function CookieNoticePage() {
                 </LegalSection>
 
                 <LegalSection title="3. Cookies We Do Not Use">
-                    <p>FantasyiQ does not use and will never use:</p>
+                    <p>FantasyiQ Trust does not use and will never use:</p>
                     <ul>
                         <li>Advertising or retargeting cookies</li>
                         <li>Cross-site tracking pixels or web beacons placed by third-party ad networks</li>
@@ -68,16 +68,16 @@ export default function CookieNoticePage() {
 
                 <LegalSection title="4. Third-Party Cookies">
                     <p>
-                        FantasyiQ does not knowingly load third-party advertising or analytics scripts that set their own cookies
+                        FantasyiQ Trust does not knowingly load third-party advertising or analytics scripts that set their own cookies
                         on your device. Any analytics tooling we use is configured to operate in a privacy-preserving, first-party
-                        context. We do not control cookies set directly by Sleeper, ESPN, or other third-party platforms you
+                        context. We do not control cookies set directly by Sleeper, ESPN, NFL Fantasy, Yahoo Fantasy, or other third-party platforms you
                         access independently; please refer to those platforms&apos; own cookie notices for details.
                     </p>
                 </LegalSection>
 
                 <LegalSection title="5. Consent">
                     <p>
-                        By continuing to use FantasyiQ after this notice has been made available to you, you consent to the
+                        By continuing to use FantasyiQ Trust after this notice has been made available to you, you consent to the
                         placement of the cookies described in Section 2. Because all cookies we use are either strictly necessary
                         for the Service to function or are privacy-respecting analytics with no cross-site tracking, we do not
                         display a cookie-consent banner. If you do not consent to these cookies, please discontinue use of the
@@ -97,7 +97,7 @@ export default function CookieNoticePage() {
                     </ul>
                     <p className="mt-3">
                         Please note that disabling strictly necessary cookies (authentication and session management) will prevent
-                        you from signing in to FantasyiQ and using most features of the Service. Disabling analytics cookies will
+                        you from signing in to FantasyiQ Trust and using most features of the Service. Disabling analytics cookies will
                         not affect your ability to use the Service.
                     </p>
                     <p>
@@ -123,8 +123,8 @@ export default function CookieNoticePage() {
                         If you have questions about our use of cookies or this notice, please contact us at:
                     </p>
                     <div className="mt-3 bg-gray-900 border border-gray-800 rounded-xl px-5 py-4 text-sm text-gray-300">
-                        <p className="font-semibold text-white">FantasyiQ</p>
-                        <p className="text-gray-400 mt-1">privacy@fantasyiq.app</p>
+                        <p className="font-semibold text-white">FantasyiQ Trust</p>
+                        <p className="text-gray-400 mt-1">Legal@FantasyiQTrust.com</p>
                     </div>
                     <p className="mt-4">
                         For broader privacy questions, please review our{' '}
@@ -136,7 +136,7 @@ export default function CookieNoticePage() {
                 <div className="border-t border-gray-800 pt-8 flex flex-wrap gap-4 text-xs text-gray-600">
                     <Link href="/terms"   className="hover:text-gray-400 transition">Terms of Service</Link>
                     <Link href="/privacy" className="hover:text-gray-400 transition">Privacy Policy</Link>
-                    <Link href="/"        className="hover:text-gray-400 transition">← Back to FantasyiQ</Link>
+                    <Link href="/"        className="hover:text-gray-400 transition">← Back to FantasyiQ Trust</Link>
                 </div>
 
             </div>
