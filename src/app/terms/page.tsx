@@ -229,7 +229,7 @@ export default function TermsOfServicePage() {
                     <p>If you have questions about these Terms, please contact us at:</p>
                     <div className="mt-3 bg-gray-900 border border-gray-800 rounded-xl px-5 py-4 text-sm text-gray-300">
                         <p className="font-semibold text-white">FantasyiQ Trust</p>
-                        <p className="text-gray-400 mt-1">legal@fantasyiq.app</p>
+                        <p className="text-gray-400 mt-1">Legal@FantasyiQTrust.com</p>
                     </div>
                 </LegalSection>
 
