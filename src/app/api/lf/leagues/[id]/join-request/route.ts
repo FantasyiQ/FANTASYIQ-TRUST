@@ -1,6 +1,8 @@
 import { auth }   from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
+import { notify } from '@/lib/notifications/service';
+import { NotificationType } from '@/lib/notifications/types';
 
 // POST — user submits a join request
 export async function POST(
@@ -15,7 +17,10 @@ export async function POST(
     const { id: leagueId } = await params;
     const userId = session.user.id;
 
-    const league = await prisma.lFLeague.findUnique({ where: { id: leagueId } });
+    const league = await prisma.lFLeague.findUnique({
+        where: { id: leagueId },
+        select: { id: true, leagueName: true, ownerId: true },
+    });
     if (!league) return Response.json({ error: 'League not found' }, { status: 404 });
 
     let body: unknown;
@@ -26,13 +31,26 @@ export async function POST(
     const { introMessage } = body as Record<string, unknown>;
 
     try {
-        const req = await prisma.lFJoinRequest.create({
-            data: {
-                leagueId,
-                userId,
-                introMessage: typeof introMessage === 'string' ? introMessage.trim() || null : null,
-            },
+        const [req, requester] = await Promise.all([
+            prisma.lFJoinRequest.create({
+                data: {
+                    leagueId,
+                    userId,
+                    introMessage: typeof introMessage === 'string' ? introMessage.trim() || null : null,
+                },
+            }),
+            prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
+        ]);
+
+        // Notify the commissioner (fire-and-forget)
+        void notify({
+            userId:  league.ownerId,
+            type:    NotificationType.LF_JOIN_REQUEST,
+            title:   'New join request',
+            body:    `${requester?.name ?? 'Someone'} has requested to join ${league.leagueName}.`,
+            data:    { leagueId, memberName: requester?.name ?? undefined },
         });
+
         return Response.json(req, { status: 201 });
     } catch (err: unknown) {
         if (err && typeof err === 'object' && 'code' in err && err.code === 'P2002') {

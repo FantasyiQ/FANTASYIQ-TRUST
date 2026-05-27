@@ -253,6 +253,18 @@ export function renderTemplate(type: NotificationType | string, ctx: TemplateCon
       return baseLayout(title, bodyHtml, ctaButton('Verify Email', verifyUrl));
     }
 
+    // ── League Finder: join request ──────────────────────────────────────────
+    case 'lf.join_request': {
+      const name      = data?.memberName as string | undefined;
+      const lfLeagueId = data?.leagueId as string | undefined;
+      const manageHref = lfLeagueId
+          ? `${appUrl}/leaguefinder/leagues/${lfLeagueId}/manage`
+          : `${appUrl}/leaguefinder`;
+      const bodyHtml = `<p style="margin:0 0 12px;">${escapeHtml(name ?? 'Someone')} has requested to join your league.</p>
+      <p style="margin:0 0 8px;">Review their player profile and intro message, then approve or decline the request.</p>`;
+      return baseLayout(title, bodyHtml, ctaButton('View Waitlist', manageHref));
+    }
+
     // ── Generic fallback ─────────────────────────────────────────────────────
     default: {
       const bodyHtml = `<p style="margin:0 0 8px;">${escapeHtml(body)}</p>`;

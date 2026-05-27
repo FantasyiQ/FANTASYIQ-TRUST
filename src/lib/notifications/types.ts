@@ -75,6 +75,9 @@ export const NotificationType = {
 
   // Engine 8 — Automated Messaging (new triggers)
   LEAGUE_SYNC_REMINDER:         'league.sync.reminder',      // "sync now to keep PRS fresh"
+
+  // League Finder
+  LF_JOIN_REQUEST:              'lf.join_request',           // player requested to join commissioner's league
 } as const;
 
 export type NotificationType = typeof NotificationType[keyof typeof NotificationType];
