@@ -130,6 +130,14 @@ export default async function CommissionerProfilePage({
                                     {commissioner.flagsCount} flag{commissioner.flagsCount !== 1 ? 's' : ''}
                                 </span>
                             )}
+                            {commissioner.ownerId && (
+                                <Link
+                                    href={`/leaguefinder/users/${commissioner.ownerId}`}
+                                    className="text-xs font-bold px-3 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:border-gray-600 hover:text-gray-200 transition"
+                                >
+                                    Player Profile →
+                                </Link>
+                            )}
                             {isOwner && (
                                 <Link
                                     href={`/leaguefinder/commissioners/${id}/edit`}
