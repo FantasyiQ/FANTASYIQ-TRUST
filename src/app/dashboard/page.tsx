@@ -68,6 +68,7 @@ export default async function DashboardPage({
             image: true,
             emailVerified: true,
             hashedPassword: true,
+            onboardingComplete: true,
             subscriptionTier: true,
             subscriptions: {
                 select: {
@@ -99,6 +100,19 @@ export default async function DashboardPage({
     });
 
     if (!user) redirect('/sign-in');
+
+    // Redirect new users to onboarding if they haven't completed it and have no leagues yet
+    if (!user.onboardingComplete && user.leagues.length === 0 && user.connectedLeagues.length === 0) {
+        redirect('/onboarding');
+    }
+
+    // If they have leagues but never completed onboarding (e.g. legacy users), mark silently
+    if (!user.onboardingComplete && (user.leagues.length > 0 || user.connectedLeagues.length > 0)) {
+        await prisma.user.update({
+            where: { email: session.user.email! },
+            data:  { onboardingComplete: true },
+        });
+    }
 
     const { name, image, emailVerified, hashedPassword, subscriptionTier, subscriptions, leagues } = user;
     // Show verification banner only to credentials users who haven't verified yet

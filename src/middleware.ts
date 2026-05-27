@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Routes that require authentication
-const PROTECTED_PREFIXES = ['/dashboard', '/admin'];
+const PROTECTED_PREFIXES = ['/dashboard', '/admin', '/onboarding'];
 
 // NextAuth v5 session cookie names (prod uses __Secure- prefix; dev does not)
 const SESSION_COOKIES = ['__Secure-authjs.session-token', 'authjs.session-token'];
@@ -36,5 +36,6 @@ export const config = {
          */
         '/dashboard/:path*',
         '/admin/:path*',
+        '/onboarding',
     ],
 };
