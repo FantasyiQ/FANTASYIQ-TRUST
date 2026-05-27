@@ -241,12 +241,20 @@ function RoleCard({
     return (
         <button
             onClick={onClick}
-            className={`rounded-xl border p-4 text-left transition space-y-1 w-full ${
+            className={`rounded-xl border p-4 text-left transition space-y-1 w-full relative ${
                 selected
                     ? 'border-[#D4AF37]/60 bg-[#D4AF37]/10'
                     : 'border-gray-700 bg-gray-800/40 hover:border-gray-600'
             }`}
         >
+            {/* Checkmark */}
+            <div className={`absolute top-3 right-3 w-5 h-5 rounded-full border-2 flex items-center justify-center transition ${
+                selected
+                    ? 'border-[#D4AF37] bg-[#D4AF37]'
+                    : 'border-gray-600 bg-transparent'
+            }`}>
+                {selected && <span className="text-gray-950 text-[10px] font-black">✓</span>}
+            </div>
             <div className="text-2xl">{icon}</div>
             <div className={`text-sm font-bold ${selected ? 'text-[#D4AF37]' : 'text-white'}`}>{title}</div>
             <div className="text-[11px] text-gray-500 leading-snug">{desc}</div>
