@@ -19,7 +19,11 @@ export async function POST(
 
     const league = await prisma.lFLeague.findUnique({
         where: { id: leagueId },
-        select: { id: true, leagueName: true, ownerId: true },
+        select: {
+            id:           true,
+            name:         true,
+            commissioner: { select: { ownerId: true } },
+        },
     });
     if (!league) return Response.json({ error: 'League not found' }, { status: 404 });
 
@@ -43,13 +47,16 @@ export async function POST(
         ]);
 
         // Notify the commissioner (fire-and-forget)
-        void notify({
-            userId:  league.ownerId,
-            type:    NotificationType.LF_JOIN_REQUEST,
-            title:   'New join request',
-            body:    `${requester?.name ?? 'Someone'} has requested to join ${league.leagueName}.`,
-            data:    { leagueId, memberName: requester?.name ?? undefined },
-        });
+        const commOwner = league.commissioner?.ownerId;
+        if (commOwner) {
+            void notify({
+                userId:  commOwner,
+                type:    NotificationType.LF_JOIN_REQUEST,
+                title:   'New join request',
+                body:    `${requester?.name ?? 'Someone'} has requested to join ${league.name}.`,
+                data:    { leagueId, memberName: requester?.name ?? undefined },
+            });
+        }
 
         return Response.json(req, { status: 201 });
     } catch (err: unknown) {

@@ -39,6 +39,7 @@ export default async function PricingPage({
         error === 'checkout-failed'       ? `Something went wrong starting checkout.${detail ? ` ${decodeURIComponent(detail)}` : ' Please try again.'}` :
         error === 'invalid-plan'          ? 'Invalid plan selected. Please try again.' :
         error === 'league-name-required'  ? 'Enter your league name before selecting a commissioner plan.' :
+        error === 'terms-required'        ? 'You must accept the Terms of Service before purchasing.' :
         null;
 
     const session = await auth();

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useId } from 'react';
+import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { createCheckoutSession } from '@/app/actions/stripe';
 import catalog from '../../../stripe-catalog-ids.json';
@@ -326,6 +327,8 @@ function UpgradeModal({
     loading: boolean;
     error: string | null;
 }) {
+    const [acceptTerms, setAcceptTerms] = useState(false);
+    const checkboxId = useId();
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
             <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onCancel} />
@@ -338,6 +341,20 @@ function UpgradeModal({
                 <p className="text-gray-500 text-xs mb-4">
                     You&apos;ll be charged the prorated difference immediately. Your new plan takes effect right away.
                 </p>
+                <div className="flex items-start gap-2 mb-4">
+                    <input
+                        id={checkboxId}
+                        type="checkbox"
+                        checked={acceptTerms}
+                        onChange={e => setAcceptTerms(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 shrink-0 accent-[#D4AF37] cursor-pointer"
+                    />
+                    <label htmlFor={checkboxId} className="text-xs text-gray-400 leading-snug cursor-pointer">
+                        I agree to the{' '}
+                        <Link href="/terms" className="text-[#D4AF37] underline" target="_blank">Terms of Service</Link>
+                        , including the <strong className="text-gray-300">No-Refund Policy</strong>.
+                    </label>
+                </div>
                 {error && (
                     <div className="mb-4 px-4 py-3 bg-red-900/30 border border-red-800 rounded-lg text-red-400 text-sm">
                         {error}
@@ -348,7 +365,7 @@ function UpgradeModal({
                         className="flex-1 py-2.5 rounded-xl border border-gray-700 text-gray-300 font-semibold text-sm hover:border-gray-500 transition disabled:opacity-50">
                         Cancel
                     </button>
-                    <button onClick={onConfirm} disabled={loading}
+                    <button onClick={onConfirm} disabled={loading || !acceptTerms}
                         className="flex-1 py-2.5 rounded-xl bg-[#D4AF37] text-black font-bold text-sm hover:bg-[#b8912a] transition disabled:opacity-50">
                         {loading ? 'Upgrading…' : 'Confirm Upgrade'}
                     </button>
@@ -379,6 +396,8 @@ interface CardProps {
 }
 
 function PlanCard({ name, price, period, badge, badgeGold, ring, features, priceId, tier, cardStatus, onUpgrade, sourceStripeSubId, leagueLimitNote, atLeagueLimit, returnTo }: CardProps) {
+    const [acceptTerms, setAcceptTerms] = useState(false);
+    const checkboxId = useId();
     return (
         <div className={`relative flex flex-col bg-gray-900 rounded-2xl p-6 border transition-shadow hover:shadow-lg hover:shadow-[#D4AF37]/5 ${
             ring ? 'border-[#D4AF37] shadow-md shadow-[#D4AF37]/10' : 'border-gray-800'
@@ -420,9 +439,24 @@ function PlanCard({ name, price, period, badge, badgeGold, ring, features, price
                         <input type="hidden" name="priceId" value={priceId} />
                         <input type="hidden" name="tier" value={tier} />
                         <input type="hidden" name="leagueName" value="" />
+                        <input type="hidden" name="acceptTerms" value={acceptTerms ? 'true' : 'false'} />
                         {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
-                        <button type="submit" disabled={!priceId}
-                            className="w-full py-3 rounded-xl font-bold transition-colors bg-[#D4AF37] text-black hover:bg-[#b8912a] disabled:opacity-50 disabled:cursor-not-allowed">
+                        <div className="flex items-start gap-2 mb-3">
+                            <input
+                                id={checkboxId}
+                                type="checkbox"
+                                checked={acceptTerms}
+                                onChange={e => setAcceptTerms(e.target.checked)}
+                                className="mt-0.5 h-4 w-4 shrink-0 accent-[#D4AF37] cursor-pointer"
+                            />
+                            <label htmlFor={checkboxId} className="text-xs text-gray-400 leading-snug cursor-pointer">
+                                I agree to the{' '}
+                                <Link href="/terms" className="text-[#D4AF37] underline" target="_blank">Terms of Service</Link>
+                                , including the <strong className="text-gray-300">No-Refund Policy</strong>.
+                            </label>
+                        </div>
+                        <button type="submit" disabled={!priceId || !acceptTerms}
+                            className="w-full py-3 rounded-xl font-bold transition-colors bg-[#D4AF37] text-black hover:bg-[#b8912a] disabled:opacity-40 disabled:cursor-not-allowed">
                             Get Started
                         </button>
                     </form>
@@ -468,7 +502,9 @@ interface CommCardProps {
 }
 
 function CommPlanCard({ name, price, period, badge, badgeGold, ring, features, priceId, tier, leagueName, cardStatus, sourceStripeSubId, onUpgrade, returnTo }: CommCardProps) {
-    const canCheckout = leagueName.trim().length > 0 && !!priceId;
+    const [acceptTerms, setAcceptTerms] = useState(false);
+    const checkboxId = useId();
+    const canCheckout = leagueName.trim().length > 0 && !!priceId && acceptTerms;
 
     return (
         <div className={`relative flex flex-col bg-gray-900 rounded-2xl p-6 border transition-shadow hover:shadow-lg hover:shadow-[#D4AF37]/5 ${
@@ -497,10 +533,25 @@ function CommPlanCard({ name, price, period, badge, badgeGold, ring, features, p
                             <input type="hidden" name="priceId" value={priceId} />
                             <input type="hidden" name="tier" value={tier} />
                             <input type="hidden" name="leagueName" value={leagueName.trim()} />
+                            <input type="hidden" name="acceptTerms" value={acceptTerms ? 'true' : 'false'} />
                             {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
+                            <div className="flex items-start gap-2 mb-3">
+                                <input
+                                    id={checkboxId}
+                                    type="checkbox"
+                                    checked={acceptTerms}
+                                    onChange={e => setAcceptTerms(e.target.checked)}
+                                    className="mt-0.5 h-4 w-4 shrink-0 accent-[#D4AF37] cursor-pointer"
+                                />
+                                <label htmlFor={checkboxId} className="text-xs text-gray-400 leading-snug cursor-pointer">
+                                    I agree to the{' '}
+                                    <Link href="/terms" className="text-[#D4AF37] underline" target="_blank">Terms of Service</Link>
+                                    , including the <strong className="text-gray-300">No-Refund Policy</strong>.
+                                </label>
+                            </div>
                             <button type="submit" disabled={!canCheckout}
                                 className="w-full py-3 rounded-xl font-bold transition-colors bg-[#D4AF37] text-black hover:bg-[#b8912a] disabled:opacity-40 disabled:cursor-not-allowed"
-                                title={!leagueName.trim() ? 'Enter your league name above' : undefined}>
+                                title={!leagueName.trim() ? 'Enter your league name above' : !acceptTerms ? 'Accept Terms of Service to continue' : undefined}>
                                 Get Started
                             </button>
                         </form>
@@ -624,7 +675,9 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                     )}
                     {checkoutError && (
                         <div className="mb-8 px-4 py-3 bg-red-900/20 border border-red-800/50 rounded-xl text-red-400 text-sm text-center">
-                            {checkoutError}
+                            {checkoutError === 'terms-required'
+                                ? 'You must accept the Terms of Service before purchasing.'
+                                : checkoutError}
                         </div>
                     )}
 

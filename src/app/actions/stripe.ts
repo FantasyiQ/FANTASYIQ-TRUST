@@ -42,6 +42,9 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
     const priceId = formData.get('priceId') as string | null;
     if (!priceId) redirect('/pricing?error=invalid-plan');
 
+    const acceptTerms = formData.get('acceptTerms');
+    if (acceptTerms !== 'true') redirect('/pricing?error=terms-required');
+
     const info = planInfo(priceId);
     if (!info) redirect('/pricing?error=invalid-plan');
 
@@ -116,11 +119,24 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
         }
     }
 
+    // Record terms acceptance (fire-and-forget — don't block checkout on this)
+    const TERMS_VERSION = '2026-05-21';
+    void prisma.user.update({
+        where: { id: user.id },
+        data: {
+            acceptedTerms:        true,
+            acceptedTermsAt:      new Date(),
+            acceptedTermsVersion: TERMS_VERSION,
+        },
+    });
+
     // Build metadata
     const sharedMeta: Record<string, string> = {
-        userId:   user.id,
-        tier:     info.tier,
-        planType: info.type,
+        userId:              user.id,
+        tier:                info.tier,
+        planType:            info.type,
+        acceptedTerms:       'true',
+        acceptedTermsVersion: TERMS_VERSION,
     };
     if (info.leagueSize != null) sharedMeta.leagueSize = info.leagueSize.toString();
     if (leagueName)              sharedMeta.leagueName  = leagueName;
