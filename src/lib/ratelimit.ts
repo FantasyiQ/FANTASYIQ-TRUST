@@ -1,5 +1,5 @@
 // Rate limiting via Upstash Redis (sliding window algorithm).
-// Fails open — if UPSTASH_REDIS_REST_URL/TOKEN are not set, all requests pass.
+// Fails open — if UPSTASH_REDIS_REST_URL/TOKEN are not set or unreachable, all requests pass.
 // Set these env vars in Vercel to activate enforcement.
 //
 // Free Upstash plan: https://upstash.com — 10k requests/day per database.
@@ -69,61 +69,73 @@ export type RateLimitResult =
 /** Apply player-search rate limit (30/min). Returns a 429 Response if exceeded. */
 export async function checkSearchLimit(ip: string): Promise<RateLimitResult> {
     if (!isConfigured()) return { limited: false };
-    const { success, limit, remaining, reset } = await getSearchLimiter().limit(ip);
-    if (success) return { limited: false };
-    return {
-        limited: true,
-        response: new Response(JSON.stringify({ error: 'Too many requests' }), {
-            status:  429,
-            headers: {
-                'Content-Type':      'application/json',
-                'X-RateLimit-Limit': String(limit),
-                'X-RateLimit-Remaining': String(remaining),
-                'X-RateLimit-Reset': String(reset),
-                'Retry-After': String(Math.ceil((reset - Date.now()) / 1000)),
-            },
-        }),
-    };
+    try {
+        const { success, limit, remaining, reset } = await getSearchLimiter().limit(ip);
+        if (success) return { limited: false };
+        return {
+            limited: true,
+            response: new Response(JSON.stringify({ error: 'Too many requests' }), {
+                status:  429,
+                headers: {
+                    'Content-Type':          'application/json',
+                    'X-RateLimit-Limit':     String(limit),
+                    'X-RateLimit-Remaining': String(remaining),
+                    'X-RateLimit-Reset':     String(reset),
+                    'Retry-After':           String(Math.ceil((reset - Date.now()) / 1000)),
+                },
+            }),
+        };
+    } catch {
+        return { limited: false };
+    }
 }
 
 /** Apply general public-endpoint rate limit (60/min). Returns a 429 Response if exceeded. */
 export async function checkPublicLimit(ip: string): Promise<RateLimitResult> {
     if (!isConfigured()) return { limited: false };
-    const { success, limit, remaining, reset } = await getPublicLimiter().limit(ip);
-    if (success) return { limited: false };
-    return {
-        limited: true,
-        response: new Response(JSON.stringify({ error: 'Too many requests' }), {
-            status:  429,
-            headers: {
-                'Content-Type':      'application/json',
-                'X-RateLimit-Limit': String(limit),
-                'X-RateLimit-Remaining': String(remaining),
-                'X-RateLimit-Reset': String(reset),
-                'Retry-After': String(Math.ceil((reset - Date.now()) / 1000)),
-            },
-        }),
-    };
+    try {
+        const { success, limit, remaining, reset } = await getPublicLimiter().limit(ip);
+        if (success) return { limited: false };
+        return {
+            limited: true,
+            response: new Response(JSON.stringify({ error: 'Too many requests' }), {
+                status:  429,
+                headers: {
+                    'Content-Type':          'application/json',
+                    'X-RateLimit-Limit':     String(limit),
+                    'X-RateLimit-Remaining': String(remaining),
+                    'X-RateLimit-Reset':     String(reset),
+                    'Retry-After':           String(Math.ceil((reset - Date.now()) / 1000)),
+                },
+            }),
+        };
+    } catch {
+        return { limited: false };
+    }
 }
 
 /** Apply financial-mutation rate limit (10/min). Returns a 429 Response if exceeded. */
 export async function checkMutationLimit(ip: string): Promise<RateLimitResult> {
     if (!isConfigured()) return { limited: false };
-    const { success, limit, remaining, reset } = await getMutationLimiter().limit(ip);
-    if (success) return { limited: false };
-    return {
-        limited: true,
-        response: new Response(JSON.stringify({ error: 'Too many requests' }), {
-            status:  429,
-            headers: {
-                'Content-Type':          'application/json',
-                'X-RateLimit-Limit':     String(limit),
-                'X-RateLimit-Remaining': String(remaining),
-                'X-RateLimit-Reset':     String(reset),
-                'Retry-After':           String(Math.ceil((reset - Date.now()) / 1000)),
-            },
-        }),
-    };
+    try {
+        const { success, limit, remaining, reset } = await getMutationLimiter().limit(ip);
+        if (success) return { limited: false };
+        return {
+            limited: true,
+            response: new Response(JSON.stringify({ error: 'Too many requests' }), {
+                status:  429,
+                headers: {
+                    'Content-Type':          'application/json',
+                    'X-RateLimit-Limit':     String(limit),
+                    'X-RateLimit-Remaining': String(remaining),
+                    'X-RateLimit-Reset':     String(reset),
+                    'Retry-After':           String(Math.ceil((reset - Date.now()) / 1000)),
+                },
+            }),
+        };
+    } catch {
+        return { limited: false };
+    }
 }
 
 /** Extract the best available IP from a Next.js request. */
