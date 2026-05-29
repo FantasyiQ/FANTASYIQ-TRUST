@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { FROM_NAME } from '@/lib/constants';
 
 // Lazy singleton — instantiated at call time so missing env var at build time
 // doesn't cause a module-level throw during static analysis / page data collection.
@@ -37,7 +38,7 @@ function isPermanent(err: unknown): boolean {
  * Permanent errors (invalid key, bad address) are not retried.
  */
 export async function sendEmail({ to, subject, html, from }: EmailOptions): Promise<void> {
-  const sender  = from ?? process.env.EMAIL_FROM ?? 'FantasyiQ Trust <noreply@fantasyiq.app>';
+  const sender  = from ?? process.env.EMAIL_FROM ?? FROM_NAME;
   const delays  = [1_000, 2_000];
   let   lastErr: unknown;
 
