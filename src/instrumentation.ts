@@ -6,8 +6,7 @@ const REQUIRED_ENV_VARS = [
     'STRIPE_SECRET_KEY',
     'STRIPE_WEBHOOK_SECRET',
     'CRON_SECRET',
-    'UPSTASH_REDIS_REST_URL',
-    'UPSTASH_REDIS_REST_TOKEN',
+    // UPSTASH_REDIS_REST_URL / TOKEN are optional — rate limiting fails open when absent
 ] as const;
 
 export async function register() {
