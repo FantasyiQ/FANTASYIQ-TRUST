@@ -37,7 +37,7 @@ function isPermanent(err: unknown): boolean {
  * Permanent errors (invalid key, bad address) are not retried.
  */
 export async function sendEmail({ to, subject, html, from }: EmailOptions): Promise<void> {
-  const sender  = from ?? process.env.EMAIL_FROM ?? 'FantasyIQ <noreply@fantasyiq.app>';
+  const sender  = from ?? process.env.EMAIL_FROM ?? 'FantasyiQ Trust <noreply@fantasyiq.app>';
   const delays  = [1_000, 2_000];
   let   lastErr: unknown;
 
