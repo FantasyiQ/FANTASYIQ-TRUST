@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import NotificationsPage from '@/components/notifications/NotificationsPage';
 
 export const metadata = {
-  title: 'Notifications — FantasyIQ Trust',
+  title: 'Notifications — FantasyiQ Trust',
 };
 
 export default async function NotificationsRoute() {

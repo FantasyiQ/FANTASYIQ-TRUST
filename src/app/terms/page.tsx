@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-    title: 'Terms of Service — FantasyiQ Trust Trust',
-    description: 'Terms governing your use of the FantasyiQ Trust Trust platform.',
+    title: 'Terms of Service — FantasyiQ Trust',
+    description: 'Terms governing your use of the FantasyiQ Trust platform.',
 };
 
 export default function TermsOfServicePage() {

@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import SignInForm from './SignInForm';
 
 export const metadata: Metadata = {
-    title: 'Sign In — FantasyIQ Trust',
-    description: 'Sign in to your FantasyIQ Trust account.',
+    title: 'Sign In — FantasyiQ Trust',
+    description: 'Sign in to your FantasyiQ Trust account.',
     robots: { index: false },
 };
 

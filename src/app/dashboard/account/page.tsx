@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma';
 import AccountSettings from './AccountSettings';
 
 export const metadata: Metadata = {
-    title: 'Account — FantasyIQ Trust',
+    title: 'Account — FantasyiQ Trust',
     robots: { index: false },
 };
 

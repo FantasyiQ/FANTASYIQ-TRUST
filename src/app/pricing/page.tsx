@@ -2,18 +2,18 @@ import type { Metadata } from 'next';
 import { auth } from '@/lib/auth';
 
 export const metadata: Metadata = {
-    title: 'Pricing — FantasyIQ Trust',
+    title: 'Pricing — FantasyiQ Trust',
     description: 'Simple, transparent pricing for fantasy football commissioners and players. No hidden fees.',
     openGraph: {
-        title:       'Pricing — FantasyIQ Trust',
+        title:       'Pricing — FantasyiQ Trust',
         description: 'Simple, transparent pricing for fantasy football commissioners and players. No hidden fees.',
         url:         'https://fantasyiq.app/pricing',
-        siteName:    'FantasyIQ Trust',
+        siteName:    'FantasyiQ Trust',
         type:        'website',
     },
     twitter: {
         card:        'summary',
-        title:       'Pricing — FantasyIQ Trust',
+        title:       'Pricing — FantasyiQ Trust',
         description: 'Simple, transparent pricing for fantasy football commissioners and players.',
     },
 };

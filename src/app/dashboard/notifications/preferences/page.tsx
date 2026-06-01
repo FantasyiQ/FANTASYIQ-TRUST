@@ -6,7 +6,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import PreferencesForm from '@/components/notifications/PreferencesForm';
 
-export const metadata = { title: 'Notification Preferences — FantasyIQ' };
+export const metadata = { title: 'Notification Preferences — FantasyiQ Trust' };
 
 export default async function NotificationPreferencesPage() {
     const session = await auth();
@@ -34,7 +34,7 @@ export default async function NotificationPreferencesPage() {
                 <div>
                     <h1 className="text-2xl font-bold">Notification Preferences</h1>
                     <p className="text-gray-500 text-sm mt-1">
-                        Choose how and when FantasyIQ contacts you. Changes take effect immediately.
+                        Choose how and when FantasyiQ Trust contacts you. Changes take effect immediately.
                     </p>
                 </div>
 

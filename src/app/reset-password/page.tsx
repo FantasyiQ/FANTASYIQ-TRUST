@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import ResetPasswordForm from './ResetPasswordForm';
 
 export const metadata: Metadata = {
-    title: 'Reset Password — FantasyiQ',
-    description: 'Set a new password for your FantasyiQ account.',
+    title: 'Reset Password — FantasyiQ Trust',
+    description: 'Set a new password for your FantasyiQ Trust account.',
     robots: { index: false },
 };
 

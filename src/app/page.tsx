@@ -2,18 +2,18 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-    title: 'FantasyIQ Trust — Your League Dues. Protected.',
+    title: 'FantasyiQ Trust — Your League Dues. Protected.',
     description: 'The fantasy football platform that never touches your money. Zero fees. Zero skimming. Total trust.',
     openGraph: {
-        title:       'FantasyIQ Trust — Your League Dues. Protected.',
+        title:       'FantasyiQ Trust — Your League Dues. Protected.',
         description: 'Sync your Sleeper, ESPN, or Yahoo league. Protect your buy-ins. Zero fees.',
         url:         'https://fantasyiq.app',
-        siteName:    'FantasyIQ Trust',
+        siteName:    'FantasyiQ Trust',
         type:        'website',
     },
     twitter: {
         card:        'summary_large_image',
-        title:       'FantasyIQ Trust — Your League Dues. Protected.',
+        title:       'FantasyiQ Trust — Your League Dues. Protected.',
         description: 'Sync your Sleeper, ESPN, or Yahoo league. Protect your buy-ins. Zero fees.',
     },
 };
