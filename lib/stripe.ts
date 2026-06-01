@@ -49,3 +49,32 @@ export const COMMISSIONER_PRICING = {
         sizes: { 8: 64.99, 10: 74.99, 12: 84.99, 14: 94.99, 16: 104.99, 32: 184.99 },
     },
 } as const;
+
+// Live-mode commissioner price IDs keyed by tier and league size.
+// Used by checkout to select the correct Stripe price.
+export const COMMISSIONER_LIVE_PRICE_IDS: Record<string, Record<number, string>> = {
+    COMMISSIONER_PRO: {
+        8:  'price_1TdXEW2RJtQwVGBE2vjFUha2',
+        10: 'price_1TdXEX2RJtQwVGBE8pftRrkW',
+        12: 'price_1TdXEX2RJtQwVGBEpaNdJgv2',
+        14: 'price_1TdXEX2RJtQwVGBE5FUPtQc8',
+        16: 'price_1TdXEX2RJtQwVGBEB15esbnp',
+        32: 'price_1TdXEY2RJtQwVGBEZ5KNgszA',
+    },
+    COMMISSIONER_ALL_PRO: {
+        8:  'price_1TdXEY2RJtQwVGBEArj5zJLM',
+        10: 'price_1TdXEY2RJtQwVGBEdjMVSqTh',
+        12: 'price_1TdXEY2RJtQwVGBEx0kzx5FZ',
+        14: 'price_1TdXEZ2RJtQwVGBEFhUuriBj',
+        16: 'price_1TdXEZ2RJtQwVGBEESYKD8bu',
+        32: 'price_1TdXEZ2RJtQwVGBE5NsAAPCf',
+    },
+    COMMISSIONER_ELITE: {
+        8:  'price_1TdXEa2RJtQwVGBETWXVX3LP',
+        10: 'price_1TdXEa2RJtQwVGBEp1dPFsoy',
+        12: 'price_1TdXEa2RJtQwVGBEf8FDHiDa',
+        14: 'price_1TdXEa2RJtQwVGBEOfAx6MT3',
+        16: 'price_1TdXEb2RJtQwVGBE2qm5a8dK',
+        32: 'price_1TdXEb2RJtQwVGBEyVHZUI5P',
+    },
+};

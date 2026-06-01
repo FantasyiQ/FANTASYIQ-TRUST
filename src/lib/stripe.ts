@@ -40,6 +40,28 @@ export const PLAN_CATALOG: Record<string, PlanInfo> = {
     'price_1TLieL2RJtQwVGBEyt1NTFef': { type: 'commissioner', tier: 'COMMISSIONER_ELITE', leagueSize: 14 },
     'price_1TLieL2RJtQwVGBEV9OKQKwq': { type: 'commissioner', tier: 'COMMISSIONER_ELITE', leagueSize: 16 },
     'price_1TLieL2RJtQwVGBE9rGNUHqY': { type: 'commissioner', tier: 'COMMISSIONER_ELITE', leagueSize: 32 },
+    // ── Live Mode ─────────────────────────────────────────────────────────────
+    // Commissioner Pro (live)
+    'price_1TdXEW2RJtQwVGBE2vjFUha2': { type: 'commissioner', tier: 'COMMISSIONER_PRO', leagueSize: 8 },
+    'price_1TdXEX2RJtQwVGBE8pftRrkW': { type: 'commissioner', tier: 'COMMISSIONER_PRO', leagueSize: 10 },
+    'price_1TdXEX2RJtQwVGBEpaNdJgv2': { type: 'commissioner', tier: 'COMMISSIONER_PRO', leagueSize: 12 },
+    'price_1TdXEX2RJtQwVGBE5FUPtQc8': { type: 'commissioner', tier: 'COMMISSIONER_PRO', leagueSize: 14 },
+    'price_1TdXEX2RJtQwVGBEB15esbnp': { type: 'commissioner', tier: 'COMMISSIONER_PRO', leagueSize: 16 },
+    'price_1TdXEY2RJtQwVGBEZ5KNgszA': { type: 'commissioner', tier: 'COMMISSIONER_PRO', leagueSize: 32 },
+    // Commissioner All-Pro (live)
+    'price_1TdXEY2RJtQwVGBEArj5zJLM': { type: 'commissioner', tier: 'COMMISSIONER_ALL_PRO', leagueSize: 8 },
+    'price_1TdXEY2RJtQwVGBEdjMVSqTh': { type: 'commissioner', tier: 'COMMISSIONER_ALL_PRO', leagueSize: 10 },
+    'price_1TdXEY2RJtQwVGBEx0kzx5FZ': { type: 'commissioner', tier: 'COMMISSIONER_ALL_PRO', leagueSize: 12 },
+    'price_1TdXEZ2RJtQwVGBEFhUuriBj': { type: 'commissioner', tier: 'COMMISSIONER_ALL_PRO', leagueSize: 14 },
+    'price_1TdXEZ2RJtQwVGBEESYKD8bu': { type: 'commissioner', tier: 'COMMISSIONER_ALL_PRO', leagueSize: 16 },
+    'price_1TdXEZ2RJtQwVGBE5NsAAPCf': { type: 'commissioner', tier: 'COMMISSIONER_ALL_PRO', leagueSize: 32 },
+    // Commissioner Elite (live)
+    'price_1TdXEa2RJtQwVGBETWXVX3LP': { type: 'commissioner', tier: 'COMMISSIONER_ELITE', leagueSize: 8 },
+    'price_1TdXEa2RJtQwVGBEp1dPFsoy': { type: 'commissioner', tier: 'COMMISSIONER_ELITE', leagueSize: 10 },
+    'price_1TdXEa2RJtQwVGBEf8FDHiDa': { type: 'commissioner', tier: 'COMMISSIONER_ELITE', leagueSize: 12 },
+    'price_1TdXEa2RJtQwVGBEOfAx6MT3': { type: 'commissioner', tier: 'COMMISSIONER_ELITE', leagueSize: 14 },
+    'price_1TdXEb2RJtQwVGBE2qm5a8dK': { type: 'commissioner', tier: 'COMMISSIONER_ELITE', leagueSize: 16 },
+    'price_1TdXEb2RJtQwVGBEyVHZUI5P': { type: 'commissioner', tier: 'COMMISSIONER_ELITE', leagueSize: 32 },
 };
 
 export function planInfo(priceId: string): PlanInfo | null {
