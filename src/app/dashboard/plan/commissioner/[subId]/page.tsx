@@ -1,11 +1,8 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import { redirect, notFound } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { createPortalSession } from '@/app/actions/stripe';
-import AssignLeagueToPlan from '../../_components/AssignLeagueToPlan';
-import UnassignLeague from '../../_components/UnassignLeague';
 
 const STATUS_STYLES: Record<string, string> = {
     active:   'bg-green-900/40 text-green-400 border-green-800',
@@ -24,12 +21,6 @@ function formatTier(tier: string): string {
     }
 }
 
-function scoringLabel(s: string | null) {
-    if (s === 'ppr')      return 'PPR';
-    if (s === 'half_ppr') return '0.5 PPR';
-    if (s === 'std')      return 'Std';
-    return s ?? '—';
-}
 
 const COMM_FEATURES = [
     { href: '/dashboard/commissioner/dues',          icon: '💰', title: 'Dues & Payout Tracker',       desc: 'Track every dollar in and out.' },
@@ -56,19 +47,6 @@ export default async function CommissionerPlanPage({
         },
     });
     if (!sub) notFound();
-
-    const allLeagues = await prisma.league.findMany({
-        where: { userId: session.user.id },
-        orderBy: { leagueName: 'asc' },
-        select: {
-            id: true, leagueName: true, totalRosters: true,
-            scoringType: true, avatar: true,
-            assignedPlanId: true, assignedPlanType: true,
-        },
-    });
-
-    const assignedLeague   = allLeagues.find(l => l.assignedPlanId === sub.id) ?? null;
-    const unassignedLeagues = allLeagues.filter(l => !l.assignedPlanId);
 
     const tier       = sub.tier as string;
     const isElite    = tier === 'COMMISSIONER_ELITE';
@@ -135,75 +113,29 @@ export default async function CommissionerPlanPage({
                     </div>
                 </div>
 
-                {/* Assigned League */}
-                <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between gap-4">
-                        <h2 className="font-semibold">League Assigned to This Plan</h2>
-                        {!assignedLeague && unassignedLeagues.length > 0 && (
-                            <AssignLeagueToPlan
-                                planId={sub.id}
-                                planType="commissioner"
-                                unassignedLeagues={unassignedLeagues}
-                            />
-                        )}
-                    </div>
-
-                    {!assignedLeague ? (
-                        <div className="px-6 py-10 text-center space-y-3">
-                            <p className="text-gray-400 text-sm">No league assigned yet.</p>
-                            <p className="text-gray-600 text-xs">
-                                Link a synced league to enable commissioner tools for it.
-                            </p>
-                            {unassignedLeagues.length === 0 && (
-                                <Link href="/dashboard/sync"
-                                    className="inline-block text-sm border border-gray-700 hover:border-gray-500 text-gray-300 font-semibold px-4 py-2 rounded-lg transition">
-                                    Sync a League First
-                                </Link>
-                            )}
+                {/* League covered by this plan */}
+                {sub.leagueName && (
+                    <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+                        <div className="px-6 py-4 border-b border-gray-800">
+                            <h2 className="font-semibold">League Covered by This Plan</h2>
+                            <p className="text-gray-500 text-xs mt-0.5">Set at purchase — this plan covers all members of this league.</p>
                         </div>
-                    ) : (
                         <div className="px-6 py-5">
-                            <div className="flex items-center gap-4 p-4 bg-gray-800/40 rounded-xl border border-gray-700">
-                                {assignedLeague.avatar ? (
-                                    <Image
-                                        src={`https://sleepercdn.com/avatars/thumbs/${assignedLeague.avatar}`}
-                                        alt={assignedLeague.leagueName} width={44} height={44}
-                                        className="rounded-lg shrink-0" />
-                                ) : (
-                                    <div className="w-11 h-11 rounded-lg bg-gray-700 shrink-0 flex items-center justify-center text-gray-500 text-xs font-bold">FF</div>
-                                )}
+                            <div className="flex items-center gap-3 p-4 bg-gray-800/40 rounded-xl border border-gray-700">
+                                <div className="w-10 h-10 rounded-lg bg-gray-700 shrink-0 flex items-center justify-center text-gray-500 text-xs font-bold">FF</div>
                                 <div className="flex-1 min-w-0">
-                                    <Link href={`/dashboard/league/${assignedLeague.id}/commissioner`}
-                                        className="font-semibold text-white hover:text-[#D4AF37] transition truncate block">
-                                        {assignedLeague.leagueName}
-                                    </Link>
-                                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                        <span className="text-xs text-gray-500">Sleeper · {assignedLeague.totalRosters} teams</span>
-                                        {assignedLeague.scoringType && (
-                                            <span className="text-xs px-1.5 py-0.5 rounded bg-gray-700 text-gray-400 border border-gray-600">
-                                                {scoringLabel(assignedLeague.scoringType)}
-                                            </span>
-                                        )}
-                                        <span className="text-xs px-1.5 py-0.5 rounded bg-blue-900/40 text-blue-400 border border-blue-800">
-                                            Commissioner Paid
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-3 shrink-0">
-                                    {unassignedLeagues.length > 0 && (
-                                        <AssignLeagueToPlan
-                                            planId={sub.id}
-                                            planType="commissioner"
-                                            unassignedLeagues={unassignedLeagues}
-                                            currentLeagueId={assignedLeague.id}
-                                        />
+                                    <p className="font-semibold text-white truncate">{sub.leagueName}</p>
+                                    {sub.leagueSize && (
+                                        <p className="text-xs text-gray-500 mt-0.5">{sub.leagueSize}-team league</p>
                                     )}
-                                    <UnassignLeague leagueId={assignedLeague.id} leagueName={assignedLeague.leagueName} />
                                 </div>
+                                <span className="text-xs px-1.5 py-0.5 rounded bg-blue-900/40 text-blue-400 border border-blue-800 shrink-0">
+                                    Commissioner Paid
+                                </span>
                             </div>
                         </div>
-                    )}
-                </div>
+                    </div>
+                )}
 
                 {/* Commissioner Tools */}
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
