@@ -39,7 +39,7 @@ function baseLayout(title: string, bodyHtml: string, ctaHtml?: string): string {
               ${ctaHtml ?? ''}
               <hr style="border:none;border-top:1px solid #1f1f1f;margin:28px 0 20px;" />
               <p style="color:#52525b;font-size:12px;margin:0;line-height:1.5;">
-                You received this email because you have an account on FantasyIQ Trust.<br />
+                You received this email because you have an account on FantasyiQ Trust.<br />
                 To manage your notification preferences, visit your
                 <a href="${appUrl}/dashboard/notifications" style="color:#D4AF37;text-decoration:none;">notification settings</a>.
               </p>
@@ -119,7 +119,7 @@ export function renderTemplate(type: NotificationType | string, ctx: TemplateCon
     // ── Member joined league ─────────────────────────────────────────────────
     case 'member.joined_league': {
       const memberName = data?.memberName ?? 'A new member';
-      const bodyHtml = `<p style="margin:0 0 8px;"><strong style="color:#fff;">${escapeHtml(memberName)}</strong> has joined your league${data?.leagueName ? ` <strong style="color:#fff;">${escapeHtml(data.leagueName)}</strong>` : ''} on FantasyIQ Trust.</p>`;
+      const bodyHtml = `<p style="margin:0 0 8px;"><strong style="color:#fff;">${escapeHtml(memberName)}</strong> has joined your league${data?.leagueName ? ` <strong style="color:#fff;">${escapeHtml(data.leagueName)}</strong>` : ''} on FantasyiQ Trust.</p>`;
       return baseLayout(title, bodyHtml, ctaButton('View League', leagueHref));
     }
 
@@ -202,7 +202,7 @@ export function renderTemplate(type: NotificationType | string, ctx: TemplateCon
 
     // ── Welcome ───────────────────────────────────────────────────────────────
     case 'account.welcome': {
-      const bodyHtml = `<p style="margin:0 0 12px;">Welcome to <strong style="color:#fff;">FantasyIQ Trust</strong> — your league&#39;s financial command center.</p>
+      const bodyHtml = `<p style="margin:0 0 12px;">Welcome to <strong style="color:#fff;">FantasyiQ Trust</strong> — your league&#39;s financial command center.</p>
       <p style="margin:0 0 8px;">Here&#39;s how to get started:</p>
       <ol style="margin:12px 0;padding-left:20px;">
         <li style="margin-bottom:6px;">Sync your Sleeper, ESPN, or Yahoo league</li>
@@ -238,7 +238,7 @@ export function renderTemplate(type: NotificationType | string, ctx: TemplateCon
     // ── Password reset ────────────────────────────────────────────────────────
     case 'account.password_reset': {
       const resetUrl = data?.resetUrl as string ?? `${appUrl}/reset-password`;
-      const bodyHtml = `<p style="margin:0 0 12px;">We received a request to reset the password for your FantasyIQ account.</p>
+      const bodyHtml = `<p style="margin:0 0 12px;">We received a request to reset the password for your FantasyiQ Trust account.</p>
       <p style="margin:0 0 8px;">Click the button below to choose a new password. This link expires in <strong style="color:#fff;">1 hour</strong>.</p>
       <p style="margin:16px 0 0;color:#52525b;font-size:13px;">If you didn&#39;t request a password reset, you can safely ignore this email. Your password will not be changed.</p>`;
       return baseLayout(title, bodyHtml, ctaButton('Reset Password', resetUrl));
@@ -247,9 +247,9 @@ export function renderTemplate(type: NotificationType | string, ctx: TemplateCon
     // ── Email verification ────────────────────────────────────────────────────
     case 'account.email_verification': {
       const verifyUrl = data?.verifyUrl as string ?? `${appUrl}/dashboard`;
-      const bodyHtml = `<p style="margin:0 0 12px;">Thanks for signing up for <strong style="color:#fff;">FantasyIQ Trust</strong>.</p>
+      const bodyHtml = `<p style="margin:0 0 12px;">Thanks for signing up for <strong style="color:#fff;">FantasyiQ Trust</strong>.</p>
       <p style="margin:0 0 8px;">Please verify your email address to confirm your account. This link expires in <strong style="color:#fff;">24 hours</strong>.</p>
-      <p style="margin:16px 0 0;color:#52525b;font-size:13px;">If you didn&#39;t create a FantasyIQ account, you can safely ignore this email.</p>`;
+      <p style="margin:16px 0 0;color:#52525b;font-size:13px;">If you didn&#39;t create a FantasyiQ Trust account, you can safely ignore this email.</p>`;
       return baseLayout(title, bodyHtml, ctaButton('Verify Email', verifyUrl));
     }
 
@@ -268,7 +268,7 @@ export function renderTemplate(type: NotificationType | string, ctx: TemplateCon
     // ── Generic fallback ─────────────────────────────────────────────────────
     default: {
       const bodyHtml = `<p style="margin:0 0 8px;">${escapeHtml(body)}</p>`;
-      return baseLayout(title, bodyHtml, ctaButton('Go to FantasyIQ', `${appUrl}/dashboard`));
+      return baseLayout(title, bodyHtml, ctaButton('Go to FantasyiQ Trust', `${appUrl}/dashboard`));
     }
   }
 }
