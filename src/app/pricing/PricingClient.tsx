@@ -739,7 +739,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                         {tab === 'player' ? (
                             <>
                                 <PlanCard
-                                    name="Pro" price="9.99" period="/mo"
+                                    name="Pro" price="9.99" period="/yr"
                                     features={PLAYER_PRO_FEATURES}
                                     priceId={PLAYER_PRICE_IDS.pro} tier="PLAYER_PRO"
                                     cardStatus={resolvePlayerCardStatus('PLAYER_PRO', playerSub)}
@@ -750,7 +750,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     returnTo={returnTo}
                                 />
                                 <PlanCard
-                                    name="All-Pro" price="24.99" period="/mo"
+                                    name="All-Pro" price="24.99" period="/yr"
                                     badge="Most Popular" badgeGold ring
                                     features={PLAYER_ALL_PRO_FEATURES}
                                     priceId={PLAYER_PRICE_IDS.all_pro} tier="PLAYER_ALL_PRO"
@@ -762,7 +762,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     returnTo={returnTo}
                                 />
                                 <PlanCard
-                                    name="Elite" price="44.99" period="/mo"
+                                    name="Elite" price="44.99" period="/yr"
                                     badge="Full Access"
                                     features={PLAYER_ELITE_FEATURES}
                                     priceId={PLAYER_PRICE_IDS.elite} tier="PLAYER_ELITE"

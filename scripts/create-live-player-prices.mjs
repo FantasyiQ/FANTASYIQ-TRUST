@@ -47,7 +47,7 @@ async function main() {
             product:     product.id,
             currency:    'usd',
             unit_amount: plan.amountCents,
-            recurring:   { interval: 'month' },
+            recurring:   { interval: 'year' },
             nickname:    plan.name,
             metadata: {
                 planType: 'player',
