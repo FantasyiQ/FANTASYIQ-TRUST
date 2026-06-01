@@ -37,6 +37,10 @@ export const PLAN_CATALOG: Record<string, PlanInfo> = {
     'price_1TLieL2RJtQwVGBEV9OKQKwq': { type: 'commissioner', tier: 'COMMISSIONER_ELITE', leagueSize: 16 },
     'price_1TLieL2RJtQwVGBE9rGNUHqY': { type: 'commissioner', tier: 'COMMISSIONER_ELITE', leagueSize: 32 },
     // ── Live Mode ─────────────────────────────────────────────────────────────
+    // Player plans (live)
+    'price_1TdaPI2RJtQwVGBErA3T1shp': { type: 'player', tier: 'PLAYER_PRO',     leagueSize: null },
+    'price_1TdaPJ2RJtQwVGBEwfraEs0N': { type: 'player', tier: 'PLAYER_ALL_PRO', leagueSize: null },
+    'price_1TdaPJ2RJtQwVGBEZys5v8db': { type: 'player', tier: 'PLAYER_ELITE',   leagueSize: null },
     // Commissioner Pro (live)
     'price_1TdXEW2RJtQwVGBE2vjFUha2': { type: 'commissioner', tier: 'COMMISSIONER_PRO', leagueSize: 8 },
     'price_1TdXEX2RJtQwVGBE8pftRrkW': { type: 'commissioner', tier: 'COMMISSIONER_PRO', leagueSize: 10 },
