@@ -140,6 +140,7 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
                 id: true, userId: true, leagueId: true, leagueName: true,
                 leagueType: true, scoringType: true, scoringSettings: true,
                 rosterPositions: true, totalRosters: true, platform: true, standings: true,
+                assignedPlanId: true,
             },
         }),
         prisma.user.findUnique({
@@ -184,11 +185,10 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
         select:  { tier: true },
     });
 
-    const syncedNameToId  = new Map((dbUser?.leagues ?? []).map(l => [l.leagueName.toLowerCase().trim(), l.id]));
-    const leagueConnected = (dbUser?.connectedLeagues ?? []).some(cl => {
-        if (cl.leagueName.toLowerCase().trim() === league.leagueName.toLowerCase().trim()) return true;
-        return syncedNameToId.get(cl.leagueName.toLowerCase().trim()) === league.id;
-    });
+    // Elite covers all leagues; Pro/All-Pro requires this league to be assigned to the plan
+    const leagueConnected =
+        playerTier === 'PLAYER_ELITE' ||
+        (!!activePlayerSub && league.assignedPlanId === activePlayerSub.id);
     const effectiveTier = effectiveTierForLeague(playerTier, commSub?.tier ?? null, leagueConnected);
     if (tierLevel(effectiveTier) < 2) notFound();
 

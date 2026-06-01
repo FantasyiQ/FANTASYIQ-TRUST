@@ -1,6 +1,6 @@
 import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
-import { requirePaidTier } from '@/lib/access';
+import { requireLeaguePaidAccess } from '@/lib/access';
 import { prisma } from '@/lib/prisma';
 import { calculateAge } from '@/lib/calculateAge';
 import { getLeagueRosters, getLeagueUsers, getPlayers } from '@/lib/sleeper';
@@ -142,8 +142,6 @@ export async function GET(
 ): Promise<Response> {
     const session = await auth();
     if (!session?.user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    const deny = await requirePaidTier(session.user.id);
-    if (deny) return deny;
 
     const { leagueId } = await params;
 
@@ -157,11 +155,15 @@ export async function GET(
             scoringSettings: true,
             rosterPositions: true,
             totalRosters:    true,
+            assignedPlanId:  true,
         },
     });
     if (!league) {
         return Response.json({ error: 'League not found' }, { status: 404 });
     }
+
+    const deny = await requireLeaguePaidAccess(session.user.id, league.assignedPlanId);
+    if (deny) return deny;
 
     const leagueType     = (league.leagueType as LeagueType) ?? 'Redraft';
     const scoringSettings = (league.scoringSettings as Record<string, number> | null) ?? {};

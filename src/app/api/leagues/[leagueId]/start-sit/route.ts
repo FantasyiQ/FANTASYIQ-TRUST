@@ -3,7 +3,7 @@
 
 import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
-import { requirePaidTier } from '@/lib/access';
+import { requireLeaguePaidAccess } from '@/lib/access';
 import { prisma } from '@/lib/prisma';
 import { getNflState } from '@/lib/sleeper';
 import {
@@ -194,8 +194,6 @@ export async function POST(
 
     const session = await auth();
     if (!session?.user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    const deny = await requirePaidTier(session.user.id);
-    if (deny) return deny;
 
     const { leagueId: dbLeagueId } = await params;
     const body = await request.json() as { playerAId?: string; playerBId?: string; week?: number };
@@ -217,12 +215,16 @@ export async function POST(
             rosterPositions: true,
             standings:       true,
             sleeperUserId:   true,
+            assignedPlanId:  true,
         },
     });
 
     if (!league || league.userId !== session.user.id) {
         return Response.json({ error: 'League not found' }, { status: 404 });
     }
+
+    const deny = await requireLeaguePaidAccess(session.user.id, league.assignedPlanId);
+    if (deny) return deny;
 
     // ── Determine week / season ───────────────────────────────────────────────
     let week   = body.week ?? 0;

@@ -48,3 +48,54 @@ export async function requirePaidTier(userId: string): Promise<Response | null> 
 
     return null;
 }
+
+/**
+ * Verify the user has paid access to a specific league.
+ *
+ * Rules:
+ * - Commissioner plan owners: full access to all features on any league.
+ * - Player Elite: unlimited leagues — all pass.
+ * - Player Pro / All-Pro: only leagues where league.assignedPlanId === playerSub.id.
+ *
+ * Pass `leagueAssignedPlanId` from the League record fetched by the caller.
+ */
+export async function requireLeaguePaidAccess(
+    userId: string,
+    leagueAssignedPlanId: string | null,
+): Promise<Response | null> {
+    const user = await prisma.user.findUnique({
+        where:  { id: userId },
+        select: {
+            subscriptions: {
+                where:  { status: { in: ['active', 'trialing'] } },
+                select: { id: true, type: true, tier: true },
+            },
+        },
+    });
+
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const subs = user.subscriptions;
+
+    // Commissioner plan owners always have full access
+    if (subs.some(s => s.type === 'commissioner')) return null;
+
+    const playerSub = subs.find(s => s.type === 'player');
+    if (!playerSub) {
+        return Response.json(
+            { error: 'This feature requires a FiQ paid plan. Upgrade at /dashboard/upgrade.' },
+            { status: 403 },
+        );
+    }
+
+    // Elite: unlimited — no assignment required
+    if (playerSub.tier === 'PLAYER_ELITE') return null;
+
+    // Pro / All-Pro: league must be assigned to this subscription
+    if (leagueAssignedPlanId === playerSub.id) return null;
+
+    return Response.json(
+        { error: 'This league is not assigned to your plan. Go to your Player Plan page to assign it.' },
+        { status: 403 },
+    );
+}
