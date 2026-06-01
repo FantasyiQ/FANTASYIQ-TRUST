@@ -5,7 +5,7 @@ import { NotificationType } from '@/lib/notifications/types';
 const TEST_TYPES = [
   { type: NotificationType.DUES_PAYMENT_CONFIRMED,  title: 'Test: Payment Confirmed',     body: 'Your dues payment of $100 has been confirmed. ✓' },
   { type: NotificationType.DUES_REMINDER_DAILY,     title: 'Test: Dues Reminder',          body: 'Your dues of $100 for Test League are due in 3 days.' },
-  { type: NotificationType.MEMBER_JOINED_LEAGUE,    title: 'Test: Member Joined',          body: 'John Doe just joined your league on FantasyIQ.' },
+  { type: NotificationType.MEMBER_JOINED_LEAGUE,    title: 'Test: Member Joined',          body: 'John Doe just joined your league on FantasyiQ Trust.' },
   { type: NotificationType.PAYOUTS_RELEASED,        title: 'Test: Payouts Released',       body: 'Your commissioner has finalized the season payouts.' },
   { type: NotificationType.COMMISSIONER_SYNC_FAILED,title: 'Test: Sync Failed',            body: 'Sleeper sync encountered an error. Check your league settings.' },
   { type: NotificationType.SEASON_DRAFT_REMINDER,   title: 'Test: Draft Tomorrow',         body: 'Your league draft starts in 24 hours. Make sure your queue is set.' },

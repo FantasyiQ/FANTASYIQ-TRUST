@@ -54,7 +54,7 @@ export async function signUpAction(
     notify({
         userId:  newUser.id,
         type:    NotificationType.ACCOUNT_WELCOME,
-        title:   'Welcome to FantasyIQ Trust!',
+        title:   'Welcome to FantasyiQ Trust!',
         body:    'Your account is ready. Sync your league and set up dues in minutes.',
         inApp:   true,
         email:   true,
@@ -71,11 +71,11 @@ export async function signUpAction(
         data: { userId: newUser.id, token: verifyToken, expiresAt },
     }).then(() => {
         const html = renderTemplate('account.email_verification', {
-            title: 'Verify your FantasyIQ email',
+            title: 'Verify your FantasyiQ Trust email',
             body:  'Click below to verify your email address.',
             data:  { verifyUrl },
         });
-        return sendEmail({ to: email, subject: 'Verify your FantasyIQ email address', html });
+        return sendEmail({ to: email, subject: 'Verify your FantasyiQ Trust email address', html });
     }).catch(() => {});
 
     // Auto sign-in after account creation — signIn throws a redirect internally.

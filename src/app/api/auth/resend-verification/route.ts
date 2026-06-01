@@ -40,14 +40,14 @@ export async function POST(request: NextRequest): Promise<Response> {
     const verifyUrl = `${appUrl}/api/auth/verify-email?token=${token}`;
 
     const html = renderTemplate('account.email_verification', {
-        title: 'Verify your FantasyIQ email',
+        title: 'Verify your FantasyiQ Trust email',
         body:  'Click below to verify your email address.',
         data:  { verifyUrl },
     });
 
     await sendEmail({
         to:      user.email,
-        subject: 'Verify your FantasyIQ email address',
+        subject: 'Verify your FantasyiQ Trust email address',
         html,
     });
 
