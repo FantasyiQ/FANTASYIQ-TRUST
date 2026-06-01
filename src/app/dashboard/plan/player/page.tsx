@@ -23,7 +23,6 @@ function formatTier(tier: string): string {
         case 'PLAYER_PRO':      return 'Player Pro';
         case 'PLAYER_ALL_PRO':  return 'Player All-Pro';
         case 'PLAYER_ELITE':    return 'Player Elite';
-        case 'PLAYER_ELITEIQ':  return 'Player EliteiQ';
         default:                return tier;
     }
 }
@@ -301,7 +300,7 @@ export default async function PlayerPlanPage() {
                             <div className="flex items-center justify-between gap-4 p-4 bg-[#D4AF37]/5 rounded-xl border border-[#D4AF37]/20">
                                 <div>
                                     <p className="font-medium text-[#D4AF37] text-sm">Player Elite ✦</p>
-                                    <p className="text-gray-500 text-xs mt-0.5">Unlimited leagues · Priority data · All features</p>
+                                    <p className="text-gray-500 text-xs mt-0.5">Unlimited leagues · All features</p>
                                 </div>
                                 <Link href="/pricing?tab=player"
                                     className="shrink-0 bg-[#D4AF37]/15 border border-[#D4AF37]/50 text-[#D4AF37] font-bold px-4 py-2 rounded-lg transition text-sm hover:bg-[#D4AF37]/25">

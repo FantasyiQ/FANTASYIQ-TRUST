@@ -7,7 +7,7 @@ import { notify } from '@/lib/notifications/service';
 import { NotificationType } from '@/lib/notifications/types';
 import type { SubscriptionTier } from '@prisma/client';
 
-const PLAYER_TIERS = new Set<SubscriptionTier>(['PLAYER_PRO', 'PLAYER_ALL_PRO', 'PLAYER_ELITE', 'PLAYER_ELITEIQ']);
+const PLAYER_TIERS = new Set<SubscriptionTier>(['PLAYER_PRO', 'PLAYER_ALL_PRO', 'PLAYER_ELITE']);
 
 // Derive plan type using the tier prefix as the authoritative signal.
 // Metadata alone can be missing or wrong; the tier string never lies.

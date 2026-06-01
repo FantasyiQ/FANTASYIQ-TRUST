@@ -15,10 +15,6 @@ export const PLAN_CATALOG: Record<string, PlanInfo> = {
     'price_1TLieF2RJtQwVGBEPpjA7NUp': { type: 'player', tier: 'PLAYER_PRO',     leagueSize: null },
     'price_1TLieF2RJtQwVGBEW2cynnDi': { type: 'player', tier: 'PLAYER_ALL_PRO', leagueSize: null },
     'price_1TLieG2RJtQwVGBELTvoH65N': { type: 'player', tier: 'PLAYER_ELITE',   leagueSize: null },
-    // PLAYER_ELITEIQ — injected from env so catalog works in both test and live
-    ...(process.env.STRIPE_PRICE_ELITEIQ
-        ? { [process.env.STRIPE_PRICE_ELITEIQ]: { type: 'player' as const, tier: 'PLAYER_ELITEIQ' as SubscriptionTier, leagueSize: null } }
-        : {}),
     // Commissioner Pro
     'price_1TLieG2RJtQwVGBEgreYGMge': { type: 'commissioner', tier: 'COMMISSIONER_PRO', leagueSize: 8 },
     'price_1TLieH2RJtQwVGBEo8qIXXDx': { type: 'commissioner', tier: 'COMMISSIONER_PRO', leagueSize: 10 },

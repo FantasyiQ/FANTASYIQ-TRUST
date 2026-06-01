@@ -40,10 +40,9 @@ function tierGroupRank(tier: string): number {
     if (tier === 'PLAYER_PRO')           return 1;
     if (tier === 'PLAYER_ALL_PRO')       return 2;
     if (tier === 'PLAYER_ELITE')         return 3;
-    if (tier === 'PLAYER_ELITEIQ')       return 4;
-    if (tier === 'COMMISSIONER_PRO')     return 5;
-    if (tier === 'COMMISSIONER_ALL_PRO') return 6;
-    if (tier === 'COMMISSIONER_ELITE')   return 7;
+    if (tier === 'COMMISSIONER_PRO')     return 4;
+    if (tier === 'COMMISSIONER_ALL_PRO') return 5;
+    if (tier === 'COMMISSIONER_ELITE')   return 6;
     return 0;
 }
 
@@ -82,7 +81,6 @@ const PLAYER_PRICE_IDS = {
     pro:      findPriceId('Player Pro'),
     all_pro:  findPriceId('Player All-Pro'),
     elite:    findPriceId('Player Elite'),
-    eliteiq:  findPriceId('Player EliteiQ'),
 };
 
 function commPriceId(tier: 'Pro' | 'All-Pro' | 'Elite', size: TeamSize): string {
@@ -148,7 +146,7 @@ const PLAYER_ALL_PRO_FEATURES: Feature[] = [
     { name: 'League Funds Secured',          included: true,  tooltip: tip('League Funds Secured') },
     { name: 'League Dues & Payouts Tracked', included: true,  tooltip: tip('League Dues & Payouts Tracked') },
     { name: 'Immediate Payouts',             included: true,  tooltip: tip('Immediate Payouts') },
-    { name: 'Sync Up to 4 Leagues',          included: true,  tooltip: 'Connect up to 4 fantasy leagues from Sleeper, ESPN, Yahoo, or NFL Fantasy.' },
+    { name: 'Sync Up to 5 Leagues',          included: true,  tooltip: 'Connect up to 5 fantasy leagues from Sleeper, ESPN, Yahoo, or NFL Fantasy.' },
     { name: 'League Finder',                 included: true,  tooltip: tip('League Finder') },
     { name: 'Commish Reviews',               included: true,  tooltip: tip('Commish Reviews') },
     { name: 'Dynasty Skill Score (DSS)',      included: true,  tooltip: tip('Dynasty Skill Score (DSS)') },
@@ -173,7 +171,7 @@ const PLAYER_ELITE_FEATURES: Feature[] = [
     { name: 'League Funds Secured',          included: true, tooltip: tip('League Funds Secured') },
     { name: 'League Dues & Payouts Tracked', included: true, tooltip: tip('League Dues & Payouts Tracked') },
     { name: 'Immediate Payouts',             included: true, tooltip: tip('Immediate Payouts') },
-    { name: 'Sync Up to 7 Leagues',          included: true, tooltip: 'Connect up to 7 fantasy leagues from Sleeper, ESPN, Yahoo, or NFL Fantasy.' },
+    { name: 'Unlimited League Syncs',         included: true, tooltip: 'Connect unlimited fantasy leagues from Sleeper, ESPN, Yahoo, or NFL Fantasy.' },
     { name: 'League Finder',                 included: true, tooltip: tip('League Finder') },
     { name: 'Commish Reviews',               included: true, tooltip: tip('Commish Reviews') },
     { name: 'Dynasty Skill Score (DSS)',      included: true, tooltip: tip('Dynasty Skill Score (DSS)') },
@@ -193,30 +191,6 @@ const PLAYER_ELITE_FEATURES: Feature[] = [
     { name: 'Live Draft',                    included: true, tooltip: tip('Live Draft') },
 ];
 
-const PLAYER_ELITEIQ_FEATURES: Feature[] = [
-    { name: 'Zero Fees',                     included: true, tooltip: tip('Zero Fees') },
-    { name: 'League Funds Secured',          included: true, tooltip: tip('League Funds Secured') },
-    { name: 'League Dues & Payouts Tracked', included: true, tooltip: tip('League Dues & Payouts Tracked') },
-    { name: 'Immediate Payouts',             included: true, tooltip: tip('Immediate Payouts') },
-    { name: 'Unlimited League Syncs',        included: true, tooltip: 'Connect unlimited fantasy leagues from Sleeper, ESPN, Yahoo, or NFL Fantasy.' },
-    { name: 'League Finder',                 included: true, tooltip: tip('League Finder') },
-    { name: 'Commish Reviews',               included: true, tooltip: tip('Commish Reviews') },
-    { name: 'Dynasty Skill Score (DSS)',      included: true, tooltip: tip('Dynasty Skill Score (DSS)') },
-    { name: 'Platform Handles',              included: true, tooltip: tip('Platform Handles') },
-    { name: 'Weekly DFS Challenge',          included: true, tooltip: tip('Weekly DFS Challenge') },
-    { name: 'Optimized Lineups',             included: true, tooltip: tip('Optimized Lineups') },
-    { name: 'Waiver Wire Intelligence',      included: true, tooltip: tip('Waiver Wire Intelligence') },
-    { name: 'Start/Sit Intelligence',        included: true, tooltip: tip('Start/Sit Intelligence') },
-    { name: 'Draft Strategy',                included: true, tooltip: tip('Draft Strategy') },
-    { name: 'Draft Report',                  included: true, tooltip: tip('Draft Report') },
-    { name: 'Player Rankings',               included: true, tooltip: tip('Player Rankings') },
-    { name: 'Team DTV Rankings',             included: true, tooltip: tip('Team DTV Rankings') },
-    { name: 'League Power Rankings',         included: true, tooltip: tip('League Power Rankings') },
-    { name: 'Dynamic Trade Evaluator',       included: true, tooltip: tip('Dynamic Trade Evaluator') },
-    { name: 'Trade Insights',                included: true, tooltip: tip('Trade Insights') },
-    { name: 'Roster Intelligence',           included: true, tooltip: tip('Roster Intelligence') },
-    { name: 'Live Draft',                    included: true, tooltip: tip('Live Draft') },
-];
 
 const COMM_PRO_FEATURES: Feature[] = [
     { name: 'Zero Fees',                     included: true,  tooltip: tip('Zero Fees') },
@@ -776,35 +750,23 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                                     returnTo={returnTo}
                                 />
                                 <PlanCard
-                                    name="All-Pro" price="19.99" period="/mo"
+                                    name="All-Pro" price="24.99" period="/mo"
                                     badge="Most Popular" badgeGold ring
                                     features={PLAYER_ALL_PRO_FEATURES}
                                     priceId={PLAYER_PRICE_IDS.all_pro} tier="PLAYER_ALL_PRO"
                                     cardStatus={resolvePlayerCardStatus('PLAYER_ALL_PRO', playerSub)}
                                     sourceStripeSubId={playerSub?.stripeSubscriptionId}
                                     onUpgrade={handleUpgradeClick}
-                                    leagueLimitNote="Up to 4 Leagues"
-                                    atLeagueLimit={resolvePlayerCardStatus('PLAYER_ALL_PRO', playerSub) === 'current' && activePlayerLeagueCount >= 4}
+                                    leagueLimitNote="Up to 5 Leagues"
+                                    atLeagueLimit={resolvePlayerCardStatus('PLAYER_ALL_PRO', playerSub) === 'current' && activePlayerLeagueCount >= 5}
                                     returnTo={returnTo}
                                 />
                                 <PlanCard
-                                    name="Elite" price="34.99" period="/mo"
+                                    name="Elite" price="44.99" period="/mo"
                                     badge="Full Access"
                                     features={PLAYER_ELITE_FEATURES}
                                     priceId={PLAYER_PRICE_IDS.elite} tier="PLAYER_ELITE"
                                     cardStatus={resolvePlayerCardStatus('PLAYER_ELITE', playerSub)}
-                                    sourceStripeSubId={playerSub?.stripeSubscriptionId}
-                                    onUpgrade={handleUpgradeClick}
-                                    leagueLimitNote="Up to 7 Leagues"
-                                    atLeagueLimit={resolvePlayerCardStatus('PLAYER_ELITE', playerSub) === 'current' && activePlayerLeagueCount >= 7}
-                                    returnTo={returnTo}
-                                />
-                                <PlanCard
-                                    name="EliteiQ" price="59.99" period="/mo"
-                                    badge="Shot Caller"
-                                    features={PLAYER_ELITEIQ_FEATURES}
-                                    priceId={PLAYER_PRICE_IDS.eliteiq} tier="PLAYER_ELITEIQ"
-                                    cardStatus={resolvePlayerCardStatus('PLAYER_ELITEIQ', playerSub)}
                                     sourceStripeSubId={playerSub?.stripeSubscriptionId}
                                     onUpgrade={handleUpgradeClick}
                                     leagueLimitNote="Unlimited Leagues"

@@ -3,7 +3,7 @@ import { stripe, planInfo } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 import type { SubscriptionTier } from '@prisma/client';
 
-const PLAYER_TIERS = new Set<SubscriptionTier>(['PLAYER_PRO', 'PLAYER_ALL_PRO', 'PLAYER_ELITE', 'PLAYER_ELITEIQ']);
+const PLAYER_TIERS = new Set<SubscriptionTier>(['PLAYER_PRO', 'PLAYER_ALL_PRO', 'PLAYER_ELITE']);
 
 function resolveSubType(
     tier: string | null | undefined,

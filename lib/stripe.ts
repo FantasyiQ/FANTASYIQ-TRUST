@@ -14,24 +14,17 @@ export const PLAYER_TIERS = {
     },
     all_pro: {
         name: "All-Pro",
-        price: 19.99,
+        price: 24.99,
         leagueMin: 1,
-        leagueMax: 4,
+        leagueMax: 5,
         priceId: process.env.STRIPE_PRICE_ALL_PRO!,
     },
     elite: {
         name: "Elite",
-        price: 34.99,
-        leagueMin: 1,
-        leagueMax: 7,
-        priceId: process.env.STRIPE_PRICE_ELITE!,
-    },
-    eliteiq: {
-        name: "ELITEiQ",
-        price: 59.99,
+        price: 44.99,
         leagueMin: 1,
         leagueMax: Infinity,
-        priceId: process.env.STRIPE_PRICE_ELITEIQ!,
+        priceId: process.env.STRIPE_PRICE_ELITE!,
     },
 } as const;
 
