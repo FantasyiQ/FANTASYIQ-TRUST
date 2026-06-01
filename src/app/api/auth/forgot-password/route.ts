@@ -42,14 +42,14 @@ export async function POST(request: NextRequest): Promise<Response> {
         const resetUrl = `${appUrl}/reset-password?token=${token}`;
 
         const html = renderTemplate('account.password_reset', {
-            title: 'Reset your FantasyIQ password',
+            title: 'Reset your FantasyiQ Trust password',
             body:  'Click below to reset your password.',
             data:  { resetUrl },
         });
 
         sendEmail({
             to:      email,
-            subject: 'Reset your FantasyIQ password',
+            subject: 'Reset your FantasyiQ Trust password',
             html,
         }).catch(() => {});
     }

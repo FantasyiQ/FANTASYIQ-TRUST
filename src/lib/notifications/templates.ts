@@ -25,7 +25,7 @@ function baseLayout(title: string, bodyHtml: string, ctaHtml?: string): string {
           <tr>
             <td style="background-color:#D4AF37;padding:16px 32px;border-radius:12px 12px 0 0;">
               <span style="color:#0a0a0a;font-size:18px;font-weight:700;letter-spacing:-0.5px;">
-                Fantasy<span style="font-style:italic;">i</span>Q Trust
+                FantasyiQ Trust
               </span>
             </td>
           </tr>
