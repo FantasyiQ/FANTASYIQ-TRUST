@@ -122,13 +122,16 @@ export default async function CommissionerPlanPage({
                             </div>
                         </div>
                     </div>
-                    <div className="pt-3 border-t border-gray-800">
+                    <div className="pt-3 border-t border-gray-800 flex items-center gap-6">
                         <form action={createPortalSession}>
                             <button type="submit"
                                 className="text-[#D4AF37]/70 hover:text-[#D4AF37] text-sm font-medium transition">
                                 Manage Subscription →
                             </button>
                         </form>
+                        <Link href="/dashboard/billing" className="text-gray-500 hover:text-gray-300 text-sm font-medium transition">
+                            Billing History →
+                        </Link>
                     </div>
                 </div>
 

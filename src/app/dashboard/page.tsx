@@ -673,6 +673,12 @@ export default async function DashboardPage({
                                 {!hasAnyActiveSub ? 'View plans and pricing' : isElite ? 'Billing and plan details' : 'Plans, billing, and upgrades'}
                             </p>
                         </Link>
+                        <Link href="/dashboard/billing"
+                            className="block bg-gray-900 border border-gray-800 hover:border-[#D4AF37]/50 rounded-xl p-5 transition group">
+                            <div className="text-2xl mb-2">🧾</div>
+                            <p className="font-semibold text-white group-hover:text-[#D4AF37] transition">Billing History</p>
+                            <p className="text-gray-500 text-sm mt-0.5">Receipts and past invoices</p>
+                        </Link>
                     </div>
                 </div>
 
