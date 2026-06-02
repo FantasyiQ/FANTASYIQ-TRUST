@@ -58,8 +58,8 @@ function SupportAssistantPanel({ onClose }: { onClose: () => void }) {
 
     return (
         <div
-            className="fixed bottom-20 right-4 sm:right-6 z-50 w-[calc(100vw-2rem)] max-w-sm flex flex-col bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl overflow-hidden"
-            style={{ maxHeight: 'min(520px, calc(100vh - 120px))' }}
+            className="fixed bottom-28 right-4 sm:right-6 z-50 w-[calc(100vw-2rem)] max-w-sm flex flex-col bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl overflow-hidden"
+            style={{ maxHeight: 'min(520px, calc(100vh - 170px))' }}
         >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800 shrink-0">
@@ -188,7 +188,7 @@ export default function SupportAssistantLauncher() {
                 type="button"
                 onClick={() => setOpen(o => !o)}
                 aria-label="Open FiQ Support Assistant"
-                className={`fixed bottom-5 right-4 sm:right-6 z-50 flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg transition-all duration-200 ${
+                className={`fixed bottom-16 right-4 sm:right-6 z-50 flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg transition-all duration-200 ${
                     open
                         ? 'bg-gray-800 border border-gray-700 text-gray-400 hover:text-white'
                         : 'bg-[#D4AF37] text-black hover:bg-[#BF9D2F]'
