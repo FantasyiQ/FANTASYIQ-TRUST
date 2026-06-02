@@ -15,13 +15,13 @@ export default function TermsOfServicePage() {
                 <div className="space-y-2 border-b border-gray-800 pb-8">
                     <p className="text-[10px] font-bold tracking-widest text-[#D4AF37] uppercase">Legal</p>
                     <h1 className="text-3xl font-bold text-white">Terms of Service</h1>
-                    <p className="text-gray-500 text-sm">Last updated: May 21, 2026</p>
+                    <p className="text-gray-500 text-sm">Last updated: June 2, 2026</p>
                 </div>
 
                 <LegalSection title="1. Acceptance of Terms">
                     <p>
                         By accessing or using FantasyiQ Trust (&ldquo;the Service,&rdquo; &ldquo;we,&rdquo; &ldquo;us,&rdquo; or &ldquo;our&rdquo;) at{' '}
-                        <span className="text-[#D4AF37]">fantasyiq.app</span>, you agree to be bound by these Terms of Service
+                        <span className="text-[#D4AF37]">www.fantasyiQTrust.com</span>, you agree to be bound by these Terms of Service
                         (&ldquo;Terms&rdquo;). If you do not agree to all of these Terms, do not use the Service. These Terms constitute a
                         legally binding agreement between you and FantasyiQ Trust.
                     </p>
@@ -227,9 +227,12 @@ export default function TermsOfServicePage() {
 
                 <LegalSection title="16. Contact">
                     <p>If you have questions about these Terms, please contact us at:</p>
-                    <div className="mt-3 bg-gray-900 border border-gray-800 rounded-xl px-5 py-4 text-sm text-gray-300">
+                    <div className="mt-3 bg-gray-900 border border-gray-800 rounded-xl px-5 py-4 text-sm text-gray-300 space-y-0.5">
                         <p className="font-semibold text-white">FantasyiQ Trust</p>
-                        <p className="text-gray-400 mt-1">Legal@FantasyiQTrust.com</p>
+                        <p className="text-gray-400">11111 San Jose Blvd, Suite 56</p>
+                        <p className="text-gray-400">Jacksonville, FL 32223</p>
+                        <p className="text-gray-400 mt-2">Legal@FantasyiQTrust.com</p>
+                        <p className="text-gray-400">(904) 925-0087</p>
                     </div>
                 </LegalSection>
 
