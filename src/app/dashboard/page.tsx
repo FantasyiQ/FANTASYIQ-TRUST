@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { auth, signOut } from '@/lib/auth';
+import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { stripe, priceIdToTier } from '@/lib/stripe';
 import { createPortalSession } from '@/app/actions/stripe';
@@ -343,15 +343,6 @@ export default async function DashboardPage({
                         </div>
                     </div>
 
-                    <form action={async () => {
-                        'use server';
-                        await signOut({ redirectTo: '/' });
-                    }}>
-                        <button type="submit"
-                            className="bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold px-4 py-2 rounded-lg transition text-sm">
-                            Sign Out
-                        </button>
-                    </form>
                 </div>
 
                 {/* ── Onboarding (new users with no leagues) ───────────── */}
