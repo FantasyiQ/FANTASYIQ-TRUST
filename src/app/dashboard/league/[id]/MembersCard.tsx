@@ -16,7 +16,7 @@ export interface LeagueMemberData {
     isCoCommissioner: boolean;
     /** Our platform user ID — null if not registered. */
     userId:           string | null;
-    /** Dynasty Skill Score 0–100, null if not registered. */
+    /** PRS score 0–100, null if not registered. */
     prsScore:         number | null;
     /** Basic trust score, null if not registered. */
     trustScore:       number | null;
@@ -110,14 +110,6 @@ function CommissionerProfile({ member }: { member: LeagueMemberData }) {
                     <p className="text-gray-600 text-xs mt-0.5">@{member.username}</p>
                 )}
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
-                    {member.prsScore != null && (
-                        <span
-                            className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border ${prsTierStyles(member.prsScore)}`}
-                            title={`Dynasty Skill Score (DSS): ${member.prsScore}/100 (${prsTierLabel(member.prsScore)})`}
-                        >
-                            DSS {member.prsScore}
-                        </span>
-                    )}
                     {member.lfCommissioner && member.lfCommissioner.reviewsCount > 0 && (
                         <span className="flex items-center gap-1.5">
                             <StarRow rating={member.lfCommissioner.avgRating} />
@@ -174,14 +166,6 @@ function MemberRow({ member }: { member: LeagueMemberData }) {
                 )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
-                {member.prsScore != null && (
-                    <span
-                        className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border ${prsTierStyles(member.prsScore)}`}
-                        title={`Dynasty Skill Score (DSS): ${member.prsScore}/100 (${prsTierLabel(member.prsScore)})`}
-                    >
-                        DSS {member.prsScore}
-                    </span>
-                )}
             </div>
         </div>
     );
@@ -247,12 +231,7 @@ export default function MembersCard({ members }: Props) {
                         <span className="text-gray-600 font-normal text-base ml-2">({members.length})</span>
                     </h2>
 
-                    {/* DSS explanation pill */}
                     <span className="inline-flex items-center gap-1.5 text-[10px] text-gray-500 bg-gray-800 border border-gray-700 px-2.5 py-1 rounded-full leading-none">
-                        <span className="font-bold text-gray-400">DSS</span>
-                        <span className="text-gray-600">·</span>
-                        Dynasty Skill Score
-                        <span className="text-gray-600">·</span>
                         {registeredCount}/{members.length} on FantasyiQ
                     </span>
                 </div>
@@ -269,31 +248,6 @@ export default function MembersCard({ members }: Props) {
             {/* ── Expanded content ──────────────────────────────────────────── */}
             {open && (
                 <>
-                    {/* DSS legend */}
-                    <div className="px-6 py-3 border-t border-gray-800 bg-gray-800/20">
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                            <p className="text-[10px] text-gray-600 leading-relaxed">
-                                <span className="font-bold text-gray-500">Dynasty Skill Score (DSS)</span> measures long-term dynasty performance — roster strength, draft efficiency, trade impact, lineup optimization, and season-over-season improvement.
-                                Scores range from 0–100. Only members who have joined FantasyiQ Trust show a score.
-                            </p>
-                            <a href="/support#faq-prs" className="text-[10px] text-gray-600 hover:text-[#D4AF37] transition shrink-0">Learn more →</a>
-                        </div>
-                        <div className="flex items-center gap-3 mt-2 flex-wrap">
-                            {[
-                                { label: 'Elite', styles: 'bg-[#D4AF37]/10 border-[#D4AF37]/40 text-[#D4AF37]',           range: '81–100' },
-                                { label: 'Trusted', styles: 'bg-emerald-900/20 border-emerald-500/40 text-emerald-400',   range: '61–80'  },
-                                { label: 'Reliable', styles: 'bg-amber-900/20 border-amber-500/40 text-amber-400',        range: '41–60'  },
-                                { label: 'Developing', styles: 'bg-orange-900/20 border-orange-500/40 text-orange-400',   range: '21–40'  },
-                                { label: 'Unproven', styles: 'bg-gray-800/40 border-gray-700 text-gray-500',              range: '0–20'   },
-                            ].map(({ label, styles, range }) => (
-                                <span key={label} className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded border ${styles}`}>
-                                    {label}
-                                    <span className="font-normal opacity-70">{range}</span>
-                                </span>
-                            ))}
-                        </div>
-                    </div>
-
                     <div className="px-6 py-5 space-y-4 border-t border-gray-800">
                         {/* Commissioner profile */}
                         {commissioner && (
