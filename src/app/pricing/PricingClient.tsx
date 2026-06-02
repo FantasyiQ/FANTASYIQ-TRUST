@@ -118,10 +118,6 @@ function tip(name: string): string | undefined {
 }
 
 const PLAYER_PRO_FEATURES: Feature[] = [
-    { name: 'Zero Fees',                     included: true,  tooltip: tip('Zero Fees') },
-    { name: 'League Funds Secured',          included: true,  tooltip: tip('League Funds Secured') },
-    { name: 'League Dues & Payouts Tracked', included: true,  tooltip: tip('League Dues & Payouts Tracked') },
-    { name: 'Immediate Payouts',             included: true,  tooltip: tip('Immediate Payouts') },
     { name: 'Sync Up to 2 Leagues',          included: true,  tooltip: 'Connect up to 2 fantasy leagues from Sleeper, ESPN, Yahoo, or NFL Fantasy.' },
     { name: 'League Finder',                 included: true,  tooltip: tip('League Finder') },
     { name: 'Commish Reviews',               included: true,  tooltip: tip('Commish Reviews') },
@@ -142,10 +138,6 @@ const PLAYER_PRO_FEATURES: Feature[] = [
 ];
 
 const PLAYER_ALL_PRO_FEATURES: Feature[] = [
-    { name: 'Zero Fees',                     included: true,  tooltip: tip('Zero Fees') },
-    { name: 'League Funds Secured',          included: true,  tooltip: tip('League Funds Secured') },
-    { name: 'League Dues & Payouts Tracked', included: true,  tooltip: tip('League Dues & Payouts Tracked') },
-    { name: 'Immediate Payouts',             included: true,  tooltip: tip('Immediate Payouts') },
     { name: 'Sync Up to 5 Leagues',          included: true,  tooltip: 'Connect up to 5 fantasy leagues from Sleeper, ESPN, Yahoo, or NFL Fantasy.' },
     { name: 'League Finder',                 included: true,  tooltip: tip('League Finder') },
     { name: 'Commish Reviews',               included: true,  tooltip: tip('Commish Reviews') },
@@ -167,11 +159,7 @@ const PLAYER_ALL_PRO_FEATURES: Feature[] = [
 ];
 
 const PLAYER_ELITE_FEATURES: Feature[] = [
-    { name: 'Zero Fees',                     included: true, tooltip: tip('Zero Fees') },
-    { name: 'League Funds Secured',          included: true, tooltip: tip('League Funds Secured') },
-    { name: 'League Dues & Payouts Tracked', included: true, tooltip: tip('League Dues & Payouts Tracked') },
-    { name: 'Immediate Payouts',             included: true, tooltip: tip('Immediate Payouts') },
-    { name: 'Unlimited League Syncs',         included: true, tooltip: 'Connect unlimited fantasy leagues from Sleeper, ESPN, Yahoo, or NFL Fantasy.' },
+    { name: 'Unlimited League Syncs',        included: true, tooltip: 'Connect unlimited fantasy leagues from Sleeper, ESPN, Yahoo, or NFL Fantasy.' },
     { name: 'League Finder',                 included: true, tooltip: tip('League Finder') },
     { name: 'Commish Reviews',               included: true, tooltip: tip('Commish Reviews') },
     { name: 'Dynasty Skill Score (DSS)',      included: true, tooltip: tip('Dynasty Skill Score (DSS)') },
@@ -659,7 +647,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                     <div className="text-center mb-10">
                         <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-4">Choose Your Plan</h1>
                         <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-                            Cross-platform access · Zero Fees Guaranteed · League Dues Protected
+                            Cross-platform access · Personal analytics for every league you play in
                         </p>
                     </div>
 
@@ -680,6 +668,16 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                             </button>
                         </div>
                     </div>
+
+                    {/* Player plan explainer */}
+                    {tab === 'player' && (
+                        <div className="mb-10 max-w-5xl mx-auto bg-gray-900/60 border border-gray-800 rounded-xl px-5 py-4 text-sm text-gray-300 space-y-2">
+                            <p><span className="text-white font-semibold">Player Plans are personal — not league-wide.</span> You&apos;re buying analytics tools for yourself, not your entire league.</p>
+                            <p><span className="text-[#D4AF37] font-semibold">Already in a commissioner-paid league?</span> You don&apos;t need to buy anything. If your commissioner has a FiQ Commissioner Plan, you already have access to league tools — no purchase required on your end.</p>
+                            <p>Player Plans let you sync <span className="text-white font-semibold">any league you play in</span> — regardless of whether that league uses FiQ or not. Use your personal analytics across all your leagues, on any platform (Sleeper, ESPN, Yahoo, NFL Fantasy).</p>
+                            <p className="text-gray-500 text-xs pt-1 border-t border-gray-800">Player Plans do not include dues collection, payouts, or commissioner tools. Those are exclusive to Commissioner Plans.</p>
+                        </div>
+                    )}
 
                     {/* Commissioner: size selector + league name input */}
                     {tab === 'commissioner' && (
