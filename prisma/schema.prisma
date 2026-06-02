@@ -63,9 +63,14 @@ model User {
     churnRiskEvents       ChurnRiskEvent[]
     prediction            UserPrediction?
 
+    // Player Reliability Score
+    prsScore              Int               @default(0)  // cached final PRS (0-100) for fast reads
+    prsEvents             PrsEvent[]
+    prsRecord             PrsScore?
+    prsHistorySubmissions PrsHistoryImport[] @relation("PrsHistorySubmitter")
+
     // LeagueFinder
     trustScore            Int               @default(0)
-    prsScore              Int               @default(0)  // Player Reliability Score (0-100)
     lfReviews             LFReview[]        @relation("ReviewerReviews")
     lfVotes               LFReviewVote[]    @relation("ReviewVotes")
     ownedCommissioner     LFCommissioner?   @relation("CommissionerOwner")
@@ -804,8 +809,11 @@ model LFLeague {
     stabilityScore       Int     @default(0)   // = min(100, completedSeasons * 20)
     verifiedReviewsCount Int     @default(0)
     rankingScore         Int     @default(0)   // composite for search ordering
+    requiresMinPrs       Int?     // minimum prsScore a player must have to join; null = open to all
     commissionerId       String
     createdAt            DateTime @default(now())
+
+    historyImport        PrsHistoryImport?
 
     commissioner    LFCommissioner  @relation(fields: [commissionerId], references: [id])
     reviews         LFReview[]
@@ -875,6 +883,62 @@ model LFReviewReply {
     owner          User           @relation("ReviewReplies", fields: [ownerId], references: [id])
 }
 
+// ── Player Reliability Score (PRS) ───────────────────────────────────────────
+
+enum PrsEventType {
+    verified_season
+    season_abandoned
+    retention_stayed
+    retention_left
+    retention_removed
+    lineup_set
+    lineup_missed
+    trade_response
+    trade_ignored
+    waiver_active
+    commish_approval
+    commish_endorsement
+    commish_flag
+    commish_ban
+    veto_abuse
+    collusion_flag
+    tanking_flag
+    toxicity_report
+    rule_violation
+}
+
+// Raw behavioral events — one row per event.
+model PrsEvent {
+    id          String       @id @default(cuid())
+    userId      String
+    eventType   PrsEventType
+    eventValue  Int?
+    eventDate   DateTime     @default(now())
+
+    user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+    @@index([userId, eventType])
+    @@index([eventDate])
+}
+
+// Computed PRS — upserted nightly and on immediate-trigger events.
+model PrsScore {
+    id                String   @id @default(cuid())
+    userId            String   @unique
+    seasonScore       Int      @default(0)
+    retentionScore    Int      @default(0)
+    engagementScore   Int      @default(0)
+    commissionerTrust Int      @default(0)
+    behaviorScore     Int      @default(0)
+    prs               Int      @default(0)
+    updatedAt         DateTime @updatedAt
+
+    user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([prs])
+}
+
 enum LFJoinStatus {
     PENDING
     ACCEPTED
@@ -913,6 +977,39 @@ model LFLeagueSeason {
 
     @@unique([leagueId, year])
     @@index([leagueId])
+}
+
+// ── Commissioner History Import ───────────────────────────────────────────────
+// Commissioners can import prior-season history for their league members once.
+// The @unique on leagueId acts as the write-once lock.
+
+model PrsHistoryImport {
+    id            String   @id @default(cuid())
+    leagueId      String   @unique  // one import per league — enforces the lock
+    submittedById String             // commissioner's userId (audit: who submitted it)
+    memberCount   Int                // how many members were processed
+    submittedAt   DateTime @default(now())
+
+    league        LFLeague              @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+    submittedBy   User                  @relation("PrsHistorySubmitter", fields: [submittedById], references: [id], onDelete: Cascade)
+    entries       PrsHistoryImportEntry[]
+
+    @@index([submittedById])
+}
+
+// One audit row per member processed in a history import.
+model PrsHistoryImportEntry {
+    id               String  @id @default(cuid())
+    importId         String
+    userId           String  // the member whose history was imported
+    completedSeasons Int     // number of verified_season events created
+    returned         Boolean // whether retention_stayed was created
+    approved         Boolean // whether commish_approval was created
+
+    import           PrsHistoryImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+    @@index([importId])
+    @@index([userId])
 }
 
 // ── Weekly DFS Challenge ──────────────────────────────────────────────────────

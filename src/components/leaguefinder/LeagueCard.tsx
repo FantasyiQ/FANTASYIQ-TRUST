@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { StarRating } from './StarRating';
+import { prsTier, PRS_TIER_LABELS, PRS_TIER_STYLES } from '@/lib/lf-prs-display';
 
 const ACTIVITY_LABELS: Record<number, string> = {
     20:  'Very low activity',
@@ -20,6 +21,7 @@ interface Props {
     activityScore:    number;
     stabilityScore:   number;
     completedSeasons: number;
+    requiresMinPrs:   number | null | undefined;
     commissioner: {
         id:           string;
         displayName:  string;
@@ -50,7 +52,7 @@ function ScorePill({ label, score, tooltip }: { label: string; score: number; to
 
 export default function LeagueCard({
     id, name, platform, format, scoring, size, buyIn,
-    activityScore, stabilityScore, completedSeasons, commissioner,
+    activityScore, stabilityScore, completedSeasons, requiresMinPrs, commissioner,
 }: Props) {
     const seasons = completedSeasons ?? Math.round(stabilityScore / 20);
     const stabilityTooltip = `Stability: ${stabilityScore} — ${seasons} completed season${seasons !== 1 ? 's' : ''} with payouts`;
@@ -97,6 +99,14 @@ export default function LeagueCard({
                     )}
                     {(buyIn == null || buyIn === 0) && (
                         <Badge color="gray">Free</Badge>
+                    )}
+                    {requiresMinPrs != null && (
+                        <span
+                            className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${PRS_TIER_STYLES[prsTier(requiresMinPrs)]}`}
+                            title={`Requires PRS ${requiresMinPrs}+ (${PRS_TIER_LABELS[prsTier(requiresMinPrs)]})`}
+                        >
+                            PRS {requiresMinPrs}+ req
+                        </span>
                     )}
                 </div>
             </div>

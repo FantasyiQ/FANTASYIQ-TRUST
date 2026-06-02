@@ -78,6 +78,7 @@ export const NotificationType = {
 
   // League Finder
   LF_JOIN_REQUEST:              'lf.join_request',           // player requested to join commissioner's league
+  LF_PRS_HISTORY_ADDED:         'lf.prs_history_added',      // commissioner imported history for this player
 } as const;
 
 export type NotificationType = typeof NotificationType[keyof typeof NotificationType];

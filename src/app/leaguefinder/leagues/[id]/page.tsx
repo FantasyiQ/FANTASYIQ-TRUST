@@ -27,7 +27,8 @@ export default async function LeagueProfilePage({
     const session = await auth();
     const userId  = session?.user?.id;
 
-    const league = await prisma.lFLeague.findUnique({
+    const [league, viewer] = await Promise.all([
+    prisma.lFLeague.findUnique({
         where:   { id },
         include: {
             commissioner: true,
@@ -45,7 +46,11 @@ export default async function LeagueProfilePage({
                 ? { where: { userId }, select: { status: true }, take: 1 }
                 : false,
         },
-    });
+    }),
+    userId
+        ? prisma.user.findUnique({ where: { id: userId }, select: { prsScore: true } })
+        : Promise.resolve(null),
+    ]);
 
     if (!league) notFound();
 
@@ -190,6 +195,7 @@ export default async function LeagueProfilePage({
                         leagueId={id}
                         leagueName={league.name}
                         initialStatus={myStatus}
+                        userPrsScore={viewer?.prsScore ?? 10}
                     />
                 ) : (
                     <div className="rounded-xl border border-gray-800 bg-gray-900 px-4 py-3 text-center">

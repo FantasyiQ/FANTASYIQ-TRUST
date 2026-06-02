@@ -20,6 +20,7 @@ export async function POST(request: Request) {
         name, platform, format, scoring, size, buyIn,
         commissionerId, payoutStructure,
         completedSeasons, activityLevel,
+        requiresMinPrs,
     } = body as Record<string, unknown>;
 
     if (typeof name           !== 'string' || !name.trim())           return Response.json({ error: 'name is required' },           { status: 400 });
@@ -40,6 +41,12 @@ export async function POST(request: Request) {
     const level          = typeof activityLevel === 'number' && activityLevel >= 1 && activityLevel <= 5 ? Math.floor(activityLevel) : 0;
     const activityScore  = level * 20;
 
+    // Validate requiresMinPrs: must be a whole number in 0–100 or omitted.
+    const minPrsRaw = typeof requiresMinPrs === 'number' ? Math.round(requiresMinPrs) : null;
+    if (minPrsRaw !== null && (minPrsRaw < 0 || minPrsRaw > 100)) {
+        return Response.json({ error: 'requiresMinPrs must be 0–100' }, { status: 400 });
+    }
+
     const league = await prisma.lFLeague.create({
         data: {
             name:             name.trim(),
@@ -53,6 +60,7 @@ export async function POST(request: Request) {
             completedSeasons: seasons,
             stabilityScore,
             activityScore,
+            requiresMinPrs:   minPrsRaw,
         },
         include: { commissioner: true },
     });

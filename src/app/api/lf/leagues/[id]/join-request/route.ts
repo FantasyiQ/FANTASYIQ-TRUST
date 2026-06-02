@@ -17,15 +17,41 @@ export async function POST(
     const { id: leagueId } = await params;
     const userId = session.user.id;
 
-    const league = await prisma.lFLeague.findUnique({
-        where: { id: leagueId },
-        select: {
-            id:           true,
-            name:         true,
-            commissioner: { select: { ownerId: true } },
-        },
-    });
+    const [league, applicant] = await Promise.all([
+        prisma.lFLeague.findUnique({
+            where: { id: leagueId },
+            select: {
+                id:             true,
+                name:           true,
+                buyIn:          true,
+                requiresMinPrs: true,
+                commissioner:   { select: { ownerId: true } },
+            },
+        }),
+        prisma.user.findUnique({
+            where:  { id: userId },
+            select: { prsScore: true },
+        }),
+    ]);
     if (!league) return Response.json({ error: 'League not found' }, { status: 404 });
+
+    const userPrs = applicant?.prsScore ?? 10; // treat missing as Unproven
+
+    // Hard guardrail: PRS < 20 cannot join any paid league.
+    if (userPrs < 20 && league.buyIn != null && league.buyIn > 0) {
+        return Response.json(
+            { error: 'Your Player Reliability Score is too low to join paid leagues. Build your reputation first.' },
+            { status: 403 },
+        );
+    }
+
+    // League-level minimum PRS requirement.
+    if (league.requiresMinPrs != null && userPrs < league.requiresMinPrs) {
+        return Response.json(
+            { error: `Your Player Reliability Score (${userPrs}) is below this league's minimum requirement of ${league.requiresMinPrs}.` },
+            { status: 403 },
+        );
+    }
 
     let body: unknown;
     try { body = await request.json(); } catch {

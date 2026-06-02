@@ -16,6 +16,8 @@ interface SearchParams {
     minStability?: string;
     minActivity?:  string;
     verifiedOnly?: string;
+    minPrs?:       string;  // filter to leagues requiring at least this PRS from members
+    hideUnproven?: string;  // filter to leagues with any PRS requirement (≥21)
 }
 
 const FORMATS   = ['Dynasty', 'Redraft', 'Best Ball'];
@@ -45,6 +47,8 @@ export default async function LeagueFinderPage({
     if (sp.minStability) where.stabilityScore = { gte: parseInt(sp.minStability, 10) };
     if (sp.minActivity)  where.activityScore  = { gte: parseInt(sp.minActivity, 10)  };
     if (sp.verifiedOnly === 'true') where.reviews = { some: { verified: true } };
+    if (sp.minPrs) where.requiresMinPrs = { gte: parseInt(sp.minPrs, 10) };
+    else if (sp.hideUnproven === 'true') where.requiresMinPrs = { gte: 21 };
 
     const leagues = await prisma.lFLeague.findMany({
         where,
@@ -111,6 +115,7 @@ export default async function LeagueFinderPage({
                                     activityScore={l.activityScore}
                                     stabilityScore={l.stabilityScore}
                                     completedSeasons={l.completedSeasons}
+                                    requiresMinPrs={l.requiresMinPrs}
                                     commissioner={{
                                         id:           l.commissioner.id,
                                         displayName:  l.commissioner.displayName,
@@ -222,6 +227,36 @@ function FilterBar({ current }: { current: SearchParams }) {
                         Verified reviews only
                     </Link>
                 </div>
+                {scoreFilter(
+                    [
+                        { label: 'Reliable+ req',  value: '41' },
+                        { label: 'Trusted+ req',   value: '61' },
+                        { label: 'Elite only',     value: '81' },
+                    ],
+                    'minPrs', 'Min PRS'
+                )}
+                {/* Hide unproven toggle — shows leagues with any PRS gate */}
+                {(() => {
+                    const hideUnprovenActive = current.hideUnproven === 'true';
+                    const hideUnprovenNext   = new URLSearchParams(current as Record<string, string>);
+                    if (hideUnprovenActive) hideUnprovenNext.delete('hideUnproven');
+                    else { hideUnprovenNext.set('hideUnproven', 'true'); hideUnprovenNext.delete('minPrs'); }
+                    return (
+                        <div className="flex flex-wrap gap-1.5 items-center">
+                            <span className="text-[10px] uppercase tracking-wider text-gray-600 mr-1 invisible">.</span>
+                            <Link
+                                href={`/leaguefinder?${hideUnprovenNext.toString()}`}
+                                className={`text-xs px-2.5 py-1 rounded-full border transition ${
+                                    hideUnprovenActive
+                                        ? 'bg-[#D4AF37] text-gray-950 border-[#D4AF37] font-bold'
+                                        : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'
+                                }`}
+                            >
+                                Vetted leagues only
+                            </Link>
+                        </div>
+                    );
+                })()}
             </div>
             {hasFilters && (
                 <div className="pt-1">

@@ -4,9 +4,10 @@ import { notFound } from 'next/navigation';
 import { auth }     from '@/lib/auth';
 import { prisma }   from '@/lib/prisma';
 import Link         from 'next/link';
-import { StarRating }  from '@/components/leaguefinder/StarRating';
-import PRSBadge        from '@/components/leaguefinder/PRSBadge';
-import { computePRS } from '@/lib/lf-prs';
+import { StarRating }    from '@/components/leaguefinder/StarRating';
+import PRSBadge          from '@/components/leaguefinder/PRSBadge';
+import TrustScoreCard    from '@/components/leaguefinder/TrustScoreCard';
+import { computePRS }   from '@/lib/lf-prs';
 
 export default async function UserProfilePage({
     params,
@@ -130,10 +131,7 @@ export default async function UserProfilePage({
                         </div>
                         <div className="flex items-start gap-3">
                             <PRSBadge score={prsBreakdown.total} tooltip={prsTooltip} />
-                            <div className="text-right">
-                                <div className="text-[10px] text-gray-600 uppercase tracking-wider">Trust Score</div>
-                                <div className="text-3xl font-black text-[#D4AF37]">{user.trustScore}</div>
-                            </div>
+                            <TrustScoreCard prsScore={user.prsScore} compact showImprove={false} />
                         </div>
                     </div>
 
@@ -189,6 +187,14 @@ export default async function UserProfilePage({
                         </p>
                     </div>
                 </section>
+
+                {/* ── Trust Score Card (own profile only) ─────────── */}
+                {isMe && (
+                    <section className="space-y-3">
+                        <h2 className="text-sm font-bold text-white uppercase tracking-wider">Your Trust Score</h2>
+                        <TrustScoreCard prsScore={user.prsScore} />
+                    </section>
+                )}
 
                 {/* ── Activity Heatmap ─────────────────────────────── */}
                 {heatmapYears.length > 0 && (

@@ -75,6 +75,10 @@
     {
       "path": "/api/cron/dfs-score",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/prs-calculate",
+      "schedule": "0 3 * * *"
     }
   ]
 }

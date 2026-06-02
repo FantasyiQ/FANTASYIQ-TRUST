@@ -1,19 +1,22 @@
 'use client';
 
 import { useState } from 'react';
+import TrustScoreCard from '@/components/leaguefinder/TrustScoreCard';
 
 interface Props {
-    leagueId:    string;
-    leagueName:  string;
+    leagueId:     string;
+    leagueName:   string;
     initialStatus: string | null; // PENDING | ACCEPTED | REJECTED | PINNED | null
+    userPrsScore?: number;        // caller passes current user's PRS for "Why can't I join?" card
 }
 
-export default function JoinRequestButton({ leagueId, leagueName, initialStatus }: Props) {
+export default function JoinRequestButton({ leagueId, leagueName, initialStatus, userPrsScore }: Props) {
     const [status,    setStatus]    = useState(initialStatus);
     const [open,      setOpen]      = useState(false);
     const [message,   setMessage]   = useState('');
     const [loading,   setLoading]   = useState(false);
     const [error,     setError]     = useState('');
+    const [prsBlocked, setPrsBlocked] = useState(false);
 
     async function submit() {
         setLoading(true);
@@ -29,13 +32,30 @@ export default function JoinRequestButton({ leagueId, leagueName, initialStatus 
                 setOpen(false);
             } else {
                 const data = await res.json() as { error?: string };
-                setError(data.error ?? 'Something went wrong');
+                if (res.status === 403 && data.error?.toLowerCase().includes('reliability score')) {
+                    setPrsBlocked(true);
+                    setOpen(false);
+                } else {
+                    setError(data.error ?? 'Something went wrong');
+                }
             }
         } catch {
             setError('Network error');
         } finally {
             setLoading(false);
         }
+    }
+
+    if (prsBlocked && userPrsScore !== undefined) {
+        return (
+            <div className="space-y-3">
+                <div className="rounded-xl border border-red-900 bg-red-950/40 px-4 py-3">
+                    <p className="text-sm font-bold text-red-400 mb-0.5">Your Trust Score is too low for this league.</p>
+                    <p className="text-xs text-red-300/70">Here's what you need to do to qualify.</p>
+                </div>
+                <TrustScoreCard prsScore={userPrsScore} />
+            </div>
+        );
     }
 
     if (status === 'PENDING') {
