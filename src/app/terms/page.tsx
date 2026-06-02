@@ -201,10 +201,10 @@ export default function TermsOfServicePage() {
 
                 <LegalSection title="13. Governing Law and Dispute Resolution">
                     <p>
-                        These Terms are governed by and construed in accordance with the laws of the State of Delaware, United States,
+                        These Terms are governed by and construed in accordance with the laws of the State of Florida, United States,
                         without regard to its conflict-of-law principles. Any dispute arising out of or related to these Terms or your
                         use of the Service shall be subject to the exclusive jurisdiction of the state and federal courts located in
-                        Delaware, and you consent to personal jurisdiction in those courts.
+                        Duval County, Florida, and you consent to personal jurisdiction in those courts.
                     </p>
                     <p>
                         Notwithstanding the foregoing, FantasyiQ Trust may seek injunctive or other equitable relief in any court of
