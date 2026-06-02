@@ -3,7 +3,7 @@
 
 import { type NextRequest } from 'next/server';
 import { auth }   from '@/lib/auth';
-import { requirePaidTier } from '@/lib/access';
+import { requireLeaguePaidAccess } from '@/lib/access';
 import { prisma } from '@/lib/prisma';
 import {
     getSleeperDraft,
@@ -23,8 +23,6 @@ export const maxDuration = 45;
 export async function GET(req: NextRequest): Promise<Response> {
     const session = await auth();
     if (!session?.user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    const deny = await requirePaidTier(session.user.id);
-    if (deny) return deny;
 
     const { searchParams } = new URL(req.url);
     const leagueId       = searchParams.get('leagueId');
@@ -37,12 +35,15 @@ export async function GET(req: NextRequest): Promise<Response> {
 
     const league = await prisma.league.findUnique({
         where:  { id: leagueId },
-        select: { userId: true, leagueId: true, leagueType: true, rosterPositions: true, scoringType: true },
+        select: { userId: true, leagueId: true, leagueType: true, rosterPositions: true, scoringType: true, assignedPlanId: true, assignedPlanType: true },
     });
 
     if (!league || league.userId !== session.user.id) {
         return Response.json({ error: 'Not found' }, { status: 404 });
     }
+
+    const deny = await requireLeaguePaidAccess(session.user.id, league.assignedPlanId, league.assignedPlanType);
+    if (deny) return deny;
 
     const myRosterIdNum  = parseInt(myRosterId, 10);
     const rosterPositions = league.rosterPositions as string[];
