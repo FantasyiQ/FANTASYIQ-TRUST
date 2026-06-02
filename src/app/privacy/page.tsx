@@ -15,13 +15,13 @@ export default function PrivacyPolicyPage() {
                 <div className="space-y-2 border-b border-gray-800 pb-8">
                     <p className="text-[10px] font-bold tracking-widest text-[#D4AF37] uppercase">Legal</p>
                     <h1 className="text-3xl font-bold text-white">Privacy Policy</h1>
-                    <p className="text-gray-500 text-sm">Last updated: May 21, 2026</p>
+                    <p className="text-gray-500 text-sm">Last updated: June 2, 2026</p>
                 </div>
 
                 <LegalSection title="1. Introduction">
                     <p>
                         FantasyiQ Trust (&ldquo;we,&rdquo; &ldquo;us,&rdquo; or &ldquo;our&rdquo;) operates the FantasyiQ Trust platform, accessible at{' '}
-                        <span className="text-[#D4AF37]">fantasyiq.app</span> (the &ldquo;Service&rdquo;). This Privacy Policy explains how we collect,
+                        <span className="text-[#D4AF37]">www.fantasyiQTrust.com</span> (the &ldquo;Service&rdquo;). This Privacy Policy explains how we collect,
                         use, disclose, and safeguard information when you use our Service. Please read this policy carefully. If you do not
                         agree with its terms, please discontinue use of the Service.
                     </p>
@@ -184,9 +184,14 @@ export default function PrivacyPolicyPage() {
 
                 <LegalSection title="10. Age Restriction">
                     <p>
-                        FantasyiQ Trust is intended for users who are at least 13 years of age. We do not knowingly collect or process
-                        data from children under 13. If you believe a child under 13 has provided us with data, please contact us
-                        immediately and we will take steps to delete that information.
+                        FantasyiQ Trust is intended for users who are <strong className="text-white">at least 18 years of age</strong>.
+                        Because the Service involves paid subscriptions, league dues, and financial transactions, use by minors is
+                        not permitted. By creating an account, you represent and warrant that you are 18 years of age or older.
+                    </p>
+                    <p>
+                        We do not knowingly collect or process personal data from individuals under 18. If you believe a minor has
+                        created an account, please contact us immediately using the information in Section 13 and we will promptly
+                        close the account and delete associated data.
                     </p>
                 </LegalSection>
 
@@ -212,9 +217,12 @@ export default function PrivacyPolicyPage() {
                     <p>
                         If you have questions about this Privacy Policy or wish to exercise your data rights, please contact us at:
                     </p>
-                    <div className="mt-3 bg-gray-900 border border-gray-800 rounded-xl px-5 py-4 text-sm text-gray-300">
+                    <div className="mt-3 bg-gray-900 border border-gray-800 rounded-xl px-5 py-4 text-sm text-gray-300 space-y-0.5">
                         <p className="font-semibold text-white">FantasyiQ Trust</p>
-                        <p className="text-gray-400 mt-1">Legal@FantasyiQTrust.com</p>
+                        <p className="text-gray-400">11111 San Jose Blvd, Suite 56</p>
+                        <p className="text-gray-400">Jacksonville, FL 32223</p>
+                        <p className="text-gray-400 mt-2">Legal@FantasyiQTrust.com</p>
+                        <p className="text-gray-400">(904) 925-0087</p>
                     </div>
                 </LegalSection>
 

@@ -25,6 +25,13 @@ export default function TermsOfServicePage() {
                         (&ldquo;Terms&rdquo;). If you do not agree to all of these Terms, do not use the Service. These Terms constitute a
                         legally binding agreement between you and FantasyiQ Trust.
                     </p>
+                    <p>
+                        <strong className="text-white">Age requirement.</strong> You must be at least{' '}
+                        <strong className="text-white">18 years of age</strong> to use the Service. Because FantasyiQ Trust involves
+                        paid subscriptions, league dues, and financial transactions, use by minors is not permitted. By using the
+                        Service, you represent and warrant that you are 18 or older and have the legal capacity to enter into a
+                        binding agreement. If you are under 18, do not access or use the Service.
+                    </p>
                 </LegalSection>
 
                 <LegalSection title="2. Nature of the Service">
