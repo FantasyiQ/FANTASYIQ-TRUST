@@ -99,16 +99,11 @@ export async function POST(request: NextRequest): Promise<Response> {
                 : null,
         ]);
 
-        const playerSub   = dbUser?.subscriptions.find(s => s.type === 'player') ?? null;
-        const commSubs    = dbUser?.subscriptions.filter(s => s.type === 'commissioner') ?? [];
-        const existingCL  = dbUser?.connectedLeagues ?? [];
-        const connectedExtIds   = new Set(existingCL.map(cl => cl.leagueExtId).filter(Boolean));
-        const connectedNames    = new Set(existingCL.map(cl => cl.leagueName.toLowerCase().trim()));
-
-        // Track how many player plan slots are already consumed (commissioner leagues don't count)
-        let playerSlotsUsed = await prisma.league.count({
-            where: { userId, assignedPlanType: 'player' },
-        });
+        const playerSub = dbUser?.subscriptions.find(s => s.type === 'player') ?? null;
+        const commSubs  = dbUser?.subscriptions.filter(s => s.type === 'commissioner') ?? [];
+        const existingCL = dbUser?.connectedLeagues ?? [];
+        const connectedExtIds = new Set(existingCL.map(cl => cl.leagueExtId).filter(Boolean));
+        const connectedNames  = new Set(existingCL.map(cl => cl.leagueName.toLowerCase().trim()));
 
         // For the invite path: check if the commissioner has paid for this Sleeper league
         let inviteCommissionerPaid = false;
@@ -127,97 +122,95 @@ export async function POST(request: NextRequest): Promise<Response> {
         let redirectTo: string | null = null;
         let limitReachedLeagueId: string | null = null;
 
-        for (const lr of leagueResults) {
-            // Already assigned from a prior sync — skip
-            if (lr.assignedPlanId) continue;
+        // ── Advisory lock: serialize concurrent syncs for the same user ───────
+        // pg_advisory_xact_lock is transaction-scoped and auto-released on commit.
+        // hashtext(userId) produces a stable int4 → cast to bigint for the lock key.
+        // This prevents two simultaneous syncs from both reading 0 used slots and
+        // both assigning leagues, which would exceed the player plan league cap.
+        await prisma.$transaction(async (tx) => {
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId})::bigint)`;
 
-            const sleeperLeagueId = lr.leagueId; // Sleeper external ID
-            const alreadyConnected =
-                connectedExtIds.has(sleeperLeagueId) ||
-                connectedNames.has(lr.leagueName.toLowerCase().trim());
+            // Re-read slot count inside the lock — this is the authoritative value
+            let playerSlotsUsed = await tx.league.count({
+                where: { userId, assignedPlanType: 'player' },
+            });
 
-            // ── Branch 1: invite + commissioner paid ──────────────────────────
-            if (invite && sleeperLeagueId === invite.sleeperLeagueId && inviteCommissionerPaid) {
-                if (!alreadyConnected) {
-                    await prisma.connectedLeague.create({
-                        data: {
-                            userId,
-                            leagueName:  lr.leagueName,
-                            platform:    'Sleeper',
-                            leagueExtId: sleeperLeagueId,
-                        },
-                    });
-                }
-                // assignedPlanType = 'commissioner' signals tier comes from the commissioner's plan
-                await prisma.league.update({
-                    where: { id: lr.id },
-                    data:  { assignedPlanType: 'commissioner' },
-                });
-                redirectTo ??= `/dashboard/league/${lr.id}`;
-                continue;
-            }
+            for (const lr of leagueResults) {
+                // Already assigned from a prior sync — skip
+                if (lr.assignedPlanId) continue;
 
-            // ── Branch 2: user IS the commissioner (has matching commissioner sub) ──
-            const ownCommSub = commSubs.find(
-                s => s.leagueName?.toLowerCase().trim() === lr.leagueName.toLowerCase().trim()
-            );
-            if (ownCommSub) {
-                await prisma.league.update({
-                    where: { id: lr.id },
-                    data:  { assignedPlanId: ownCommSub.id, assignedPlanType: 'commissioner' },
-                });
-                redirectTo ??= `/dashboard/league/${lr.id}`;
-                continue;
-            }
+                const sleeperLeagueId = lr.leagueId;
+                const alreadyConnected =
+                    connectedExtIds.has(sleeperLeagueId) ||
+                    connectedNames.has(lr.leagueName.toLowerCase().trim());
 
-            // ── Branch 3: user is the Sleeper commissioner but has no plan yet ──
-            // Match the syncing user's Sleeper ID against the league's commissioner_id.
-            // We need the original SleeperLeague to read settings.commissioner_id.
-            const sleeperLeague = toSync.find(l => l.league_id === sleeperLeagueId);
-            const isSleeperCommissioner =
-                !!sleeperUserId &&
-                !!sleeperLeague?.settings?.commissioner_id &&
-                String(sleeperLeague.settings.commissioner_id).trim() === String(sleeperUserId).trim();
-
-            if (isSleeperCommissioner) {
-                // Do NOT assign to any player plan slot. Leave unassigned until they
-                // choose a commissioner plan. Redirect with a plan-selection modal.
-                redirectTo ??= `/dashboard/league/${lr.id}?showCommissionerPlanModal=1`;
-                continue;
-            }
-
-            // ── Branch 4: user has a player plan ─────────────────────────────
-            if (playerSub) {
-                const limitKey = tierToLimitKey(playerSub.tier);
-                const limit    = getLeagueLimit(limitKey);
-
-                if (playerSlotsUsed < limit) {
+                // ── Branch 1: invite + commissioner paid ──────────────────────
+                if (invite && sleeperLeagueId === invite.sleeperLeagueId && inviteCommissionerPaid) {
                     if (!alreadyConnected) {
-                        await prisma.connectedLeague.create({
-                            data: {
-                                userId,
-                                leagueName:  lr.leagueName,
-                                platform:    'Sleeper',
-                                leagueExtId: sleeperLeagueId,
-                            },
+                        await tx.connectedLeague.create({
+                            data: { userId, leagueName: lr.leagueName, platform: 'Sleeper', leagueExtId: sleeperLeagueId },
                         });
-                        playerSlotsUsed++;
                     }
-                    await prisma.league.update({
+                    await tx.league.update({
                         where: { id: lr.id },
-                        data:  { assignedPlanId: playerSub.id, assignedPlanType: 'player' },
+                        data:  { assignedPlanType: 'commissioner' },
                     });
                     redirectTo ??= `/dashboard/league/${lr.id}`;
-                } else {
-                    // Player plan slot limit reached
-                    limitReachedLeagueId ??= lr.id;
+                    continue;
                 }
-                continue;
-            }
 
-            // ── Branch 5: no plans — redirect to league with plan modal ───────
-            redirectTo ??= `/dashboard/league/${lr.id}?showPlanModal=1`;
-        }
+                // ── Branch 2: user IS the commissioner ────────────────────────
+                const ownCommSub = commSubs.find(
+                    s => s.leagueName?.toLowerCase().trim() === lr.leagueName.toLowerCase().trim()
+                );
+                if (ownCommSub) {
+                    await tx.league.update({
+                        where: { id: lr.id },
+                        data:  { assignedPlanId: ownCommSub.id, assignedPlanType: 'commissioner' },
+                    });
+                    redirectTo ??= `/dashboard/league/${lr.id}`;
+                    continue;
+                }
+
+                // ── Branch 3: Sleeper commissioner, no plan yet ───────────────
+                const sleeperLeague = toSync.find(l => l.league_id === sleeperLeagueId);
+                const isSleeperCommissioner =
+                    !!sleeperUserId &&
+                    !!sleeperLeague?.settings?.commissioner_id &&
+                    String(sleeperLeague.settings.commissioner_id).trim() === String(sleeperUserId).trim();
+
+                if (isSleeperCommissioner) {
+                    redirectTo ??= `/dashboard/league/${lr.id}?showCommissionerPlanModal=1`;
+                    continue;
+                }
+
+                // ── Branch 4: user has a player plan ─────────────────────────
+                if (playerSub) {
+                    const limitKey = tierToLimitKey(playerSub.tier);
+                    const limit    = getLeagueLimit(limitKey);
+
+                    if (playerSlotsUsed < limit) {
+                        if (!alreadyConnected) {
+                            await tx.connectedLeague.create({
+                                data: { userId, leagueName: lr.leagueName, platform: 'Sleeper', leagueExtId: sleeperLeagueId },
+                            });
+                            playerSlotsUsed++;
+                        }
+                        await tx.league.update({
+                            where: { id: lr.id },
+                            data:  { assignedPlanId: playerSub.id, assignedPlanType: 'player' },
+                        });
+                        redirectTo ??= `/dashboard/league/${lr.id}`;
+                    } else {
+                        limitReachedLeagueId ??= lr.id;
+                    }
+                    continue;
+                }
+
+                // ── Branch 5: no plans ────────────────────────────────────────
+                redirectTo ??= `/dashboard/league/${lr.id}?showPlanModal=1`;
+            }
+        });
 
         // If any leagues hit the player plan limit, redirect to upgrade
         if (limitReachedLeagueId && !redirectTo) {

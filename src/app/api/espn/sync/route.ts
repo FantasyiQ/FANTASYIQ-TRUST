@@ -84,28 +84,33 @@ export async function POST(request: NextRequest): Promise<Response> {
             select: { assignedPlanId: true, assignedPlanType: true, leagueName: true },
         });
         if (fullLeague && !fullLeague.assignedPlanId && !fullLeague.assignedPlanType) {
-            const [subscriptions, playerSlotsUsed] = await Promise.all([
-                prisma.subscription.findMany({
-                    where:  { userId, status: { in: ['active', 'trialing'] } },
-                    select: { id: true, type: true, tier: true, leagueName: true },
-                }),
-                prisma.league.count({ where: { userId, assignedPlanType: 'player' } }),
-            ]);
-            const planOptions = subscriptions.map(s => ({
-                id: s.id, type: s.type as 'player' | 'commissioner',
-                tier: s.tier, leagueName: s.leagueName ?? null,
-            }));
-            const [assignment] = computeAutoAssignments(
-                [{ id: league.id, leagueName: fullLeague.leagueName }],
-                planOptions,
-                playerSlotsUsed,
-            );
-            if (assignment?.planId) {
-                await prisma.league.update({
-                    where: { id: league.id },
-                    data:  { assignedPlanId: assignment.planId, assignedPlanType: assignment.planType },
-                });
-            }
+            await prisma.$transaction(async (tx) => {
+                // Advisory lock serializes concurrent syncs for the same user
+                await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId})::bigint)`;
+
+                const [subscriptions, playerSlotsUsed] = await Promise.all([
+                    tx.subscription.findMany({
+                        where:  { userId, status: { in: ['active', 'trialing'] } },
+                        select: { id: true, type: true, tier: true, leagueName: true },
+                    }),
+                    tx.league.count({ where: { userId, assignedPlanType: 'player' } }),
+                ]);
+                const planOptions = subscriptions.map(s => ({
+                    id: s.id, type: s.type as 'player' | 'commissioner',
+                    tier: s.tier, leagueName: s.leagueName ?? null,
+                }));
+                const [assignment] = computeAutoAssignments(
+                    [{ id: league.id, leagueName: fullLeague.leagueName }],
+                    planOptions,
+                    playerSlotsUsed,
+                );
+                if (assignment?.planId) {
+                    await tx.league.update({
+                        where: { id: league.id },
+                        data:  { assignedPlanId: assignment.planId, assignedPlanType: assignment.planType },
+                    });
+                }
+            });
         }
 
         return Response.json({
