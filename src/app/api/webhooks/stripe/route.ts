@@ -361,6 +361,39 @@ export async function POST(request: NextRequest): Promise<Response> {
                     select: { type: true },
                 });
 
+                // ── Clear league assignments for the cancelled plan ────────────
+                if (subRecord?.type === 'commissioner') {
+                    // Find the external leagueId(s) covered by this commissioner subscription
+                    // (commissioner's own League rows carry assignedPlanId = sub.id)
+                    const coveredLeagues = await prisma.league.findMany({
+                        where: { assignedPlanId: sub.id },
+                        select: { leagueId: true },  // external platform ID (e.g. Sleeper league ID)
+                    });
+                    const externalIds = coveredLeagues.map(l => l.leagueId);
+
+                    // Clear commissioner's own rows AND all member rows for those leagues.
+                    // Member rows have assignedPlanType='commissioner' but assignedPlanId=null,
+                    // so we match by external leagueId + planType rather than planId.
+                    if (externalIds.length > 0) {
+                        await prisma.league.updateMany({
+                            where: {
+                                leagueId:         { in: externalIds },
+                                assignedPlanType: 'commissioner',
+                            },
+                            data: {
+                                assignedPlanId:   null,
+                                assignedPlanType: null,
+                            },
+                        });
+                    }
+                } else {
+                    // Player plan cancelled — unassign any leagues tied to this subscription
+                    await prisma.league.updateMany({
+                        where: { assignedPlanId: sub.id },
+                        data:  { assignedPlanId: null, assignedPlanType: null },
+                    });
+                }
+
                 await prisma.$transaction([
                     // Only reset subscriptionTier for player plan cancellations
                     ...(subRecord?.type === 'player' ? [
