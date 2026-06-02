@@ -215,7 +215,8 @@ export async function POST(
             rosterPositions: true,
             standings:       true,
             sleeperUserId:   true,
-            assignedPlanId:  true,
+            assignedPlanId:   true,
+            assignedPlanType: true,
         },
     });
 
@@ -223,7 +224,7 @@ export async function POST(
         return Response.json({ error: 'League not found' }, { status: 404 });
     }
 
-    const deny = await requireLeaguePaidAccess(session.user.id, league.assignedPlanId);
+    const deny = await requireLeaguePaidAccess(session.user.id, league.assignedPlanId, league.assignedPlanType);
     if (deny) return deny;
 
     // ── Determine week / season ───────────────────────────────────────────────

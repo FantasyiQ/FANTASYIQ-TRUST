@@ -50,7 +50,8 @@ export async function GET(
             totalRosters:   true,
             standings:      true,
             platform:       true,
-            assignedPlanId: true,
+            assignedPlanId:   true,
+            assignedPlanType: true,
         },
     });
 
@@ -58,7 +59,7 @@ export async function GET(
         return Response.json({ error: 'League not found' }, { status: 404 });
     }
 
-    const deny = await requireLeaguePaidAccess(session.user.id, league.assignedPlanId);
+    const deny = await requireLeaguePaidAccess(session.user.id, league.assignedPlanId, league.assignedPlanType);
     if (deny) return deny;
 
     if (league.platform !== 'sleeper') {

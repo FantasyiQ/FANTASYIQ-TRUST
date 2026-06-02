@@ -53,16 +53,22 @@ export async function requirePaidTier(userId: string): Promise<Response | null> 
  * Verify the user has paid access to a specific league.
  *
  * Rules:
+ * - If the league is commissioner-covered (assignedPlanType === 'commissioner'):
+ *   any registered user gets access — the commissioner's plan covers all members.
  * - Commissioner plan owners: full access to all features on any league.
  * - Player Elite: unlimited leagues — all pass.
  * - Player Pro / All-Pro: only leagues where league.assignedPlanId === playerSub.id.
  *
- * Pass `leagueAssignedPlanId` from the League record fetched by the caller.
+ * Pass `assignedPlanId` and `assignedPlanType` from the League record fetched by the caller.
  */
 export async function requireLeaguePaidAccess(
     userId: string,
     leagueAssignedPlanId: string | null,
+    leagueAssignedPlanType?: string | null,
 ): Promise<Response | null> {
+    // League is commissioner-covered — all members get access regardless of their own plan
+    if (leagueAssignedPlanType === 'commissioner') return null;
+
     const user = await prisma.user.findUnique({
         where:  { id: userId },
         select: {

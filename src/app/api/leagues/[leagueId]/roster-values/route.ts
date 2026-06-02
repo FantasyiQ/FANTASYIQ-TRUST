@@ -155,14 +155,15 @@ export async function GET(
             scoringSettings: true,
             rosterPositions: true,
             totalRosters:    true,
-            assignedPlanId:  true,
+            assignedPlanId:   true,
+            assignedPlanType: true,
         },
     });
     if (!league) {
         return Response.json({ error: 'League not found' }, { status: 404 });
     }
 
-    const deny = await requireLeaguePaidAccess(session.user.id, league.assignedPlanId);
+    const deny = await requireLeaguePaidAccess(session.user.id, league.assignedPlanId, league.assignedPlanType);
     if (deny) return deny;
 
     const leagueType     = (league.leagueType as LeagueType) ?? 'Redraft';

@@ -61,7 +61,8 @@ export async function getTradeEvaluatorContent(id: string): Promise<TradeEvaluat
             sleeperUserId: true, platform: true,
             season: true, draftStatus: true,
             playoffWeekStart: true, champWeek: true,
-            assignedPlanId: true,
+            assignedPlanId:   true,
+            assignedPlanType: true,
         },
     });
     if (!league || league.userId !== session.user.id) notFound();
@@ -120,11 +121,11 @@ export async function getTradeEvaluatorContent(id: string): Promise<TradeEvaluat
         select:  { tier: true },
     });
 
-    // Elite covers all leagues; Pro/All-Pro requires this league to be assigned to the plan
-    const leagueConnected =
+    const isLeagueAssigned =
         playerTier === 'PLAYER_ELITE' ||
-        (!!activePlayerSub && league.assignedPlanId === activePlayerSub.id);
-    const effectiveTier       = effectiveTierForLeague(playerTier, commSub?.tier ?? null, leagueConnected);
+        (!!activePlayerSub && league.assignedPlanId === activePlayerSub.id) ||
+        league.assignedPlanType === 'commissioner';
+    const effectiveTier       = effectiveTierForLeague(playerTier, commSub?.tier ?? null, isLeagueAssigned);
     if (tierLevel(effectiveTier) < 2) notFound();
 
     // ── Build pick data ───────────────────────────────────────────────────────

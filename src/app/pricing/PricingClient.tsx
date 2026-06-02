@@ -675,6 +675,7 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                             <p><span className="text-white font-semibold">Player Plans are personal — not league-wide.</span> You&apos;re buying analytics tools for yourself, not your entire league.</p>
                             <p><span className="text-[#D4AF37] font-semibold">Already in a commissioner-paid league?</span> You don&apos;t need to buy anything. If your commissioner has a FiQ Commissioner Plan, you already have access to league tools — no purchase required on your end.</p>
                             <p>Player Plans let you sync <span className="text-white font-semibold">any league you play in</span> — regardless of whether that league uses FiQ or not. Use your personal analytics across all your leagues, on any platform (Sleeper, ESPN, Yahoo, NFL Fantasy).</p>
+                            <p><span className="text-white font-semibold">Your plan stacks on top of your commissioner&apos;s.</span> If your commissioner has PRO but you have All-Pro, you get <span className="text-[#D4AF37] font-semibold">All-Pro features</span> in that league. Your plan always sets the floor — never a ceiling.</p>
                             <p className="text-gray-500 text-xs pt-1 border-t border-gray-800">Player Plans do not include dues collection, payouts, or commissioner tools. Those are exclusive to Commissioner Plans.</p>
                         </div>
                     )}
@@ -684,10 +685,11 @@ export default function PricingClient({ playerSub, commSubs, activeCommCount, ac
                         <div className="mb-10 max-w-5xl mx-auto space-y-6">
 
                             {/* How commissioner plans work */}
-                            <div className="bg-[#D4AF37]/8 border border-[#D4AF37]/25 rounded-xl px-5 py-4 text-sm text-gray-300 space-y-1">
+                            <div className="bg-[#D4AF37]/8 border border-[#D4AF37]/25 rounded-xl px-5 py-4 text-sm text-gray-300 space-y-1.5">
                                 <p><span className="text-[#D4AF37] font-semibold">Commissioner Plans cover the entire league.</span> All members get access at no additional cost.</p>
                                 <p>Commissioners must send invites for members to join a commissioner‑paid league.</p>
-                                <p className="text-gray-500">Player Plans are optional personal upgrades and are never required to use commissioner‑paid tools.</p>
+                                <p>Your plan is the <span className="text-white font-semibold">minimum floor for every member</span>. If any member has a higher-tier Player Plan of their own, they keep their higher tier — your plan never caps theirs.</p>
+                                <p className="text-gray-500 text-xs pt-1 border-t border-[#D4AF37]/15">Player Plans are optional personal upgrades and are never required to use commissioner‑paid tools.</p>
                             </div>
 
                             {/* League name input */}
