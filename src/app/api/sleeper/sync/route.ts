@@ -136,8 +136,23 @@ export async function POST(request: NextRequest): Promise<Response> {
             });
 
             for (const lr of leagueResults) {
-                // Already assigned from a prior sync — skip
-                if (lr.assignedPlanId) continue;
+                // Already assigned — skip, UNLESS a commissioner sub now matches this
+                // league (user bought a commissioner plan after initial sync). In that
+                // case promote the assignment so player slots are freed.
+                if (lr.assignedPlanId) {
+                    if (lr.assignedPlanType !== 'commissioner') {
+                        const ownCommSub = commSubs.find(
+                            s => s.leagueName?.toLowerCase().trim() === lr.leagueName.toLowerCase().trim()
+                        );
+                        if (ownCommSub) {
+                            await tx.league.update({
+                                where: { id: lr.id },
+                                data:  { assignedPlanId: ownCommSub.id, assignedPlanType: 'commissioner' },
+                            });
+                        }
+                    }
+                    continue;
+                }
 
                 const sleeperLeagueId = lr.leagueId;
                 const alreadyConnected =

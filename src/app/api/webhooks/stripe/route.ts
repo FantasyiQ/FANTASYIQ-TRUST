@@ -144,6 +144,30 @@ export async function POST(request: NextRequest): Promise<Response> {
                     }),
                 ]);
 
+                // ── Commissioner plan: re-assign matching leagues immediately ─────
+                // Leagues synced BEFORE this purchase were assigned to the player plan
+                // and consumed slots. Fix that now so slots are freed and the league
+                // is correctly covered by the commissioner plan.
+                if (subType === 'commissioner' && metaLeagueName) {
+                    const dbSub = await prisma.subscription.findUnique({
+                        where:  { stripeSubscriptionId: stripeSubId },
+                        select: { id: true },
+                    });
+                    if (dbSub) {
+                        await prisma.league.updateMany({
+                            where: {
+                                userId:           user.id,
+                                leagueName:       { equals: metaLeagueName, mode: 'insensitive' },
+                                assignedPlanType: { not: 'commissioner' },
+                            },
+                            data: {
+                                assignedPlanId:   dbSub.id,
+                                assignedPlanType: 'commissioner',
+                            },
+                        });
+                    }
+                }
+
                 break;
             }
 

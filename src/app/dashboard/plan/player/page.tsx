@@ -88,8 +88,11 @@ export default async function PlayerPlanPage() {
 
     const sub = { ...rawSub, tier };
 
-    const assignedLeagues   = user.leagues.filter(l => l.assignedPlanId === sub.id);
-    const unassignedLeagues = user.leagues.filter(l => !l.assignedPlanId);
+    const assignedLeagues      = user.leagues.filter(l => l.assignedPlanId === sub.id);
+    const commCoveredLeagues   = user.leagues.filter(l => l.assignedPlanType === 'commissioner');
+    // Unassigned = no plan at all. Exclude commissioner-covered leagues so they
+    // don't appear as available player-plan slots.
+    const unassignedLeagues    = user.leagues.filter(l => !l.assignedPlanId && l.assignedPlanType !== 'commissioner');
 
     const leagueLimit = getLeagueLimit(tierToLimitKey(tier));
     const atLimit     = leagueLimit !== Infinity && assignedLeagues.length >= leagueLimit;
@@ -239,6 +242,47 @@ export default async function PlayerPlanPage() {
                         </div>
                     )}
                 </div>
+
+                {/* Commissioner-Covered Leagues */}
+                {commCoveredLeagues.length > 0 && (
+                    <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+                        <div className="px-6 py-4 border-b border-gray-800">
+                            <h2 className="font-semibold">Commissioner-Covered Leagues</h2>
+                            <p className="text-gray-500 text-xs mt-0.5">These leagues are paid for by a Commissioner Plan — they do not use any of your player plan slots.</p>
+                        </div>
+                        <ul className="divide-y divide-gray-800/50">
+                            {commCoveredLeagues.map(league => (
+                                <li key={league.id} className="flex items-center gap-4 px-6 py-4">
+                                    {league.avatar ? (
+                                        <Image
+                                            src={`https://sleepercdn.com/avatars/thumbs/${league.avatar}`}
+                                            alt={league.leagueName} width={36} height={36}
+                                            className="rounded-lg shrink-0" />
+                                    ) : (
+                                        <div className="w-9 h-9 rounded-lg bg-gray-800 shrink-0 flex items-center justify-center text-gray-600 text-xs font-bold">FF</div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                        <Link href={`/dashboard/league/${league.id}`}
+                                            className="font-medium text-white hover:text-[#D4AF37] transition truncate block">
+                                            {league.leagueName}
+                                        </Link>
+                                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                            <span className="text-xs text-gray-500">Sleeper</span>
+                                            {league.scoringType && (
+                                                <span className="text-xs px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700">
+                                                    {scoringLabel(league.scoringType)}
+                                                </span>
+                                            )}
+                                            <span className="text-xs px-1.5 py-0.5 rounded bg-blue-900/40 text-blue-400 border border-blue-800">
+                                                Commissioner Paid
+                                            </span>
+                                        </div>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
 
                 {/* Unassigned Leagues */}
                 {unassignedLeagues.length > 0 && (
