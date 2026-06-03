@@ -45,7 +45,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     const subRecord = await prisma.subscription.findUnique({
         where: { stripeSubscriptionId },
-        select: { id: true, userId: true, type: true, status: true, tier: true, leagueSize: true },
+        select: { id: true, userId: true, type: true, status: true, tier: true, leagueSize: true, leagueName: true },
     });
 
     if (!subRecord) {
@@ -91,12 +91,20 @@ export async function POST(request: NextRequest): Promise<Response> {
             }, { status: 400 });
         }
 
+        // Preserve existing metadata (especially leagueName) — only overwrite what's changing
+        const existingMeta = stripeSub.metadata ?? {};
+        const leagueName   = existingMeta.leagueName ?? subRecord.leagueName ?? '';
+
         const updated = await stripe.subscriptions.update(stripeSubscriptionId, {
             items: [{ id: stripeSub.items.data[0].id, price: priceId }],
             proration_behavior: 'always_invoice',
+            description: leagueName
+                ? `${newInfo.type === 'commissioner' ? 'Commissioner' : 'Player'} Plan — ${leagueName}`
+                : undefined,
             metadata: {
-                tier: newInfo.tier,
-                planType: newInfo.type,
+                ...existingMeta,
+                tier:       newInfo.tier,
+                planType:   newInfo.type,
                 leagueSize: newInfo.leagueSize != null ? String(newInfo.leagueSize) : '',
             },
         });
