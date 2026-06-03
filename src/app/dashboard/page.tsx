@@ -670,6 +670,12 @@ export default async function DashboardPage({
                             <p className="font-semibold text-white group-hover:text-[#D4AF37] transition">Billing History</p>
                             <p className="text-gray-500 text-sm mt-0.5">Receipts and past invoices</p>
                         </Link>
+                        <Link href="/dss/leaderboard"
+                            className="block bg-gray-900 border border-gray-800 hover:border-[#D4AF37]/50 rounded-xl p-5 transition group">
+                            <div className="text-2xl mb-2">🏆</div>
+                            <p className="font-semibold text-white group-hover:text-[#D4AF37] transition">DSS Leaderboard</p>
+                            <p className="text-gray-500 text-sm mt-0.5">Top dynasty players ranked by skill</p>
+                        </Link>
                     </div>
                 </div>
 
