@@ -7,6 +7,7 @@ import { getLeagueById } from '@/lib/db/leagues';
 import { prisma } from '@/lib/prisma';
 import { stripe } from '@/lib/stripe';
 import BackToOverview from '../../_components/BackToOverview';
+import DuesPayConfirm from './DuesPayConfirm';
 
 function appUrl() {
     return (() => { const u = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL; if (!u) throw new Error('NEXTAUTH_URL is not configured'); return u; })();
@@ -65,7 +66,6 @@ export default async function PayDuesPage({
         const picked = allMembers.find(m => m.id === pickedMemberId);
         if (picked && picked.duesStatus !== 'paid') {
             member = picked;
-            // Persist the link so future visits auto-match
             await prisma.duesMember.update({
                 where: { id: picked.id },
                 data:  { userId: user.id },
@@ -117,44 +117,62 @@ export default async function PayDuesPage({
         );
     }
 
-    // Get or create Stripe customer
-    let customerId = dbUser.stripeCustomerId;
-    if (!customerId) {
-        const customer = await stripe.customers.create({
-            email:    dbUser.email ?? undefined,
-            name:     dbUser.name  ?? undefined,
-            metadata: { userId: user.id },
+    // ── Server action: create Stripe session on confirmed TOS acceptance ──────
+    async function createSession() {
+        'use server';
+
+        let customerId = dbUser!.stripeCustomerId;
+        if (!customerId) {
+            const customer = await stripe.customers.create({
+                email:    dbUser!.email ?? undefined,
+                name:     dbUser!.name  ?? undefined,
+                metadata: { userId: user.id },
+            });
+            customerId = customer.id;
+            await prisma.user.update({ where: { id: user.id }, data: { stripeCustomerId: customerId } });
+        }
+
+        const base        = appUrl();
+        const amountCents = Math.round(dues!.buyInAmount * 100);
+
+        const cs = await stripe.checkout.sessions.create({
+            customer:  customerId,
+            mode:      'payment',
+            line_items: [{
+                quantity:   1,
+                price_data: {
+                    currency:     'usd',
+                    unit_amount:  amountCents,
+                    product_data: {
+                        name:        `League Dues — ${league!.leagueName.replace(/\s*\(\d{4}\)\s*$/, '')}`,
+                        description: `${league!.season} season buy-in · ${member!.displayName}`,
+                    },
+                },
+            }],
+            success_url: `${base}/api/dues/${dues!.id}/pay-confirm?session_id={CHECKOUT_SESSION_ID}&memberId=${member!.id}&leagueId=${id}`,
+            cancel_url:  `${base}/dashboard/league/${id}/overview?dues_cancelled=true`,
+            metadata: {
+                type:        'LEAGUE_DUES',
+                duesId:      dues!.id,
+                memberId:    member!.id,
+                buyInAmount: String(dues!.buyInAmount),
+            },
         });
-        customerId = customer.id;
-        await prisma.user.update({ where: { id: user.id }, data: { stripeCustomerId: customerId } });
+
+        redirect(cs.url!);
     }
 
-    const base        = appUrl();
-    const amountCents = Math.round(dues.buyInAmount * 100);
-
-    const cs = await stripe.checkout.sessions.create({
-        customer:  customerId,
-        mode:      'payment',
-        line_items: [{
-            quantity:   1,
-            price_data: {
-                currency:     'usd',
-                unit_amount:  amountCents,
-                product_data: {
-                    name:        `League Dues — ${league.leagueName.replace(/\s*\(\d{4}\)\s*$/, '')}`,
-                    description: `${league.season} season buy-in · ${member.displayName}`,
-                },
-            },
-        }],
-        success_url: `${base}/api/dues/${dues.id}/pay-confirm?session_id={CHECKOUT_SESSION_ID}&memberId=${member.id}&leagueId=${id}`,
-        cancel_url:  `${base}/dashboard/league/${id}/overview?dues_cancelled=true`,
-        metadata: {
-            type:        'LEAGUE_DUES',
-            duesId:      dues.id,
-            memberId:    member.id,
-            buyInAmount: String(dues.buyInAmount),
-        },
-    });
-
-    redirect(cs.url!);
+    // ── Confirmation screen with TOS + trust callout ──────────────────────────
+    return (
+        <div className="max-w-xl mx-auto mt-10 space-y-6">
+            <BackToOverview leagueId={id} />
+            <DuesPayConfirm
+                leagueName={league.leagueName}
+                season={league.season}
+                memberName={member.displayName}
+                amount={dues.buyInAmount}
+                createSession={createSession}
+            />
+        </div>
+    );
 }

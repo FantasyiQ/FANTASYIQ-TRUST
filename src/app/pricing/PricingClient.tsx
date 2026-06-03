@@ -303,7 +303,7 @@ function UpgradeModal({
                 <p className="text-gray-500 text-xs mb-4">
                     You&apos;ll be charged the prorated difference immediately. Your new plan takes effect right away.
                 </p>
-                <div className="flex items-start gap-2 mb-4">
+                <div className="flex items-start gap-2 mb-3">
                     <input
                         id={checkboxId}
                         type="checkbox"
@@ -316,6 +316,14 @@ function UpgradeModal({
                         <Link href="/terms" className="text-[#D4AF37] underline" target="_blank">Terms of Service</Link>
                         , including the <strong className="text-gray-300">No-Refund Policy</strong>.
                     </label>
+                </div>
+                <div className="rounded-lg border border-gray-700 bg-gray-800/50 px-3 py-2.5 mb-4 space-y-0.5">
+                    <p className="text-[10px] font-bold text-white flex items-center gap-1">
+                        🛡️ Protected Payments
+                    </p>
+                    <p className="text-[10px] text-gray-400 leading-snug">
+                        Your purchase is protected against fraud, chargebacks, and payment disputes through FantasyiQ Trust.
+                    </p>
                 </div>
                 {error && (
                     <div className="mb-4 px-4 py-3 bg-red-900/30 border border-red-800 rounded-lg text-red-400 text-sm">
@@ -416,6 +424,14 @@ function PlanCard({ name, price, period, badge, badgeGold, ring, features, price
                                 <Link href="/terms" className="text-[#D4AF37] underline" target="_blank">Terms of Service</Link>
                                 , including the <strong className="text-gray-300">No-Refund Policy</strong>.
                             </label>
+                        </div>
+                        <div className="rounded-lg border border-gray-700 bg-gray-800/50 px-3 py-2.5 mb-3 space-y-0.5">
+                            <p className="text-[10px] font-bold text-white flex items-center gap-1">
+                                🛡️ Protected Payments
+                            </p>
+                            <p className="text-[10px] text-gray-400 leading-snug">
+                                Your purchase is protected against fraud, chargebacks, and payment disputes through FantasyiQ Trust.
+                            </p>
                         </div>
                         <button type="submit" disabled={!priceId || !acceptTerms}
                             className="w-full py-3 rounded-xl font-bold transition-colors bg-[#D4AF37] text-black hover:bg-[#b8912a] disabled:opacity-40 disabled:cursor-not-allowed">
