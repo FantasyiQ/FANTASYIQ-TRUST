@@ -223,6 +223,33 @@ export async function POST(request: NextRequest): Promise<Response> {
                 break;
             }
 
+            case 'invoice.created': {
+                const invoice = event.data.object as Stripe.Invoice;
+                // Only modify invoices that are still in draft — once finalized we can't change description.
+                if (invoice.status !== 'draft') break;
+
+                // Resolve the subscription ID from the newer parent-based structure.
+                const rawSubRef = invoice.parent?.subscription_details?.subscription;
+                const subId = typeof rawSubRef === 'string'
+                    ? rawSubRef
+                    : (rawSubRef as Stripe.Subscription | undefined)?.id ?? null;
+                if (!subId) break;
+
+                // Fetch subscription metadata to get leagueName (set during checkout).
+                const subscription = await stripe.subscriptions.retrieve(subId);
+                const leagueName = subscription.metadata?.leagueName;
+                if (!leagueName) break;
+
+                // Stamp the invoice memo so the league name appears on the receipt PDF.
+                const planType = subscription.metadata?.planType ?? 'commissioner';
+                const invoiceDescription = planType === 'commissioner'
+                    ? `Commissioner Plan — ${leagueName}`
+                    : `Player Plan — ${leagueName}`;
+
+                await stripe.invoices.update(invoice.id, { description: invoiceDescription });
+                break;
+            }
+
             case 'invoice.payment_failed': {
                 const invoice = event.data.object as Stripe.Invoice;
                 const customerId = typeof invoice.customer === 'string' ? invoice.customer : null;
