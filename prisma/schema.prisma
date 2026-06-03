@@ -69,6 +69,10 @@ model User {
     prsRecord             PrsScore?
     prsHistorySubmissions PrsHistoryImport[] @relation("PrsHistorySubmitter")
 
+    // Dynasty Skill Score
+    dssScore              Int               @default(0)  // cached final DSS (0-100) for fast reads
+    dssRecord             DssScore?
+
     // LeagueFinder
     trustScore            Int               @default(0)
     lfReviews             LFReview[]        @relation("ReviewerReviews")
@@ -937,6 +941,27 @@ model PrsScore {
     user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@index([prs])
+}
+
+// Computed DSS — upserted nightly by dss-calculate cron.
+model DssScore {
+    id               String   @id @default(cuid())
+    userId           String   @unique
+    // V1 component scores (0–100 each)
+    winRateScore     Int      @default(0)   // weighted avg win rate across dynasty leagues
+    pfScore          Int      @default(0)   // weighted avg PF percentile rank within league
+    playoffScore     Int      @default(0)   // % of seasons finishing in playoff position
+    leagueStrScore   Int      @default(0)   // opponent quality (higher = tougher competition)
+    // Metadata
+    dynastyLeagues   Int      @default(0)   // number of dynasty leagues used for computation
+    totalGames       Int      @default(0)   // total regular-season games across leagues
+    dss              Int      @default(0)   // final score (0-100)
+    computedAt       DateTime @default(now())
+    updatedAt        DateTime @updatedAt
+
+    user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([dss])
 }
 
 enum LFJoinStatus {

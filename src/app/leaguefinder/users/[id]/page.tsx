@@ -26,7 +26,9 @@ export default async function UserProfilePage({
                 name:       true,
                 trustScore: true,
                 prsScore:   true,
+                dssScore:   true,
                 createdAt:  true,
+                dssRecord:  true,
                 lfReviews: {
                     orderBy: [{ seasonYear: 'desc' }],
                     take:    50,
@@ -188,6 +190,27 @@ export default async function UserProfilePage({
                     </div>
                 </section>
 
+                {/* ── DSS Section ─────────────────────────────────── */}
+                {user.dssRecord && (
+                    <section className="space-y-3">
+                        <h2 className="text-sm font-bold text-white uppercase tracking-wider">Dynasty Skill Score</h2>
+                        <div className="rounded-xl border border-gray-800 bg-gray-900 p-4 space-y-3">
+                            <div className="flex items-center gap-3">
+                                <DSSBadge score={user.dssRecord.dss} />
+                                <div className="flex-1 space-y-2">
+                                    <PRSBar label="Win Rate"        pts={user.dssRecord.winRateScore}   max={100} detail="weighted avg across leagues" />
+                                    <PRSBar label="Points For"      pts={user.dssRecord.pfScore}        max={100} detail="PF percentile rank" />
+                                    <PRSBar label="Playoff Rate"    pts={user.dssRecord.playoffScore}   max={100} detail="% of seasons in playoff position" />
+                                    <PRSBar label="League Strength" pts={user.dssRecord.leagueStrScore} max={100} detail="avg opponent win rate" />
+                                </div>
+                            </div>
+                            <p className="text-[10px] text-gray-600">
+                                Based on {user.dssRecord.dynastyLeagues} dynasty league{user.dssRecord.dynastyLeagues !== 1 ? 's' : ''} · {user.dssRecord.totalGames} total games played
+                            </p>
+                        </div>
+                    </section>
+                )}
+
                 {/* ── Trust Score Card (own profile only) ─────────── */}
                 {isMe && (
                     <section className="space-y-3">
@@ -326,6 +349,25 @@ function StatBox({ label, value }: { label: string; value: number }) {
         <div className="rounded-lg bg-gray-800/60 border border-gray-700/50 px-2 py-2.5 text-center">
             <div className="text-[9px] uppercase tracking-wider text-gray-500 leading-tight">{label}</div>
             <div className="text-lg font-bold text-white mt-0.5">{value}</div>
+        </div>
+    );
+}
+
+function DSSBadge({ score }: { score: number }) {
+    const color =
+        score >= 70 ? 'text-[#D4AF37] border-[#D4AF37]/50 bg-[#D4AF37]/10' :
+        score >= 50 ? 'text-sky-400 border-sky-800 bg-sky-900/20' :
+        score >= 30 ? 'text-gray-300 border-gray-600 bg-gray-800' :
+                      'text-gray-500 border-gray-700 bg-gray-900';
+    const label =
+        score >= 70 ? 'Elite' :
+        score >= 50 ? 'Solid' :
+        score >= 30 ? 'Average' : 'Developing';
+    return (
+        <div className={`flex-shrink-0 rounded-xl border px-3 py-2 text-center min-w-[64px] ${color}`}>
+            <div className="text-xl font-black leading-none">{score}</div>
+            <div className="text-[9px] font-bold uppercase tracking-wider mt-0.5 opacity-80">DSS</div>
+            <div className="text-[8px] opacity-60 mt-0.5">{label}</div>
         </div>
     );
 }
