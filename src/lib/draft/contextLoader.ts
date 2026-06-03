@@ -17,6 +17,18 @@ import type {
     DraftProfile, TrajectoryWindow, HorizonYears, RiskTolerance, DraftPoolADPEntry,
 } from './context';
 import { normalizePosition, getTier, computeTeamMode } from './context';
+
+/** Normalizes a player name for fuzzy fallback matching.
+ *  Strips Jr/Sr/II/III/IV/V suffixes, apostrophes, periods, and extra whitespace. */
+function normalizeDraftName(name: string): string {
+    return name
+        .toLowerCase()
+        .replace(/[''\u2018\u2019]/g, '')          // remove apostrophes (including curly)
+        .replace(/\s+\b(jr\.?|sr\.?|ii|iii|iv|v)\s*$/i, '')  // remove suffixes
+        .replace(/\./g, '')                        // remove periods
+        .replace(/\s+/g, ' ')
+        .trim();
+}
 import { getLeagueContext } from '@/lib/trajectory/contextLoader';
 import { computeTeamTrajectoryForLeague } from '@/lib/trajectory/teamTrajectory';
 import type { TeamTrajectory, TrajectoryMode, WinCurve } from '@/lib/trajectory/types';
@@ -214,12 +226,14 @@ export async function loadDraftContext(params: {
             select: { fullName: true, playerId: true, team: true, age: true },
         });
 
-        const spByName = new Map(sleeperPlayers.map(p => [p.fullName, p]));
+        const spByName         = new Map(sleeperPlayers.map(p => [p.fullName, p]));
+        const spByNormalName   = new Map(sleeperPlayers.map(p => [normalizeDraftName(p.fullName), p]));
+        const spLookup = (name: string) => spByName.get(name) ?? spByNormalName.get(normalizeDraftName(name));
 
         // Pass 1: build pool ADP for all players (including drafted)
         let poolRank = 0;
         for (const r of rookies) {
-            const sp = spByName.get(r.playerName);
+            const sp = spLookup(r.playerName);
             if (!sp?.playerId) continue;
             poolRank++;
             draftPoolPlayers.push(sp.playerId);
@@ -234,7 +248,7 @@ export async function loadDraftContext(params: {
 
         // Pass 2: available players = undrafted only
         for (const r of rookies) {
-            const sp = spByName.get(r.playerName);
+            const sp = spLookup(r.playerName);
             if (sp && draftedIds.has(sp.playerId)) continue;
             const fiqScore  = Math.round(r.fiqScore);
             const tierMatch = r.fiqTier?.match(/(\d+)/);
@@ -270,12 +284,14 @@ export async function loadDraftContext(params: {
             select: { fullName: true, playerId: true, team: true, age: true },
         });
 
-        const spByName = new Map(sleeperPlayers.map(p => [p.fullName, p]));
+        const spByName2       = new Map(sleeperPlayers.map(p => [p.fullName, p]));
+        const spByNormalName2 = new Map(sleeperPlayers.map(p => [normalizeDraftName(p.fullName), p]));
+        const spLookup2 = (name: string) => spByName2.get(name) ?? spByNormalName2.get(normalizeDraftName(name));
 
         // Pass 1: build pool ADP for all players (including drafted)
         let poolRank = 0;
         for (const fcv of fcValues) {
-            const sp = spByName.get(fcv.playerName);
+            const sp = spLookup2(fcv.playerName);
             if (!sp?.playerId) continue;
             poolRank++;
             draftPoolPlayers.push(sp.playerId);
@@ -290,7 +306,7 @@ export async function loadDraftContext(params: {
 
         // Pass 2: available players = undrafted only
         for (const fcv of fcValues) {
-            const sp = spByName.get(fcv.playerName);
+            const sp = spLookup2(fcv.playerName);
             if (sp && draftedIds.has(sp.playerId)) continue;
             const ktcValue = superflex ? fcv.dynastyValueSf : fcv.dynastyValue;
             const fiqScore = Math.min(100, Math.round(ktcValue / 90));
