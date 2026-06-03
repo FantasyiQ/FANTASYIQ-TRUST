@@ -41,9 +41,9 @@ export default async function Navbar() {
 
   return (
     <nav className="fixed top-0 w-full z-50 bg-gray-950/90 backdrop-blur-sm border-b border-gray-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2 min-w-0">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between gap-2 min-w-0">
         <Link href="/" className="shrink-0">
-          <Image src="/logo.png" alt="FantasyiQ Trust" width={160} height={107} className="h-16 w-auto object-contain rounded-md" priority />
+          <Image src="/logo.png" alt="FantasyiQ Trust" width={160} height={107} className="h-20 w-auto object-contain rounded-md" priority />
         </Link>
         {/* Scrollable nav items — overflow-x: auto prevents page widening on mobile */}
         <div
