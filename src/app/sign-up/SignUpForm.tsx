@@ -14,7 +14,7 @@ export default function SignUpForm({ redirect }: { redirect: string }) {
                 {/* Brand */}
                 <div className="flex justify-center mb-8">
                     <Link href="/">
-                        <Image src="/logo.png" alt="FantasyiQ Trust" width={400} height={400} className="w-64 h-64 object-contain rounded-xl" />
+                        <Image src="/logo.png" alt="FantasyiQ Trust" width={400} height={400} className="w-64 h-64 object-contain" style={{ mixBlendMode: 'lighten' }} />
                     </Link>
                 </div>
 
