@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { signUpAction, signInWithGoogle } from '@/app/actions/auth';
 
 export default function SignUpForm({ redirect }: { redirect: string }) {
@@ -11,9 +12,9 @@ export default function SignUpForm({ redirect }: { redirect: string }) {
         <main className="min-h-screen bg-gray-950 flex items-center justify-center px-4 py-16">
             <div className="w-full max-w-md">
                 {/* Brand */}
-                <div className="text-center mb-8">
-                    <Link href="/" className="text-2xl font-bold text-white">
-                        Fantasy<span className="text-[#D4AF37]">i</span>Q Trust
+                <div className="flex justify-center mb-8">
+                    <Link href="/">
+                        <Image src="/logo.png" alt="FantasyiQ Trust" width={160} height={107} className="h-20 w-auto object-contain rounded-xl" />
                     </Link>
                 </div>
 

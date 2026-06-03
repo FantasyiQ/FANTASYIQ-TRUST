@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { auth, signOut } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import NotificationBell from '@/components/notifications/NotificationBell';
@@ -41,8 +42,8 @@ export default async function Navbar() {
   return (
     <nav className="fixed top-0 w-full z-50 bg-gray-950/90 backdrop-blur-sm border-b border-gray-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2 min-w-0">
-        <Link href="/" className="text-lg sm:text-2xl font-bold text-white shrink-0">
-          Fantasy<span className="text-[#D4AF37]">i</span>Q Trust
+        <Link href="/" className="shrink-0">
+          <Image src="/logo.png" alt="FantasyiQ Trust" width={120} height={80} className="h-10 w-auto object-contain rounded-md" priority />
         </Link>
         {/* Scrollable nav items — overflow-x: auto prevents page widening on mobile */}
         <div
