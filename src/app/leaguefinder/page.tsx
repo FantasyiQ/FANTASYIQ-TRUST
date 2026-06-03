@@ -69,7 +69,13 @@ export default async function LeagueFinderPage({
                             Find your next dynasty or redraft league — vetted by the community.
                         </p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
+                        <Link
+                            href="/dss/leaderboard"
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold border border-[#D4AF37]/40 text-[#D4AF37] hover:bg-[#D4AF37]/10 transition"
+                        >
+                            🏆 DSS Leaderboard
+                        </Link>
                         <Link
                             href="/leaguefinder/commissioners/new"
                             className="px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-700 text-gray-300 hover:border-[#D4AF37] hover:text-[#D4AF37] transition"

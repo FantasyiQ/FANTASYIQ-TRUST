@@ -193,7 +193,12 @@ export default async function UserProfilePage({
                 {/* ── DSS Section ─────────────────────────────────── */}
                 {user.dssRecord && (
                     <section className="space-y-3">
-                        <h2 className="text-sm font-bold text-white uppercase tracking-wider">Dynasty Skill Score</h2>
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-sm font-bold text-white uppercase tracking-wider">Dynasty Skill Score</h2>
+                            <Link href="/dss/leaderboard" className="text-[10px] text-[#D4AF37] hover:opacity-80 transition">
+                                View leaderboard →
+                            </Link>
+                        </div>
                         <div className="rounded-xl border border-gray-800 bg-gray-900 p-4 space-y-3">
                             <div className="flex items-center gap-3">
                                 <DSSBadge score={user.dssRecord.dss} />
@@ -355,14 +360,14 @@ function StatBox({ label, value }: { label: string; value: number }) {
 
 function DSSBadge({ score }: { score: number }) {
     const color =
-        score >= 70 ? 'text-[#D4AF37] border-[#D4AF37]/50 bg-[#D4AF37]/10' :
-        score >= 50 ? 'text-sky-400 border-sky-800 bg-sky-900/20' :
-        score >= 30 ? 'text-gray-300 border-gray-600 bg-gray-800' :
+        score >= 85 ? 'text-[#D4AF37] border-[#D4AF37]/50 bg-[#D4AF37]/10' :
+        score >= 70 ? 'text-sky-400 border-sky-800 bg-sky-900/20' :
+        score >= 50 ? 'text-gray-300 border-gray-600 bg-gray-800' :
                       'text-gray-500 border-gray-700 bg-gray-900';
     const label =
-        score >= 70 ? 'Elite' :
-        score >= 50 ? 'Solid' :
-        score >= 30 ? 'Average' : 'Developing';
+        score >= 85 ? 'Elite' :
+        score >= 70 ? 'Solid' :
+        score >= 50 ? 'Average' : 'Developing';
     return (
         <div className={`flex-shrink-0 rounded-xl border px-3 py-2 text-center min-w-[64px] ${color}`}>
             <div className="text-xl font-black leading-none">{score}</div>
