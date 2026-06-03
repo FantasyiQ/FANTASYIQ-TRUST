@@ -25,7 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               Skip to main content
             </a>
             <Navbar />
-            <div id="main-content">{children}</div>
+            <div id="main-content" className="pt-24">{children}</div>
             <Footer />
             <SupportAssistantLauncher />
           </SupportContextProvider>
