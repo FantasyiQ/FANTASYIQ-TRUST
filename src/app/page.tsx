@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export const metadata: Metadata = {
     title: 'FantasyiQ Trust — Your League Dues. Protected.',
@@ -68,6 +69,9 @@ export default function Home() {
       {/* ── Hero ─────────────────────────────────────────────────────── */}
       <section className="pt-32 pb-20 px-6 bg-black">
         <div className="max-w-4xl mx-auto text-center">
+          <div className="flex justify-center mb-6">
+            <Image src="/logo.png" alt="FantasyiQ Trust" width={300} height={300} className="w-48 h-48 md:w-64 md:h-64 object-contain" style={{ mixBlendMode: 'lighten' }} priority />
+          </div>
           <div className="inline-block mb-6 px-4 py-1.5 rounded-full border border-[#D4AF37]/30 bg-[#D4AF37]/10 text-[#D4AF37] text-sm font-medium">
             ★★★★★ Trusted by Commissioners
           </div>
