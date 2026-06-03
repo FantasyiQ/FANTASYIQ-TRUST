@@ -248,8 +248,9 @@ export default async function DashboardPage({
             );
             const syncedLeagueNames = new Set(leagues.map(l => l.leagueName.toLowerCase().trim()));
 
-            // All synced leagues — always have syncedLeagueId, so link always works
-            const fromSynced = leagues.map(l => {
+            // All synced leagues — exclude commissioner-covered ones (they appear in
+            // the Commissioner Plans section, not under Player Plan).
+            const fromSynced = leagues.filter(l => !commissionerLeagueIds.has(l.id)).map(l => {
                 const existing = connectedByName.get(l.leagueName.toLowerCase().trim());
                 return {
                     id:             existing?.id ?? `auto-${l.id}`,
@@ -276,7 +277,7 @@ export default async function DashboardPage({
                 a.leagueName.localeCompare(b.leagueName)
             );
         })()
-        : connectedLeagues;
+        : connectedLeagues.filter(cl => !cl.isCommissioner);
 
     const testDataReset = params.test_data_reset === 'true';
 
