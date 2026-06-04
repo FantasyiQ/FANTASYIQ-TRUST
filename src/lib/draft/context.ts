@@ -210,4 +210,14 @@ export interface DraftContext {
 
     /** Pool-relative ADP by sleeperPlayerId — includes drafted players. */
     draftPoolADP: Record<string, DraftPoolADPEntry>;
+
+    /** Diagnostic info about how the user's roster was resolved. */
+    binding: {
+        rosterFound:       boolean;
+        resolvedRosterId:  number | null;    // actual roster_id that was bound
+        rosterPlayerCount: number;           // existing players on the roster
+        myPickCount:       number;           // picks made in this draft
+        sleeperUserIdUsed: string | null;    // sleeperUserId that was matched (or null)
+        boundByOwnerId:    boolean;          // true = owner_id match, false = rosterId fallback
+    };
 }

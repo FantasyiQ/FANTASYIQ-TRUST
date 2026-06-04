@@ -31,6 +31,15 @@ interface Meta {
     trajectoryLabel:    string;
 }
 
+interface BindingDebug {
+    rosterFound:       boolean;
+    resolvedRosterId:  number | null;
+    rosterPlayerCount: number;
+    myPickCount:       number;
+    sleeperUserIdUsed: string | null;
+    boundByOwnerId:    boolean;
+}
+
 interface Props {
     leagueId:      string;
     draftOptions:  DraftOption[];
@@ -77,6 +86,7 @@ export default function DraftAssistantPanel({
     const [recommendations,  setRecommendations]  = useState<DraftRecommendation[] | null>(null);
     const [meta,             setMeta]             = useState<Meta | null>(null);
     const [tradeDownNote,    setTradeDownNote]    = useState<string | null>(null);
+    const [binding,          setBinding]          = useState<BindingDebug | null>(null);
     const [loading,          setLoading]          = useState(false);
     const [error,            setError]            = useState<string | null>(null);
 
@@ -89,10 +99,19 @@ export default function DraftAssistantPanel({
             const url = `/api/draft-assistant?leagueId=${leagueId}&sleeperDraftId=${selectedDraftId}&myRosterId=${selectedRosterId}`;
             const res = await fetch(url);
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error ?? 'Failed to load recommendations');
+            if (!res.ok) {
+                if (data.error === 'NO_ROSTER_BOUND') {
+                    const debugStr = data.debug
+                        ? ` (sleeperUserId=${data.debug.sleeperUserIdFromDb ?? 'null'}, rosterId=${data.debug.myRosterIdParam ?? 'null'})`
+                        : '';
+                    throw new Error(`Your Sleeper account couldn't be matched to a roster.${debugStr} Go to Settings → Sync → Sleeper to reconnect.`);
+                }
+                throw new Error(data.error ?? 'Failed to load recommendations');
+            }
             setRecommendations(data.recommendations);
             setMeta(data.meta);
             setTradeDownNote(data.tradeDownNote ?? null);
+            setBinding(data.binding ?? null);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load recommendations');
         } finally {
@@ -226,6 +245,19 @@ export default function DraftAssistantPanel({
                             {meta.trajectoryLabel} · {meta.horizonYears}-yr
                         </span>
                     )}
+                </div>
+            )}
+
+            {/* Binding debug strip — always shown after first load so we can diagnose */}
+            {binding && (
+                <div className="bg-gray-900/60 border border-gray-800 rounded-xl px-4 py-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-gray-500 font-mono">
+                    <span className={binding.boundByOwnerId ? 'text-green-500' : 'text-amber-400'}>
+                        bound: {binding.boundByOwnerId ? 'owner_id ✓' : 'rosterId fallback'}
+                    </span>
+                    <span>roster_id: {binding.resolvedRosterId ?? 'null'}</span>
+                    <span>players: {binding.rosterPlayerCount}</span>
+                    <span>picks: {binding.myPickCount}</span>
+                    <span>sleeperUid: {binding.sleeperUserIdUsed ?? 'null'}</span>
                 </div>
             )}
 

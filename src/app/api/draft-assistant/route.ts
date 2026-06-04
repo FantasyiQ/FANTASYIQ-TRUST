@@ -19,8 +19,8 @@ export async function GET(req: NextRequest): Promise<Response> {
     const sleeperDraftId = searchParams.get('sleeperDraftId');
     const myRosterId     = searchParams.get('myRosterId');
 
-    if (!leagueId || !sleeperDraftId || !myRosterId) {
-        return Response.json({ error: 'Missing params: leagueId, sleeperDraftId, myRosterId' }, { status: 400 });
+    if (!leagueId || !sleeperDraftId) {
+        return Response.json({ error: 'Missing params: leagueId, sleeperDraftId' }, { status: 400 });
     }
 
     const [league, dbUser] = await Promise.all([
@@ -46,13 +46,28 @@ export async function GET(req: NextRequest): Promise<Response> {
     // roster is always loaded regardless of what myRosterId the client sends.
     const sleeperUserId = dbUser?.sleeperUserId ?? league.sleeperUserId ?? null;
 
-    const ctx = await loadDraftContext({
-        leagueDbId:      leagueId,
-        sleeperLeagueId: league.leagueId,
-        sleeperDraftId,
-        myRosterId,
-        sleeperUserId,
-    });
+    let ctx;
+    try {
+        ctx = await loadDraftContext({
+            leagueDbId:      leagueId,
+            sleeperLeagueId: league.leagueId,
+            sleeperDraftId,
+            myRosterId,
+            sleeperUserId,
+        });
+    } catch (err) {
+        if ((err as { code?: string }).code === 'NO_ROSTER_BOUND') {
+            return Response.json({
+                error:   'NO_ROSTER_BOUND',
+                message: 'Your Sleeper account could not be matched to a roster in this league.',
+                debug: {
+                    sleeperUserIdFromDb: sleeperUserId,
+                    myRosterIdParam:     myRosterId,
+                },
+            }, { status: 400 });
+        }
+        throw err;
+    }
 
     const recommendations = rankCandidates(ctx);
     const tradeDownNote   = detectTradeDown(ctx);
@@ -66,12 +81,13 @@ export async function GET(req: NextRequest): Promise<Response> {
             totalRounds:        ctx.draftMeta.totalRounds,
             draftType:          ctx.draftType,
             onTheClockRosterId: ctx.draftMeta.onTheClockRosterId,
-            myPickCount:        ctx.myRoster.length,
+            myPickCount:        ctx.binding.myPickCount,
             teamMode:           ctx.draftProfile.teamMode,
             trajectoryWindow:   ctx.draftProfile.trajectoryWindow,
             horizonYears:       ctx.draftProfile.horizonYears,
             riskTolerance:      ctx.draftProfile.riskTolerance,
             trajectoryLabel:    getTrajectoryLabel(ctx.draftProfile),
         },
+        binding: ctx.binding,
     });
 }

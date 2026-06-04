@@ -174,11 +174,20 @@ export async function loadDraftContext(params: {
     // Binding priority:
     //   1. sleeperUserId (server-authoritative, matches owner_id) — always correct
     //   2. myRosterIdNum from the UI param — fallback when sleeperUserId is unknown
-    const mySleeperRoster = sleeperUserId
-        ? (rosters.find(r => r.owner_id === sleeperUserId) ?? rosters.find(r => r.roster_id === myRosterIdNum))
-        : rosters.find(r => r.roster_id === myRosterIdNum);
-    const existingPlayerIds  = (mySleeperRoster?.players ?? []).filter(id => id && id !== '0');
-    const mySleeperUserId    = mySleeperRoster?.owner_id ?? sleeperUserId ?? null;
+    const byOwnerId   = sleeperUserId ? rosters.find(r => r.owner_id === sleeperUserId) : undefined;
+    const byRosterId  = isNaN(myRosterIdNum) ? undefined : rosters.find(r => r.roster_id === myRosterIdNum);
+    const mySleeperRoster = byOwnerId ?? byRosterId;
+    const boundByOwnerId  = Boolean(byOwnerId);
+
+    if (!mySleeperRoster) {
+        // Hard fail — do not return generic recommendations for an unknown user
+        const err = new Error('Roster binding failed: no roster matched sleeperUserId or myRosterId') as Error & { code: string };
+        err.code = 'NO_ROSTER_BOUND';
+        throw err;
+    }
+
+    const existingPlayerIds = (mySleeperRoster.players ?? []).filter(id => id && id !== '0');
+    const mySleeperUserId   = mySleeperRoster.owner_id ?? sleeperUserId ?? null;
 
     const existingPlayers = existingPlayerIds.length > 0
         ? await prisma.sleeperPlayer.findMany({
@@ -193,8 +202,10 @@ export async function loadDraftContext(params: {
     }));
 
     // ── My picks from this draft ─────────────────────────────────────────────
+    // Use mySleeperRoster.roster_id (the authoritatively bound roster),
+    // NOT myRosterIdNum (the UI param) — these can differ if owner_id binding fired.
     const myPickIds = picks
-        .filter(p => p.roster_id === myRosterIdNum)
+        .filter(p => p.roster_id === mySleeperRoster.roster_id)
         .map(p => p.player_id);
 
     const myPickPlayers = myPickIds.length > 0
@@ -427,5 +438,13 @@ export async function loadDraftContext(params: {
         availablePlayers,
         draftPoolPlayers,
         draftPoolADP,
+        binding: {
+            rosterFound:       true,
+            resolvedRosterId:  mySleeperRoster.roster_id,
+            rosterPlayerCount: existingPlayerIds.length,
+            myPickCount:       myPickIds.length,
+            sleeperUserIdUsed: mySleeperUserId,
+            boundByOwnerId,
+        },
     };
 }
