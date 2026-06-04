@@ -339,7 +339,7 @@ export async function POST(request: NextRequest): Promise<Response> {
                         amount:    invoice.amount_paid ? invoice.amount_paid / 100 : undefined,
                         currency:  invoice.currency,
                     },
-                }).catch(() => {});
+                }).catch(err => captureError(err, { event: 'invoice.payment_succeeded', notify: true }));
                 break;
             }
 
@@ -391,7 +391,7 @@ export async function POST(request: NextRequest): Promise<Response> {
                     inApp:      true,
                     throttleMs: 0,
                     data:       { deadline: trialEnd?.toISOString() },
-                }).catch(() => {});
+                }).catch(err => captureError(err, { event: 'customer.subscription.trial_will_end', notify: true }));
                 break;
             }
 
@@ -479,7 +479,7 @@ export async function POST(request: NextRequest): Promise<Response> {
                     email:   true,
                     inApp:   true,
                     throttleMs: 0,
-                }).catch(() => {});
+                }).catch(err => captureError(err, { event: 'customer.subscription.deleted', notify: true }));
                 break;
             }
         }
@@ -488,8 +488,9 @@ export async function POST(request: NextRequest): Promise<Response> {
         return Response.json({ error: 'Webhook handler failed' }, { status: 500 });
     }
 
-    // Mark event as processed (best-effort — don't fail the response if this write fails)
-    prisma.processedStripeEvent.create({ data: { id: event.id } }).catch(() => {});
+    // Mark event as processed — log failures so re-processing can be investigated
+    prisma.processedStripeEvent.create({ data: { id: event.id } })
+        .catch(err => captureError(err, { event: event.id, context: 'idempotency_write' }));
 
     return Response.json({ received: true });
 }

@@ -19,7 +19,7 @@ export default function DashboardError({
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
             <div className="max-w-md mx-auto text-center space-y-4">
                 <p className="text-red-400 font-semibold text-lg">Something went wrong</p>
-                <p className="text-gray-500 text-sm">{error.message || 'An unexpected error occurred.'}</p>
+                <p className="text-gray-500 text-sm">An unexpected error occurred. Please try again.</p>
                 <div className="flex items-center justify-center gap-4 pt-2">
                     <button
                         onClick={reset}

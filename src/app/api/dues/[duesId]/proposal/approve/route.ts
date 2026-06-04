@@ -36,13 +36,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!proposal || proposal.leagueDuesId !== duesId) return Response.json({ error: 'Proposal not found.' }, { status: 404 });
     if (proposal.status !== 'pending_commissioner') return Response.json({ error: 'Proposal is not pending approval.' }, { status: 400 });
 
-    // Update item member assignments
-    for (const [itemId, memberId] of Object.entries(assignments)) {
-        await prisma.payoutProposalItem.update({
-            where: { id: itemId },
-            data: { memberId },
-        });
+    // Validate that all itemIds belong to this proposal
+    const validItemIds = new Set(proposal.items.map(i => i.id));
+    for (const itemId of Object.keys(assignments)) {
+        if (!validItemIds.has(itemId)) {
+            return Response.json({ error: 'Invalid item assignment.' }, { status: 400 });
+        }
     }
+
+    // Validate all memberIds exist and belong to this dues tracker
+    const memberIds = [...new Set(Object.values(assignments))];
+    const validMembers = await prisma.duesMember.findMany({
+        where: { id: { in: memberIds }, leagueDuesId: duesId },
+        select: { id: true },
+    });
+    if (validMembers.length !== memberIds.length) {
+        return Response.json({ error: 'Invalid member assignment.' }, { status: 400 });
+    }
+
+    // Batch update all item member assignments in a single transaction
+    await prisma.$transaction(
+        Object.entries(assignments).map(([itemId, memberId]) =>
+            prisma.payoutProposalItem.update({ where: { id: itemId }, data: { memberId } })
+        )
+    );
 
     // Create Stripe payment links for each winner
     for (const item of proposal.items) {

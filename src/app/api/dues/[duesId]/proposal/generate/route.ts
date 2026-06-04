@@ -32,10 +32,10 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ du
             leagueDuesId: duesId,
             status: 'pending_commissioner',
             items: {
-                create: dues.payoutSpots.map(spot => ({
+                create: dues.payoutSpots.map((spot, i) => ({
                     payoutSpotId: spot.id,
-                    // Assign first N members as placeholder — commissioner edits before approving
-                    memberId: dues.members[0]?.id ?? dues.members[0]?.id,
+                    // Assign first N paid members as placeholder — commissioner edits before approving
+                    memberId: dues.members[i]?.id ?? dues.members[0]?.id,
                     amount: spot.amount,
                     status: 'pending',
                 })),

@@ -50,6 +50,9 @@ export async function PATCH(
     const data: Record<string, unknown> = {};
 
     if (typeof displayName === 'string' && displayName.trim()) {
+        if (displayName.trim().length > 100) {
+            return Response.json({ error: 'displayName must be 100 characters or fewer.' }, { status: 400 });
+        }
         data.displayName = displayName.trim();
     }
     if (platformHandles !== undefined && typeof platformHandles === 'object' && platformHandles !== null) {

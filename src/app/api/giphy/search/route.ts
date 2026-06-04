@@ -19,7 +19,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     const session = await auth();
     if (!session?.user?.email) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const q = req.nextUrl.searchParams.get('q')?.trim();
+    const q = req.nextUrl.searchParams.get('q')?.trim().slice(0, 100);
     if (!q) return Response.json({ results: [] });
 
     const key = process.env.GIPHY_API_KEY;

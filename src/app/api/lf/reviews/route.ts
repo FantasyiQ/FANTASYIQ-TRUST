@@ -29,6 +29,12 @@ export async function POST(request: Request) {
     if (typeof leagueId       !== 'string') return Response.json({ error: 'leagueId is required' },       { status: 400 });
     if (typeof commissionerId !== 'string') return Response.json({ error: 'commissionerId is required' }, { status: 400 });
     if (typeof seasonYear     !== 'number') return Response.json({ error: 'seasonYear is required' },     { status: 400 });
+    if (!Number.isInteger(seasonYear) || seasonYear < 2000 || seasonYear > 2100) {
+        return Response.json({ error: 'seasonYear must be a valid year.' }, { status: 400 });
+    }
+    if (typeof text === 'string' && text.length > 2000) {
+        return Response.json({ error: 'Review text must be 2000 characters or fewer.' }, { status: 400 });
+    }
 
     const validRating = (v: unknown): v is number =>
         typeof v === 'number' && v >= 1 && v <= 5 && Number.isInteger(v);

@@ -20,6 +20,9 @@ export async function POST(request: NextRequest): Promise<Response> {
     const body = await request.json() as { duesId?: string; season?: string };
     const { duesId, season } = body;
     if (!duesId || !season) return Response.json({ error: 'duesId and season are required' }, { status: 400 });
+    if (!/^\d{4}$/.test(season) || parseInt(season) < 2000 || parseInt(season) > 2100) {
+        return Response.json({ error: 'season must be a valid 4-digit year.' }, { status: 400 });
+    }
 
     const dues = await prisma.leagueDues.findUnique({
         where: { id: duesId },
