@@ -15,7 +15,7 @@ export default function TermsOfServicePage() {
                 <div className="space-y-2 border-b border-gray-800 pb-8">
                     <p className="text-[10px] font-bold tracking-widest text-[#D4AF37] uppercase">Legal</p>
                     <h1 className="text-3xl font-bold text-white">Terms of Service</h1>
-                    <p className="text-gray-500 text-sm">Last updated: June 2, 2026</p>
+                    <p className="text-gray-500 text-sm">Last updated: June 4, 2026</p>
                 </div>
 
                 <LegalSection title="1. Acceptance of Terms">
@@ -170,7 +170,7 @@ export default function TermsOfServicePage() {
                     <p>
                         You may terminate your account at any time by contacting us or by using the account deletion feature in your
                         account settings. Upon termination, your right to use the Service ceases immediately. Sections 6, 7, 8, 9,
-                        10, 13, and 14 of these Terms survive termination.
+                        10, 14, and 15 of these Terms survive termination.
                     </p>
                 </LegalSection>
 
@@ -199,7 +199,18 @@ export default function TermsOfServicePage() {
                         for any sales, use, value-added, or similar taxes imposed by your jurisdiction.</p>
                 </LegalSection>
 
-                <LegalSection title="13. Governing Law and Dispute Resolution">
+                <LegalSection title="13. League Dues Protected">
+                    <p>
+                        &ldquo;League Dues Protected&rdquo; refers to FantasyiQ Trust&apos;s verification and tracking of league dues payments,
+                        including fraud-prevention measures, chargeback handling, payment dispute support, and maintaining an auditable
+                        record of all dues activity within a league. FantasyiQ Trust does not hold league funds, act as an escrow
+                        service, guarantee payouts, or issue refunds on behalf of commissioners or league members. All funds are
+                        collected and managed directly by the league commissioner, who is solely responsible for distributing payouts,
+                        issuing refunds, and resolving any financial disputes between league participants.
+                    </p>
+                </LegalSection>
+
+                <LegalSection title="14. Governing Law and Dispute Resolution">
                     <p>
                         These Terms are governed by and construed in accordance with the laws of the State of Florida, United States,
                         without regard to its conflict-of-law principles. Any dispute arising out of or related to these Terms or your
@@ -212,7 +223,7 @@ export default function TermsOfServicePage() {
                     </p>
                 </LegalSection>
 
-                <LegalSection title="14. Changes to These Terms">
+                <LegalSection title="15. Changes to These Terms">
                     <p>
                         We may modify these Terms at any time by posting the revised Terms on the Service and updating the
                         &ldquo;Last updated&rdquo; date. For material changes, we will provide additional notice. Your continued use of the
@@ -221,7 +232,7 @@ export default function TermsOfServicePage() {
                     </p>
                 </LegalSection>
 
-                <LegalSection title="15. Miscellaneous">
+                <LegalSection title="16. Miscellaneous">
                     <p>
                         These Terms, together with our <Link href="/privacy" className="text-[#D4AF37] hover:underline">Privacy Policy</Link> and{' '}
                         <Link href="/cookies" className="text-[#D4AF37] hover:underline">Cookie Notice</Link>, constitute the entire agreement
@@ -232,7 +243,7 @@ export default function TermsOfServicePage() {
                     </p>
                 </LegalSection>
 
-                <LegalSection title="16. Contact">
+                <LegalSection title="17. Contact">
                     <p>If you have questions about these Terms, please contact us at:</p>
                     <div className="mt-3 bg-gray-900 border border-gray-800 rounded-xl px-5 py-4 text-sm text-gray-300 space-y-0.5">
                         <p className="font-semibold text-white">FantasyiQ Trust</p>
