@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -12,6 +12,12 @@ interface LookupResult {
     user: SleeperUser;
     leagues: SleeperLeague[];
     season: string;
+}
+
+interface SlotInfo {
+    slotLimit:               number | null; // null = unlimited
+    playerSlotsUsed:         number;
+    commissionerLeagueNames: string[];      // lowercase-normalized
 }
 
 function statusLabel(status: string) {
@@ -55,6 +61,15 @@ function SyncPageInner() {
     const [result, setResult]   = useState<LookupResult | null>(null);
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [synced, setSynced]   = useState(0);
+    const [slotInfo, setSlotInfo] = useState<SlotInfo | null>(null);
+
+    // Fetch slot info once on mount so step 2 can show slot awareness
+    useEffect(() => {
+        fetch('/api/user/slot-info')
+            .then(r => r.ok ? r.json() as Promise<SlotInfo> : null)
+            .then(data => { if (data) setSlotInfo(data); })
+            .catch(() => {/* non-critical — degrade silently */});
+    }, []);
 
     async function handleLookup(e: React.FormEvent) {
         e.preventDefault();
@@ -229,15 +244,38 @@ function SyncPageInner() {
                                     {selected.size === result.leagues.length ? 'Deselect all' : 'Select all'}
                                 </button>
                             </div>
+
+                            {/* Slot counter — only shown when user has a finite player plan */}
+                            {slotInfo && slotInfo.slotLimit !== null && (
+                                <div className="px-5 py-3 bg-gray-800/60 border-b border-gray-800 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                                    {slotInfo.slotLimit === 0 ? (
+                                        <span className="text-yellow-400">No player plan active — leagues won&apos;t be assigned until you upgrade.</span>
+                                    ) : (
+                                        <>
+                                            <span className="text-gray-400">
+                                                Player slots: <span className={`font-semibold ${slotInfo.playerSlotsUsed >= slotInfo.slotLimit ? 'text-red-400' : 'text-white'}`}>
+                                                    {slotInfo.playerSlotsUsed} / {slotInfo.slotLimit} used
+                                                </span>
+                                            </span>
+                                            <span className="text-gray-600 hidden sm:inline">·</span>
+                                            <span className="text-gray-500">Commissioner-covered leagues don&apos;t use a slot.</span>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+
                             {result.leagues.length === 0 ? (
                                 <div className="px-5 py-10 text-center text-gray-500 text-sm">No leagues found for {result.season}.</div>
                             ) : (
                                 <ul className="divide-y divide-gray-800/50">
                                     {result.leagues.map((league) => {
                                         const isInvited = fromInvite && league.league_id === inviteLeagueId;
+                                        const isCommCovered = slotInfo?.commissionerLeagueNames.includes(
+                                            league.name.toLowerCase().trim()
+                                        ) ?? false;
                                         return (
                                             <li key={league.league_id} onClick={() => toggleLeague(league.league_id)}
-                                                className={`flex items-center gap-4 px-5 py-4 cursor-pointer transition ${isInvited ? 'bg-[#D4AF37]/5 hover:bg-[#D4AF37]/10' : 'hover:bg-gray-800/30'}`}>
+                                                className={`flex items-center gap-4 px-5 py-4 cursor-pointer transition ${isInvited || isCommCovered ? 'bg-[#D4AF37]/5 hover:bg-[#D4AF37]/10' : 'hover:bg-gray-800/30'}`}>
                                                 <input type="checkbox" checked={selected.has(league.league_id)}
                                                     onChange={() => toggleLeague(league.league_id)}
                                                     onClick={(e) => e.stopPropagation()}
@@ -252,7 +290,12 @@ function SyncPageInner() {
                                                     <p className="font-medium text-white truncate">{league.name}</p>
                                                     <p className="text-gray-500 text-xs mt-0.5">{league.total_rosters} teams · {scoringLabel(league)}</p>
                                                 </div>
-                                                <div className="shrink-0 flex items-center gap-2">
+                                                <div className="shrink-0 flex items-center gap-2 flex-wrap justify-end">
+                                                    {isCommCovered && !isInvited && (
+                                                        <span className="text-xs font-semibold text-[#D4AF37] bg-[#D4AF37]/10 border border-[#D4AF37]/30 px-2 py-0.5 rounded-full whitespace-nowrap">
+                                                            Commissioner Covered
+                                                        </span>
+                                                    )}
                                                     {isInvited && (
                                                         <span className="text-xs font-semibold text-[#D4AF37] bg-[#D4AF37]/10 border border-[#D4AF37]/30 px-2 py-0.5 rounded-full">
                                                             Invited
