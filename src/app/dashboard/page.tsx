@@ -205,6 +205,42 @@ export default async function DashboardPage({
         }
     }
 
+    // ── Silent commissioner promotion ─────────────────────────────────────────
+    // Heals leagues stuck on a player plan when a commissioner sub exists for
+    // that same league. This happens when:
+    //   (a) the user bought the commissioner plan after initially syncing, and
+    //   (b) the webhook's updateMany ran but found no League row (not yet synced),
+    //       OR the name in the subscription differs from the Sleeper league name.
+    // The sync route does the same check at sync time; this fires on every dashboard
+    // load so the fix is instant without requiring a manual re-sync.
+    if (commSubs.length > 0) {
+        const playerAssigned = leagues.filter(l => l.assignedPlanType === 'player');
+        const promotions: { leagueDbId: string; planId: string }[] = [];
+
+        for (const league of playerAssigned) {
+            if (leagueAssignmentOverrides.has(league.id)) continue; // already handled above
+            const match = commSubs.find(
+                s => s.leagueName?.toLowerCase().trim() === league.leagueName.toLowerCase().trim()
+            );
+            if (match) {
+                promotions.push({ leagueDbId: league.id, planId: match.id });
+                leagueAssignmentOverrides.set(league.id, {
+                    assignedPlanId:   match.id,
+                    assignedPlanType: 'commissioner',
+                });
+            }
+        }
+
+        if (promotions.length > 0) {
+            Promise.all(
+                promotions.map(p => prisma.league.update({
+                    where: { id: p.leagueDbId },
+                    data:  { assignedPlanId: p.planId, assignedPlanType: 'commissioner' },
+                }).catch(() => {}))
+            ).catch(() => {});
+        }
+    }
+
     // Enrich leagues array with any auto-assignments computed above
     const enrichedLeagues = leagues.map(l => {
         const override = leagueAssignmentOverrides.get(l.id);
