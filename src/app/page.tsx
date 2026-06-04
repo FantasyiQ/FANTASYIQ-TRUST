@@ -4,7 +4,7 @@ import Image from 'next/image';
 
 export const metadata: Metadata = {
     title: 'FantasyiQ Trust — Your League Dues. Protected.',
-    description: 'Stop chasing dues. Sync your Sleeper, ESPN, or Yahoo league and let FantasyiQ Trust handle collections, reminders, and payouts — with zero fees.',
+    description: 'Stop chasing dues. Sync your Sleeper, ESPN, NFL, or Yahoo league and let FantasyiQ Trust handle collections, reminders, and payouts — with zero fees.',
     openGraph: {
         title:       'FantasyiQ Trust — Your League Dues. Protected.',
         description: 'Stop chasing dues. Sync your league and let FantasyiQ Trust handle collections, reminders, and payouts — with zero fees.',
@@ -23,7 +23,7 @@ const FEATURES = [
     {
         icon: '⚡',
         title: 'Sync in Seconds',
-        body:  'Connect your Sleeper, ESPN, or Yahoo league instantly. No spreadsheets, no manual entry.',
+        body:  'Connect your Sleeper, ESPN, NFL, or Yahoo league instantly. No spreadsheets, no manual entry.',
     },
     {
         icon: '🔔',
@@ -66,7 +66,7 @@ const STEPS = [
     {
         number: '01',
         title: 'Sync Your League',
-        body: 'Connect your Sleeper, ESPN, or Yahoo league in seconds. Your roster, members, and settings import automatically.',
+        body: 'Connect your Sleeper, ESPN, NFL, or Yahoo league in seconds. Your roster, members, and settings import automatically.',
     },
     {
         number: '02',
@@ -115,7 +115,7 @@ export default function Home() {
 
           {/* Trust bar */}
           <div className="mt-12 flex flex-wrap items-center justify-center gap-6 text-sm text-gray-500">
-            <span className="flex items-center gap-2"><span className="text-[#D4AF37]">✓</span> Sleeper, ESPN &amp; Yahoo</span>
+            <span className="flex items-center gap-2"><span className="text-[#D4AF37]">✓</span> Sleeper, ESPN, NFL &amp; Yahoo</span>
             <span className="flex items-center gap-2"><span className="text-[#D4AF37]">✓</span> Zero fees on every dollar</span>
             <span className="flex items-center gap-2"><span className="text-[#D4AF37]">✓</span> No contracts, cancel anytime</span>
           </div>
@@ -126,7 +126,7 @@ export default function Home() {
       <section id="how-it-works" className="bg-[#050505] border-t border-gray-900 py-24 px-6">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-14">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">Up and running in minutes</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">Up and running in no time</h2>
             <p className="text-gray-400 text-lg max-w-xl mx-auto">No setup headaches. No learning curve. Just sync your league and go.</p>
           </div>
 
@@ -151,7 +151,7 @@ export default function Home() {
               <span className="text-[#D4AF37]">Nothing it doesn&apos;t.</span>
             </h2>
             <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-              We built FantasyiQ Trust because we were tired of the same problems every season — missing dues, disputed payouts, and commissioners who had to do all the work for free.
+              We built FantasyiQ Trust because every season looked the same — juggling dues across multiple leagues, no idea who actually paid, payouts handled on a handshake, and the commissioner doing all of it manually with zero tools. Nothing was integrated. Nothing was simple. We fixed that.
             </p>
           </div>
 
