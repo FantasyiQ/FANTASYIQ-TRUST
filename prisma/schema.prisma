@@ -922,12 +922,18 @@ model PrsEvent {
     eventType   PrsEventType
     eventValue  Int?
     eventDate   DateTime     @default(now())
+    // Deduplication key for cron-ingested events.
+    // Format: "txn:{transactionId}[:{sleeperUserId}]" | "lineup:{leagueId}:{season}:week{N}:{rosterId}" | "season:{leagueId}:{season}"
+    // NULL for manually-submitted events (history-import, /api/prs/events).
+    // A partial unique index (WHERE sourceRef IS NOT NULL) enforces uniqueness — see migration SQL.
+    sourceRef   String?
 
     user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@index([userId])
     @@index([userId, eventType])
     @@index([eventDate])
+    @@index([sourceRef])
 }
 
 // Computed PRS — upserted nightly and on immediate-trigger events.

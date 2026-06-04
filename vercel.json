@@ -77,8 +77,20 @@
       "schedule": "0 * * * *"
     },
     {
+      "path": "/api/cron/prs-season",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/cron/prs-transactions",
+      "schedule": "0 2 * * *"
+    },
+    {
       "path": "/api/cron/prs-calculate",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/prs-lineups",
+      "schedule": "0 6 * * 2"
     },
     {
       "path": "/api/cron/dss-calculate",

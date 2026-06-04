@@ -194,6 +194,23 @@ export async function getLeagueDrafts(leagueId: string): Promise<SleeperDraft[]>
     return sleeperFetch<SleeperDraft[]>(`/league/${leagueId}/drafts`, 0);
 }
 
+export interface SleeperTransaction {
+    transaction_id: string;
+    type: 'trade' | 'waiver' | 'free_agent';
+    status: 'complete' | 'failed' | 'processing';
+    roster_ids: number[];
+    consenter_ids: string[] | null;  // sleeper user_ids who agreed (trades only)
+    creator: string | null;          // sleeper user_id who initiated (waivers/free agents)
+    adds: Record<string, number> | null;   // player_id → roster_id
+    drops: Record<string, number> | null;  // player_id → roster_id
+    created: number;        // epoch ms
+    status_updated: number; // epoch ms
+}
+
+export async function getLeagueTransactions(leagueId: string, week: number): Promise<SleeperTransaction[]> {
+    return sleeperFetch<SleeperTransaction[]>(`/league/${leagueId}/transactions/${week}`, 0);
+}
+
 /**
  * Determine the effective draft type to persist for a league.
  * Only two values are valid: 'rookie' and 'snake'.
