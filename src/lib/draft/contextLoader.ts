@@ -290,6 +290,7 @@ export async function loadDraftContext(params: {
             });
         }
     } else {
+        // Recommendations pool: high-quality players worth drafting (value > 300).
         const fcValues = superflex
             ? await prisma.fantasyCalcValue.findMany({
                 where:   { dynastyValueSf: { gt: 300 } },
@@ -304,8 +305,30 @@ export async function loadDraftContext(params: {
                 select:  { playerName: true, position: true, dynastyValue: true, dynastyValueSf: true },
             });
 
+        // FPDO pool: wider net (value > 50) so positional ranks reflect the full draftable universe.
+        // Without this, a TE with value 250 is excluded and players like Max Klare inflate to TE5
+        // when they're actually TE12+ — producing misleadingly large FPDO deltas.
+        const fcFpdo = superflex
+            ? await prisma.fantasyCalcValue.findMany({
+                where:   { dynastyValueSf: { gt: 50 } },
+                orderBy: { dynastyValueSf: 'desc' },
+                take:    1000,
+                select:  { playerName: true, position: true, dynastyValue: true, dynastyValueSf: true },
+            })
+            : await prisma.fantasyCalcValue.findMany({
+                where:   { dynastyValue: { gt: 50 } },
+                orderBy: { dynastyValue: 'desc' },
+                take:    1000,
+                select:  { playerName: true, position: true, dynastyValue: true, dynastyValueSf: true },
+            });
+
+        const allFpdoNames = Array.from(new Set([
+            ...fcValues.map(v => v.playerName),
+            ...fcFpdo.map(v => v.playerName),
+        ]));
+
         const sleeperPlayers = await prisma.sleeperPlayer.findMany({
-            where:  { fullName: { in: fcValues.map(v => v.playerName) }, active: true },
+            where:  { fullName: { in: allFpdoNames }, active: true },
             select: { fullName: true, playerId: true, team: true, age: true },
         });
 
@@ -313,10 +336,11 @@ export async function loadDraftContext(params: {
         const spByNormalName2 = new Map(sleeperPlayers.map(p => [normalizeDraftName(p.fullName), p]));
         const spLookup2 = (name: string) => spByName2.get(name) ?? spByNormalName2.get(normalizeDraftName(name));
 
-        // Pass 1: build FPDO (Fantasy Positional Draft Order) for all players (including drafted).
-        // Group by position, sort by KTC value descending within each position → adpRankInPool = positional rank.
-        const fcByPos: Record<string, typeof fcValues> = {};
-        for (const fcv of fcValues) {
+        // Pass 1: build FPDO (Fantasy Positional Draft Order) from the wide pool (value > 50).
+        // Group by position, sort by KTC value descending → adpRankInPool = true positional rank.
+        // Uses fcFpdo (not fcValues) so ranks reflect the full draftable universe, not just top-300.
+        const fcByPos: Record<string, typeof fcFpdo> = {};
+        for (const fcv of fcFpdo) {
             (fcByPos[fcv.position] ??= []).push(fcv);
         }
         for (const posGroup of Object.values(fcByPos)) {
@@ -330,7 +354,7 @@ export async function loadDraftContext(params: {
                     playerId:      sp.playerId,
                     isRookie:      false,
                     isVet:         true,
-                    adpRankInPool: idx + 1,   // FPDO: 1 = best at this position by KTC value
+                    adpRankInPool: idx + 1,   // FPDO: true positional rank in full draftable pool
                     adpSource:     'fa',
                 };
             });
