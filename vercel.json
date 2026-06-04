@@ -61,12 +61,12 @@
       "schedule": "0 9 * * 1"
     },
     {
-      "path": "/api/cron/drafttype-health",
-      "schedule": "0 5 * * *"
+      "path": "/api/cron/dss-history",
+      "schedule": "30 3 * * *"
     },
     {
-      "path": "/api/cron/dss-history",
-      "schedule": "30 5 * * *"
+      "path": "/api/cron/drafttype-health",
+      "schedule": "0 5 * * *"
     },
     {
       "path": "/api/cron/rookie-opportunity-sync",
@@ -98,7 +98,7 @@
     },
     {
       "path": "/api/cron/dss-calculate",
-      "schedule": "0 4 * * *"
+      "schedule": "30 4 * * *"
     }
   ]
 }
