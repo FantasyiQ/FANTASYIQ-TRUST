@@ -142,6 +142,40 @@ function buildDraftProfile(
     return { teamMode, trajectoryWindow, horizonYears, riskTolerance };
 }
 
+// ── Allowed player positions ──────────────────────────────────────────────────
+//
+// Derives the set of NORMALIZED player positions that have starting-roster slots
+// in this specific league. Used to filter the draft pool so the LDA never surfaces
+// positions the league doesn't use (no IDP in skill-only leagues, no K in no-kicker
+// leagues, etc.). Everything comes from Sleeper's roster_positions — no assumptions.
+//
+// Bench (BN) and IR are intentionally excluded: holding-slot positions don't define
+// what's worth drafting. Only slots where a player can score points are counted.
+
+function deriveAllowedPlayerPositions(rosterPositions: string[]): Set<string> {
+    const allowed = new Set<string>();
+    for (const slot of rosterPositions) {
+        switch (slot) {
+            case 'QB':         allowed.add('QB'); break;
+            case 'RB':         allowed.add('RB'); break;
+            case 'WR':         allowed.add('WR'); break;
+            case 'TE':         allowed.add('TE'); break;
+            case 'K':          allowed.add('K');  break;
+            case 'DEF':        allowed.add('DEF'); break;
+            case 'FLEX':       allowed.add('RB'); allowed.add('WR'); allowed.add('TE'); break;
+            case 'REC_FLEX':   allowed.add('WR'); allowed.add('TE'); break;
+            case 'SUPER_FLEX': allowed.add('QB'); allowed.add('RB'); allowed.add('WR'); allowed.add('TE'); break;
+            case 'TE_FLEX':    allowed.add('WR'); allowed.add('TE'); break;
+            // Any IDP slot type → normalized IDP
+            case 'IDP_FLEX':
+            case 'DL': case 'LB': case 'DB':
+                allowed.add('IDP'); break;
+            // BN, IR — not starting slots; skip
+        }
+    }
+    return allowed;
+}
+
 // ── Main export ────────────────────────────────────────────────────────────────
 
 export async function loadDraftContext(params: {
@@ -164,7 +198,8 @@ export async function loadDraftContext(params: {
         }),
     ]);
 
-    const rosterPositions = dbLeague.rosterPositions as string[];
+    const rosterPositions  = dbLeague.rosterPositions as string[];
+    const allowedPositions = deriveAllowedPlayerPositions(rosterPositions);
     const superflex  = rosterPositions.includes('SUPER_FLEX');
     const tePremium  = rosterPositions.includes('TE_FLEX');
     const ppr        = dbLeague.scoringType === 'ppr';
@@ -286,30 +321,27 @@ export async function loadDraftContext(params: {
         const spByNormalName   = new Map(sleeperPlayers.map(p => [normalizeDraftName(p.fullName), p]));
         const spLookup = (name: string) => spByName.get(name) ?? spByNormalName.get(normalizeDraftName(name));
 
-        // Pass 1: build FPDO (Fantasy Positional Draft Order) for all players (including drafted).
-        // Group by position, sort by NFL draft pick within each position → adpRankInPool = positional rank.
-        const rookiesByPos: Record<string, typeof rookies> = {};
+        // Pass 1: FiQ baseline pick — global rank across allowed positions by fiqScore (already sorted desc).
+        // delta = myNextPick - fiqBaselineRank: positive = player available later than FiQ suggests.
+        let fiqBaselineRank = 0;
         for (const r of rookies) {
-            (rookiesByPos[r.position] ??= []).push(r);
-        }
-        for (const posGroup of Object.values(rookiesByPos)) {
-            posGroup.sort((a, b) => a.overallPick - b.overallPick);
-            posGroup.forEach((r, idx) => {
-                const sp = spLookup(r.playerName);
-                if (!sp?.playerId) return;
-                draftPoolPlayers.push(sp.playerId);
-                draftPoolADP[sp.playerId] = {
-                    playerId:      sp.playerId,
-                    isRookie:      true,
-                    isVet:         false,
-                    adpRankInPool: idx + 1,   // FPDO: 1 = first at this position by NFL draft order
-                    adpSource:     'rookie',
-                };
-            });
+            if (!allowedPositions.has(normalizePosition(r.position))) continue;
+            const sp = spLookup(r.playerName);
+            if (!sp?.playerId) continue;
+            fiqBaselineRank++;
+            draftPoolPlayers.push(sp.playerId);
+            draftPoolADP[sp.playerId] = {
+                playerId:      sp.playerId,
+                isRookie:      true,
+                isVet:         false,
+                adpRankInPool: fiqBaselineRank,   // FiQ baseline pick: global rank by fiqScore
+                adpSource:     'rookie',
+            };
         }
 
-        // Pass 2: available players = undrafted only
+        // Pass 2: available players = undrafted, allowed positions only
         for (const r of rookies) {
+            if (!allowedPositions.has(normalizePosition(r.position))) continue;
             const sp = spLookup(r.playerName);
             if (sp && draftedIds.has(sp.playerId)) continue;
             const fiqScore  = Math.round(r.fiqScore);
@@ -373,32 +405,28 @@ export async function loadDraftContext(params: {
         const spByNormalName2 = new Map(sleeperPlayers.map(p => [normalizeDraftName(p.fullName), p]));
         const spLookup2 = (name: string) => spByName2.get(name) ?? spByNormalName2.get(normalizeDraftName(name));
 
-        // Pass 1: build FPDO (Fantasy Positional Draft Order) from the wide pool (value > 50).
-        // Group by position, sort by KTC value descending → adpRankInPool = true positional rank.
-        // Uses fcFpdo (not fcValues) so ranks reflect the full draftable universe, not just top-300.
-        const fcByPos: Record<string, typeof fcFpdo> = {};
+        // Pass 1: FiQ baseline pick — global rank across allowed positions by KTC value (fcFpdo already sorted desc).
+        // delta = myNextPick - fiqBaselineRank: positive = player available later than FiQ suggests.
+        // Uses fcFpdo (value > 50) so the full draftable universe is ranked, not just top-300.
+        let fiqBaselineRank = 0;
         for (const fcv of fcFpdo) {
-            (fcByPos[fcv.position] ??= []).push(fcv);
-        }
-        for (const posGroup of Object.values(fcByPos)) {
-            const ktcKey = superflex ? 'dynastyValueSf' : 'dynastyValue';
-            posGroup.sort((a, b) => b[ktcKey] - a[ktcKey]);
-            posGroup.forEach((fcv, idx) => {
-                const sp = spLookup2(fcv.playerName);
-                if (!sp?.playerId) return;
-                draftPoolPlayers.push(sp.playerId);
-                draftPoolADP[sp.playerId] = {
-                    playerId:      sp.playerId,
-                    isRookie:      false,
-                    isVet:         true,
-                    adpRankInPool: idx + 1,   // FPDO: true positional rank in full draftable pool
-                    adpSource:     'fa',
-                };
-            });
+            if (!allowedPositions.has(normalizePosition(fcv.position))) continue;
+            const sp = spLookup2(fcv.playerName);
+            if (!sp?.playerId) continue;
+            fiqBaselineRank++;
+            draftPoolPlayers.push(sp.playerId);
+            draftPoolADP[sp.playerId] = {
+                playerId:      sp.playerId,
+                isRookie:      false,
+                isVet:         true,
+                adpRankInPool: fiqBaselineRank,   // FiQ baseline pick: global KTC rank in pool
+                adpSource:     'fa',
+            };
         }
 
-        // Pass 2: available players = undrafted only
+        // Pass 2: available players = undrafted, allowed positions only
         for (const fcv of fcValues) {
+            if (!allowedPositions.has(normalizePosition(fcv.position))) continue;
             const sp = spLookup2(fcv.playerName);
             if (sp && draftedIds.has(sp.playerId)) continue;
             const ktcValue = superflex ? fcv.dynastyValueSf : fcv.dynastyValue;

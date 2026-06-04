@@ -121,7 +121,8 @@ function scarcityDelta(
     position: string,
     scoring:  DraftContext['scoring'],
 ): { delta: number; reason: string | null } {
-    if (position === 'IDP') return { delta: -35, reason: 'IDP: abundant supply, draft skill positions first' };
+    // IDP penalty removed — players not in the league's roster positions are filtered
+    // at the source in contextLoader.ts, so IDP players never reach scoring in skill-only leagues.
     if (position === 'QB' && scoring.superflex) return { delta: 10, reason: 'QB scarcity in Superflex' };
     if (position === 'TE' && scoring.tePremium) return { delta: 8,  reason: 'TE premium scoring' };
     return { delta: 0, reason: null };
@@ -330,7 +331,15 @@ export function rankCandidates(ctx: DraftContext): DraftRecommendation[] {
 
     return ctx.availablePlayers
         .map(p => scoreCandidate(p, ctx, bpaTier))
-        .sort((a, b) => b.compositeScore - a.compositeScore)
+        // Primary sort: delta (myNextPick - fiqBaselineRank) — value board, not talent board.
+        // Players still available past their FiQ baseline pick float to the top.
+        // Secondary: compositeScore breaks ties (factors in need, opportunity, trajectory).
+        .sort((a, b) => {
+            const da = a.adpVsPick ?? -Infinity;
+            const db = b.adpVsPick ?? -Infinity;
+            if (db !== da) return db - da;
+            return b.compositeScore - a.compositeScore;
+        })
         .slice(0, 10)
         .map(({ compositeScore: _, ...rec }) => rec);
 }

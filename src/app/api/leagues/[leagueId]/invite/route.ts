@@ -30,8 +30,10 @@ export async function POST(
     }
     try {
         const members = await getLeagueUsers(leagueId);
-        const commissioner = members.find(m => m.is_owner);
-        if (!commissioner || String(commissioner.user_id).trim() !== String(user.sleeperUserId).trim()) {
+        const isCommissioner = members.some(
+            m => m.is_owner && String(m.user_id).trim() === String(user.sleeperUserId).trim()
+        );
+        if (!isCommissioner) {
             return Response.json({ error: 'Forbidden' }, { status: 403 });
         }
     } catch {

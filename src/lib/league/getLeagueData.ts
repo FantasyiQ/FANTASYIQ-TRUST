@@ -69,9 +69,11 @@ export async function getLeagueData(id: string): Promise<LeagueData> {
         const mySleeperUserId = dbUser?.sleeperUserId ?? league.sleeperUserId ?? null;
         try {
             const members = await getLeagueUsers(league.leagueId);
-            const commId  = members.find(m => m.is_owner)?.user_id;
-            is_owner = !!commId && !!mySleeperUserId &&
-                String(commId).trim() === String(mySleeperUserId).trim();
+            // Use .some() — both primary commissioner and co-commissioners have is_owner: true.
+            // .find() only checks the first match and locks out co-commissioners listed second.
+            is_owner = !!mySleeperUserId && members.some(
+                m => m.is_owner && String(m.user_id).trim() === String(mySleeperUserId).trim()
+            );
         } catch { /* Sleeper unreachable */ }
     }
 

@@ -81,9 +81,10 @@ export async function getLeagueDues(id: string): Promise<LeagueDuesData> {
     let isCommissioner = dues?.commissionerId === session.user.id;
     if (!isCommissioner && mySleeperUserId) {
         try {
-            const members    = await getLeagueUsers(league.leagueId);
-            const commId     = members.find(m => m.is_owner)?.user_id;
-            isCommissioner   = !!commId && String(commId).trim() === String(mySleeperUserId).trim();
+            const members  = await getLeagueUsers(league.leagueId);
+            isCommissioner = members.some(
+                m => m.is_owner && String(m.user_id).trim() === String(mySleeperUserId).trim()
+            );
         } catch { /* Sleeper unreachable */ }
     }
 

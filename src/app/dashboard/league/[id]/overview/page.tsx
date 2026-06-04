@@ -238,10 +238,12 @@ export default async function LeagueOverviewPage({
         trade_deadline: sleeperLeague.settings?.trade_deadline,
     };
 
-    const mySleeperUserId = dbUser?.sleeperUserId ?? league.sleeperUserId ?? null;
+    const mySleeperUserId           = dbUser?.sleeperUserId ?? league.sleeperUserId ?? null;
     const commissionerSleeperUserId = members.find(m => m.is_owner)?.user_id;
-    const isCommissioner = !!commissionerSleeperUserId && !!mySleeperUserId &&
-        String(commissionerSleeperUserId).trim() === String(mySleeperUserId).trim();
+    // Use .some() — both primary commissioner and co-commissioners have is_owner: true.
+    const isCommissioner = !!mySleeperUserId && members.some(
+        m => m.is_owner && String(m.user_id).trim() === String(mySleeperUserId).trim()
+    );
 
     const standingRows: StandingRow[] = rows.map(row => ({
         rosterId: row.roster.roster_id,

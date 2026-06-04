@@ -116,11 +116,11 @@ export default async function PayoutsPage({
         ]);
 
     // ── Commissioner check via Sleeper is_owner ───────────────────────────────
-    const mySleeperUserId       = dbUser?.sleeperUserId ?? league.sleeperUserId;
-    const commissionerSleeperId = sleeperLeague.users.find(m => m.is_owner)?.user_id;
-    const isCommissioner        =
-        !!commissionerSleeperId && !!mySleeperUserId &&
-        String(commissionerSleeperId).trim() === String(mySleeperUserId).trim();
+    // Use .some() — both primary commissioner and co-commissioners have is_owner: true.
+    const mySleeperUserId = dbUser?.sleeperUserId ?? league.sleeperUserId;
+    const isCommissioner  = !!mySleeperUserId && sleeperLeague.users.some(
+        m => m.is_owner && String(m.user_id).trim() === String(mySleeperUserId).trim()
+    );
 
     if (!isCommissioner) {
         redirect(`/dashboard/league/${id}/overview?no_permission_manage_payouts=true`);
