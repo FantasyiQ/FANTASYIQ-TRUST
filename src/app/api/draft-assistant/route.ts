@@ -7,6 +7,7 @@ import { requireLeaguePaidAccess } from '@/lib/access';
 import { prisma } from '@/lib/prisma';
 import { loadDraftContext } from '@/lib/draft/contextLoader';
 import { rankCandidates, detectTradeDown } from '@/lib/draft/scoring';
+import { getTrajectoryLabel } from '@/lib/draft/context';
 
 export const maxDuration = 30;
 
@@ -58,6 +59,7 @@ export async function GET(req: NextRequest): Promise<Response> {
             trajectoryWindow:   ctx.draftProfile.trajectoryWindow,
             horizonYears:       ctx.draftProfile.horizonYears,
             riskTolerance:      ctx.draftProfile.riskTolerance,
+            trajectoryLabel:    getTrajectoryLabel(ctx.draftProfile),
         },
     });
 }

@@ -28,6 +28,7 @@ interface Meta {
     trajectoryWindow:   'WIN_NOW' | 'ASCENDING' | 'PLATEAU' | 'REBUILD';
     horizonYears:       1 | 2 | 3;
     riskTolerance:      'LOW' | 'MEDIUM' | 'HIGH';
+    trajectoryLabel:    string;
 }
 
 interface Props {
@@ -201,30 +202,17 @@ export default function DraftAssistantPanel({
                     <span className="text-[10px] font-bold px-2.5 py-1 rounded-full border bg-gray-800 text-gray-400 border-gray-700 uppercase">
                         {meta.draftType === 'rookie' ? 'Rookie Draft' : 'Startup Draft'}
                     </span>
-                    {meta.teamMode && (
+                    {meta.trajectoryLabel && (
                         <span className={[
-                            'text-[10px] font-bold px-2.5 py-1 rounded-full border uppercase',
-                            meta.teamMode === 'WIN_NOW'  ? 'bg-red-900/30 text-red-300 border-red-700/50' :
-                            meta.teamMode === 'REBUILD'  ? 'bg-blue-900/30 text-blue-300 border-blue-700/50' :
-                            'bg-gray-800 text-gray-400 border-gray-700',
+                            'text-[10px] font-bold px-2.5 py-1 rounded-full border uppercase tracking-wide',
+                            meta.trajectoryLabel === 'All-In'     ? 'bg-red-900/40 text-red-300 border-red-700/60' :
+                            meta.trajectoryLabel === 'Win-Now'    ? 'bg-red-900/30 text-red-300 border-red-700/50' :
+                            meta.trajectoryLabel === 'Contender'  ? 'bg-amber-900/30 text-amber-300 border-amber-700/50' :
+                            meta.trajectoryLabel === 'Youth-Build'? 'bg-emerald-900/30 text-emerald-300 border-emerald-700/50' :
+                            meta.trajectoryLabel === 'Tank'       ? 'bg-indigo-900/40 text-indigo-300 border-indigo-700/60' :
+                            'bg-blue-900/30 text-blue-300 border-blue-700/50',
                         ].join(' ')}>
-                            {meta.teamMode === 'WIN_NOW' ? '⚡ Win Now' : meta.teamMode === 'REBUILD' ? '🔄 Rebuild' : '⚖ Balanced'}
-                        </span>
-                    )}
-                    {meta.trajectoryWindow && (
-                        <span className={[
-                            'text-[10px] font-medium px-2 py-0.5 rounded border',
-                            meta.trajectoryWindow === 'WIN_NOW'   ? 'bg-red-950/40 text-red-400/80 border-red-800/40' :
-                            meta.trajectoryWindow === 'ASCENDING' ? 'bg-emerald-950/40 text-emerald-400/80 border-emerald-800/40' :
-                            meta.trajectoryWindow === 'REBUILD'   ? 'bg-indigo-950/40 text-indigo-400/80 border-indigo-800/40' :
-                            'bg-gray-900 text-gray-500 border-gray-700',
-                        ].join(' ')}>
-                            Trajectory: {
-                                meta.trajectoryWindow === 'WIN_NOW'   ? `WIN‑NOW (${meta.horizonYears}-yr)` :
-                                meta.trajectoryWindow === 'ASCENDING' ? `ASCENDING (${meta.horizonYears}-yr)` :
-                                meta.trajectoryWindow === 'REBUILD'   ? `REBUILD (${meta.horizonYears}+ yr)` :
-                                `PLATEAU (${meta.horizonYears}-yr)`
-                            }
+                            {meta.trajectoryLabel} · {meta.horizonYears}-yr
                         </span>
                     )}
                 </div>

@@ -13,7 +13,7 @@
 // it never makes you take T3 over T1.
 
 import type { DraftContext, TeamMode, TrajectoryWindow, DraftProfile } from './context';
-import { normalizePosition, getDraftPoolADPDelta } from './context';
+import { normalizePosition, getDraftPoolADPDelta, getTrajectoryLabel } from './context';
 
 export interface DraftRecommendation {
     sleeperPlayerId: string;
@@ -176,6 +176,7 @@ export function detectTradeDown(ctx: DraftContext): string | null {
     const profile  = ctx.draftProfile;
     const effective = resolveEffectiveMode(profile);
     const spots    = Math.min(6, tier2Available.length);
+    const label    = getTrajectoryLabel(profile);
 
     // Aggressive Win-Now: less likely to trade down out of elite talent
     if (effective === 'WIN_NOW' && profile.trajectoryWindow === 'WIN_NOW') {
@@ -183,17 +184,11 @@ export function detectTradeDown(ctx: DraftContext): string | null {
         if (profile.horizonYears <= 1) return null;
     }
 
-    const windowLabel =
-        profile.trajectoryWindow === 'WIN_NOW'   ? 'Your trajectory is WIN‑NOW' :
-        profile.trajectoryWindow === 'REBUILD'    ? 'Your trajectory is REBUILD' :
-        profile.trajectoryWindow === 'ASCENDING'  ? 'Your trajectory is ASCENDING' :
-        'Your trajectory is PLATEAU';
-
     if (effective === 'REBUILD') {
-        return `${windowLabel}: consider trading down ${Math.min(3, spots)}–${spots} spots — ${tier2Available.length} Tier 2 players remain who fit your rebuild window, and you gain extra draft capital`;
+        return `${label} trajectory: consider trading down ${Math.min(3, spots)}–${spots} spots — ${tier2Available.length} Tier 2 players remain who fit your window, and you gain extra draft capital`;
     }
 
-    return `Trade down ${Math.min(3, spots)}–${spots} spots — ${tier2Available.length} Tier 2 players remain who fit your team, and you can gain extra draft capital`;
+    return `Trade down ${Math.min(3, spots)}–${spots} spots — ${tier2Available.length} Tier 2 players remain who fit your ${label} build, and you can gain extra draft capital`;
 }
 
 // ── Core scorer ───────────────────────────────────────────────────────────────

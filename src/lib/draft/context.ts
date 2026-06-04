@@ -20,6 +20,32 @@ export interface DraftProfile {
     riskTolerance:    RiskTolerance;
 }
 
+/**
+ * Derives a single plain-English trajectory label from teamMode + trajectoryWindow.
+ * Used everywhere labels are shown to the user — replaces raw BALANCED/PLATEAU strings.
+ *
+ * All-In     → WIN_NOW roster + WIN_NOW trajectory (aggressive, mortgaging future)
+ * Win-Now    → WIN_NOW roster, stable/plateau window
+ * Contender  → WIN_NOW roster on the rise, or balanced team near their peak
+ * Youth-Build → ASCENDING trajectory — young team investing in upside
+ * Rebuild    → REBUILD signals without full teardown
+ * Tank       → REBUILD roster + REBUILD trajectory (full teardown)
+ */
+export function getTrajectoryLabel(profile: DraftProfile): string {
+    const { teamMode, trajectoryWindow } = profile;
+    if (teamMode === 'WIN_NOW' && trajectoryWindow === 'WIN_NOW')   return 'All-In';
+    if (teamMode === 'WIN_NOW' && trajectoryWindow === 'ASCENDING') return 'Contender';
+    if (teamMode === 'WIN_NOW')                                      return 'Win-Now';
+    if (teamMode === 'REBUILD' && trajectoryWindow === 'REBUILD')   return 'Tank';
+    if (teamMode === 'REBUILD' && trajectoryWindow === 'ASCENDING') return 'Youth-Build';
+    if (teamMode === 'REBUILD')                                      return 'Rebuild';
+    // BALANCED
+    if (trajectoryWindow === 'WIN_NOW')   return 'Contender';
+    if (trajectoryWindow === 'ASCENDING') return 'Youth-Build';
+    if (trajectoryWindow === 'REBUILD')   return 'Rebuild';
+    return 'Contender'; // BALANCED + PLATEAU — solid, competitive team
+}
+
 // Shared position normalizer — IDP variants all collapse to 'IDP'.
 const IDP_POSITIONS = new Set([
     'DE', 'DT', 'NT', 'DL', 'EDGE',
