@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     openGraph: {
         title:       'FantasyiQ Trust — Your League Dues. Protected.',
         description: 'Sync your Sleeper, ESPN, or Yahoo league. Protect your buy-ins. Zero fees.',
-        url:         'https://fantasyiq.app',
+        url:         'https://fantasyiqtrust.com',
         siteName:    'FantasyiQ Trust',
         type:        'website',
     },
@@ -67,7 +67,7 @@ export default function Home() {
     <main className="min-h-screen bg-black text-white">
 
       {/* ── Hero ─────────────────────────────────────────────────────── */}
-      <section className="pt-32 pb-20 px-6 bg-black">
+      <section className="pt-24 pb-20 px-6 bg-black">
         <div className="max-w-4xl mx-auto text-center">
           <div className="flex justify-center mb-6">
             <Image src="/logo.png" alt="FantasyiQ Trust" width={300} height={300} className="w-48 h-48 md:w-64 md:h-64 object-contain" style={{ mixBlendMode: 'lighten' }} priority />
@@ -84,7 +84,7 @@ export default function Home() {
           </p>
 
           <div className="flex gap-4 justify-center flex-wrap">
-            <Link href="/pricing" className="bg-[#D4AF37] hover:bg-[#D4AF37] text-gray-950 font-bold px-8 py-4 rounded-lg text-lg transition">
+            <Link href="/pricing" className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-8 py-4 rounded-lg text-lg transition">
               Get Started
             </Link>
             <a href="#features" className="border border-gray-700 hover:border-[#D4AF37]/50 text-white font-semibold px-8 py-4 rounded-lg text-lg transition">
@@ -140,14 +140,22 @@ export default function Home() {
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Protect Your League?</h2>
           <p className="text-[#A1A1A1] text-lg mb-10">Join commissioners who trust FantasyiQ Trust to keep their leagues fair and their money safe.</p>
-          <Link href="/pricing" className="bg-[#D4AF37] hover:bg-[#D4AF37] text-gray-950 font-bold px-10 py-4 rounded-lg text-lg transition inline-block">
+          <Link href="/pricing" className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-10 py-4 rounded-lg text-lg transition inline-block">
             View Pricing
           </Link>
         </div>
       </section>
 
       <footer className="border-t border-gray-800 py-8 px-6 bg-black">
-        <div className="max-w-6xl mx-auto text-center text-gray-500 text-sm">© 2026 FantasyiQ Trust. All rights reserved.</div>
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-gray-500 text-sm">
+          <span>© {new Date().getFullYear()} FantasyiQ Trust. All rights reserved.</span>
+          <div className="flex gap-6">
+            <a href="/pricing" className="hover:text-white transition">Pricing</a>
+            <a href="/support" className="hover:text-white transition">Support</a>
+            <a href="/privacy" className="hover:text-white transition">Privacy</a>
+            <a href="/terms" className="hover:text-white transition">Terms</a>
+          </div>
+        </div>
       </footer>
     </main>
   );
