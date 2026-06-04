@@ -60,12 +60,14 @@ export async function POST(request: NextRequest): Promise<Response> {
                 if (league.previous_league_id) {
                     const prior = await prisma.league.findFirst({
                         where:  { userId, leagueId: league.previous_league_id },
-                        select: { id: true },
+                        select: { id: true, isHistorical: true },
                     });
                     // Delete the old-season row so the upsert below creates a clean
                     // new row for the current season. Updating in place risks carrying
                     // forward stale state (wrong leagueId, bad assignedPlanId, etc.).
-                    if (prior) {
+                    // Historical rows (written by dss-history cron) are preserved —
+                    // they are DSS source data, not active league records.
+                    if (prior && !prior.isHistorical) {
                         await prisma.league.delete({ where: { id: prior.id } });
                     }
                 }

@@ -199,6 +199,9 @@ model League {
     healthCheckedAt  DateTime?
     // Predictive models (Engine 7)
     survivalProbability Float  @default(0.5)    // 0.0-1.0: probability league active next season
+    // Historical season rows written by dss-history cron — protected from sync-route deletion
+    // so DSS can aggregate standings across multiple completed seasons per dynasty franchise.
+    isHistorical    Boolean   @default(false)
     createdAt       DateTime  @default(now())
     updatedAt       DateTime  @updatedAt
 
