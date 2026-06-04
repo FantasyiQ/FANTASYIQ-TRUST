@@ -114,7 +114,7 @@ export default async function DssLeaderboardPage() {
                         <div className="text-3xl">🏆</div>
                         <p className="text-gray-400 font-semibold">No scores yet</p>
                         <p className="text-xs text-gray-600">
-                            DSS scores are computed nightly. Check back after 4am UTC.
+                            DSS scores are computed nightly. Check back after 4:30am UTC.
                         </p>
                     </div>
                 ) : (
@@ -237,7 +237,7 @@ export default async function DssLeaderboardPage() {
                         </div>
 
                         <p className="text-[10px] text-gray-700 text-center">
-                            Showing {rows.length} eligible dynasty players · Updated nightly at 4am UTC
+                            Showing {rows.length} eligible dynasty players · Updated nightly at 4:30am UTC
                         </p>
                     </>
                 )}
