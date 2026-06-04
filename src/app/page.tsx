@@ -4,10 +4,10 @@ import Image from 'next/image';
 
 export const metadata: Metadata = {
     title: 'FantasyiQ Trust — Your League Dues. Protected.',
-    description: 'Stop chasing dues. Sync your Sleeper, ESPN, NFL, or Yahoo league and let FantasyiQ Trust handle collections, reminders, and payouts — with zero fees.',
+    description: 'FantasyiQ Trust is the league-aware dues, payouts, and sync engine built for commissioners who run real leagues. Sync ESPN, Sleeper, Yahoo, or NFL Fantasy. Zero fees.',
     openGraph: {
         title:       'FantasyiQ Trust — Your League Dues. Protected.',
-        description: 'Stop chasing dues. Sync your league and let FantasyiQ Trust handle collections, reminders, and payouts — with zero fees.',
+        description: 'Sync your league, collect buy-ins automatically, and pay winners instantly — with zero fees and zero headaches.',
         url:         'https://fantasyiqtrust.com',
         siteName:    'FantasyiQ Trust',
         type:        'website',
@@ -15,68 +15,72 @@ export const metadata: Metadata = {
     twitter: {
         card:        'summary_large_image',
         title:       'FantasyiQ Trust — Your League Dues. Protected.',
-        description: 'Stop chasing dues. Sync your league and let FantasyiQ Trust handle collections, reminders, and payouts — with zero fees.',
+        description: 'Sync your league, collect buy-ins automatically, and pay winners instantly — with zero fees and zero headaches.',
     },
 };
 
-const FEATURES = [
+const WHY_ITEMS = [
     {
-        icon: '⚡',
-        title: 'Sync in Seconds',
-        body:  'Connect your Sleeper, ESPN, NFL, or Yahoo league instantly. No spreadsheets, no manual entry.',
+        icon: '🏆',
+        title: 'Commissioner-First Design',
+        body: 'FantasyiQ Trust eliminates the worst part of running a league — chasing money. You get a clean dashboard showing every league, every team, every balance, and every payout.',
     },
     {
-        icon: '🔔',
-        title: 'Automatic Reminders',
-        body:  'Members get notified until they pay. You stop chasing people and start enjoying the season.',
-    },
-    {
-        icon: '📊',
-        title: 'Full Transparency',
-        body:  'Every dollar logged. Every payout tracked. Your whole league can see exactly where the money stands.',
-    },
-    {
-        icon: '💰',
-        title: 'Instant Payouts',
-        body:  'Winners get paid the moment the season ends. No holds, no delays, no awkward Venmo requests.',
-    },
-    {
-        icon: '🛠️',
-        title: 'Commissioner Hub',
-        body:  'Dues, payouts, announcements, and league settings — all in one place. Total control, zero friction.',
-    },
-    {
-        icon: '💳',
-        title: 'One System, Every App',
-        body:  'Replace the Venmo/Cash App/Zelle juggling act with a single clean platform your whole league uses.',
-    },
-    {
-        icon: '🛡️',
-        title: 'Zero Fees. Always.',
-        body:  'We charge commissioners a flat plan fee. Every buy-in dollar goes to your league — not to us.',
+        icon: '🔗',
+        title: 'League-Aware, Not Generic Payments',
+        body: 'FantasyiQ Trust understands fantasy leagues: buy-ins, pot size, payout tiers, league structure, and eligibility rules. This is a commissioner control panel — not a payment app.',
     },
     {
         icon: '🔄',
-        title: 'Multi-League Ready',
-        body:  'Run dynasty, redraft, and best ball leagues simultaneously. One dashboard, every league.',
+        title: 'ESPN, Sleeper, Yahoo & NFL Fantasy Sync',
+        body: 'Your league stays synced automatically — standings, teams, payouts, everything. Our ESPN Chrome extension handles what ESPN doesn\'t expose natively.',
     },
+    {
+        icon: '🛡️',
+        title: 'Zero-Fee Payment Rails',
+        body: 'Stop losing a chunk of the pot to payment app fees. FantasyiQ Trust keeps your league\'s money in your league — every dollar, every time.',
+    },
+    {
+        icon: '📋',
+        title: 'Multi-League Management',
+        body: 'Run multiple leagues? FantasyiQ Trust gives you one dashboard to manage all of them — dues, payouts, sync, and owners — without switching between apps.',
+    },
+];
+
+const TOOLS = [
+    'Player Reliability Score (PRS)',
+    'Weekly projections',
+    'Matchup analytics',
+    'Waiver optimization',
+    'Trade evaluation tools',
+    'Dynasty & keeper insights',
+    'League health analytics',
+    'Team stability scoring',
+];
+
+const TRUST_ITEMS = [
+    'A complete audit trail',
+    'Locked-in pot size',
+    'Verified payouts',
+    'Commissioner transparency',
+    'PRS-powered player insights (All-Pro & Elite)',
 ];
 
 const STEPS = [
     {
         number: '01',
         title: 'Sync Your League',
-        body: 'Connect your Sleeper, ESPN, NFL, or Yahoo league in seconds. Your roster, members, and settings import automatically.',
+        body: 'FantasyiQ Trust connects to ESPN (via our Chrome extension), Sleeper, Yahoo, and NFL Fantasy to pull in your league, teams, and payouts automatically. Your league stays synced all season — no manual updates, no rosters to copy, no mistakes.',
     },
     {
         number: '02',
-        title: 'Set Your Dues',
-        body: 'Enter your buy-in amount and payout structure. We handle collection, reminders, and tracking from there.',
+        title: 'Set Dues and Payouts',
+        body: 'Define your buy-ins, deadlines, and payout structure once. FantasyiQ Trust tracks who\'s paid, who hasn\'t, and what each team is owed at season\'s end.',
     },
     {
         number: '03',
-        title: 'Pay Winners Instantly',
-        body: 'When the season ends, generate a payout proposal and send winners their money in one click.',
+        title: 'Collect and Pay Automatically',
+        body: 'Owners pay securely through FantasyiQ Trust. We track every payment, lock in eligibility, and calculate final payouts so you can pay winners instantly and transparently.',
     },
 ];
 
@@ -87,43 +91,48 @@ export default function Home() {
       {/* ── Hero ─────────────────────────────────────────────────────── */}
       <section className="pt-16 pb-20 px-6 bg-black">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="flex justify-center mb-4">
+          <div className="flex justify-center mb-6">
             <Image src="/logo.png" alt="FantasyiQ Trust" width={300} height={300} className="w-44 h-44 md:w-56 md:h-56 object-contain" style={{ mixBlendMode: 'lighten' }} priority />
           </div>
 
-          <div className="inline-block mb-5 px-4 py-1.5 rounded-full border border-[#D4AF37]/30 bg-[#D4AF37]/10 text-[#D4AF37] text-sm font-medium tracking-wide">
-            Built by a commissioner, for commissioners
-          </div>
-
-          <h1 className="text-5xl md:text-7xl font-bold mb-5 leading-tight tracking-tight">
-            Stop Chasing Dues.<br />
-            <span className="text-[#D4AF37]">Start Running Leagues.</span>
+          <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight tracking-tight">
+            Stop chasing dues.<br />
+            <span className="text-[#D4AF37]">Start running leagues.</span>
           </h1>
 
-          <p className="text-lg md:text-xl text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed">
-            Sync your fantasy league, automate dues collection, and pay out winners — all with <span className="text-white font-semibold">zero fees</span> on every dollar.
+          <p className="text-lg md:text-xl text-gray-400 mb-10 max-w-3xl mx-auto leading-relaxed">
+            FantasyiQ Trust is the league-aware dues, payouts, and sync engine built for commissioners who run real leagues — not group chats. Sync your ESPN, Sleeper, Yahoo, or NFL Fantasy league, collect buy-ins automatically, and pay winners instantly with <span className="text-white font-semibold">zero fees</span> and zero headaches.
           </p>
 
           <div className="flex gap-4 justify-center flex-wrap">
             <Link href="/sign-up" className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-8 py-4 rounded-lg text-lg transition">
-              Protect My League
+              Start with FantasyiQ Trust
             </Link>
             <a href="#how-it-works" className="border border-gray-700 hover:border-[#D4AF37]/50 text-white font-semibold px-8 py-4 rounded-lg text-lg transition">
-              See How It Works
+              See how league sync works
             </a>
           </div>
+        </div>
+      </section>
 
-          {/* Trust bar */}
-          <div className="mt-12 flex flex-wrap items-center justify-center gap-6 text-sm text-gray-500">
-            <span className="flex items-center gap-2"><span className="text-[#D4AF37]">✓</span> Sleeper, ESPN, NFL &amp; Yahoo</span>
+      {/* ── Social Proof ─────────────────────────────────────────────── */}
+      <section className="bg-[#050505] border-y border-gray-900 py-10 px-6">
+        <div className="max-w-3xl mx-auto text-center">
+          <p className="text-gray-400 text-base leading-relaxed">
+            Trusted by commissioners who want integration that streamlines dues, payouts, and league management — without wasting time or testing their memory.
+          </p>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-6 text-sm text-gray-500">
+            <span className="flex items-center gap-2"><span className="text-[#D4AF37]">✓</span> ESPN via Chrome Extension</span>
+            <span className="flex items-center gap-2"><span className="text-[#D4AF37]">✓</span> Sleeper</span>
+            <span className="flex items-center gap-2"><span className="text-[#D4AF37]">✓</span> Yahoo Fantasy</span>
+            <span className="flex items-center gap-2"><span className="text-[#D4AF37]">✓</span> NFL Fantasy</span>
             <span className="flex items-center gap-2"><span className="text-[#D4AF37]">✓</span> Zero fees on every dollar</span>
-            <span className="flex items-center gap-2"><span className="text-[#D4AF37]">✓</span> No contracts, cancel anytime</span>
           </div>
         </div>
       </section>
 
       {/* ── How It Works ─────────────────────────────────────────────── */}
-      <section id="how-it-works" className="bg-[#050505] border-t border-gray-900 py-24 px-6">
+      <section id="how-it-works" className="bg-black py-24 px-6">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-14">
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">Up and running in minutes</h2>
@@ -132,9 +141,9 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {STEPS.map((step) => (
-              <div key={step.number} className="relative bg-[#0A0A0A] border border-gray-800 rounded-2xl p-8">
+              <div key={step.number} className="bg-[#0A0A0A] border border-gray-800 rounded-2xl p-8">
                 <div className="text-5xl font-black text-[#D4AF37]/20 mb-4 leading-none">{step.number}</div>
-                <h3 className="text-lg font-bold text-white mb-2">{step.title}</h3>
+                <h3 className="text-lg font-bold text-white mb-3">{step.title}</h3>
                 <p className="text-gray-400 text-sm leading-relaxed">{step.body}</p>
               </div>
             ))}
@@ -142,71 +151,133 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Features ─────────────────────────────────────────────────── */}
-      <section id="features" className="bg-black py-24 px-6">
-        <div className="max-w-[1320px] mx-auto">
+      {/* ── Why Commissioners Choose FiQ ─────────────────────────────── */}
+      <section className="bg-[#050505] border-t border-gray-900 py-24 px-6">
+        <div className="max-w-5xl mx-auto">
           <div className="text-center mb-14">
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">
-              Everything your league needs.<br />
-              <span className="text-[#D4AF37]">Nothing it doesn&apos;t.</span>
+              Why commissioners choose<br />
+              <span className="text-[#D4AF37]">FantasyiQ Trust</span>
             </h2>
-            <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-              We built FantasyiQ Trust because every season looked the same — juggling dues across multiple leagues, no idea who actually paid, payouts handled on a handshake, and the commissioner doing all of it manually with zero tools. Nothing was integrated. Nothing was simple. We fixed that.
-            </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-            {FEATURES.map((f) => (
-              <div
-                key={f.title}
-                className="group bg-[#0A0A0A] border border-gray-800 hover:border-[#D4AF37]/60 rounded-xl p-6 cursor-default transition-all duration-200 hover:bg-[#0f0f0f]"
-              >
-                <div className="text-3xl mb-4 leading-none">{f.icon}</div>
-                <h3 className="text-base font-bold text-white mb-2 leading-snug">{f.title}</h3>
-                <p className="text-sm text-gray-400 leading-relaxed">{f.body}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {WHY_ITEMS.map((item) => (
+              <div key={item.title} className="bg-[#0A0A0A] border border-gray-800 hover:border-[#D4AF37]/40 rounded-xl p-7 transition-all duration-200">
+                <div className="text-3xl mb-4">{item.icon}</div>
+                <h3 className="text-base font-bold text-white mb-2">{item.title}</h3>
+                <p className="text-sm text-gray-400 leading-relaxed">{item.body}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── Pricing teaser ───────────────────────────────────────────── */}
+      {/* ── Fantasy Tools ────────────────────────────────────────────── */}
+      <section className="bg-black border-t border-gray-900 py-24 px-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+            <div>
+              <div className="inline-block mb-4 px-3 py-1 rounded-full border border-[#D4AF37]/30 bg-[#D4AF37]/10 text-[#D4AF37] text-xs font-semibold tracking-widest uppercase">
+                All-Pro &amp; Elite Plans
+              </div>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">
+                Fantasy Tools for the<br />
+                <span className="text-[#D4AF37]">Competitive Edge</span>
+              </h2>
+              <p className="text-gray-400 text-base leading-relaxed mb-6">
+                Commissioners who upgrade unlock the full FantasyiQ analytics suite. FantasyiQ Trust isn&apos;t just a dues engine — it&apos;s a competitive advantage.
+              </p>
+              <Link href="/pricing" className="inline-flex items-center gap-2 text-[#D4AF37] hover:underline font-semibold text-sm">
+                See all plan features →
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 gap-3">
+              {TOOLS.map((tool) => (
+                <div key={tool} className="flex items-center gap-3 bg-[#0A0A0A] border border-gray-800 rounded-lg px-4 py-3">
+                  <span className="text-[#D4AF37] font-bold text-sm">✓</span>
+                  <span className="text-white text-sm font-medium">{tool}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── For League Members ───────────────────────────────────────── */}
+      <section className="bg-[#050505] border-t border-gray-900 py-24 px-6">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">
+            One place to pay.<br />
+            <span className="text-[#D4AF37]">One place to get paid.</span>
+          </h2>
+          <p className="text-gray-400 text-lg mb-10 max-w-xl mx-auto">
+            Owners see exactly what they owe, when it&apos;s due, and how much they&apos;ll win if they cash. No more &ldquo;did you send it.&rdquo; No more random payment apps. No more confusion.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
+            {['What they owe', 'When it\'s due', 'How much they\'ll win'].map((item) => (
+              <div key={item} className="bg-[#0A0A0A] border border-gray-800 rounded-xl p-5 text-center">
+                <p className="text-white font-semibold text-sm">{item}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Trust & Transparency ─────────────────────────────────────── */}
+      <section className="bg-black border-t border-gray-900 py-24 px-6">
+        <div className="max-w-3xl mx-auto text-center">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">
+            Your league stops running on blind trust.<br />
+            <span className="text-[#D4AF37]">Starts running on FantasyiQ Trust.</span>
+          </h2>
+          <p className="text-gray-400 text-lg mb-10">FantasyiQ Trust gives your league:</p>
+          <div className="flex flex-col gap-3 max-w-sm mx-auto text-left">
+            {TRUST_ITEMS.map((item) => (
+              <div key={item} className="flex items-center gap-3">
+                <span className="text-[#D4AF37] font-bold">✓</span>
+                <span className="text-white text-sm font-medium">{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Pricing ──────────────────────────────────────────────────── */}
       <section className="bg-[#050505] border-t border-gray-900 py-24 px-6">
         <div className="max-w-3xl mx-auto text-center">
           <div className="inline-block mb-4 px-3 py-1 rounded-full border border-[#D4AF37]/30 bg-[#D4AF37]/10 text-[#D4AF37] text-xs font-semibold tracking-widest uppercase">
-            Flat Rate. No Surprises.
+            Simple Pricing
           </div>
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            We charge commissioners a flat fee.<br />
-            <span className="text-[#D4AF37]">Your players pay nothing extra.</span>
+            Commissioner-friendly pricing.<br />
+            <span className="text-[#D4AF37]">No surprises.</span>
           </h2>
-          <p className="text-gray-400 text-lg mb-10 max-w-xl mx-auto">
-            No per-transaction cuts. No percentage skimmed off dues. A predictable plan price so your league keeps every dollar it puts in.
-          </p>
-          <div className="flex gap-4 justify-center flex-wrap">
-            <Link href="/pricing" className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-8 py-4 rounded-lg text-lg transition">
-              View Pricing
-            </Link>
-            <Link href="/sign-up" className="border border-gray-700 hover:border-[#D4AF37]/50 text-white font-semibold px-8 py-4 rounded-lg text-lg transition">
-              Start for Free
-            </Link>
-          </div>
+          <p className="text-gray-400 text-lg mb-8 max-w-xl mx-auto">Flat, transparent pricing with no per-team fees, no per-transaction fees, no hidden charges, and no premium tiers for basic features.</p>
+          <Link href="/pricing" className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-8 py-4 rounded-lg text-lg transition inline-block">
+            View Pricing
+          </Link>
         </div>
       </section>
 
       {/* ── Final CTA ────────────────────────────────────────────────── */}
       <section className="bg-black border-t border-[#D4AF37]/20 py-24 px-6">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl md:text-5xl font-black mb-4 leading-tight">
+          <h2 className="text-3xl md:text-5xl font-black mb-6 leading-tight">
             Your league deserves better<br />than a group chat and a prayer.
           </h2>
-          <p className="text-gray-400 text-lg mb-10">
-            Join commissioners who&apos;ve moved on from chasing dues and disputing payouts. Set it up once. Run it forever.
+          <p className="text-gray-400 text-lg mb-10 max-w-xl mx-auto">
+            You&apos;ve already built the league.<br />
+            Let FantasyiQ Trust handle the money, the sync, and the receipts.
           </p>
-          <Link href="/sign-up" className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-black px-12 py-5 rounded-lg text-xl transition inline-block">
-            Protect My League — Free
-          </Link>
-          <p className="mt-4 text-gray-600 text-sm">No credit card required to get started.</p>
+          <div className="flex gap-4 justify-center flex-wrap">
+            <Link href="/sign-up" className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-black px-10 py-4 rounded-lg text-lg transition">
+              Start your first league with FantasyiQ Trust
+            </Link>
+            <Link href="/dashboard" className="border border-gray-700 hover:border-[#D4AF37]/50 text-white font-semibold px-8 py-4 rounded-lg text-lg transition">
+              See a sample commissioner dashboard
+            </Link>
+          </div>
         </div>
       </section>
 
