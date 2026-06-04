@@ -4,10 +4,10 @@ import Image from 'next/image';
 
 export const metadata: Metadata = {
     title: 'FantasyiQ Trust — Your League Dues. Protected.',
-    description: 'The fantasy football platform that never touches your money. Zero fees. Zero skimming. Total trust.',
+    description: 'Stop chasing dues. Sync your Sleeper, ESPN, or Yahoo league and let FantasyiQ Trust handle collections, reminders, and payouts — with zero fees.',
     openGraph: {
         title:       'FantasyiQ Trust — Your League Dues. Protected.',
-        description: 'Sync your Sleeper, ESPN, or Yahoo league. Protect your buy-ins. Zero fees.',
+        description: 'Stop chasing dues. Sync your league and let FantasyiQ Trust handle collections, reminders, and payouts — with zero fees.',
         url:         'https://fantasyiqtrust.com',
         siteName:    'FantasyiQ Trust',
         type:        'website',
@@ -15,50 +15,68 @@ export const metadata: Metadata = {
     twitter: {
         card:        'summary_large_image',
         title:       'FantasyiQ Trust — Your League Dues. Protected.',
-        description: 'Sync your Sleeper, ESPN, or Yahoo league. Protect your buy-ins. Zero fees.',
+        description: 'Stop chasing dues. Sync your league and let FantasyiQ Trust handle collections, reminders, and payouts — with zero fees.',
     },
 };
 
 const FEATURES = [
     {
         icon: '⚡',
-        title: 'Instant League Setup',
-        body:  'Sync your league in seconds. No spreadsheets, no manual entry, no setup headaches.',
+        title: 'Sync in Seconds',
+        body:  'Connect your Sleeper, ESPN, or Yahoo league instantly. No spreadsheets, no manual entry.',
     },
     {
-        icon: '🔄',
-        title: 'Cross-Platform Sync',
-        body:  'Your fantasy leagues sync automatically into one unified dashboard.',
+        icon: '🔔',
+        title: 'Automatic Reminders',
+        body:  'Members get notified until they pay. You stop chasing people and start enjoying the season.',
+    },
+    {
+        icon: '📊',
+        title: 'Full Transparency',
+        body:  'Every dollar logged. Every payout tracked. Your whole league can see exactly where the money stands.',
+    },
+    {
+        icon: '💰',
+        title: 'Instant Payouts',
+        body:  'Winners get paid the moment the season ends. No holds, no delays, no awkward Venmo requests.',
     },
     {
         icon: '🛠️',
         title: 'Commissioner Hub',
-        body:  'All commissioner tools in one place. Total control, zero friction.',
-    },
-    {
-        icon: '📊',
-        title: 'Track Dues & Payouts',
-        body:  'Every payment logged. Every payout tracked. Full transparency for every member.',
+        body:  'Dues, payouts, announcements, and league settings — all in one place. Total control, zero friction.',
     },
     {
         icon: '💳',
-        title: 'No More Digital Currency Chaos',
-        body:  'No more juggling Venmo, Cash App, Zelle, PayPal, or missing funds. One clean, secure system to streamline everything.',
-    },
-    {
-        icon: '🔔',
-        title: 'Auto-Reminders',
-        body:  'Players get notified until they pay. You stop chasing people.',
+        title: 'One System, Every App',
+        body:  'Replace the Venmo/Cash App/Zelle juggling act with a single clean platform your whole league uses.',
     },
     {
         icon: '🛡️',
-        title: 'Zero Fees Guaranteed',
-        body:  'Every dollar goes to your league — not to fees.',
+        title: 'Zero Fees. Always.',
+        body:  'We charge commissioners a flat plan fee. Every buy-in dollar goes to your league — not to us.',
     },
     {
-        icon: '💰',
-        title: 'Immediate Payouts',
-        body:  'Winners get paid instantly. No delays, no holds, no fees.',
+        icon: '🔄',
+        title: 'Multi-League Ready',
+        body:  'Run dynasty, redraft, and best ball leagues simultaneously. One dashboard, every league.',
+    },
+];
+
+const STEPS = [
+    {
+        number: '01',
+        title: 'Sync Your League',
+        body: 'Connect your Sleeper, ESPN, or Yahoo league in seconds. Your roster, members, and settings import automatically.',
+    },
+    {
+        number: '02',
+        title: 'Set Your Dues',
+        body: 'Enter your buy-in amount and payout structure. We handle collection, reminders, and tracking from there.',
+    },
+    {
+        number: '03',
+        title: 'Pay Winners Instantly',
+        body: 'When the season ends, generate a payout proposal and send winners their money in one click.',
     },
 ];
 
@@ -67,87 +85,133 @@ export default function Home() {
     <main className="min-h-screen bg-black text-white">
 
       {/* ── Hero ─────────────────────────────────────────────────────── */}
-      <section className="pt-24 pb-20 px-6 bg-black">
+      <section className="pt-16 pb-20 px-6 bg-black">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="flex justify-center mb-6">
-            <Image src="/logo.png" alt="FantasyiQ Trust" width={300} height={300} className="w-48 h-48 md:w-64 md:h-64 object-contain" style={{ mixBlendMode: 'lighten' }} priority />
+          <div className="flex justify-center mb-4">
+            <Image src="/logo.png" alt="FantasyiQ Trust" width={300} height={300} className="w-44 h-44 md:w-56 md:h-56 object-contain" style={{ mixBlendMode: 'lighten' }} priority />
           </div>
-          <div className="inline-block mb-6 px-4 py-1.5 rounded-full border border-[#D4AF37]/30 bg-[#D4AF37]/10 text-[#D4AF37] text-sm font-medium">
-            ★★★★★ Trusted by Commissioners
+
+          <div className="inline-block mb-5 px-4 py-1.5 rounded-full border border-[#D4AF37]/30 bg-[#D4AF37]/10 text-[#D4AF37] text-sm font-medium tracking-wide">
+            Built by a commissioner, for commissioners
           </div>
-          <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
-            Your League Dues{' '}
-            <span className="text-[#D4AF37]">Protected.</span>
+
+          <h1 className="text-5xl md:text-7xl font-bold mb-5 leading-tight tracking-tight">
+            Stop Chasing Dues.<br />
+            <span className="text-[#D4AF37]">Start Running Leagues.</span>
           </h1>
-          <p className="text-xl text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed">
-            ZERO FEES GUARANTEED.
+
+          <p className="text-lg md:text-xl text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed">
+            Sync your fantasy league, automate dues collection, and pay out winners — all with <span className="text-white font-semibold">zero fees</span> on every dollar.
           </p>
 
           <div className="flex gap-4 justify-center flex-wrap">
-            <Link href="/pricing" className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-8 py-4 rounded-lg text-lg transition">
-              Get Started
+            <Link href="/sign-up" className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-8 py-4 rounded-lg text-lg transition">
+              Protect My League
             </Link>
-            <a href="#features" className="border border-gray-700 hover:border-[#D4AF37]/50 text-white font-semibold px-8 py-4 rounded-lg text-lg transition">
-              Learn More
+            <a href="#how-it-works" className="border border-gray-700 hover:border-[#D4AF37]/50 text-white font-semibold px-8 py-4 rounded-lg text-lg transition">
+              See How It Works
             </a>
+          </div>
+
+          {/* Trust bar */}
+          <div className="mt-12 flex flex-wrap items-center justify-center gap-6 text-sm text-gray-500">
+            <span className="flex items-center gap-2"><span className="text-[#D4AF37]">✓</span> Sleeper, ESPN &amp; Yahoo</span>
+            <span className="flex items-center gap-2"><span className="text-[#D4AF37]">✓</span> Zero fees on every dollar</span>
+            <span className="flex items-center gap-2"><span className="text-[#D4AF37]">✓</span> No contracts, cancel anytime</span>
           </div>
         </div>
       </section>
 
-      {/* ── Feature Grid ─────────────────────────────────────────────── */}
-      <section id="features" className="bg-black pt-24 pb-24 px-6">
-        <div className="max-w-[1320px] mx-auto">
-
-          {/* Headline */}
-          <div className="text-center mb-12">
-            <h2 className="text-[44px] leading-tight font-bold text-[#D4AF37] mb-3">
-              Why Commissioners Trust Us
-            </h2>
-            <p className="text-[21px] text-[#A1A1A1] max-w-3xl mx-auto leading-relaxed">
-              Built by a commissioner who wanted to streamline league dues and payouts with <span className="text-[#D4AF37] font-semibold">ZERO FEES</span> and the ability to sync all your fantasy leagues into one clean, unified place.
-            </p>
+      {/* ── How It Works ─────────────────────────────────────────────── */}
+      <section id="how-it-works" className="bg-[#050505] border-t border-gray-900 py-24 px-6">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">Up and running in minutes</h2>
+            <p className="text-gray-400 text-lg max-w-xl mx-auto">No setup headaches. No learning curve. Just sync your league and go.</p>
           </div>
 
-          {/* 4×2 Grid — desktop / 2×4 — mobile */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
-            {FEATURES.map((f) => (
-              <div
-                key={f.title}
-                className="group bg-[#0A0A0A] border border-[#D4AF37] rounded-xl p-5 md:p-7 cursor-default transition-all duration-200 hover:bg-[#111111] hover:border-[#D4AF37]"
-              >
-                {/* Icon */}
-                <div className="text-[30px] mb-4 inline-block transition-transform duration-200 group-hover:scale-105 leading-none">
-                  {f.icon}
-                </div>
-
-                {/* Title */}
-                <h3 className="text-[18px] md:text-[19px] font-semibold text-[#D4AF37] group-hover:text-[#D4AF37] transition-colors duration-200 mb-2 leading-snug">
-                  {f.title}
-                </h3>
-
-                {/* Body */}
-                <p className="text-[15px] text-[#E5E5E5] leading-relaxed">
-                  {f.body}
-                </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {STEPS.map((step) => (
+              <div key={step.number} className="relative bg-[#0A0A0A] border border-gray-800 rounded-2xl p-8">
+                <div className="text-5xl font-black text-[#D4AF37]/20 mb-4 leading-none">{step.number}</div>
+                <h3 className="text-lg font-bold text-white mb-2">{step.title}</h3>
+                <p className="text-gray-400 text-sm leading-relaxed">{step.body}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── CTA ──────────────────────────────────────────────────────── */}
-      <section className="py-20 px-6 border-t border-[#D4AF37]/20 bg-black">
-        <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Protect Your League?</h2>
-          <p className="text-[#A1A1A1] text-lg mb-10">Join commissioners who trust FantasyiQ Trust to keep their leagues fair and their money safe.</p>
-          <Link href="/pricing" className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-10 py-4 rounded-lg text-lg transition inline-block">
-            View Pricing
-          </Link>
+      {/* ── Features ─────────────────────────────────────────────────── */}
+      <section id="features" className="bg-black py-24 px-6">
+        <div className="max-w-[1320px] mx-auto">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">
+              Everything your league needs.<br />
+              <span className="text-[#D4AF37]">Nothing it doesn&apos;t.</span>
+            </h2>
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+              We built FantasyiQ Trust because we were tired of the same problems every season — missing dues, disputed payouts, and commissioners who had to do all the work for free.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+            {FEATURES.map((f) => (
+              <div
+                key={f.title}
+                className="group bg-[#0A0A0A] border border-gray-800 hover:border-[#D4AF37]/60 rounded-xl p-6 cursor-default transition-all duration-200 hover:bg-[#0f0f0f]"
+              >
+                <div className="text-3xl mb-4 leading-none">{f.icon}</div>
+                <h3 className="text-base font-bold text-white mb-2 leading-snug">{f.title}</h3>
+                <p className="text-sm text-gray-400 leading-relaxed">{f.body}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      <footer className="border-t border-gray-800 py-8 px-6 bg-black">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-gray-500 text-sm">
+      {/* ── Pricing teaser ───────────────────────────────────────────── */}
+      <section className="bg-[#050505] border-t border-gray-900 py-24 px-6">
+        <div className="max-w-3xl mx-auto text-center">
+          <div className="inline-block mb-4 px-3 py-1 rounded-full border border-[#D4AF37]/30 bg-[#D4AF37]/10 text-[#D4AF37] text-xs font-semibold tracking-widest uppercase">
+            Flat Rate. No Surprises.
+          </div>
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">
+            We charge commissioners a flat fee.<br />
+            <span className="text-[#D4AF37]">Your players pay nothing extra.</span>
+          </h2>
+          <p className="text-gray-400 text-lg mb-10 max-w-xl mx-auto">
+            No per-transaction cuts. No percentage skimmed off dues. A predictable plan price so your league keeps every dollar it puts in.
+          </p>
+          <div className="flex gap-4 justify-center flex-wrap">
+            <Link href="/pricing" className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-8 py-4 rounded-lg text-lg transition">
+              View Pricing
+            </Link>
+            <Link href="/sign-up" className="border border-gray-700 hover:border-[#D4AF37]/50 text-white font-semibold px-8 py-4 rounded-lg text-lg transition">
+              Start for Free
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Final CTA ────────────────────────────────────────────────── */}
+      <section className="bg-black border-t border-[#D4AF37]/20 py-24 px-6">
+        <div className="max-w-3xl mx-auto text-center">
+          <h2 className="text-3xl md:text-5xl font-black mb-4 leading-tight">
+            Your league deserves better<br />than a group chat and a prayer.
+          </h2>
+          <p className="text-gray-400 text-lg mb-10">
+            Join commissioners who&apos;ve moved on from chasing dues and disputing payouts. Set it up once. Run it forever.
+          </p>
+          <Link href="/sign-up" className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-black px-12 py-5 rounded-lg text-xl transition inline-block">
+            Protect My League — Free
+          </Link>
+          <p className="mt-4 text-gray-600 text-sm">No credit card required to get started.</p>
+        </div>
+      </section>
+
+      <footer className="border-t border-gray-900 py-8 px-6 bg-black">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-gray-600 text-sm">
           <span>© {new Date().getFullYear()} FantasyiQ Trust. All rights reserved.</span>
           <div className="flex gap-6">
             <a href="/pricing" className="hover:text-white transition">Pricing</a>
