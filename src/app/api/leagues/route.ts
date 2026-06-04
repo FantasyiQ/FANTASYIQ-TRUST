@@ -42,6 +42,14 @@ export async function POST(request: NextRequest): Promise<Response> {
         );
     }
 
+    const existing = await prisma.connectedLeague.findFirst({
+        where: { userId: user.id, leagueName: { equals: leagueName, mode: 'insensitive' } },
+        select: { id: true },
+    });
+    if (existing) {
+        return Response.json({ error: 'This league is already connected.' }, { status: 409 });
+    }
+
     const league = await prisma.connectedLeague.create({
         data: {
             userId: user.id,
