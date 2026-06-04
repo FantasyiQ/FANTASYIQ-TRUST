@@ -38,6 +38,7 @@ interface BindingDebug {
     myPickCount:       number;
     sleeperUserIdUsed: string | null;
     boundByOwnerId:    boolean;
+    draftStatus?:      string;
 }
 
 interface Props {
@@ -258,6 +259,11 @@ export default function DraftAssistantPanel({
                     <span>players: {binding.rosterPlayerCount}</span>
                     <span>picks: {binding.myPickCount}</span>
                     <span>sleeperUid: {binding.sleeperUserIdUsed ?? 'null'}</span>
+                    {binding.draftStatus && (
+                        <span className={binding.draftStatus === 'drafting' ? 'text-green-500' : 'text-amber-400'}>
+                            draft: {binding.draftStatus}
+                        </span>
+                    )}
                 </div>
             )}
 

@@ -64,10 +64,15 @@ export default async function DraftAssistantPage({
         ]);
     } catch { /* Sleeper unreachable — show empty state */ }
 
-    // Filter to startup + rookie drafts that are active or pre_draft
-    const relevantDrafts = drafts.filter(d =>
-        d.status === 'drafting' || d.status === 'pre_draft'
-    );
+    // Filter to startup + rookie drafts that are active or pre_draft.
+    // Sort drafting first so the panel defaults to the live draft, not a pre_draft placeholder.
+    const relevantDrafts = drafts
+        .filter(d => d.status === 'drafting' || d.status === 'pre_draft')
+        .sort((a, b) => {
+            if (a.status === 'drafting' && b.status !== 'drafting') return -1;
+            if (b.status === 'drafting' && a.status !== 'drafting') return  1;
+            return 0;
+        });
 
     // Build user → display name map
     const userDisplayName = new Map(

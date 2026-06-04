@@ -204,8 +204,10 @@ export async function loadDraftContext(params: {
     // ── My picks from this draft ─────────────────────────────────────────────
     // Use mySleeperRoster.roster_id (the authoritatively bound roster),
     // NOT myRosterIdNum (the UI param) — these can differ if owner_id binding fired.
+    // Explicit Number() coercion guards against JSON string/number ambiguity.
+    const myRosterId_ = Number(mySleeperRoster.roster_id);
     const myPickIds = picks
-        .filter(p => p.roster_id === mySleeperRoster.roster_id)
+        .filter(p => Number(p.roster_id) === myRosterId_)
         .map(p => p.player_id);
 
     const myPickPlayers = myPickIds.length > 0
@@ -445,6 +447,7 @@ export async function loadDraftContext(params: {
             myPickCount:       myPickIds.length,
             sleeperUserIdUsed: mySleeperUserId,
             boundByOwnerId,
+            draftStatus:       draft.status,
         },
     };
 }

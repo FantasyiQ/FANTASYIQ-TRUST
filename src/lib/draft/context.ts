@@ -219,5 +219,6 @@ export interface DraftContext {
         myPickCount:       number;           // picks made in this draft
         sleeperUserIdUsed: string | null;    // sleeperUserId that was matched (or null)
         boundByOwnerId:    boolean;          // true = owner_id match, false = rosterId fallback
+        draftStatus:       string;           // 'drafting' | 'pre_draft' | 'complete' — confirms picks are expected
     };
 }
