@@ -1,12 +1,15 @@
-// FantasyiQ Trust — Support Center FAQ Data v1
+// FantasyiQ Trust — Support Center FAQ Data v2
 
 export type FAQCategoryId =
     | 'account'
+    | 'billing'
     | 'league-sync'
-    | 'draft-reports'
-    | 'prs'
-    | 'dtv'
     | 'commissioner-tools'
+    | 'dues-payouts'
+    | 'draft-reports'
+    | 'dss'
+    | 'dtv'
+    | 'leaguefinder'
     | 'calendar-playoffs'
     | 'troubleshooting';
 
@@ -19,17 +22,21 @@ export interface FAQItem {
 }
 
 export const CATEGORIES: { id: FAQCategoryId; label: string; icon: string }[] = [
-    { id: 'account',            label: 'Account & Login',       icon: '👤' },
-    { id: 'league-sync',        label: 'League Syncing',        icon: '🔄' },
-    { id: 'draft-reports',      label: 'Draft Reports',         icon: '📊' },
-    { id: 'prs',                label: 'PRS & Member Profiles', icon: '⭐' },
-    { id: 'dtv',                label: 'DTV & Player Values',   icon: '💰' },
-    { id: 'commissioner-tools', label: 'Commissioner Tools',    icon: '🏆' },
-    { id: 'calendar-playoffs',  label: 'Calendar & Playoffs',   icon: '📅' },
-    { id: 'troubleshooting',    label: 'Troubleshooting',       icon: '🔧' },
+    { id: 'account',            label: 'Account & Login',        icon: '👤' },
+    { id: 'billing',            label: 'Plans & Billing',        icon: '💳' },
+    { id: 'league-sync',        label: 'League Syncing',         icon: '🔄' },
+    { id: 'commissioner-tools', label: 'Commissioner Tools',     icon: '🏆' },
+    { id: 'dues-payouts',       label: 'Dues & Payouts',         icon: '💰' },
+    { id: 'draft-reports',      label: 'Draft Reports',          icon: '📊' },
+    { id: 'dss',                label: 'DSS & Member Profiles',  icon: '⭐' },
+    { id: 'dtv',                label: 'DTV & Player Values',    icon: '📈' },
+    { id: 'leaguefinder',       label: 'League Finder',          icon: '🔍' },
+    { id: 'calendar-playoffs',  label: 'Calendar & Playoffs',    icon: '📅' },
+    { id: 'troubleshooting',    label: 'Troubleshooting',        icon: '🔧' },
 ];
 
 export const FAQ_ITEMS: FAQItem[] = [
+
     // ── Account & Login ──────────────────────────────────────────────────────
     {
         id:       'create-account',
@@ -49,15 +56,80 @@ export const FAQ_ITEMS: FAQItem[] = [
         id:       'connect-espn',
         category: 'account',
         question: 'How do I connect an ESPN league?',
-        answer:   'Go to Dashboard → Sync → ESPN. You\'ll need your ESPN league ID plus your espn_s2 and SWID cookies (found in your browser\'s dev tools while logged into ESPN). Private leagues require these credentials; public leagues only need the league ID.',
+        answer:   'Go to Dashboard → Sync → ESPN. For private leagues, you\'ll need your ESPN league ID plus your espn_s2 and SWID tokens.\n\nThe easiest way to get these:\n1. Log into ESPN Fantasy in your browser\n2. Go to Dashboard → Sync → ESPN and follow the on-screen instructions — we walk you through exactly where to find them\n3. Paste them in and hit Connect\n\nPublic leagues only need the league ID.',
         tags:     ['espn', 'credentials', 'swid', 'espn_s2', 'connect'],
     },
     {
         id:       'invite-members',
         category: 'account',
-        question: 'How do I invite league members to FantasyiQ Trust?',
-        answer:   'Open your league in the dashboard, go to Commissioner Hub → Invite Members. Copy the invite link and share it with your leaguemates. When they join, their PRS scores will appear on your Members card.',
+        question: 'How do I invite league members?',
+        answer:   'Open your league in the dashboard, go to Commissioner Hub → Invite Members. Copy the invite link and share it with your leaguemates. When they join, their DSS scores will appear on your Members card.',
         tags:     ['invite', 'members', 'link', 'commissioner'],
+    },
+    {
+        id:       'forgot-password',
+        category: 'account',
+        question: 'I forgot my password. How do I reset it?',
+        answer:   'On the sign-in page, click "Forgot password?" and enter your email. You\'ll receive a reset link within a few minutes. Check your spam folder if it doesn\'t arrive. If you signed up with Google, you\'ll need to use "Sign in with Google" — there is no password to reset.',
+        tags:     ['password', 'reset', 'forgot', 'email', 'login'],
+    },
+    {
+        id:       'change-email',
+        category: 'account',
+        question: 'Can I change my email address?',
+        answer:   'Yes. Go to Dashboard → Account Settings and update your email. You\'ll need to verify the new address before it takes effect.',
+        tags:     ['email', 'change', 'account', 'settings'],
+    },
+
+    // ── Plans & Billing ──────────────────────────────────────────────────────
+    {
+        id:       'plans-overview',
+        category: 'billing',
+        question: 'What plans does FantasyiQ Trust offer?',
+        answer:   'FiQ has two plan types:\n\n• Player Plans — for individual players who want analytics across their leagues (DSS, DTV, Draft Reports, Start/Sit). Plans: Free, PRO, ALL-PRO, ELITE.\n\n• Commissioner Plans — for league commissioners who want dues collection, payout management, reminders, and the full commissioner hub. Plans are per-league: Commissioner PRO, ALL-PRO, and ELITE.\n\nVisit /pricing for the full feature breakdown and current pricing.',
+        tags:     ['plans', 'pricing', 'commissioner', 'player', 'tiers'],
+    },
+    {
+        id:       'free-plan',
+        category: 'billing',
+        question: 'Is there a free plan?',
+        answer:   'Yes. The Player Free plan lets you sync up to 1 league and access basic dashboard features at no cost. Commissioner plans start with a paid tier since they include dues collection and payout tooling. Visit /pricing to compare what\'s included in each plan.',
+        tags:     ['free', 'cost', 'trial', 'plan'],
+    },
+    {
+        id:       'how-to-upgrade',
+        category: 'billing',
+        question: 'How do I upgrade my plan?',
+        answer:   'Go to Dashboard → Account → Upgrade, or visit /pricing and click the plan you want. You\'ll be taken to a secure Stripe checkout. Your new features activate immediately after payment.',
+        tags:     ['upgrade', 'plan', 'stripe', 'checkout', 'billing'],
+    },
+    {
+        id:       'how-to-cancel',
+        category: 'billing',
+        question: 'How do I cancel my subscription?',
+        answer:   'Go to Dashboard → Account → Manage Subscription. Click "Cancel Plan" and confirm. Your access continues until the end of your current billing period — you won\'t be charged again after that.',
+        tags:     ['cancel', 'subscription', 'billing', 'refund'],
+    },
+    {
+        id:       'when-billed',
+        category: 'billing',
+        question: 'When am I charged?',
+        answer:   'Subscriptions are billed monthly on the same date you first subscribed. You\'ll receive an email receipt after each payment. You can view your billing history under Dashboard → Billing.',
+        tags:     ['billed', 'charge', 'monthly', 'receipt', 'billing history'],
+    },
+    {
+        id:       'refund-policy',
+        category: 'billing',
+        question: 'Do you offer refunds?',
+        answer:   'We handle refund requests on a case-by-case basis. If you were charged unexpectedly or have a billing issue, open the FiQ Assistant or email us from your Account Settings page and we\'ll make it right.',
+        tags:     ['refund', 'charge', 'billing', 'dispute'],
+    },
+    {
+        id:       'commissioner-vs-player-plan',
+        category: 'billing',
+        question: 'Do I need both a Player plan and a Commissioner plan?',
+        answer:   'Not necessarily. Commissioner plans cover your league-level tools (dues, payouts, commissioner hub). Player plans cover your personal analytics (DSS, DTV, Draft Reports) across all leagues you play in.\n\nIf you\'re just running dues for your league, a Commissioner plan is all you need. If you also want personal analytics, you\'ll want a Player plan too.',
+        tags:     ['commissioner', 'player', 'plan', 'both', 'difference'],
     },
 
     // ── League Syncing ───────────────────────────────────────────────────────
@@ -69,10 +141,24 @@ export const FAQ_ITEMS: FAQItem[] = [
         tags:     ['sync', 'sleeper', 'refresh', 'league'],
     },
     {
+        id:       'connect-yahoo',
+        category: 'league-sync',
+        question: 'How do I connect a Yahoo Fantasy league?',
+        answer:   'Go to Dashboard → Sync → Yahoo. You\'ll be redirected to Yahoo to authorize the connection — no manual credentials needed. Once authorized, select the leagues you want to import and hit Connect.\n\nIf your Yahoo session expires, you may need to reconnect from the same page.',
+        tags:     ['yahoo', 'sync', 'connect', 'authorize', 'oauth'],
+    },
+    {
+        id:       'connect-nfl-fantasy',
+        category: 'league-sync',
+        question: 'How do I connect an NFL Fantasy league?',
+        answer:   'Go to Dashboard → Sync → NFL Fantasy. Enter your NFL Fantasy league ID (found in the URL when you\'re on your league page at fantasy.nfl.com). Public leagues connect automatically. If your league is private, you may need to provide your NFL.com login credentials to authorize access.',
+        tags:     ['nfl', 'nfl fantasy', 'sync', 'connect', 'league'],
+    },
+    {
         id:       'espn-not-showing',
         category: 'league-sync',
         question: 'Why isn\'t my ESPN league showing up?',
-        answer:   'ESPN leagues require valid espn_s2 and SWID credentials for private leagues. Common issues: (1) expired cookies — log out and back into ESPN to refresh them; (2) wrong league ID — check the URL on ESPN Fantasy; (3) whitespace in credentials — the system strips it automatically, but double-check your copy-paste.',
+        answer:   'ESPN leagues require valid espn_s2 and SWID tokens for private leagues. Common fixes:\n\n1. Tokens expired — log out and back into ESPN to refresh them, then re-enter them on FiQ\n2. Wrong league ID — check the URL on ESPN Fantasy (it\'s the number after /ffl/leagues/)\n3. Make sure you\'re copying the tokens without extra spaces\n\nPublic ESPN leagues only need the league ID.',
         tags:     ['espn', 'private', 'credentials', 'not showing', 'league'],
     },
     {
@@ -86,8 +172,89 @@ export const FAQ_ITEMS: FAQItem[] = [
         id:       'stale-data',
         category: 'league-sync',
         question: 'Why does my league show stale data?',
-        answer:   'If your league shows outdated rosters or standings, try a manual refresh from the league overview page (the ↺ button near the league header). If the issue persists, verify your Sleeper username is correct or that your ESPN credentials haven\'t expired.',
+        answer:   'If your league shows outdated rosters or standings, try a manual refresh from the league overview page (the ↺ button near the league header). If the issue persists, verify your Sleeper username is correct or that your ESPN/Yahoo credentials haven\'t expired.',
         tags:     ['stale', 'outdated', 'refresh', 'data', 'sync'],
+    },
+    {
+        id:       'multiple-leagues',
+        category: 'league-sync',
+        question: 'Can I sync multiple leagues at once?',
+        answer:   'Yes. You can sync leagues from multiple platforms simultaneously — Sleeper, ESPN, Yahoo, and NFL Fantasy all in one dashboard. The number of leagues you can connect depends on your plan. Check /pricing for league limits per tier.',
+        tags:     ['multiple', 'leagues', 'platforms', 'limit', 'sync'],
+    },
+
+    // ── Commissioner Tools ───────────────────────────────────────────────────
+    {
+        id:       'announcements',
+        category: 'commissioner-tools',
+        question: 'How do I post an announcement to my league?',
+        answer:   'Go to Commissioner Hub → Announcements Manager. You can create a new post, pin important announcements to the top, and attach documents (PDFs, images). All league members who have joined FantasyiQ Trust will see announcements on their league dashboard.',
+        tags:     ['announcements', 'post', 'commissioner', 'pin', 'documents'],
+    },
+    {
+        id:       'commissioner-settings',
+        category: 'commissioner-tools',
+        question: 'What can I manage in Commissioner Settings?',
+        answer:   'Commissioner Settings let you manage:\n• League dues setup\n• Payout structure\n• Announcements\n• Playoff schedule\n• Scoring rules\n• Roster settings\n• League metadata\n\nChanges sync automatically across FiQ.',
+        tags:     ['settings', 'commissioner', 'configuration', 'scoring', 'roster', 'playoff'],
+    },
+    {
+        id:       'invite-members-comm',
+        category: 'commissioner-tools',
+        question: 'How do I get my league members to join FiQ?',
+        answer:   'From Commissioner Hub → Invite Members, copy your unique invite link and share it in your league group chat or Sleeper. When members join using your link, they\'re automatically connected to your league. You can track who has joined from the Members dashboard.',
+        tags:     ['invite', 'members', 'join', 'link', 'commissioner'],
+    },
+
+    // ── Dues & Payouts ───────────────────────────────────────────────────────
+    {
+        id:       'setup-dues',
+        category: 'dues-payouts',
+        question: 'How do I set up dues for my league?',
+        answer:   'Go to Commissioner Hub → Dues and click "Set Up Dues Tracker." Enter your buy-in amount, team count, and any notes. FiQ will calculate the full pot automatically. Members get notified to pay and can track their status from their dashboard.\n\nOnce all dues are collected, you\'ll be able to generate a payout proposal.',
+        tags:     ['dues', 'setup', 'commissioner', 'buy-in', 'tracker'],
+    },
+    {
+        id:       'how-members-pay',
+        category: 'dues-payouts',
+        question: 'How do members pay their dues?',
+        answer:   'FiQ tracks dues status but members pay through your existing method (Venmo, Cash App, Zelle, etc.) — you mark members as paid as you receive it, or members can self-report payment.\n\nThis keeps everything in one place without FiQ touching the money. Your league controls the payment method.',
+        tags:     ['pay', 'dues', 'venmo', 'cash app', 'zelle', 'members', 'payment'],
+    },
+    {
+        id:       'dues-reminders',
+        category: 'dues-payouts',
+        question: 'How do auto-reminders work?',
+        answer:   'Once dues are set up, FiQ automatically sends reminders to members who haven\'t paid. Reminders go out via in-app notification and email (for members who have joined FiQ). You can also manually trigger a reminder blast from the Dues dashboard.',
+        tags:     ['reminders', 'notifications', 'auto', 'dues', 'unpaid'],
+    },
+    {
+        id:       'pot-full',
+        category: 'dues-payouts',
+        question: 'What happens when all dues are collected?',
+        answer:   'Once the pot is complete (all members marked as paid), you\'ll see a "Generate Payout Proposal" button in your Dues dashboard. Click it to create a draft payout breakdown. You assign each payout spot to the correct winner, then approve the proposal to send out payment links.',
+        tags:     ['pot', 'full', 'collected', 'payout', 'proposal', 'generate'],
+    },
+    {
+        id:       'payout-process',
+        category: 'dues-payouts',
+        question: 'How do payouts work?',
+        answer:   'Once you approve a payout proposal, FiQ generates a secure payment link for each winner. Winners receive a notification with their link and can claim their payout directly. The funds come from your league\'s payment method — FiQ never holds money.\n\nYou can track payout status (sent, claimed, pending) from the Payouts dashboard.',
+        tags:     ['payout', 'winners', 'payment', 'link', 'claim', 'funds'],
+    },
+    {
+        id:       'dues-fees',
+        category: 'dues-payouts',
+        question: 'Does FiQ take a cut of dues or payouts?',
+        answer:   'No. Zero. FiQ charges commissioners a flat plan fee — that\'s it. Every dollar your league puts in as dues goes back out as payouts. We never touch or skim your league\'s money.',
+        tags:     ['fees', 'cut', 'percentage', 'dues', 'payouts', 'zero fees'],
+    },
+    {
+        id:       'future-dues',
+        category: 'dues-payouts',
+        question: 'Can I track dues for next season before it starts?',
+        answer:   'Yes. FiQ supports Future Dues tracking so you can log who has already committed or paid for the upcoming season. Go to Commissioner Hub → Dues → Future Dues to set it up.',
+        tags:     ['future', 'next season', 'dues', 'upcoming', 'commit'],
     },
 
     // ── Draft Reports ────────────────────────────────────────────────────────
@@ -120,37 +287,37 @@ export const FAQ_ITEMS: FAQItem[] = [
         tags:     ['no data', 'missing', 'players', 'report', 'rankings'],
     },
 
-    // ── PRS ──────────────────────────────────────────────────────────────────
+    // ── DSS & Member Profiles ────────────────────────────────────────────────
     {
-        id:       'what-is-prs',
-        category: 'prs',
+        id:       'what-is-dss',
+        category: 'dss',
         question: 'What is DSS?',
         answer:   'DSS (Dynasty Skill Score) measures your long-term dynasty performance using:\n• Roster strength\n• Draft efficiency\n• Trade impact\n• Lineup optimization\n• Season-over-season improvement\n\nIt is a holistic score designed to reflect dynasty skill, not just win totals.',
         tags:     ['dss', 'dynasty skill', 'score', 'members', 'tiers', 'dynasty'],
     },
     {
-        id:       'how-prs-calculated',
-        category: 'prs',
+        id:       'how-dss-calculated',
+        category: 'dss',
         question: 'How is DSS calculated?',
         answer:   'DSS blends multiple weighted components:\n• DTV-based roster value\n• Draft value added\n• Trade efficiency\n• Lineup decisions\n• Playoff performance\n• Consistency over time\n\nEach component updates automatically as your league syncs.',
         tags:     ['dss', 'dynasty skill', 'calculation', 'formula', 'how', 'score'],
     },
     {
-        id:       'low-prs',
-        category: 'prs',
-        question: 'Why is my PRS low?',
-        answer:   'Common reasons include:\n• Low roster value relative to league average\n• Negative draft value added\n• Trades that lost value\n• Inconsistent lineup optimization\n• Rebuilding roster strategy\n\nPRS improves as your roster strengthens and your decisions add value.',
-        tags:     ['prs', 'low', 'improve', 'score', 'why'],
+        id:       'low-dss',
+        category: 'dss',
+        question: 'Why is my DSS low?',
+        answer:   'Common reasons include:\n• Low roster value relative to league average\n• Negative draft value added\n• Trades that lost value\n• Inconsistent lineup optimization\n• Rebuilding roster strategy\n\nDSS improves as your roster strengthens and your decisions add value.',
+        tags:     ['dss', 'low', 'improve', 'score', 'why'],
     },
     {
-        id:       'improve-prs',
-        category: 'prs',
-        question: 'How do I improve my PRS?',
-        answer:   'PRS improves as your dynasty decisions pay off over time:\n• Build roster DTV through smart drafting and trading\n• Add value in trades — target positive-DTV swaps\n• Set optimal lineups consistently\n• Make deep playoff runs\n• Improve season-over-season\n\nThere is no shortcut — the score reflects your cumulative dynasty track record.',
-        tags:     ['prs', 'improve', 'increase', 'tips', 'score'],
+        id:       'improve-dss',
+        category: 'dss',
+        question: 'How do I improve my DSS?',
+        answer:   'DSS improves as your dynasty decisions pay off over time:\n• Build roster DTV through smart drafting and trading\n• Add value in trades — target positive-DTV swaps\n• Set optimal lineups consistently\n• Make deep playoff runs\n• Improve season-over-season\n\nThere is no shortcut — the score reflects your cumulative dynasty track record.',
+        tags:     ['dss', 'improve', 'increase', 'tips', 'score'],
     },
 
-    // ── DTV ──────────────────────────────────────────────────────────────────
+    // ── DTV & Player Values ──────────────────────────────────────────────────
     {
         id:       'what-is-dtv',
         category: 'dtv',
@@ -159,10 +326,10 @@ export const FAQ_ITEMS: FAQItem[] = [
         tags:     ['dtv', 'dynasty', 'trade value', 'player values', 'roster'],
     },
     {
-        id:       'dtv-vs-ktc',
+        id:       'dtv-formats',
         category: 'dtv',
-        question: 'Does FiQ use an external value source?',
-        answer:   'FantasyiQ Trust uses one value system across the entire platform: DTV.\n\nFiQ automatically adjusts DTV based on your league format:\n• Superflex leagues use Superflex-adjusted DTV\n• 1QB leagues use Standard DTV\n\nThis ensures all values, trade scores, and draft grades are aligned with your league type.',
+        question: 'Does FiQ adjust values for Superflex vs 1QB?',
+        answer:   'Yes. FiQ automatically adjusts DTV based on your league format:\n• Superflex leagues use Superflex-adjusted DTV\n• 1QB leagues use Standard DTV\n\nThis ensures all values, trade scores, and draft grades are aligned with your league type.',
         tags:     ['dtv', 'values', 'superflex', '1qb', 'format', 'external'],
     },
     {
@@ -173,27 +340,41 @@ export const FAQ_ITEMS: FAQItem[] = [
         tags:     ['values', 'update', 'frequency', 'daily', 'sync'],
     },
 
-    // ── Commissioner Tools ───────────────────────────────────────────────────
+    // ── League Finder ────────────────────────────────────────────────────────
     {
-        id:       'setup-dues',
-        category: 'commissioner-tools',
-        question: 'How do I set up dues for my league?',
-        answer:   'You can configure league dues from Commissioner Settings → Dues.\nSet the amount, due date, and payment method.\nMembers will see dues reminders on their dashboard.',
-        tags:     ['dues', 'setup', 'commissioner', 'buy-in', 'payouts'],
+        id:       'what-is-leaguefinder',
+        category: 'leaguefinder',
+        question: 'What is League Finder?',
+        answer:   'League Finder is FiQ\'s directory for finding and joining open fantasy leagues. Commissioners can list their leagues publicly with details like format, buy-in, and platform. Players can browse, apply to join, and read verified commissioner reviews before committing.',
+        tags:     ['league finder', 'find', 'join', 'directory', 'open'],
     },
     {
-        id:       'announcements',
-        category: 'commissioner-tools',
-        question: 'How do I post an announcement to my league?',
-        answer:   'Go to Commissioner Hub → Announcements Manager. You can create a new post, pin important announcements to the top, and attach documents (PDFs, images). All league members who have joined FantasyiQ Trust will see announcements on their league dashboard.',
-        tags:     ['announcements', 'post', 'commissioner', 'pin', 'documents'],
+        id:       'list-league-leaguefinder',
+        category: 'leaguefinder',
+        question: 'How do I list my league on League Finder?',
+        answer:   'Go to League Finder → My Leagues and click "List a League." Fill in your league details — platform, format, buy-in, roster settings, and any notes for prospective members. Once published, your listing is visible to all FiQ users browsing for leagues.',
+        tags:     ['list', 'league', 'publish', 'commissioner', 'league finder'],
     },
     {
-        id:       'commissioner-settings',
-        category: 'commissioner-tools',
-        question: 'What can I manage in Commissioner Settings?',
-        answer:   'Commissioner Settings allow you to manage:\n• League dues\n• Announcements\n• Playoff structure\n• Scoring rules\n• Roster settings\n• League metadata\n\nChanges sync automatically across FiQ.',
-        tags:     ['settings', 'commissioner', 'configuration', 'scoring', 'roster', 'playoff'],
+        id:       'commissioner-profile',
+        category: 'leaguefinder',
+        question: 'What is a Commissioner Profile?',
+        answer:   'Your Commissioner Profile is a public page on League Finder that shows your track record as a commissioner — leagues you\'ve run, verified player reviews, and your overall rating. It helps prospective members trust you before joining your league.',
+        tags:     ['commissioner profile', 'rating', 'reviews', 'trust', 'league finder'],
+    },
+    {
+        id:       'leaguefinder-reviews',
+        category: 'leaguefinder',
+        question: 'How do commissioner reviews work?',
+        answer:   'After a season, league members can leave a verified review of their commissioner on League Finder. Reviews rate commissioners on fairness, communication, rule consistency, and league stability. Verified reviews (from members FiQ can confirm were in the league) carry more weight.',
+        tags:     ['reviews', 'rating', 'commissioner', 'verified', 'season'],
+    },
+    {
+        id:       'join-league-leaguefinder',
+        category: 'leaguefinder',
+        question: 'How do I apply to join a league on League Finder?',
+        answer:   'Browse League Finder, find a league you\'re interested in, and click "Request to Join." The commissioner will receive your request and can approve or decline. You\'ll be notified either way.',
+        tags:     ['join', 'apply', 'request', 'league finder', 'commissioner'],
     },
 
     // ── Calendar & Playoffs ──────────────────────────────────────────────────
@@ -201,13 +382,13 @@ export const FAQ_ITEMS: FAQItem[] = [
         id:       'set-playoff-weeks',
         category: 'calendar-playoffs',
         question: 'How do I set my playoff weeks?',
-        answer:   'Open Commissioner Hub → Calendar Manager. At the top of the page, you\'ll see the Playoff Schedule section. Enter your Playoff Start Week (e.g. 15) and Championship Week (e.g. 17), then click Save. Sleeper leagues auto-populate these values when available; ESPN leagues must be set manually.',
+        answer:   'Open Commissioner Hub → Calendar Manager. At the top of the page, you\'ll see the Playoff Schedule section. Enter your Playoff Start Week (e.g. 15) and Championship Week (e.g. 17), then click Save. Sleeper leagues auto-populate these values when available; ESPN and other leagues must be set manually.',
         tags:     ['playoffs', 'calendar', 'commissioner', 'weeks', 'schedule'],
     },
     {
         id:       'wrong-phase',
         category: 'calendar-playoffs',
-        question: 'Why does my league show the wrong season phase (e.g. "Playoffs" when it\'s regular season)?',
+        question: 'Why does my league show the wrong season phase?',
         answer:   'Season phase is derived from your configured playoff weeks and the current NFL week. If phase detection is wrong: (1) check that Playoff Start Week and Championship Week are set correctly in Calendar Manager; (2) Sleeper leagues auto-populate these but you can override them; (3) if no weeks are configured, the system falls back to NFL defaults (Week 14 = Playoffs, Week 15+ = Championship).',
         tags:     ['phase', 'playoffs', 'season', 'wrong', 'regular season', 'detection'],
     },
@@ -215,7 +396,7 @@ export const FAQ_ITEMS: FAQItem[] = [
         id:       'auto-synced-playoffs',
         category: 'calendar-playoffs',
         question: 'What does "Auto-synced from Sleeper" mean on my playoff settings?',
-        answer:   'When Sleeper provides playoff start week data for your league, FantasyiQ Trust automatically fills in your Playoff Start Week and Championship Week. The "Auto-synced from Sleeper" badge confirms the values came from Sleeper. You can override them manually at any time — the badge will change to "Manual override" when you do.',
+        answer:   'When Sleeper provides playoff start week data for your league, FantasyiQ Trust automatically fills in your Playoff Start Week and Championship Week. The "Auto-synced from Sleeper" badge confirms the values came from Sleeper. You can override them manually at any time.',
         tags:     ['auto-sync', 'sleeper', 'playoffs', 'badge', 'override'],
     },
 
@@ -238,8 +419,8 @@ export const FAQ_ITEMS: FAQItem[] = [
         id:       'espn-sync-fails',
         category: 'troubleshooting',
         question: 'Why does my ESPN league keep failing to sync?',
-        answer:   'Common causes:\n• Expired ESPN session\n• Missing espn_s2 or SWID\n• Extension not installed\n• Logged into ESPN in a different browser\n• Private league access blocked\n• Corporate device blocking extensions\n\nLog into ESPN in the same browser and retry. Use the FiQ ESPN Connector extension for the easiest fix.',
-        tags:     ['espn', 'sync', 'fail', 'credentials', 'error', 'swid', 'espn_s2', 'extension'],
+        answer:   'Common causes:\n• Expired ESPN session — log into ESPN in the same browser, then re-enter your tokens on FiQ\n• Missing espn_s2 or SWID — follow the on-screen guide at Dashboard → Sync → ESPN\n• Private league access blocked\n• Wrong league ID\n\nIf you\'re still stuck, open the FiQ Assistant and describe the error — we\'ll walk you through it.',
+        tags:     ['espn', 'sync', 'fail', 'credentials', 'error', 'swid', 'espn_s2'],
     },
     {
         id:       'unauthorized-error',
@@ -247,6 +428,13 @@ export const FAQ_ITEMS: FAQItem[] = [
         question: 'I see "Unauthorized" errors — what should I do?',
         answer:   'Unauthorized errors mean your session has expired. Sign out and sign back in. If the error persists on a specific league page, the league may belong to a different account — make sure you\'re signed in with the account that originally synced that league.',
         tags:     ['unauthorized', 'error', 'session', 'login', 'sign in'],
+    },
+    {
+        id:       'notifications-not-working',
+        category: 'troubleshooting',
+        question: 'I\'m not receiving notifications or emails — why?',
+        answer:   'Check the following:\n1. Go to Dashboard → Notifications → Preferences and confirm your notification settings are enabled\n2. Check your spam folder for FiQ emails\n3. Make sure the email on your account is correct (Dashboard → Account)\n\nIf in-app notifications aren\'t showing, try a hard refresh (Ctrl+Shift+R or Cmd+Shift+R).',
+        tags:     ['notifications', 'email', 'alerts', 'preferences', 'spam'],
     },
 ];
 

@@ -5,13 +5,13 @@ import type { SupportContext, SupportPage, SupportPlatform, SupportSeasonPhase }
 
 // ── Intent types ──────────────────────────────────────────────────────────────
 
-export type Intent = 'draft-not-showing' | 'playoff-weeks' | 'prs' | 'none';
+export type Intent = 'draft-not-showing' | 'playoff-weeks' | 'dss' | 'none';
 
 // ── Page → boosted categories ─────────────────────────────────────────────────
 
 const PAGE_BOOST: Record<SupportPage, string[]> = {
     'draft-report':  ['draft-reports', 'dtv'],
-    'members':       ['prs'],
+    'members':       ['dss'],
     'calendar':      ['calendar-playoffs'],
     'commissioner':  ['commissioner-tools'],
     'league-sync':   ['league-sync'],
@@ -78,7 +78,7 @@ export function detectIntent(query: string): Intent {
         return 'playoff-weeks';
     }
     if (q.includes('dss') || q.includes('dynasty skill') || q.includes('performance rating')) {
-        return 'prs';
+        return 'dss';
     }
 
     return 'none';
@@ -172,7 +172,7 @@ function handlePRS(ctx: SupportContext): { content: string; faq: FAQItem | null 
         : '';
     return {
         content: `DSS (Dynasty Skill Score) measures your long-term dynasty performance — roster strength, draft efficiency, trade impact, lineup optimization, and season-over-season improvement. It reflects dynasty skill, not just win totals.${suffix}`,
-        faq:     FAQ_ITEMS.find(f => f.id === 'what-is-prs') ?? null,
+        faq:     FAQ_ITEMS.find(f => f.id === 'what-is-dss') ?? null,
     };
 }
 
@@ -186,7 +186,7 @@ export function generateAssistantReply(
 
     if (intent === 'draft-not-showing') return handleDraftNotShowing(context);
     if (intent === 'playoff-weeks')     return handlePlayoffWeeks(context);
-    if (intent === 'prs')               return handlePRS(context);
+    if (intent === 'dss')               return handlePRS(context);
 
     // Context-boosted FAQ match
     const match = findBestFAQMatchWithContext(query, context);
