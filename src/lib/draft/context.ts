@@ -104,8 +104,10 @@ export function computeTeamMode(profiles: RosterProfile[]): TeamMode {
 
 /**
  * Pool-relative ADP entry for a single player.
- * adpRankInPool = 1-based rank in the draft pool sorted by value (fiqScore desc
- * for rookies, KTC value desc for startups). Rank 1 = best player in this pool.
+ * adpRankInPool = FPDO (Fantasy Positional Draft Order): 1-based rank within the
+ * player's position group. Rookies sorted by NFL draft pick; startup/FA sorted by
+ * KTC value desc. Rank 1 = first player taken at this position.
+ * Exposed to the UI as "ADP" — users don't need to know the acronym FPDO.
  */
 export interface DraftPoolADPEntry {
     playerId:      string;

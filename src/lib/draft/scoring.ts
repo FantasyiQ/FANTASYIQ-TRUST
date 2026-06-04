@@ -300,8 +300,8 @@ export function scoreCandidate(
         adpVsPick     = poolADPDelta;
         const clamped = Math.max(-24, Math.min(24, poolADPDelta));
         score        += clamped * 0.3;
-        if (poolADPDelta >= 3)       reasons.push(`Value vs Draft Pool ADP: +${poolADPDelta} picks`);
-        else if (poolADPDelta <= -3) reasons.push(`Reach vs Draft Pool ADP: ${Math.abs(poolADPDelta)} picks early`);
+        if (poolADPDelta >= 3)       reasons.push(`Value vs ADP: +${poolADPDelta} picks`);
+        else if (poolADPDelta <= -3) reasons.push(`Reach vs ADP: ${Math.abs(poolADPDelta)} picks early`);
     }
 
     // 9. Positional scarcity / IDP dampening

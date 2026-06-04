@@ -218,7 +218,7 @@ export async function loadDraftContext(params: {
         const rookies = await prisma.rookieRankingsPlayer.findMany({
             where:   { season: '2026' },
             orderBy: { fiqScore: 'desc' },
-            select:  { playerName: true, position: true, fiqScore: true, fiqTier: true, opportunityScore: true },
+            select:  { playerName: true, position: true, fiqScore: true, fiqTier: true, opportunityScore: true, overallPick: true },
         });
 
         const sleeperPlayers = await prisma.sleeperPlayer.findMany({
@@ -230,20 +230,26 @@ export async function loadDraftContext(params: {
         const spByNormalName   = new Map(sleeperPlayers.map(p => [normalizeDraftName(p.fullName), p]));
         const spLookup = (name: string) => spByName.get(name) ?? spByNormalName.get(normalizeDraftName(name));
 
-        // Pass 1: build pool ADP for all players (including drafted)
-        let poolRank = 0;
+        // Pass 1: build FPDO (Fantasy Positional Draft Order) for all players (including drafted).
+        // Group by position, sort by NFL draft pick within each position → adpRankInPool = positional rank.
+        const rookiesByPos: Record<string, typeof rookies> = {};
         for (const r of rookies) {
-            const sp = spLookup(r.playerName);
-            if (!sp?.playerId) continue;
-            poolRank++;
-            draftPoolPlayers.push(sp.playerId);
-            draftPoolADP[sp.playerId] = {
-                playerId:      sp.playerId,
-                isRookie:      true,
-                isVet:         false,
-                adpRankInPool: poolRank,
-                adpSource:     'rookie',
-            };
+            (rookiesByPos[r.position] ??= []).push(r);
+        }
+        for (const posGroup of Object.values(rookiesByPos)) {
+            posGroup.sort((a, b) => a.overallPick - b.overallPick);
+            posGroup.forEach((r, idx) => {
+                const sp = spLookup(r.playerName);
+                if (!sp?.playerId) return;
+                draftPoolPlayers.push(sp.playerId);
+                draftPoolADP[sp.playerId] = {
+                    playerId:      sp.playerId,
+                    isRookie:      true,
+                    isVet:         false,
+                    adpRankInPool: idx + 1,   // FPDO: 1 = first at this position by NFL draft order
+                    adpSource:     'rookie',
+                };
+            });
         }
 
         // Pass 2: available players = undrafted only
@@ -288,20 +294,27 @@ export async function loadDraftContext(params: {
         const spByNormalName2 = new Map(sleeperPlayers.map(p => [normalizeDraftName(p.fullName), p]));
         const spLookup2 = (name: string) => spByName2.get(name) ?? spByNormalName2.get(normalizeDraftName(name));
 
-        // Pass 1: build pool ADP for all players (including drafted)
-        let poolRank = 0;
+        // Pass 1: build FPDO (Fantasy Positional Draft Order) for all players (including drafted).
+        // Group by position, sort by KTC value descending within each position → adpRankInPool = positional rank.
+        const fcByPos: Record<string, typeof fcValues> = {};
         for (const fcv of fcValues) {
-            const sp = spLookup2(fcv.playerName);
-            if (!sp?.playerId) continue;
-            poolRank++;
-            draftPoolPlayers.push(sp.playerId);
-            draftPoolADP[sp.playerId] = {
-                playerId:      sp.playerId,
-                isRookie:      false,
-                isVet:         true,
-                adpRankInPool: poolRank,
-                adpSource:     'fa',
-            };
+            (fcByPos[fcv.position] ??= []).push(fcv);
+        }
+        for (const posGroup of Object.values(fcByPos)) {
+            const ktcKey = superflex ? 'dynastyValueSf' : 'dynastyValue';
+            posGroup.sort((a, b) => b[ktcKey] - a[ktcKey]);
+            posGroup.forEach((fcv, idx) => {
+                const sp = spLookup2(fcv.playerName);
+                if (!sp?.playerId) return;
+                draftPoolPlayers.push(sp.playerId);
+                draftPoolADP[sp.playerId] = {
+                    playerId:      sp.playerId,
+                    isRookie:      false,
+                    isVet:         true,
+                    adpRankInPool: idx + 1,   // FPDO: 1 = best at this position by KTC value
+                    adpSource:     'fa',
+                };
+            });
         }
 
         // Pass 2: available players = undrafted only
