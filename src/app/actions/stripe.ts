@@ -75,6 +75,7 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
                     type: true,
                     tier: true,
                     leagueSize: true,
+                    leagueName: true,
                     stripeSubscriptionId: true,
                 },
             },
