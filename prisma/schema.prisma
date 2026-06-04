@@ -305,6 +305,10 @@ model ConnectedLeague {
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@index([userId])
+    // leagueExtId is nullable — the unique constraint prevents duplicate rows when
+    // an external ID is present (NULL values are exempt, so manual/name-only rows
+    // aren't blocked).
+    @@unique([userId, leagueExtId])
 }
 
 // ── League Dues & Payout Tracker ─────────────────────────────────────────────

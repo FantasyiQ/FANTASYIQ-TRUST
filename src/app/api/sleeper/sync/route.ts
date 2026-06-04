@@ -88,7 +88,6 @@ export async function POST(request: NextRequest): Promise<Response> {
                         orderBy: { createdAt: 'desc' },
                         select:  { id: true, type: true, tier: true, leagueName: true },
                     },
-                    connectedLeagues: { select: { leagueExtId: true, leagueName: true } },
                 },
             }),
             inviteToken
@@ -101,9 +100,6 @@ export async function POST(request: NextRequest): Promise<Response> {
 
         const playerSub = dbUser?.subscriptions.find(s => s.type === 'player') ?? null;
         const commSubs  = dbUser?.subscriptions.filter(s => s.type === 'commissioner') ?? [];
-        const existingCL = dbUser?.connectedLeagues ?? [];
-        const connectedExtIds = new Set(existingCL.map(cl => cl.leagueExtId).filter(Boolean));
-        const connectedNames  = new Set(existingCL.map(cl => cl.leagueName.toLowerCase().trim()));
 
         // For the invite path: check if the commissioner has paid for this Sleeper league
         let inviteCommissionerPaid = false;
@@ -129,6 +125,14 @@ export async function POST(request: NextRequest): Promise<Response> {
         // both assigning leagues, which would exceed the player plan league cap.
         await prisma.$transaction(async (tx) => {
             await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId})::bigint)`;
+
+            // Re-read connected leagues inside the lock — authoritative, no race condition
+            const lockedCL = await tx.connectedLeague.findMany({
+                where:  { userId },
+                select: { leagueExtId: true, leagueName: true },
+            });
+            const connectedExtIds = new Set(lockedCL.map(cl => cl.leagueExtId).filter(Boolean) as string[]);
+            const connectedNames  = new Set(lockedCL.map(cl => cl.leagueName.toLowerCase().trim()));
 
             // Re-read slot count inside the lock — this is the authoritative value
             let playerSlotsUsed = await tx.league.count({
