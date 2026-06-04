@@ -145,6 +145,7 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
     try {
         const cs = await stripe.checkout.sessions.create({
             customer: customerId!,
+            receipt_email: user.email ?? undefined,
             mode: 'subscription',
             line_items: [{ price: priceId, quantity: 1 }],
             // allow_promotion_codes lets anyone enter a promo code (e.g. ALLPRO100).
