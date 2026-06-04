@@ -48,7 +48,6 @@ const WHY_ITEMS = [
 ];
 
 const TOOLS = [
-    'Player Reliability Score (PRS)',
     'Weekly projections',
     'Matchup analytics',
     'Waiver optimization',
@@ -169,6 +168,53 @@ export default function Home() {
                 <p className="text-sm text-gray-400 leading-relaxed">{item.body}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── PRS Commissioner Card ────────────────────────────────────── */}
+      <section className="bg-black border-t border-gray-900 py-24 px-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="relative bg-[#0A0A0A] border border-[#D4AF37]/40 rounded-2xl p-8 md:p-12 overflow-hidden">
+            {/* Background accent */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-[#D4AF37]/5 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+
+            <div className="relative">
+              <div className="inline-block mb-4 px-3 py-1 rounded-full border border-[#D4AF37]/40 bg-[#D4AF37]/10 text-[#D4AF37] text-xs font-bold tracking-widest uppercase">
+                Player Reliability Score — PRS
+              </div>
+
+              <h2 className="text-3xl md:text-4xl font-black text-white mb-4 leading-tight">
+                Tired of members leaving a team<br className="hidden md:block" />
+                <span className="text-[#D4AF37]"> you had to give away?</span>
+              </h2>
+
+              <p className="text-gray-400 text-lg leading-relaxed mb-8 max-w-2xl">
+                PRS is FantasyiQ Trust&apos;s reliability score for every player on the platform. Members earn points by <span className="text-white font-semibold">completing full seasons</span>, staying active, and showing up — and lose points when they ghost, abandon teams, or go dark mid-season.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+                <div className="bg-black/50 border border-gray-800 rounded-xl p-5">
+                  <div className="text-2xl mb-2">✅</div>
+                  <p className="text-white font-semibold text-sm mb-1">Earns Points</p>
+                  <p className="text-gray-500 text-xs leading-relaxed">Completing seasons, active lineups, timely dues payments, consistent engagement</p>
+                </div>
+                <div className="bg-black/50 border border-gray-800 rounded-xl p-5">
+                  <div className="text-2xl mb-2">❌</div>
+                  <p className="text-white font-semibold text-sm mb-1">Loses Points</p>
+                  <p className="text-gray-500 text-xs leading-relaxed">Abandoning teams, ghosting mid-season, missing dues, inactive lineups</p>
+                </div>
+                <div className="bg-black/50 border border-gray-800 rounded-xl p-5">
+                  <div className="text-2xl mb-2">🏆</div>
+                  <p className="text-white font-semibold text-sm mb-1">Commissioner Control</p>
+                  <p className="text-gray-500 text-xs leading-relaxed">Set a minimum PRS to join your league. Flaky members can&apos;t get in.</p>
+                </div>
+              </div>
+
+              <p className="text-gray-500 text-sm italic">
+                Players must earn their spot. Your league stays competitive — and full.
+              </p>
+            </div>
           </div>
         </div>
       </section>
