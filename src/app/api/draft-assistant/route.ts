@@ -77,6 +77,7 @@ export async function GET(req: NextRequest): Promise<Response> {
         tradeDownNote,
         meta: {
             currentPick:        ctx.draftMeta.currentPickOverall,
+            myNextPick:         ctx.draftMeta.myNextPickOverall,
             currentRound:       ctx.draftMeta.currentRound,
             totalRounds:        ctx.draftMeta.totalRounds,
             draftType:          ctx.draftType,

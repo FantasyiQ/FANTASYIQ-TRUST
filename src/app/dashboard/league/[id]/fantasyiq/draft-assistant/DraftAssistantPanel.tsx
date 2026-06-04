@@ -19,6 +19,7 @@ interface RosterOption {
 
 interface Meta {
     currentPick:        number;
+    myNextPick:         number;
     currentRound:       number;
     totalRounds:        number;
     draftType:          'rookie' | 'startup';
@@ -259,6 +260,11 @@ export default function DraftAssistantPanel({
                     <span>players: {binding.rosterPlayerCount}</span>
                     <span>picks: {binding.myPickCount}</span>
                     <span>sleeperUid: {binding.sleeperUserIdUsed ?? 'null'}</span>
+                    {meta && (
+                        <span className={meta.currentPick === meta.myNextPick ? 'text-green-500' : 'text-blue-400'}>
+                            myNextPick: {meta.myNextPick} {meta.currentPick === meta.myNextPick ? '(on clock)' : ''}
+                        </span>
+                    )}
                     {binding.draftStatus && (
                         <span className={binding.draftStatus === 'drafting' ? 'text-green-500' : 'text-amber-400'}>
                             draft: {binding.draftStatus}

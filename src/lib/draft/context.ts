@@ -175,12 +175,13 @@ export interface DraftContext {
     };
 
     draftMeta: {
-        totalTeams:         number;
-        totalRounds:        number;
-        currentRound:       number;
-        currentPickOverall: number;
-        picksPerRound:      number;
-        onTheClockRosterId: string | null;
+        totalTeams:          number;
+        totalRounds:         number;
+        currentRound:        number;
+        currentPickOverall:  number;
+        myNextPickOverall:   number;   // user's next pick in snake order — used for FPDO delta
+        picksPerRound:       number;
+        onTheClockRosterId:  string | null;
     };
 
     picksSoFar: {

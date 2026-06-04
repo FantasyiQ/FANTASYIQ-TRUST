@@ -297,14 +297,20 @@ export interface SleeperDraftPickEntry {
     pick_no:    number;   // 1-based overall pick number
 }
 
-/** Returns all picks made so far in a specific draft. */
+/** Returns all picks made so far in a specific draft.
+ *  Uses cache: 'no-store' to guarantee fresh data — live drafts change every few seconds. */
 export async function getActiveDraftPicks(draftId: string): Promise<SleeperDraftPickEntry[]> {
-    return sleeperFetch<SleeperDraftPickEntry[]>(`/draft/${draftId}/picks`, 0);
+    const res = await fetch(`${BASE}/draft/${draftId}/picks`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`Sleeper API ${res.status}: /draft/${draftId}/picks`);
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
 }
 
-/** Fetch a single draft by its draft_id. */
+/** Fetch a single draft by its draft_id. Uses no-store so live draft state is always fresh. */
 export async function getSleeperDraft(draftId: string): Promise<SleeperDraft> {
-    return sleeperFetch<SleeperDraft>(`/draft/${draftId}`);
+    const res = await fetch(`${BASE}/draft/${draftId}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`Sleeper API ${res.status}: /draft/${draftId}`);
+    return res.json();
 }
 
 // ─── Player cache ──────────────────────────────────────────────────────────────

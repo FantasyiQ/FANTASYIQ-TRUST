@@ -285,11 +285,13 @@ export function scoreCandidate(
     }
 
     // 8. Draft Pool ADP value (0.3× weight — FiQ/tier is primary)
+    // Use myNextPickOverall so the delta reflects the user's actual upcoming pick,
+    // not the current on-clock pick which may belong to another team.
     let adpVsPick: number | null = null;
     const poolADPDelta = getDraftPoolADPDelta(
         ctx.draftPoolADP,
         player.sleeperPlayerId,
-        ctx.draftMeta.currentPickOverall,
+        ctx.draftMeta.myNextPickOverall,
     );
     if (poolADPDelta != null) {
         adpVsPick     = poolADPDelta;

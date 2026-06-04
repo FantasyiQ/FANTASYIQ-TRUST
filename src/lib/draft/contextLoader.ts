@@ -34,6 +34,32 @@ import { computeTeamTrajectoryForLeague } from '@/lib/trajectory/teamTrajectory'
 import type { TeamTrajectory, TrajectoryMode, WinCurve } from '@/lib/trajectory/types';
 import type { LeaguePhaseResult } from '@/lib/leaguePhase';
 
+// ── User's next pick resolution ───────────────────────────────────────────────
+//
+// The FPDO delta should be computed against the pick where the USER will be
+// making their selection, not the current overall pick (which may belong to
+// another team). This function finds the next pick overall that belongs to
+// the user's draft slot in a snake draft.
+
+function deriveMyNextPickOverall(
+    currentPickOverall: number,
+    totalTeams:         number,
+    totalRounds:        number,
+    userSlot:           number | null | undefined,
+    draftType:          string,
+): number {
+    if (!userSlot) return currentPickOverall;
+
+    for (let round = Math.ceil(currentPickOverall / totalTeams); round <= totalRounds; round++) {
+        const pickInRound = (draftType === 'snake' && round % 2 === 0)
+            ? totalTeams - userSlot + 1
+            : userSlot;
+        const pickOverall = (round - 1) * totalTeams + pickInRound;
+        if (pickOverall >= currentPickOverall) return pickOverall;
+    }
+    return currentPickOverall; // draft is over
+}
+
 // ── On-the-clock resolution ────────────────────────────────────────────────────
 
 function deriveOnTheClockRosterId(
@@ -161,6 +187,11 @@ export async function loadDraftContext(params: {
     const currentRound       = Math.ceil(currentPickOverall / totalTeams);
     const onTheClockRosterId = deriveOnTheClockRosterId(draft, picks, rosters);
 
+    // Compute user's next pick — used for FPDO delta so recs reflect the user's
+    // actual turn, not the current on-clock pick (which may belong to another team).
+    // Resolved after mySleeperRoster binding below; placeholder until then.
+    let myNextPickOverall = currentPickOverall;
+
     const picksSoFar = picks.map(p => ({
         pickOverall:     p.pick_no,
         round:           p.round,
@@ -188,6 +219,12 @@ export async function loadDraftContext(params: {
 
     const existingPlayerIds = (mySleeperRoster.players ?? []).filter(id => id && id !== '0');
     const mySleeperUserId   = mySleeperRoster.owner_id ?? sleeperUserId ?? null;
+
+    // Now that we know the user's Sleeper ID, resolve their draft slot and next pick.
+    const userSlot = mySleeperUserId && draft.draft_order
+        ? (draft.draft_order[mySleeperUserId] ?? null)
+        : null;
+    myNextPickOverall = deriveMyNextPickOverall(currentPickOverall, totalTeams, totalRounds, userSlot, draft.type);
 
     const existingPlayers = existingPlayerIds.length > 0
         ? await prisma.sleeperPlayer.findMany({
@@ -454,6 +491,7 @@ export async function loadDraftContext(params: {
             totalRounds,
             currentRound,
             currentPickOverall,
+            myNextPickOverall,
             picksPerRound: totalTeams,
             onTheClockRosterId,
         },
