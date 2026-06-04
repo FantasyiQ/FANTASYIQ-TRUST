@@ -71,7 +71,9 @@ export default function DraftAssistantPanel({
     myRosterId,
 }: Props) {
     const [selectedDraftId,  setSelectedDraftId]  = useState(draftOptions[0]?.draftId ?? '');
-    const [selectedRosterId, setSelectedRosterId] = useState(myRosterId ?? rosterOptions[0]?.rosterId ?? '');
+    // Do NOT fall back to rosterOptions[0] — silently using someone else's roster causes wrong trajectory/BPA.
+    // If myRosterId is null the user must explicitly choose their team from the dropdown.
+    const [selectedRosterId, setSelectedRosterId] = useState(myRosterId ?? '');
     const [recommendations,  setRecommendations]  = useState<DraftRecommendation[] | null>(null);
     const [meta,             setMeta]             = useState<Meta | null>(null);
     const [tradeDownNote,    setTradeDownNote]    = useState<string | null>(null);
@@ -136,12 +138,15 @@ export default function DraftAssistantPanel({
 
                         {/* Team picker */}
                         <div className="space-y-1">
-                            <label className="text-gray-500 text-xs block">I am</label>
+                            <label className={`text-xs block ${!myRosterId ? 'text-amber-400' : 'text-gray-500'}`}>
+                                {!myRosterId ? '⚠ Select your team' : 'I am'}
+                            </label>
                             <select
                                 value={selectedRosterId}
                                 onChange={e => { setSelectedRosterId(e.target.value); setRecommendations(null); }}
-                                className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-gray-500 min-w-[160px]"
+                                className={`bg-gray-800 border rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-gray-500 min-w-[160px] ${!myRosterId ? 'border-amber-700/60' : 'border-gray-700'}`}
                             >
+                                {!myRosterId && <option value="">— pick your team —</option>}
                                 {rosterOptions.map(r => (
                                     <option key={r.rosterId} value={r.rosterId}>{r.displayName}</option>
                                 ))}
@@ -168,6 +173,12 @@ export default function DraftAssistantPanel({
                     </div>
                 </div>
 
+                {!myRosterId && (
+                    <p className="text-amber-400/80 text-xs">
+                        We couldn&apos;t auto-detect your roster. Select your team above so recommendations are based on your roster, picks, and trajectory — not someone else&apos;s.
+                        {' '}<a href="/dashboard/sync/sleeper" className="underline hover:text-amber-300 transition">Connect your Sleeper account</a> to auto-detect next time.
+                    </p>
+                )}
                 {error && <p className="text-red-400 text-xs">{error}</p>}
             </div>
 

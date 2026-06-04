@@ -23,10 +23,16 @@ export async function GET(req: NextRequest): Promise<Response> {
         return Response.json({ error: 'Missing params: leagueId, sleeperDraftId, myRosterId' }, { status: 400 });
     }
 
-    const league = await prisma.league.findUnique({
-        where:  { id: leagueId },
-        select: { userId: true, leagueId: true, assignedPlanId: true, assignedPlanType: true },
-    });
+    const [league, dbUser] = await Promise.all([
+        prisma.league.findUnique({
+            where:  { id: leagueId },
+            select: { userId: true, leagueId: true, assignedPlanId: true, assignedPlanType: true, sleeperUserId: true },
+        }),
+        prisma.user.findUnique({
+            where:  { id: session.user.id },
+            select: { sleeperUserId: true },
+        }),
+    ]);
 
     if (!league || league.userId !== session.user.id) {
         return Response.json({ error: 'Not found' }, { status: 404 });
@@ -35,11 +41,17 @@ export async function GET(req: NextRequest): Promise<Response> {
     const deny = await requireLeaguePaidAccess(session.user.id, league.assignedPlanId, league.assignedPlanType);
     if (deny) return deny;
 
+    // Server-side Sleeper user ID — prefer user-level, fall back to league-level.
+    // This is used for authoritative owner_id binding in contextLoader so the correct
+    // roster is always loaded regardless of what myRosterId the client sends.
+    const sleeperUserId = dbUser?.sleeperUserId ?? league.sleeperUserId ?? null;
+
     const ctx = await loadDraftContext({
         leagueDbId:      leagueId,
         sleeperLeagueId: league.leagueId,
         sleeperDraftId,
         myRosterId,
+        sleeperUserId,
     });
 
     const recommendations = rankCandidates(ctx);

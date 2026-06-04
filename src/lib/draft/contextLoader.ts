@@ -122,10 +122,11 @@ export async function loadDraftContext(params: {
     leagueDbId:      string;
     sleeperLeagueId: string;
     sleeperDraftId:  string;
-    myRosterId:      string;
+    myRosterId:      string | null;
+    sleeperUserId?:  string | null;   // authenticated user's Sleeper ID — used for authoritative owner_id binding
 }): Promise<DraftContext> {
-    const { leagueDbId, sleeperLeagueId, sleeperDraftId, myRosterId } = params;
-    const myRosterIdNum = parseInt(myRosterId, 10);
+    const { leagueDbId, sleeperLeagueId, sleeperDraftId, myRosterId, sleeperUserId } = params;
+    const myRosterIdNum = myRosterId ? parseInt(myRosterId, 10) : NaN;
 
     const [draft, picks, rosters, dbLeague] = await Promise.all([
         getSleeperDraft(sleeperDraftId),
@@ -170,9 +171,14 @@ export async function loadDraftContext(params: {
     const draftedIds = new Set(picks.map(p => p.player_id));
 
     // ── Full existing roster ────────────────────────────────────────────────
-    const mySleeperRoster    = rosters.find(r => r.roster_id === myRosterIdNum);
+    // Binding priority:
+    //   1. sleeperUserId (server-authoritative, matches owner_id) — always correct
+    //   2. myRosterIdNum from the UI param — fallback when sleeperUserId is unknown
+    const mySleeperRoster = sleeperUserId
+        ? (rosters.find(r => r.owner_id === sleeperUserId) ?? rosters.find(r => r.roster_id === myRosterIdNum))
+        : rosters.find(r => r.roster_id === myRosterIdNum);
     const existingPlayerIds  = (mySleeperRoster?.players ?? []).filter(id => id && id !== '0');
-    const mySleeperUserId    = mySleeperRoster?.owner_id ?? null;
+    const mySleeperUserId    = mySleeperRoster?.owner_id ?? sleeperUserId ?? null;
 
     const existingPlayers = existingPlayerIds.length > 0
         ? await prisma.sleeperPlayer.findMany({
