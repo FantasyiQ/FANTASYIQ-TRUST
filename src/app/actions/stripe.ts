@@ -89,6 +89,17 @@ export async function createCheckoutSession(formData: FormData): Promise<never> 
         redirect('/pricing?error=already-subscribed');
     }
 
+    // Block a duplicate commissioner plan for the same league name
+    if (info.type === 'commissioner' && leagueName) {
+        const existingCommSub = user.subscriptions.find(
+            s => s.type === 'commissioner' &&
+                 s.leagueName?.toLowerCase().trim() === leagueName.toLowerCase()
+        );
+        if (existingCommSub) {
+            redirect('/pricing?tab=commissioner&error=already-subscribed-league');
+        }
+    }
+
     // Get or create Stripe customer — verify the stored ID is valid in the current Stripe mode
     let customerId = user.stripeCustomerId;
     if (customerId) {
