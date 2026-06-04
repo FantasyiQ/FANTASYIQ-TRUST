@@ -250,6 +250,60 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── League Finder Commissioner Card ──────────────────────────── */}
+      <section className="bg-[#050505] border-t border-gray-900 py-24 px-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="relative bg-[#0A0A0A] border border-[#D4AF37]/40 rounded-2xl p-8 md:p-12 overflow-hidden">
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-[#D4AF37]/5 rounded-full translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+
+            <div className="relative">
+              <div className="inline-block mb-4 px-3 py-1 rounded-full border border-[#D4AF37]/40 bg-[#D4AF37]/10 text-[#D4AF37] text-xs font-bold tracking-widest uppercase">
+                League Finder
+              </div>
+
+              <h2 className="text-3xl md:text-4xl font-black text-white mb-4 leading-tight">
+                Do you ever get members who leave<br className="hidden md:block" />
+                <span className="text-[#D4AF37]"> last minute and hold up your draft?</span>
+              </h2>
+
+              <p className="text-gray-400 text-lg leading-relaxed mb-8 max-w-2xl">
+                Build a waitlist for your league and set a minimum PRS requirement. When a spot opens up, you&apos;re not scrambling through group chats — you&apos;re pulling from a list of <span className="text-white font-semibold">vetted, reliable players who actually want in</span>. Stop giving teams away. Players will pay to join great leagues.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                <div className="bg-black/50 border border-gray-800 rounded-xl p-5">
+                  <div className="text-2xl mb-2">📋</div>
+                  <p className="text-white font-semibold text-sm mb-1">Built-In Waitlist</p>
+                  <p className="text-gray-500 text-xs leading-relaxed">Players apply to join your league through League Finder. You approve. Draft day never waits on a missing owner again.</p>
+                </div>
+                <div className="bg-black/50 border border-gray-800 rounded-xl p-5">
+                  <div className="text-2xl mb-2">🎯</div>
+                  <p className="text-white font-semibold text-sm mb-1">Set a Minimum PRS</p>
+                  <p className="text-gray-500 text-xs leading-relaxed">Filter applicants by reliability score. Only players with a proven track record of completing seasons can get through the door.</p>
+                </div>
+                <div className="bg-black/50 border border-gray-800 rounded-xl p-5">
+                  <div className="text-2xl mb-2">💪</div>
+                  <p className="text-white font-semibold text-sm mb-1">Strengthen Your League</p>
+                  <p className="text-gray-500 text-xs leading-relaxed">Replace dropouts with players who will compete, pay on time, and show up every week — not split your league apart.</p>
+                </div>
+                <div className="bg-black/50 border border-gray-800 rounded-xl p-5">
+                  <div className="text-2xl mb-2">💰</div>
+                  <p className="text-white font-semibold text-sm mb-1">Players Pay to Join</p>
+                  <p className="text-gray-500 text-xs leading-relaxed">Great leagues attract serious players. Stop giving spots away. List your league, set your price, and let the right players find you.</p>
+                </div>
+              </div>
+
+              <Link href="/leaguefinder" className="inline-flex items-center gap-2 bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-6 py-3 rounded-lg text-sm transition">
+                List My League on League Finder
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── For League Members ───────────────────────────────────────── */}
       <section className="bg-[#050505] border-t border-gray-900 py-24 px-6">
         <div className="max-w-4xl mx-auto text-center">
