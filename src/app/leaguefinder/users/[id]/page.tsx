@@ -7,7 +7,6 @@ import Link         from 'next/link';
 import { StarRating }    from '@/components/leaguefinder/StarRating';
 import PRSBadge          from '@/components/leaguefinder/PRSBadge';
 import TrustScoreCard    from '@/components/leaguefinder/TrustScoreCard';
-import { computePRS }   from '@/lib/lf-prs';
 
 export default async function UserProfilePage({
     params,
@@ -29,6 +28,16 @@ export default async function UserProfilePage({
                 dssScore:   true,
                 createdAt:  true,
                 dssRecord:  true,
+                prsRecord: {
+                    select: {
+                        seasonScore:       true,
+                        retentionScore:    true,
+                        engagementScore:   true,
+                        commissionerTrust: true,
+                        behaviorScore:     true,
+                        prs:               true,
+                    },
+                },
                 lfReviews: {
                     orderBy: [{ seasonYear: 'desc' }],
                     take:    50,
@@ -36,7 +45,6 @@ export default async function UserProfilePage({
                         league:      { select: { id: true, name: true, platform: true, format: true } },
                         commissioner:{ select: { id: true, displayName: true } },
                     },
-                    // helpfulCount needed for PRS tooltip
                 },
             },
         }),
@@ -49,27 +57,7 @@ export default async function UserProfilePage({
     if (!user) notFound();
 
     const verifiedCount = user.lfReviews.filter(r => r.verified).length;
-
-    // PRS breakdown (for tooltip)
-    const leagueReviewCounts = new Map<string, number>();
-    for (const r of user.lfReviews) {
-        leagueReviewCounts.set(r.league.id, (leagueReviewCounts.get(r.league.id) ?? 0) + 1);
-    }
-    const returnedLeagues   = Array.from(leagueReviewCounts.values()).filter(c => c >= 2).length;
-    const totalHelpful      = user.lfReviews.reduce((s, r) => s + r.helpfulCount, 0);
-    const [acceptedRequests, connectedSeasons] = await Promise.all([
-        prisma.lFJoinRequest.count({ where: { userId: id, status: 'ACCEPTED' } }),
-        prisma.connectedLeague.count({ where: { userId: id } }),
-    ]);
-    const prsBreakdown      = computePRS(verifiedCount, connectedSeasons, returnedLeagues, totalHelpful, acceptedRequests);
-    const totalVerified     = prsBreakdown.verifiedSeasons + prsBreakdown.connectedSeasons;
-    const prsTooltip        =
-        `Player Reliability Score: ${prsBreakdown.total}/100\n\n` +
-        `Verified seasons  +${prsBreakdown.pts.verified}  (${totalVerified} × 8)\n` +
-        `  ↳ LF reviews: ${prsBreakdown.verifiedSeasons}, invite leagues: ${prsBreakdown.connectedSeasons}\n` +
-        `League retention  +${prsBreakdown.pts.retention}  (${prsBreakdown.returnedLeagues} multi-season leagues × 5)\n` +
-        `Helpful votes     +${prsBreakdown.pts.helpful}  (${prsBreakdown.totalHelpful} votes × 2)\n` +
-        `Comm. approvals   +${prsBreakdown.pts.accepted}  (${prsBreakdown.acceptedRequests} accepted requests × 3)`;
+    const prs           = user.prsRecord?.prs ?? user.prsScore ?? 0;
 
     // Unique leagues + format breakdown
     const leaguesMap = new Map(user.lfReviews.map(r => [r.league.id, r.league]));
@@ -132,8 +120,8 @@ export default async function UserProfilePage({
                             </p>
                         </div>
                         <div className="flex items-start gap-3">
-                            <PRSBadge score={prsBreakdown.total} tooltip={prsTooltip} />
-                            <TrustScoreCard prsScore={user.prsScore} compact showImprove={false} />
+                            <PRSBadge score={prs} />
+                            <TrustScoreCard prsScore={prs} compact showImprove={false} />
                         </div>
                     </div>
 
@@ -176,17 +164,25 @@ export default async function UserProfilePage({
                     <h2 className="text-sm font-bold text-white uppercase tracking-wider">Player Reliability Score</h2>
                     <div className="rounded-xl border border-gray-800 bg-gray-900 p-4 space-y-3">
                         <div className="flex items-center gap-3">
-                            <PRSBadge score={prsBreakdown.total} tooltip={prsTooltip} />
+                            <PRSBadge score={prs} />
                             <div className="flex-1 space-y-2">
-                                <PRSBar label="Verified Seasons"  pts={prsBreakdown.pts.verified}  max={40} detail={`${prsBreakdown.verifiedSeasons} season${prsBreakdown.verifiedSeasons !== 1 ? 's' : ''} × 8 pts`} />
-                                <PRSBar label="League Retention"  pts={prsBreakdown.pts.retention} max={25} detail={`${prsBreakdown.returnedLeagues} multi-season league${prsBreakdown.returnedLeagues !== 1 ? 's' : ''} × 5 pts`} />
-                                <PRSBar label="Helpful Votes"     pts={prsBreakdown.pts.helpful}   max={20} detail={`${prsBreakdown.totalHelpful} vote${prsBreakdown.totalHelpful !== 1 ? 's' : ''} × 2 pts`} />
-                                <PRSBar label="Comm. Approvals"   pts={prsBreakdown.pts.accepted}  max={15} detail={`${prsBreakdown.acceptedRequests} accepted × 3 pts`} />
+                                <PRSBar label="Season Reliability"  pts={user.prsRecord?.seasonScore       ?? 0} max={100} detail="verified seasons vs abandoned" />
+                                <PRSBar label="Retention"           pts={user.prsRecord?.retentionScore    ?? 0} max={100} detail="leagues returned to over time" />
+                                <PRSBar label="Engagement"          pts={user.prsRecord?.engagementScore   ?? 0} max={100} detail="lineups, trades & waiver activity" />
+                                <PRSBar label="Commissioner Trust"  pts={user.prsRecord?.commissionerTrust ?? 0} max={100} detail="approvals, flags & endorsements" />
+                                <PRSBar label="Behavior"            pts={user.prsRecord?.behaviorScore     ?? 0} max={100} detail="conduct & rule adherence" />
                             </div>
                         </div>
-                        <p className="text-[10px] text-gray-600">
-                            Commissioners use PRS to evaluate join requests. Earn points by playing verified seasons, returning to leagues, writing helpful reviews, and getting accepted by commissioners.
-                        </p>
+                        {!user.prsRecord && (
+                            <p className="text-[10px] text-gray-500">
+                                Score updates nightly once your connected leagues are synced.
+                            </p>
+                        )}
+                        {user.prsRecord && (
+                            <p className="text-[10px] text-gray-600">
+                                Score updates nightly based on your activity across connected leagues.
+                            </p>
+                        )}
                     </div>
                 </section>
 

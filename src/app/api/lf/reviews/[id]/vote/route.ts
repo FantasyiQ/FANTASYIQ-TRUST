@@ -1,6 +1,6 @@
 import { auth }      from '@/lib/auth';
 import { prisma }    from '@/lib/prisma';
-import { recalcPRS } from '@/lib/lf-prs';
+import { calculateAndSavePrs } from '@/lib/prs';
 import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
 
 export async function POST(
@@ -71,8 +71,8 @@ export async function POST(
         });
     }
 
-    // Recalculate PRS for the review's author (helpful votes affect their score)
-    await recalcPRS(review.reviewerId);
+    // Recalculate unified PRS for the review's author
+    await calculateAndSavePrs(review.reviewerId);
 
     return Response.json(updated);
 }

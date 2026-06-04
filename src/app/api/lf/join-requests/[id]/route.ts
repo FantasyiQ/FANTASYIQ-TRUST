@@ -1,7 +1,7 @@
 import { auth }      from '@/lib/auth';
 import { prisma }    from '@/lib/prisma';
 import { LFJoinStatus } from '@prisma/client';
-import { recalcPRS } from '@/lib/lf-prs';
+import { calculateAndSavePrs } from '@/lib/prs';
 import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
 
 // PATCH — commissioner updates a join request status
@@ -41,9 +41,9 @@ export async function PATCH(
         data:  { status: status as LFJoinStatus },
     });
 
-    // Accepted requests count toward the player's PRS
+    // Accepted requests trigger an immediate unified PRS recalculation
     if (status === 'ACCEPTED') {
-        await recalcPRS(joinReq.userId);
+        await calculateAndSavePrs(joinReq.userId);
     }
 
     return Response.json(updated);
