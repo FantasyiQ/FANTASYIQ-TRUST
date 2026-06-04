@@ -14,14 +14,14 @@ const shared = {
 if (watch) {
     const ctx = await esbuild.context({
         ...shared,
-        entryPoints: ['src/background.ts', 'src/contentScript.ts'],
+        entryPoints: ['src/background.ts'],
     });
     await ctx.watch();
     console.log('Watching for changes…');
 } else {
     await esbuild.build({
         ...shared,
-        entryPoints: ['src/background.ts', 'src/contentScript.ts'],
+        entryPoints: ['src/background.ts'],
         minify: true,
     });
     console.log('Build complete → dist/');

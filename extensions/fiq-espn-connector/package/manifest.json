@@ -12,6 +12,7 @@
 
   "externally_connectable": {
     "matches": [
+      "https://fantasyiqtrust.com/*",
       "https://fantasyiq-trust.vercel.app/*",
       "http://localhost:3000/*"
     ]
@@ -21,17 +22,6 @@
     "service_worker": "background.js",
     "type": "module"
   },
-
-  "content_scripts": [
-    {
-      "matches": [
-        "https://www.espn.com/*",
-        "https://fantasy.espn.com/*"
-      ],
-      "js": ["contentScript.js"],
-      "run_at": "document_idle"
-    }
-  ],
 
   "action": {
     "default_title": "FiQ ESPN Connector"
