@@ -46,20 +46,6 @@ export const FAQ_ITEMS: FAQItem[] = [
         tags:     ['signup', 'register', 'account', 'login'],
     },
     {
-        id:       'connect-sleeper',
-        category: 'account',
-        question: 'How do I connect my Sleeper account?',
-        answer:   'From your dashboard, click "Sync a League" and enter your Sleeper username. FantasyiQ Trust will fetch your leagues automatically. No password is required — we use Sleeper\'s public API.',
-        tags:     ['sleeper', 'sync', 'connect', 'account'],
-    },
-    {
-        id:       'connect-espn',
-        category: 'account',
-        question: 'How do I connect an ESPN league?',
-        answer:   'Go to Dashboard → Sync → ESPN. For private leagues, you\'ll need your ESPN league ID plus your espn_s2 and SWID tokens.\n\nThe easiest way to get these:\n1. Log into ESPN Fantasy in your browser\n2. Go to Dashboard → Sync → ESPN and follow the on-screen instructions — we walk you through exactly where to find them\n3. Paste them in and hit Connect\n\nPublic leagues only need the league ID.',
-        tags:     ['espn', 'credentials', 'swid', 'espn_s2', 'connect'],
-    },
-    {
         id:       'invite-members',
         category: 'account',
         question: 'How do I invite league members?',
@@ -133,6 +119,13 @@ export const FAQ_ITEMS: FAQItem[] = [
     },
 
     // ── League Syncing ───────────────────────────────────────────────────────
+    {
+        id:       'chrome-extension',
+        category: 'league-sync',
+        question: 'What is the FantasyiQ Trust Chrome Extension?',
+        answer:   'The FantasyiQ Trust Chrome Extension makes connecting your ESPN league effortless. Once installed, it automatically captures your ESPN credentials while you browse ESPN Fantasy — no manual token copying needed.\n\nTo install:\n1. Visit the Chrome Web Store and search for "FantasyiQ Trust"\n2. Click "Add to Chrome"\n3. Log into ESPN Fantasy in your browser\n4. The extension will detect your league and prompt you to connect it to FiQ\n\nThe extension is free and works with all ESPN private leagues.',
+        tags:     ['chrome', 'extension', 'espn', 'install', 'browser', 'credentials', 'google'],
+    },
     {
         id:       'sync-sleeper-league',
         category: 'league-sync',
