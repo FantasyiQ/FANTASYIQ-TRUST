@@ -55,8 +55,8 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     const checkoutSession = await stripe.checkout.sessions.create({
         customer: customerId,
-        receipt_email: user.email ?? undefined,
         mode: 'payment',
+        payment_intent_data: { receipt_email: user.email ?? undefined },
         line_items: [{
             quantity: 1,
             price_data: {
