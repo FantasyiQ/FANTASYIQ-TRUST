@@ -126,7 +126,7 @@ export default function Home() {
       <section id="how-it-works" className="bg-[#050505] border-t border-gray-900 py-24 px-6">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-14">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">Up and running in no time</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">Up and running in minutes</h2>
             <p className="text-gray-400 text-lg max-w-xl mx-auto">No setup headaches. No learning curve. Just sync your league and go.</p>
           </div>
 
