@@ -146,9 +146,18 @@ export default async function DashboardPage({
         s => s.status === 'active' || s.status === 'trialing'
     );
     const rawPlayerSub = activeSubs.find(s => s.type === 'player') ?? null;
-    const commSubs     = activeSubs
-        .filter(s => s.type === 'commissioner')
-        .sort((a, b) => (a.leagueName ?? '').localeCompare(b.leagueName ?? ''));
+    // Deduplicate commissioner subs by league name — subscription recreation can leave
+    // two active rows for the same league. Keep the one with the furthest period end.
+    const _rawCommSubs = activeSubs.filter(s => s.type === 'commissioner');
+    const _seenCommSubs = new Map<string, typeof _rawCommSubs[0]>();
+    for (const s of _rawCommSubs) {
+        const key = (s.leagueName ?? '').toLowerCase().trim();
+        const ex  = _seenCommSubs.get(key);
+        if (!ex || (s.currentPeriodEnd?.getTime() ?? 0) > (ex.currentPeriodEnd?.getTime() ?? 0)) {
+            _seenCommSubs.set(key, s);
+        }
+    }
+    const commSubs = [..._seenCommSubs.values()].sort((a, b) => (a.leagueName ?? '').localeCompare(b.leagueName ?? ''));
 
     // Verify player plan tier against Stripe — heals DB when webhook fires with stale metadata
     // (e.g. billing-portal upgrades where subscription metadata retains the original checkout tier)
