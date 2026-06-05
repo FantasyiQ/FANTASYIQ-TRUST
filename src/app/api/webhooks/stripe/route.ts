@@ -445,25 +445,22 @@ export async function POST(request: NextRequest): Promise<Response> {
                     });
                 }
 
+                // Only update — never create — on deletion. If there's no DB record the
+                // subscription was intentionally removed by an admin; recreating it as a
+                // canceled ghost would cause it to reappear after every webhook delivery.
+                if (!subRecord) break;
+
                 await prisma.$transaction([
                     // Only reset subscriptionTier for player plan cancellations
-                    ...(subRecord?.type === 'player' ? [
+                    ...(subRecord.type === 'player' ? [
                         prisma.user.update({
                             where: { id: user.id },
                             data: { subscriptionTier: 'FREE' },
                         }),
                     ] : []),
-                    prisma.subscription.upsert({
+                    prisma.subscription.updateMany({
                         where: { stripeSubscriptionId: sub.id },
-                        create: {
-                            userId: user.id,
-                            stripeSubscriptionId: sub.id,
-                            stripeCustomerId: customerId,
-                            type: subRecord?.type ?? 'player',
-                            tier: 'FREE',
-                            status: 'canceled',
-                        },
-                        update: {
+                        data: {
                             status: 'canceled',
                             cancelAtPeriodEnd: false,
                         },
