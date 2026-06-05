@@ -19,21 +19,48 @@ export async function POST(request: NextRequest): Promise<Response> {
         return Response.json({ error: 'leagueName is required' }, { status: 400 });
     }
 
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        select: {
-            id: true,
-            subscriptionTier: true,
-            _count: { select: { connectedLeagues: true } },
-        },
-    });
+    const [user, commissionerLeagueNames] = await Promise.all([
+        prisma.user.findUnique({
+            where: { email: session.user.email },
+            select: {
+                id: true,
+                subscriptionTier: true,
+                subscriptions: {
+                    where:  { status: { in: ['active', 'trialing'] } },
+                    select: { tier: true, type: true },
+                    orderBy: { createdAt: 'desc' },
+                },
+                connectedLeagues: { select: { leagueName: true } },
+            },
+        }),
+        // Will be used below once we have the userId
+        Promise.resolve([] as { leagueName: string }[]),
+    ]);
     if (!user) {
         return Response.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const limitKey = tierToLimitKey(user.subscriptionTier);
+    // Resolve effective tier: active player plan > active commissioner plan > stored tier
+    const activeTier =
+        user.subscriptions.find(s => s.type === 'player')?.tier ??
+        user.subscriptions.find(s => s.type === 'commissioner')?.tier ??
+        user.subscriptionTier;
+
+    const limitKey = tierToLimitKey(activeTier);
     const limit = getLeagueLimit(limitKey);
-    const currentCount = user._count.connectedLeagues;
+
+    // Fetch league names covered by a commissioner plan for this user so they
+    // don't consume player slots.
+    const coveredLeagues = await prisma.league.findMany({
+        where:  { userId: user.id, assignedPlanType: 'commissioner' },
+        select: { leagueName: true },
+    });
+    const coveredNames = new Set(coveredLeagues.map(l => l.leagueName.toLowerCase().trim()));
+
+    // Count only non-commissioner-covered connected leagues against the limit.
+    const currentCount = user.connectedLeagues.filter(
+        cl => !coveredNames.has(cl.leagueName.toLowerCase().trim())
+    ).length;
 
     if (currentCount >= limit) {
         return Response.json(

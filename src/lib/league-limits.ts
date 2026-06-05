@@ -17,10 +17,13 @@ export function canAddLeague(tier: string | null, currentCount: number): boolean
 /** Maps SubscriptionTier enum values to league-limits keys. */
 export function tierToLimitKey(tier: string): string | null {
     switch (tier) {
-        case 'PLAYER_PRO':      return 'pro';
-        case 'PLAYER_ALL_PRO':  return 'all-pro';
-        case 'PLAYER_ELITE':    return 'elite';
-        default:                return null;
+        case 'PLAYER_PRO':
+        case 'COMMISSIONER_PRO':      return 'pro';
+        case 'PLAYER_ALL_PRO':
+        case 'COMMISSIONER_ALL_PRO':  return 'all-pro';
+        case 'PLAYER_ELITE':
+        case 'COMMISSIONER_ELITE':    return 'elite';
+        default:                      return null;
     }
 }
 
