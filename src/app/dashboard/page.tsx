@@ -113,7 +113,17 @@ export default async function DashboardPage({
         });
     }
 
-    const { name, image, emailVerified, hashedPassword, subscriptionTier, subscriptions, leagues } = user;
+    const { name, image, emailVerified, hashedPassword, subscriptionTier, subscriptions, leagues: rawLeagues } = user;
+
+    // Deduplicate: Sleeper creates a new leagueId every season for the same league name.
+    // Keep only the most recent season per league name so the dashboard shows one row per league.
+    const _seenLeagueNames = new Map<string, typeof rawLeagues[0]>();
+    for (const l of rawLeagues) {
+        const key = l.leagueName.toLowerCase().trim();
+        const existing = _seenLeagueNames.get(key);
+        if (!existing || l.season > existing.season) _seenLeagueNames.set(key, l);
+    }
+    const leagues = [..._seenLeagueNames.values()].sort((a, b) => a.leagueName.localeCompare(b.leagueName));
     // Show verification banner only to credentials users who haven't verified yet
     const needsVerification = !emailVerified && !!hashedPassword;
 
