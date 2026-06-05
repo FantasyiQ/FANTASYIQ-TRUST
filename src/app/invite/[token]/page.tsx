@@ -5,11 +5,27 @@ import { prisma } from '@/lib/prisma';
 import { getLeague, deriveScoringType } from '@/lib/sleeper';
 import { calculateAndSavePrs } from '@/lib/prs';
 
+// Looks up the commissioner's active League row for this Sleeper league and
+// propagates commissioner coverage to the member's League row.
+async function applyCommissionerCoverage(memberLeagueDbId: string, sleeperLeagueId: string): Promise<void> {
+    const commLeague = await prisma.league.findFirst({
+        where:  { leagueId: sleeperLeagueId, assignedPlanType: 'commissioner', assignedPlanId: { not: null } },
+        select: { assignedPlanId: true },
+    });
+    if (!commLeague?.assignedPlanId) return;
+
+    await prisma.league.update({
+        where: { id: memberLeagueDbId },
+        data:  { assignedPlanId: commLeague.assignedPlanId, assignedPlanType: 'commissioner' },
+    });
+}
+
 // Auto-accept an invite for a logged-in user:
 // 1. Fetch the Sleeper league (public API — no user credentials needed)
 // 2. Upsert the League record in our DB
-// 3. Add a ConnectedLeague entry → grants access to the commissioner's paid plan tier
-// 4. Return the DB league ID for redirect
+// 3. Propagate commissioner coverage to the member's League row
+// 4. Add a ConnectedLeague entry
+// 5. Return the DB league ID for redirect
 async function acceptInvite(
     userId:        string,
     sleeperUserId: string | null,
@@ -57,7 +73,10 @@ async function acceptInvite(
         dbLeagueId = r.id;
     }
 
-    // ConnectedLeague entry = what unlocks the commissioner's plan tier for this member
+    // Propagate commissioner plan coverage to this member's League row.
+    await applyCommissionerCoverage(dbLeagueId, invite.sleeperLeagueId);
+
+    // ConnectedLeague entry tracks the verified invite for PRS and slot counting.
     const already = await prisma.connectedLeague.findFirst({
         where: { userId, leagueExtId: invite.sleeperLeagueId },
     });
@@ -118,6 +137,8 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
             }
 
             if (existing) {
+                // Ensure commissioner coverage is set even on the fast path.
+                await applyCommissionerCoverage(existing.id, invite.sleeperLeagueId);
                 redirect(`/dashboard/league/${existing.id}`);
             }
 
