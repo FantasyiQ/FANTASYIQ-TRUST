@@ -17,7 +17,7 @@
 // calls, so repeat runs are cheap.
 
 import { prisma } from '@/lib/prisma';
-import { getLeague, getLeagueRosters, rosterFpts } from '@/lib/sleeper';
+import { getLeague, getLeagueRosters, rosterFpts, type SleeperLeague } from '@/lib/sleeper';
 import { captureError } from '@/lib/sentry';
 
 export const maxDuration = 300;
@@ -25,11 +25,149 @@ export const maxDuration = 300;
 // How many seasons back to walk for each dynasty franchise.
 // 6 covers 2019–2025 for a league in its 7th year.
 const MAX_HISTORY_DEPTH = 6;
+const USER_BATCH_SIZE   = 5; // users processed in parallel per batch
 
 // Sleeper sometimes uses "0" as a null sentinel for previous_league_id
 function isValidLeagueId(id: string | null | undefined): id is string {
     return !!id && id !== '0' && id.length > 4;
 }
+
+// Promise-based cache so parallel users sharing a Sleeper league dedup to
+// a single in-flight fetch rather than N concurrent fetches.
+type LeagueCache = Map<string, Promise<SleeperLeague | null>>;
+
+function getCachedLeague(leagueId: string, cache: LeagueCache): Promise<SleeperLeague | null> {
+    if (!cache.has(leagueId)) {
+        cache.set(leagueId, getLeague(leagueId).catch(() => null));
+    }
+    return cache.get(leagueId)!;
+}
+
+// ── Per-league processor ──────────────────────────────────────────────────────
+
+async function processLeague(
+    userId:      string,
+    leagueId:    string,
+    existingIds: Set<string>,     // pre-fetched, read-only; upsert is idempotent for dups
+    cache:       LeagueCache,
+): Promise<{ backfilled: number; skipped: number }> {
+    let currentLeagueId = leagueId;
+    let backfilled = 0;
+    let skipped    = 0;
+
+    for (let depth = 0; depth < MAX_HISTORY_DEPTH; depth++) {
+        const sleeperLeague = await getCachedLeague(currentLeagueId, cache);
+        if (!sleeperLeague) break;
+
+        const prevLeagueId = sleeperLeague.previous_league_id;
+        if (!isValidLeagueId(prevLeagueId)) break;
+        const historicalLeagueId = prevLeagueId;
+
+        if (existingIds.has(historicalLeagueId)) {
+            skipped++;
+            currentLeagueId = historicalLeagueId;
+            continue;
+        }
+
+        let historicalLeague: SleeperLeague;
+        let rosters;
+        try {
+            const [hl, rs] = await Promise.all([
+                getCachedLeague(historicalLeagueId, cache),
+                getLeagueRosters(historicalLeagueId),
+            ]);
+            if (!hl) break;
+            historicalLeague = hl;
+            rosters = rs;
+        } catch {
+            break; // Historical data unavailable — stop chain
+        }
+
+        if (!Array.isArray(rosters) || rosters.length === 0) {
+            currentLeagueId = historicalLeagueId;
+            continue;
+        }
+
+        // Build standings in the same format as sleeper-sync
+        const standings = rosters
+            .filter(r => r.owner_id != null)
+            .map(r => ({
+                rosterId: r.roster_id,
+                ownerId:  r.owner_id!,
+                wins:     r.settings?.wins   ?? 0,
+                losses:   r.settings?.losses ?? 0,
+                ties:     r.settings?.ties   ?? 0,
+                fpts:     rosterFpts(r.settings),
+            }))
+            .sort((a, b) => b.wins - a.wins || b.fpts - a.fpts);
+
+        // Only store if the season actually had games played
+        const totalGames = standings.reduce((sum, r) => sum + r.wins + r.losses + r.ties, 0);
+        if (totalGames === 0) {
+            currentLeagueId = historicalLeagueId;
+            continue;
+        }
+
+        const isDynasty = historicalLeague.settings?.type === 2;
+
+        await prisma.league.upsert({
+            where:  { userId_platform_leagueId: { userId, platform: 'sleeper', leagueId: historicalLeagueId } },
+            create: {
+                userId,
+                platform:     'sleeper',
+                leagueId:     historicalLeagueId,
+                leagueName:   historicalLeague.name,
+                season:       historicalLeague.season,
+                status:       'complete',
+                totalRosters: historicalLeague.total_rosters,
+                leagueType:   isDynasty ? 'Dynasty' : 'Redraft',
+                standings,
+                isHistorical: true,
+                lastSyncedAt: new Date(),
+            },
+            update: {
+                standings,
+                leagueName:   historicalLeague.name,
+                totalRosters: historicalLeague.total_rosters,
+                isHistorical: true,
+                lastSyncedAt: new Date(),
+            },
+        });
+
+        backfilled++;
+        currentLeagueId = historicalLeagueId;
+    }
+
+    return { backfilled, skipped };
+}
+
+// ── Per-user processor ────────────────────────────────────────────────────────
+
+async function processUser(
+    user:  { id: string; leagues: { leagueId: string }[] },
+    cache: LeagueCache,
+): Promise<{ backfilled: number; skipped: number }> {
+    // Pre-fetch all existing league IDs for this user in one query, replacing
+    // the per-depth findFirst calls (N queries → 1 query per user).
+    const existingIds = new Set(
+        (await prisma.league.findMany({
+            where:  { userId: user.id, platform: 'sleeper' },
+            select: { leagueId: true },
+        })).map(l => l.leagueId),
+    );
+
+    // Process all dynasty leagues for this user in parallel — chains are independent.
+    const results = await Promise.all(
+        user.leagues.map(dbLeague => processLeague(user.id, dbLeague.leagueId, existingIds, cache)),
+    );
+
+    return results.reduce(
+        (acc, r) => ({ backfilled: acc.backfilled + r.backfilled, skipped: acc.skipped + r.skipped }),
+        { backfilled: 0, skipped: 0 },
+    );
+}
+
+// ── Cron handler ──────────────────────────────────────────────────────────────
 
 export async function GET(request: Request): Promise<Response> {
     if (request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -37,7 +175,6 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     try {
-        // Get all users who have at least one dynasty league synced
         const users = await prisma.user.findMany({
             where: {
                 sleeperUserId: { not: null },
@@ -53,113 +190,26 @@ export async function GET(request: Request): Promise<Response> {
             },
         });
 
+        // Shared league cache — deduplicates Sleeper API calls across users in the same batch.
+        const leagueCache: LeagueCache = new Map();
+
         let seasonsBackfilled = 0;
         let seasonsSkipped    = 0;
         let usersFailed       = 0;
 
-        for (const user of users) {
-            try {
-                for (const dbLeague of user.leagues) {
-                    let currentLeagueId = dbLeague.leagueId;
+        for (let i = 0; i < users.length; i += USER_BATCH_SIZE) {
+            const batch   = users.slice(i, i + USER_BATCH_SIZE);
+            const results = await Promise.allSettled(batch.map(user => processUser(user, leagueCache)));
 
-                    for (let depth = 0; depth < MAX_HISTORY_DEPTH; depth++) {
-                        // Fetch the Sleeper league to get previous_league_id + season
-                        let sleeperLeague;
-                        try {
-                            sleeperLeague = await getLeague(currentLeagueId);
-                        } catch {
-                            break; // League no longer accessible on Sleeper — stop chain
-                        }
-
-                        const prevLeagueId = sleeperLeague.previous_league_id;
-                        if (!isValidLeagueId(prevLeagueId)) break; // reached the beginning of the franchise
-
-                        const historicalLeagueId = prevLeagueId;
-
-                        // Skip if we've already cached this season for this user
-                        const existing = await prisma.league.findFirst({
-                            where:  { userId: user.id, platform: 'sleeper', leagueId: historicalLeagueId },
-                            select: { id: true },
-                        });
-                        if (existing) {
-                            seasonsSkipped++;
-                            // Still walk further back — older seasons may not be cached yet
-                            currentLeagueId = historicalLeagueId;
-                            continue;
-                        }
-
-                        // Fetch the historical league details + rosters
-                        let historicalLeague;
-                        let rosters;
-                        try {
-                            [historicalLeague, rosters] = await Promise.all([
-                                getLeague(historicalLeagueId),
-                                getLeagueRosters(historicalLeagueId),
-                            ]);
-                        } catch {
-                            break; // Historical data unavailable — stop chain
-                        }
-
-                        if (!Array.isArray(rosters) || rosters.length === 0) {
-                            currentLeagueId = historicalLeagueId;
-                            continue;
-                        }
-
-                        // Build standings in the same format as sleeper-sync
-                        const standings = rosters
-                            .filter(r => r.owner_id != null)
-                            .map(r => ({
-                                rosterId: r.roster_id,
-                                ownerId:  r.owner_id!,
-                                wins:     r.settings?.wins    ?? 0,
-                                losses:   r.settings?.losses  ?? 0,
-                                ties:     r.settings?.ties    ?? 0,
-                                fpts:     rosterFpts(r.settings),
-                            }))
-                            .sort((a, b) => b.wins - a.wins || b.fpts - a.fpts);
-
-                        // Only store if the season actually had games played
-                        const totalGames = standings.reduce(
-                            (sum, r) => sum + r.wins + r.losses + r.ties, 0
-                        );
-                        if (totalGames === 0) {
-                            currentLeagueId = historicalLeagueId;
-                            continue;
-                        }
-
-                        const isDynasty = historicalLeague.settings?.type === 2;
-
-                        await prisma.league.upsert({
-                            where:  { userId_platform_leagueId: { userId: user.id, platform: 'sleeper', leagueId: historicalLeagueId } },
-                            create: {
-                                userId:         user.id,
-                                platform:       'sleeper',
-                                leagueId:       historicalLeagueId,
-                                leagueName:     historicalLeague.name,
-                                season:         historicalLeague.season,
-                                status:         'complete',
-                                totalRosters:   historicalLeague.total_rosters,
-                                leagueType:     isDynasty ? 'Dynasty' : 'Redraft',
-                                standings,
-                                isHistorical:   true,
-                                lastSyncedAt:   new Date(),
-                            },
-                            update: {
-                                standings,
-                                leagueName:   historicalLeague.name,
-                                totalRosters: historicalLeague.total_rosters,
-                                isHistorical: true,
-                                lastSyncedAt: new Date(),
-                            },
-                        });
-
-                        seasonsBackfilled++;
-                        currentLeagueId = historicalLeagueId;
-                    }
+            for (let j = 0; j < results.length; j++) {
+                const result = results[j];
+                if (result.status === 'fulfilled') {
+                    seasonsBackfilled += result.value.backfilled;
+                    seasonsSkipped    += result.value.skipped;
+                } else {
+                    captureError(result.reason, { cron: 'dss-history', userId: batch[j].id });
+                    usersFailed++;
                 }
-            } catch (err) {
-                captureError(err, { cron: 'dss-history', userId: user.id });
-                usersFailed++;
             }
         }
 

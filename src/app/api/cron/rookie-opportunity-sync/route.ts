@@ -135,17 +135,20 @@ export async function GET(request: Request): Promise<Response> {
             projByPlayerId.set(row.playerId, (projByPlayerId.get(row.playerId) ?? 0) + row.pointsPpr);
         }
     
-        // Process each rookie
+        // Compute all updates synchronously, then execute in a single transaction
+        // (one DB round trip instead of N sequential updates).
+        type RookieUpdateOp = ReturnType<typeof prisma.rookieRankingsPlayer.update>;
+        const ops: RookieUpdateOp[] = [];
         let updated = 0;
         let noMatch = 0;
-    
+
         for (const rookie of rookies) {
             const sp = sleeperMap.get(rookie.playerName);
-    
+
             // If baseFiQScore hasn't been set yet (existing rows seeded before this feature),
             // treat the current fiqScore as the base.
             const base = rookie.baseFiQScore > 0 ? rookie.baseFiQScore : rookie.fiqScore;
-    
+
             if (!sp) {
                 // No Sleeper match — if a manual depth order is set, apply it with no other signals
                 if (rookie.manualDepthOrder != null) {
@@ -160,21 +163,21 @@ export async function GET(request: Request): Promise<Response> {
                     const rawAdjusted = (base * 0.75) + (opportunityScore * 0.25);
                     const adjustedFiQ = parseFloat(Math.max(rawAdjusted, base).toFixed(2));
                     const newTier     = computeRookieFiQTier(adjustedFiQ);
-                    await prisma.rookieRankingsPlayer.update({
+                    ops.push(prisma.rookieRankingsPlayer.update({
                         where: { id: rookie.id },
                         data:  { baseFiQScore: base, opportunityScore, fiqScore: adjustedFiQ, fiqTier: newTier },
-                    });
+                    }));
                     updated++;
                 } else if (rookie.baseFiQScore === 0) {
-                    await prisma.rookieRankingsPlayer.update({
+                    ops.push(prisma.rookieRankingsPlayer.update({
                         where: { id: rookie.id },
                         data:  { baseFiQScore: rookie.fiqScore },
-                    });
+                    }));
                 }
                 noMatch++;
                 continue;
             }
-    
+
             const projectedPts    = projByPlayerId.get(sp.playerId) ?? 0;
             // Use Sleeper depth chart if available; fall back to manual override
             const depthChartOrder = sp.depthChartOrder ?? rookie.manualDepthOrder ?? null;
@@ -186,24 +189,21 @@ export async function GET(request: Request): Promise<Response> {
                 projectedPts,
                 position:        sp.position,
             });
-    
+
             // Floor at base — opportunity can only raise the score, never lower it
             const rawAdjusted = (base * 0.75) + (opportunityScore * 0.25);
             const adjustedFiQ = parseFloat(Math.max(rawAdjusted, base).toFixed(2));
             const newTier     = computeRookieFiQTier(adjustedFiQ);
-    
-            await prisma.rookieRankingsPlayer.update({
+
+            ops.push(prisma.rookieRankingsPlayer.update({
                 where: { id: rookie.id },
-                data: {
-                    baseFiQScore:    base,
-                    opportunityScore,
-                    fiqScore:        adjustedFiQ,
-                    fiqTier:         newTier,
-                },
-            });
-    
+                data:  { baseFiQScore: base, opportunityScore, fiqScore: adjustedFiQ, fiqTier: newTier },
+            }));
+
             updated++;
         }
+
+        if (ops.length > 0) await prisma.$transaction(ops);
     
         return Response.json({
             ok:      true,
