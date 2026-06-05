@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "FiQ ESPN Connector",
   "description": "Securely connect your ESPN fantasy league to FantasyiQ Trust. Reads only espn_s2 and SWID cookies — nothing else.",
-  "version": "1.0.0",
+  "version": "1.0.1",
 
   "permissions": ["cookies"],
   "host_permissions": [
@@ -12,6 +12,7 @@
 
   "externally_connectable": {
     "matches": [
+      "https://fantasyiqtrust.com/*",
       "https://fantasyiq-trust.vercel.app/*",
       "http://localhost:3000/*"
     ]
