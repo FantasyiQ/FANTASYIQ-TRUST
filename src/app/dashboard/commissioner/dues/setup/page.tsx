@@ -27,7 +27,7 @@ export default async function DuesSetupPage({
     });
 
     // Deduplicate: one entry per league name (highest season wins)
-    const _seen = new Map<string, typeof user.leagues[0]>();
+    const _seen = new Map<string, NonNullable<typeof user>['leagues'][0]>();
     for (const l of user?.leagues ?? []) {
         const key = l.leagueName.toLowerCase().trim();
         const ex  = _seen.get(key);
