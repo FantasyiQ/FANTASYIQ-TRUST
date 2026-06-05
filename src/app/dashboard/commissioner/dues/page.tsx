@@ -54,7 +54,64 @@ export default async function DuesPage() {
 
     if (!user) redirect('/sign-in');
 
-    const subs = user.subscriptions;
+    // Re-link any orphaned dues (subscriptionId=null) to the matching active subscription.
+    // This happens when a subscription is recreated (new Stripe sub = new DB row) and the
+    // old subscriptionId was set to null via onDelete: SetNull.
+    const orphanedDues = await prisma.leagueDues.findMany({
+        where:  { commissionerId: user.id, subscriptionId: null },
+        select: { id: true, leagueName: true },
+    });
+
+    if (orphanedDues.length > 0) {
+        const activeSubs = await prisma.subscription.findMany({
+            where:  { userId: user.id, type: 'commissioner', status: { in: ['active', 'trialing'] }, leagueDues: null },
+            select: { id: true, leagueName: true },
+        });
+
+        for (const orphan of orphanedDues) {
+            const match = activeSubs.find(
+                s => s.leagueName?.toLowerCase().trim() === orphan.leagueName.toLowerCase().trim()
+            );
+            if (match) {
+                await prisma.leagueDues.update({
+                    where: { id: orphan.id },
+                    data:  { subscriptionId: match.id },
+                });
+            }
+        }
+
+        // Re-fetch user with repaired links
+        const repaired = await prisma.user.findUnique({
+            where: { id: user.id },
+            select: {
+                id: true,
+                subscriptions: {
+                    where: { type: 'commissioner', status: { in: ['active', 'trialing'] } },
+                    select: {
+                        id: true,
+                        leagueName: true,
+                        leagueSize: true,
+                        tier: true,
+                        leagueDues: {
+                            select: {
+                                id: true,
+                                leagueName: true,
+                                season: true,
+                                buyInAmount: true,
+                                teamCount: true,
+                                potTotal: true,
+                                status: true,
+                                members: { select: { duesStatus: true } },
+                            },
+                        },
+                    },
+                },
+            },
+        });
+        var subs = repaired?.subscriptions ?? [];
+    } else {
+        var subs = user.subscriptions;
+    }
 
     return (
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
