@@ -26,13 +26,20 @@ export async function GET(): Promise<Response> {
         duesMap.set(`${d.leagueName.toLowerCase()}:${d.season}`, d.id);
     }
 
-    const result = leagues.map(l => ({
-        id:        l.id,
+    // Deduplicate: one entry per league name (highest season, already sorted desc)
+    const seen = new Map<string, typeof leagues[0]>();
+    for (const l of leagues) {
+        const key = l.leagueName.toLowerCase().trim();
+        if (!seen.has(key)) seen.set(key, l);
+    }
+
+    const result = [...seen.values()].map(l => ({
+        id:         l.id,
         leagueName: l.leagueName,
-        season:    l.season,
-        platform:  l.platform,
-        avatar:    l.avatar ?? null,
-        duesId:    duesMap.get(`${l.leagueName.toLowerCase()}:${l.season}`) ?? null,
+        season:     l.season,
+        platform:   l.platform,
+        avatar:     l.avatar ?? null,
+        duesId:     duesMap.get(`${l.leagueName.toLowerCase()}:${l.season}`) ?? null,
     }));
 
     return Response.json(result);

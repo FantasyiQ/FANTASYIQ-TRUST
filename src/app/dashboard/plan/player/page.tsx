@@ -88,11 +88,20 @@ export default async function PlayerPlanPage() {
 
     const sub = { ...rawSub, tier };
 
-    const assignedLeagues      = user.leagues.filter(l => l.assignedPlanId === sub.id);
-    const commCoveredLeagues   = user.leagues.filter(l => l.assignedPlanType === 'commissioner');
+    // Deduplicate: keep only the most recent season per league name
+    const _seenPlan = new Map<string, typeof user.leagues[0]>();
+    for (const l of user.leagues) {
+        const key = l.leagueName.toLowerCase().trim();
+        const ex  = _seenPlan.get(key);
+        if (!ex || (l.assignedPlanId === sub.id) || l.season > ex.season) _seenPlan.set(key, l);
+    }
+    const dedupedLeagues = [..._seenPlan.values()];
+
+    const assignedLeagues      = dedupedLeagues.filter(l => l.assignedPlanId === sub.id);
+    const commCoveredLeagues   = dedupedLeagues.filter(l => l.assignedPlanType === 'commissioner');
     // Unassigned = no plan at all. Exclude commissioner-covered leagues so they
     // don't appear as available player-plan slots.
-    const unassignedLeagues    = user.leagues.filter(l => !l.assignedPlanId && l.assignedPlanType !== 'commissioner');
+    const unassignedLeagues    = dedupedLeagues.filter(l => !l.assignedPlanId && l.assignedPlanType !== 'commissioner');
 
     const leagueLimit = getLeagueLimit(tierToLimitKey(tier));
     const atLimit     = leagueLimit !== Infinity && assignedLeagues.length >= leagueLimit;

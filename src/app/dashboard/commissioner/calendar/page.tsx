@@ -30,7 +30,14 @@ export default async function SeasonCalendarPage() {
     });
     if (!user) redirect('/sign-in');
 
-    const leagues = user.leagues;
+    // Deduplicate: keep only the most recent season per league name
+    const _seenCal = new Map<string, typeof user.leagues[0]>();
+    for (const l of user.leagues) {
+        const key = l.leagueName.toLowerCase().trim();
+        const ex  = _seenCal.get(key);
+        if (!ex || l.season > ex.season) _seenCal.set(key, l);
+    }
+    const leagues = [..._seenCal.values()].sort((a, b) => a.leagueName.localeCompare(b.leagueName));
 
     return (
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">

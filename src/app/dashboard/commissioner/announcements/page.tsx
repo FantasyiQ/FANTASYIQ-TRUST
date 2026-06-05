@@ -50,7 +50,14 @@ export default async function AnnouncementsPage({
 
     if (!user) redirect('/sign-in');
 
-    const leagues = user.leagues;
+    // Deduplicate: keep only the most recent season per league name
+    const _seenAnn = new Map<string, typeof user.leagues[0]>();
+    for (const l of user.leagues) {
+        const key = l.leagueName.toLowerCase().trim();
+        const ex  = _seenAnn.get(key);
+        if (!ex || l.season > ex.season) _seenAnn.set(key, l);
+    }
+    const leagues = [..._seenAnn.values()].sort((a, b) => a.leagueName.localeCompare(b.leagueName));
 
     // Build a map of leagueName → documents from dues tracker (still dues-linked)
     const docsByLeagueName = new Map<string, { id: string; label: string; url: string; createdAt: Date }[]>();
