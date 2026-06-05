@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "FiQ ESPN Connector",
   "description": "Securely connect your ESPN fantasy league to FantasyiQ Trust. Reads only espn_s2 and SWID cookies — nothing else.",
-  "version": "1.0.1",
+  "version": "1.0.5",
 
   "permissions": ["cookies"],
   "host_permissions": [
