@@ -360,37 +360,35 @@ export default function LeagueOverviewCards({
             />
 
 
-            {/* Card 4: Player Rankings launch */}
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl px-6 py-5 flex items-center justify-between gap-6">
-                <div>
-                    <h2 className="font-semibold text-base">Player Rankings</h2>
-                    <p className="text-gray-500 text-sm mt-0.5">
+            {/* Card 4: Player Rankings */}
+            <CollapsibleCard title="Player Rankings">
+                <div className="px-6 py-5">
+                    <p className="text-gray-500 text-sm mb-4">
                         Full DTV-ranked player list with HOT / NEW / TRADED signals, scoped to this league&apos;s settings.
                     </p>
+                    <Link
+                        href={`/dashboard/league/${leagueId}/rankings`}
+                        className="inline-flex items-center text-[#D4AF37] font-semibold text-sm hover:underline"
+                    >
+                        Open Player Rankings →
+                    </Link>
                 </div>
-                <Link
-                    href={`/dashboard/league/${leagueId}/rankings`}
-                    className="shrink-0 bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-5 py-2 rounded-xl transition text-sm"
-                >
-                    Open →
-                </Link>
-            </div>
+            </CollapsibleCard>
 
-            {/* Card 5: Trade Evaluator launch */}
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl px-6 py-5 flex items-center justify-between gap-6">
-                <div>
-                    <h2 className="font-semibold text-base">Trade Evaluator</h2>
-                    <p className="text-gray-500 text-sm mt-0.5">
+            {/* Card 5: Trade Evaluator */}
+            <CollapsibleCard title="Trade Evaluator">
+                <div className="px-6 py-5">
+                    <p className="text-gray-500 text-sm mb-4">
                         Analyze trades, compare rosters, and browse dynasty values — scoped to this league.
                     </p>
+                    <Link
+                        href={`/dashboard/league/${leagueId}/trade`}
+                        className="inline-flex items-center text-[#D4AF37] font-semibold text-sm hover:underline"
+                    >
+                        Open Trade Evaluator →
+                    </Link>
                 </div>
-                <Link
-                    href={`/dashboard/league/${leagueId}/trade`}
-                    className="shrink-0 bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-5 py-2 rounded-xl transition text-sm"
-                >
-                    Open →
-                </Link>
-            </div>
+            </CollapsibleCard>
 
             {/* Card 6: Standings */}
             <CollapsibleCard title="Standings">

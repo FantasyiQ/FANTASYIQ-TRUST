@@ -552,7 +552,7 @@ export default async function DashboardPage({
                                                     : null;
                                                 const resolvedId = leagueId ?? partialMatch?.id;
                                                 return resolvedId ? (
-                                                    <Link href={`/dashboard/league/${resolvedId}/commissioner`}
+                                                    <Link href={`/dashboard/league/${resolvedId}/overview`}
                                                         className="text-[#D4AF37] font-semibold text-sm hover:underline">
                                                         {sub.leagueName} →
                                                     </Link>

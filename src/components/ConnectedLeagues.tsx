@@ -283,12 +283,8 @@ export default function ConnectedLeagues({ leagues: initial, syncedLeagues = [],
                     {leagues.map(l => {
                         const locked   = !l.isAutoIncluded && isLocked(l.createdAt);
                         const syncedId = l.syncedLeagueId ?? syncedIdByName.get(l.leagueName.toLowerCase());
-                        const leagueHref = syncedId
-                            ? (l.isCommissioner
-                                ? `/dashboard/league/${syncedId}/commissioner`
-                                : `/dashboard/league/${syncedId}`)
-                            : null;
-                        const actionLabel = l.isCommissioner ? 'Manage League →' : 'View League →';
+                        const leagueHref = syncedId ? `/dashboard/league/${syncedId}/overview` : null;
+                        const actionLabel = 'View League →';
 
                         return (
                             <li key={l.id} className="flex items-center justify-between gap-3 px-3 py-2 bg-gray-800/50 rounded-lg">
