@@ -13,17 +13,26 @@ export async function getUserSubscriptionTier(): Promise<number> {
         orderBy: { createdAt: 'desc' },
         select:  { tier: true, stripeSubscriptionId: true },
     });
-    if (!sub) return 0;
 
-    let tier = sub.tier;
-    if (sub.stripeSubscriptionId) {
-        try {
-            const stripeSub  = await stripe.subscriptions.retrieve(sub.stripeSubscriptionId);
-            const priceId    = stripeSub.items.data[0]?.price.id;
-            const stripeTier = priceId ? priceIdToTier(priceId) : null;
-            if (stripeTier) tier = stripeTier;
-        } catch { /* fall back to DB tier */ }
+    if (sub) {
+        let tier = sub.tier;
+        if (sub.stripeSubscriptionId) {
+            try {
+                const stripeSub  = await stripe.subscriptions.retrieve(sub.stripeSubscriptionId);
+                const priceId    = stripeSub.items.data[0]?.price.id;
+                const stripeTier = priceId ? priceIdToTier(priceId) : null;
+                if (stripeTier) tier = stripeTier;
+            } catch { /* fall back to DB tier */ }
+        }
+        return tierLevel(tier);
     }
 
-    return tierLevel(tier);
+    // No player plan — check for an active commissioner plan.
+    // Commissioner plan holders get the equivalent feature access as their tier level.
+    const commSub = await prisma.subscription.findFirst({
+        where:   { userId: session.user.id, type: 'commissioner', status: { in: ['active', 'trialing'] } },
+        orderBy: { createdAt: 'desc' },
+        select:  { tier: true },
+    });
+    return commSub ? tierLevel(commSub.tier) : 0;
 }
