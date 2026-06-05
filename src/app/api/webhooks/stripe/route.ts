@@ -406,18 +406,24 @@ export async function POST(request: NextRequest): Promise<Response> {
                 });
                 if (!user) break;
 
-                // Look up the subscription record to know its type
+                // Look up the subscription record to know its type and internal DB ID.
+                // assignedPlanId stores our internal DB ID, NOT the Stripe sub ID.
                 const subRecord = await prisma.subscription.findUnique({
                     where: { stripeSubscriptionId: sub.id },
-                    select: { type: true },
+                    select: { id: true, type: true },
                 });
 
+                // Only update — never create — on deletion. If there's no DB record the
+                // subscription was intentionally removed by an admin; recreating it as a
+                // canceled ghost would cause it to reappear after every webhook delivery.
+                if (!subRecord) break;
+
                 // ── Clear league assignments for the cancelled plan ────────────
-                if (subRecord?.type === 'commissioner') {
-                    // Find the external leagueId(s) covered by this commissioner subscription
-                    // (commissioner's own League rows carry assignedPlanId = sub.id)
+                if (subRecord.type === 'commissioner') {
+                    // Find the external leagueId(s) covered by this commissioner subscription.
+                    // Must use subRecord.id (internal DB id) — sub.id is the Stripe sub id and never matches.
                     const coveredLeagues = await prisma.league.findMany({
-                        where: { assignedPlanId: sub.id },
+                        where: { assignedPlanId: subRecord.id },
                         select: { leagueId: true },  // external platform ID (e.g. Sleeper league ID)
                     });
                     const externalIds = coveredLeagues.map(l => l.leagueId);
@@ -438,17 +444,13 @@ export async function POST(request: NextRequest): Promise<Response> {
                         });
                     }
                 } else {
-                    // Player plan cancelled — unassign any leagues tied to this subscription
+                    // Player plan cancelled — unassign any leagues tied to this subscription.
+                    // Must use subRecord.id (internal DB id) — sub.id is the Stripe sub id and never matches.
                     await prisma.league.updateMany({
-                        where: { assignedPlanId: sub.id },
+                        where: { assignedPlanId: subRecord.id },
                         data:  { assignedPlanId: null, assignedPlanType: null },
                     });
                 }
-
-                // Only update — never create — on deletion. If there's no DB record the
-                // subscription was intentionally removed by an admin; recreating it as a
-                // canceled ghost would cause it to reappear after every webhook delivery.
-                if (!subRecord) break;
 
                 await prisma.$transaction([
                     // Only reset subscriptionTier for player plan cancellations
