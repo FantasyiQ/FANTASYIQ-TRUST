@@ -30,16 +30,20 @@ export async function requirePaidTier(userId: string): Promise<Response | null> 
             subscriptionTier: true,
             subscriptions: {
                 where:  { status: { in: ['active', 'trialing'] } },
-                select: { id: true },
-                take:   1,
+                select: { id: true, tier: true },
+                take:   5,
             },
         },
     });
 
-    const hasTier     = user && PAID_TIERS.has(user.subscriptionTier);
-    const hasActiveSub = user && user.subscriptions.length > 0;
+    // Accept either a paid subscriptionTier on the user record (player plans set this)
+    // or any active subscription with a paid tier (commissioner plans don't set subscriptionTier).
+    const hasTier = user && (
+        PAID_TIERS.has(user.subscriptionTier) ||
+        user.subscriptions.some(s => PAID_TIERS.has(s.tier))
+    );
 
-    if (!hasTier || !hasActiveSub) {
+    if (!hasTier) {
         return Response.json(
             { error: 'This feature requires a FiQ paid plan. Upgrade at /dashboard/upgrade.' },
             { status: 403 },
