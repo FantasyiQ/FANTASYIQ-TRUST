@@ -88,7 +88,8 @@ export default async function LeagueOverviewPage({
 
         const [leagueDuesRecord, leagueAnnouncements] = await Promise.all([
             prisma.leagueDues.findFirst({
-                where: { leagueName: { equals: league.leagueName, mode: 'insensitive' }, season: league.season },
+                where:   { leagueName: { equals: league.leagueName, mode: 'insensitive' } },
+                orderBy: { season: 'desc' },
                 select: {
                     id: true, commissionerId: true, buyInAmount: true, collectedAmount: true,
                     potTotal: true, status: true, teamCount: true,
@@ -150,10 +151,8 @@ export default async function LeagueOverviewPage({
             select: { sleeperUserId: true },
         }),
         prisma.leagueDues.findFirst({
-            where: {
-                leagueName: { equals: league.leagueName, mode: 'insensitive' },
-                season:     league.season,
-            },
+            where:   { leagueName: { equals: league.leagueName, mode: 'insensitive' } },
+            orderBy: { season: 'desc' },
             select: {
                 id:              true,
                 commissionerId:  true,
