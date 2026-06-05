@@ -52,7 +52,7 @@ export default async function PlayerPlanPage() {
             leagues: {
                 orderBy: { leagueName: 'asc' },
                 select: {
-                    id: true, leagueName: true, totalRosters: true,
+                    id: true, leagueName: true, season: true, totalRosters: true,
                     scoringType: true, avatar: true,
                     assignedPlanId: true, assignedPlanType: true,
                 },
@@ -88,12 +88,13 @@ export default async function PlayerPlanPage() {
 
     const sub = { ...rawSub, tier };
 
-    // Deduplicate: keep only the most recent season per league name
+    // Deduplicate: keep only the most recent season per league name.
+    // Prefer an assigned row over an unassigned one of the same league.
     const _seenPlan = new Map<string, typeof user.leagues[0]>();
     for (const l of user.leagues) {
         const key = l.leagueName.toLowerCase().trim();
         const ex  = _seenPlan.get(key);
-        if (!ex || (l.assignedPlanId === sub.id) || l.season > ex.season) _seenPlan.set(key, l);
+        if (!ex || l.season > ex.season || (!ex.assignedPlanId && l.assignedPlanId)) _seenPlan.set(key, l);
     }
     const dedupedLeagues = [..._seenPlan.values()];
 
