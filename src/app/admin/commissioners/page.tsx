@@ -2,6 +2,8 @@ export const dynamic = 'force-dynamic';
 
 import { prisma } from '@/lib/prisma';
 import { getActivationFunnel, STAGE_LABELS } from '@/lib/commissioner-activation';
+import EditLeagueName from './EditLeagueName';
+import DeleteSubscription from './DeleteSubscription';
 
 function startOf(daysAgo: number): Date {
     const d = new Date();
@@ -145,7 +147,7 @@ export default async function AdminCommissionersPage() {
                     {recentCommSubs.map(s => (
                         <div key={s.id} className="px-5 py-3 flex items-center justify-between gap-4">
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm text-white truncate">{s.leagueName ?? '—'}</p>
+                                <EditLeagueName subId={s.id} current={s.leagueName} />
                                 <p className="text-xs text-gray-600 truncate">{s.user.email}</p>
                             </div>
                             <div className="flex items-center gap-3 shrink-0 text-right">
@@ -159,6 +161,7 @@ export default async function AdminCommissionersPage() {
                                 <span className="text-[10px] text-gray-600 tabular-nums whitespace-nowrap">
                                     {new Date(s.createdAt).toLocaleDateString()}
                                 </span>
+                                <DeleteSubscription subId={s.id} />
                             </div>
                         </div>
                     ))}

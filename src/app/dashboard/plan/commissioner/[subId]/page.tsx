@@ -66,9 +66,9 @@ export default async function CommissionerPlanPage({
                         ← Back to My Leagues
                     </Link>
                     <h1 className="text-2xl font-bold mt-3">Your Commissioner Plan</h1>
-                    {sub.leagueName && (
-                        <p className="text-gray-400 text-sm mt-1">{sub.leagueName}</p>
-                    )}
+                        <p className="text-gray-400 text-sm mt-1">
+                        {sub.leagueName ?? <span className="italic text-gray-600">League name not set</span>}
+                    </p>
                 </div>
 
                 {/* How commissioner plans work */}
@@ -114,28 +114,30 @@ export default async function CommissionerPlanPage({
                 </div>
 
                 {/* League covered by this plan */}
-                {sub.leagueName && (
-                    <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-                        <div className="px-6 py-4 border-b border-gray-800">
-                            <h2 className="font-semibold">League Covered by This Plan</h2>
-                            <p className="text-gray-500 text-xs mt-0.5">Set at purchase — this plan covers all members of this league.</p>
-                        </div>
-                        <div className="px-6 py-5">
-                            <div className="flex items-center gap-3 p-4 bg-gray-800/40 rounded-xl border border-gray-700">
-                                <div className="w-10 h-10 rounded-lg bg-gray-700 shrink-0 flex items-center justify-center text-gray-500 text-xs font-bold">FF</div>
-                                <div className="flex-1 min-w-0">
+                <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+                    <div className="px-6 py-4 border-b border-gray-800">
+                        <h2 className="font-semibold">League Covered by This Plan</h2>
+                        <p className="text-gray-500 text-xs mt-0.5">Set at purchase — this plan covers all members of this league.</p>
+                    </div>
+                    <div className="px-6 py-5">
+                        <div className="flex items-center gap-3 p-4 bg-gray-800/40 rounded-xl border border-gray-700">
+                            <div className="w-10 h-10 rounded-lg bg-gray-700 shrink-0 flex items-center justify-center text-gray-500 text-xs font-bold">FF</div>
+                            <div className="flex-1 min-w-0">
+                                {sub.leagueName ? (
                                     <p className="font-semibold text-white truncate">{sub.leagueName}</p>
-                                    {sub.leagueSize && (
-                                        <p className="text-xs text-gray-500 mt-0.5">{sub.leagueSize}-team league</p>
-                                    )}
-                                </div>
-                                <span className="text-xs px-1.5 py-0.5 rounded bg-blue-900/40 text-blue-400 border border-blue-800 shrink-0">
-                                    Commissioner Paid
-                                </span>
+                                ) : (
+                                    <p className="italic text-gray-600 text-sm">League name not set — contact support</p>
+                                )}
+                                {sub.leagueSize && (
+                                    <p className="text-xs text-gray-500 mt-0.5">{sub.leagueSize}-team league</p>
+                                )}
                             </div>
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-blue-900/40 text-blue-400 border border-blue-800 shrink-0">
+                                Commissioner Paid
+                            </span>
                         </div>
                     </div>
-                )}
+                </div>
 
                 {/* Commissioner Tools */}
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
