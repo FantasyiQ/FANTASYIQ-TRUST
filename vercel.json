@@ -61,8 +61,12 @@
       "schedule": "0 9 * * 1"
     },
     {
+      "path": "/api/cron/prs-history",
+      "schedule": "0 3 * * *"
+    },
+    {
       "path": "/api/cron/dss-history",
-      "schedule": "30 3 * * *"
+      "schedule": "0 4 * * *"
     },
     {
       "path": "/api/cron/drafttype-health",
@@ -90,7 +94,7 @@
     },
     {
       "path": "/api/cron/prs-calculate",
-      "schedule": "0 3 * * *"
+      "schedule": "30 3 * * *"
     },
     {
       "path": "/api/cron/prs-lineups",
