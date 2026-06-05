@@ -88,13 +88,18 @@ function statusBadge(status: string) {
 
 function ExtensionConnector({
     onCredentials,
+    onManual,
 }: {
     onCredentials: (s2: string, swid: string) => void;
+    onManual?: () => void;
 }) {
     const [extState, setExtState] = useState<ExtensionState>('checking');
+    const [probeCount, setProbeCount] = useState(0);
 
-    // Probe for the extension on mount
+    // Probe for the extension on mount and whenever the user clicks Re-check
     useEffect(() => {
+        setExtState('checking');
+
         if (!EXTENSION_ID) {
             setExtState('not_installed');
             return;
@@ -117,7 +122,7 @@ function ExtensionConnector({
                 }
             },
         );
-    }, []);
+    }, [probeCount]);
 
     async function handleConnect() {
         setExtState('connecting');
@@ -195,8 +200,23 @@ function ExtensionConnector({
                             Chrome Web Store — coming soon
                         </span>
                     )}
-                    <p className="text-gray-600 text-xs self-center">After installing, refresh this page.</p>
+                    <button
+                        type="button"
+                        onClick={() => setProbeCount(c => c + 1)}
+                        className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-white border border-gray-700 hover:border-gray-500 px-3 py-2 rounded-lg transition"
+                    >
+                        Already installed? Re-check →
+                    </button>
                 </div>
+                {onManual && (
+                    <button
+                        type="button"
+                        onClick={onManual}
+                        className="text-xs text-gray-500 hover:text-gray-300 transition"
+                    >
+                        Skip extension — enter credentials manually instead →
+                    </button>
+                )}
                 <p className="text-gray-700 text-[10px]">The extension reads only your ESPN cookies (espn_s2 + SWID) and nothing else.</p>
             </div>
         );
@@ -448,7 +468,7 @@ export default function EspnSyncPage() {
                                 <span className="text-[#D4AF37] text-xs font-bold uppercase tracking-widest">Recommended</span>
                                 <div className="flex-1 h-px bg-gray-800" />
                             </div>
-                            <ExtensionConnector onCredentials={handleExtensionCredentials} />
+                            <ExtensionConnector onCredentials={handleExtensionCredentials} onManual={() => setShowManual(true)} />
                         </div>
 
                         {/* League ID — always visible once we have credentials */}
