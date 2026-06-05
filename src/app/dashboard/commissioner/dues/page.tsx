@@ -20,6 +20,8 @@ function statusLabel(status: string): { label: string; className: string } {
     }
 }
 
+const COMPLETED_STATUSES = new Set(['paid_out', 'season_ended']);
+
 export default async function DuesPage() {
     const session = await auth();
     if (!session?.user?.email) redirect('/sign-in');
@@ -31,39 +33,88 @@ export default async function DuesPage() {
 
     if (!user) redirect('/sign-in');
 
-    // Fetch active commissioner subscriptions (for "Set Up Tracker" cards and league metadata)
     const subs = await prisma.subscription.findMany({
         where: { userId: user.id, type: 'commissioner', status: { in: ['active', 'trialing'] } },
         select: { id: true, leagueName: true, leagueSize: true, tier: true },
     });
 
-    // Fetch ALL dues trackers for this commissioner — regardless of subscriptionId.
-    // This survives subscription recreation (onDelete: SetNull nulls subscriptionId but
-    // commissionerId always stays intact).
+    // All dues by commissionerId — survives subscription recreation (subscriptionId may be null)
     const allDues = await prisma.leagueDues.findMany({
         where: { commissionerId: user.id },
         select: {
-            id: true,
-            leagueName: true,
-            season: true,
-            buyInAmount: true,
-            teamCount: true,
-            potTotal: true,
-            status: true,
-            subscriptionId: true,
+            id: true, leagueName: true, season: true, buyInAmount: true,
+            teamCount: true, potTotal: true, status: true,
             members: { select: { duesStatus: true } },
         },
         orderBy: [{ season: 'desc' }, { createdAt: 'desc' }],
     });
 
-    // Subscriptions that have no dues tracker yet (by league name match)
-    const duesLeagueNames = new Set(allDues.map(d => d.leagueName.toLowerCase().trim()));
-    const subsWithoutDues = subs.filter(
-        s => s.leagueName && !duesLeagueNames.has(s.leagueName.toLowerCase().trim())
+    // Deduplicate: one entry per league name (highest season first, already sorted)
+    const seenLeagues = new Set<string>();
+    const primaryDues = allDues.filter(d => {
+        const key = d.leagueName.toLowerCase().trim();
+        if (seenLeagues.has(key)) return false;
+        seenLeagues.add(key);
+        return true;
+    });
+
+    const activeDues    = primaryDues.filter(d => !COMPLETED_STATUSES.has(d.status));
+    const completedDues = primaryDues.filter(d => COMPLETED_STATUSES.has(d.status));
+
+    // "Set Up Tracker" only for subscriptions with zero dues records (any season)
+    const allDuesLeagueNames = new Set(allDues.map(d => d.leagueName.toLowerCase().trim()));
+    const subsNeedingSetup   = subs.filter(
+        s => s.leagueName && !allDuesLeagueNames.has(s.leagueName.toLowerCase().trim())
     );
 
-    // If user has no commissioner plan and no dues at all, show upgrade prompt
     const hasPlan = subs.length > 0;
+
+    function DuesCard({ dues }: { dues: typeof primaryDues[0] }) {
+        const fullPot   = dues.buyInAmount * dues.teamCount;
+        const paidCount = dues.members.filter(m => m.duesStatus === 'paid').length;
+        const total     = dues.members.length;
+        const progress  = potProgress(dues.potTotal, fullPot);
+        const st        = statusLabel(dues.status);
+        const matchedSub = subs.find(
+            s => s.leagueName?.toLowerCase().trim() === dues.leagueName.toLowerCase().trim()
+        );
+
+        return (
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div>
+                        <p className="font-bold text-white text-lg">{dues.leagueName}</p>
+                        <p className="text-gray-500 text-sm mt-0.5">
+                            {dues.season} Season
+                            {matchedSub?.leagueSize ? ` · ${matchedSub.leagueSize}-Team League` : ''}
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${st.className}`}>
+                            {st.label}
+                        </span>
+                        <Link href={`/dashboard/commissioner/dues/${dues.id}`}
+                            className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-black font-bold px-4 py-2 rounded-lg text-sm transition">
+                            Open Tracker
+                        </Link>
+                    </div>
+                </div>
+                <div className="mt-5 space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-400">${dues.buyInAmount}/team · {dues.teamCount} teams</span>
+                        <span className="text-gray-300 font-semibold">${dues.potTotal.toFixed(2)} / ${fullPot.toFixed(2)}</span>
+                    </div>
+                    <div className="w-full bg-gray-800 rounded-full h-2">
+                        <div className="bg-[#D4AF37] h-2 rounded-full transition-all" style={{ width: `${progress}%` }} />
+                    </div>
+                    <div className="flex gap-4 text-xs text-gray-500">
+                        <span>{paidCount}/{total} members paid</span>
+                        <span>{progress}% of pot collected</span>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
@@ -74,7 +125,7 @@ export default async function DuesPage() {
                         ← Back to Commissioner Hub
                     </Link>
                     <h1 className="text-2xl font-bold mt-3">League Dues & Payout Tracker</h1>
-                    <p className="text-gray-400 text-sm mt-1">One tracker per commissioner league. Track buy-ins, manage payouts, and run polls.</p>
+                    <p className="text-gray-400 text-sm mt-1">Track buy-ins, manage payouts, and run polls for your commissioner leagues.</p>
                 </div>
 
                 {!hasPlan && allDues.length === 0 ? (
@@ -89,63 +140,12 @@ export default async function DuesPage() {
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        {/* Existing dues trackers — all seasons, all leagues */}
-                        {allDues.map((dues) => {
-                            const fullPot   = dues.buyInAmount * dues.teamCount;
-                            const paidCount = dues.members.filter(m => m.duesStatus === 'paid').length;
-                            const total     = dues.members.length;
-                            const progress  = potProgress(dues.potTotal, fullPot);
-                            const st        = statusLabel(dues.status);
 
-                            // Find matching subscription for league metadata
-                            const matchedSub = subs.find(
-                                s => s.leagueName?.toLowerCase().trim() === dues.leagueName.toLowerCase().trim()
-                            );
+                        {/* Active trackers */}
+                        {activeDues.map(dues => <DuesCard key={dues.id} dues={dues} />)}
 
-                            return (
-                                <div key={dues.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-                                    <div className="flex items-start justify-between gap-4 flex-wrap">
-                                        <div>
-                                            <p className="font-bold text-white text-lg">{dues.leagueName}</p>
-                                            <p className="text-gray-500 text-sm mt-0.5">
-                                                {dues.season} Season
-                                                {matchedSub?.leagueSize ? ` · ${matchedSub.leagueSize}-Team League` : ''}
-                                            </p>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${st.className}`}>
-                                                {st.label}
-                                            </span>
-                                            <Link
-                                                href={`/dashboard/commissioner/dues/${dues.id}`}
-                                                className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-black font-bold px-4 py-2 rounded-lg text-sm transition">
-                                                Open Tracker
-                                            </Link>
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-5 space-y-3">
-                                        <div className="flex items-center justify-between text-sm">
-                                            <span className="text-gray-400">${dues.buyInAmount}/team · {dues.teamCount} teams</span>
-                                            <span className="text-gray-300 font-semibold">${dues.potTotal.toFixed(2)} / ${fullPot.toFixed(2)}</span>
-                                        </div>
-                                        <div className="w-full bg-gray-800 rounded-full h-2">
-                                            <div
-                                                className="bg-[#D4AF37] h-2 rounded-full transition-all"
-                                                style={{ width: `${progress}%` }}
-                                            />
-                                        </div>
-                                        <div className="flex gap-4 text-xs text-gray-500">
-                                            <span>{paidCount}/{total} members paid</span>
-                                            <span>{progress}% of pot collected</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-
-                        {/* Subscriptions with no dues tracker yet */}
-                        {subsWithoutDues.map((sub) => (
+                        {/* New leagues that genuinely have no tracker yet */}
+                        {subsNeedingSetup.map(sub => (
                             <div key={sub.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
                                 <div className="flex items-start justify-between gap-4 flex-wrap">
                                     <div>
@@ -161,6 +161,24 @@ export default async function DuesPage() {
                                 <p className="mt-4 text-gray-500 text-sm">No tracker set up yet. Click Set Up Tracker to get started.</p>
                             </div>
                         ))}
+
+                        {activeDues.length === 0 && subsNeedingSetup.length === 0 && completedDues.length > 0 && (
+                            <p className="text-gray-500 text-sm text-center py-4">All trackers are from past seasons.</p>
+                        )}
+
+                        {/* Past seasons — collapsed */}
+                        {completedDues.length > 0 && (
+                            <details className="group">
+                                <summary className="cursor-pointer text-sm text-gray-500 hover:text-gray-300 transition list-none flex items-center gap-2 py-2">
+                                    <span className="group-open:rotate-90 transition-transform inline-block">›</span>
+                                    Past Seasons ({completedDues.length})
+                                </summary>
+                                <div className="mt-3 space-y-4">
+                                    {completedDues.map(dues => <DuesCard key={dues.id} dues={dues} />)}
+                                </div>
+                            </details>
+                        )}
+
                     </div>
                 )}
             </div>

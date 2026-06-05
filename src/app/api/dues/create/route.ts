@@ -45,19 +45,30 @@ export async function POST(request: NextRequest): Promise<Response> {
     if (subId) {
         const sub = await prisma.subscription.findUnique({
             where:  { id: subId },
-            select: { id: true, userId: true, type: true, status: true, leagueDues: { select: { id: true } } },
+            select: { id: true, userId: true, type: true, status: true },
         });
         if (!sub) return Response.json({ error: 'Subscription not found.' }, { status: 404 });
         if (sub.userId !== user.id) return Response.json({ error: 'Forbidden.' }, { status: 403 });
         if (sub.type !== 'commissioner') return Response.json({ error: 'Only commissioner plans can use the dues tracker.' }, { status: 400 });
         if (sub.status !== 'active' && sub.status !== 'trialing') return Response.json({ error: 'Subscription is not active.' }, { status: 400 });
-        if (sub.leagueDues) return Response.json({ error: 'A tracker already exists for this league.' }, { status: 400 });
+    }
+
+    // Prevent duplicates: check by commissioner + league name + season (case-insensitive)
+    const [primarySeason, ...extraSeasons] = seasons;
+    const duplicateCheck = await prisma.leagueDues.findFirst({
+        where: {
+            commissionerId: user.id,
+            leagueName:     { equals: leagueName, mode: 'insensitive' },
+            season:         primarySeason,
+        },
+        select: { id: true },
+    });
+    if (duplicateCheck) {
+        return Response.json({ error: `A tracker for ${leagueName} (${primarySeason}) already exists.` }, { status: 400 });
     }
 
     // Create one tracker per season. First season links to the subscription;
     // additional seasons are standalone (commissionerId only).
-    const [primarySeason, ...extraSeasons] = seasons;
-
     const primary = await prisma.leagueDues.create({
         data: {
             ...(subId ? { subscriptionId: subId } : {}),
