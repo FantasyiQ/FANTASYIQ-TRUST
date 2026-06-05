@@ -26,92 +26,44 @@ export default async function DuesPage() {
 
     const user = await prisma.user.findUnique({
         where: { email: session.user.email },
-        select: {
-            id: true,
-            subscriptions: {
-                where: { type: 'commissioner', status: { in: ['active', 'trialing'] } },
-                select: {
-                    id: true,
-                    leagueName: true,
-                    leagueSize: true,
-                    tier: true,
-                    leagueDues: {
-                        select: {
-                            id: true,
-                            leagueName: true,
-                            season: true,
-                            buyInAmount: true,
-                            teamCount: true,
-                            potTotal: true,
-                            status: true,
-                            members: { select: { duesStatus: true } },
-                        },
-                    },
-                },
-            },
-        },
+        select: { id: true },
     });
 
     if (!user) redirect('/sign-in');
 
-    // Re-link any orphaned dues (subscriptionId=null) to the matching active subscription.
-    // This happens when a subscription is recreated (new Stripe sub = new DB row) and the
-    // old subscriptionId was set to null via onDelete: SetNull.
-    const orphanedDues = await prisma.leagueDues.findMany({
-        where:  { commissionerId: user.id, subscriptionId: null },
-        select: { id: true, leagueName: true },
+    // Fetch active commissioner subscriptions (for "Set Up Tracker" cards and league metadata)
+    const subs = await prisma.subscription.findMany({
+        where: { userId: user.id, type: 'commissioner', status: { in: ['active', 'trialing'] } },
+        select: { id: true, leagueName: true, leagueSize: true, tier: true },
     });
 
-    if (orphanedDues.length > 0) {
-        const activeSubs = await prisma.subscription.findMany({
-            where:  { userId: user.id, type: 'commissioner', status: { in: ['active', 'trialing'] }, leagueDues: null },
-            select: { id: true, leagueName: true },
-        });
+    // Fetch ALL dues trackers for this commissioner — regardless of subscriptionId.
+    // This survives subscription recreation (onDelete: SetNull nulls subscriptionId but
+    // commissionerId always stays intact).
+    const allDues = await prisma.leagueDues.findMany({
+        where: { commissionerId: user.id },
+        select: {
+            id: true,
+            leagueName: true,
+            season: true,
+            buyInAmount: true,
+            teamCount: true,
+            potTotal: true,
+            status: true,
+            subscriptionId: true,
+            members: { select: { duesStatus: true } },
+        },
+        orderBy: [{ season: 'desc' }, { createdAt: 'desc' }],
+    });
 
-        for (const orphan of orphanedDues) {
-            const match = activeSubs.find(
-                s => s.leagueName?.toLowerCase().trim() === orphan.leagueName.toLowerCase().trim()
-            );
-            if (match) {
-                await prisma.leagueDues.update({
-                    where: { id: orphan.id },
-                    data:  { subscriptionId: match.id },
-                });
-            }
-        }
+    // Subscriptions that have no dues tracker yet (by league name match)
+    const duesLeagueNames = new Set(allDues.map(d => d.leagueName.toLowerCase().trim()));
+    const subsWithoutDues = subs.filter(
+        s => s.leagueName && !duesLeagueNames.has(s.leagueName.toLowerCase().trim())
+    );
 
-        // Re-fetch user with repaired links
-        const repaired = await prisma.user.findUnique({
-            where: { id: user.id },
-            select: {
-                id: true,
-                subscriptions: {
-                    where: { type: 'commissioner', status: { in: ['active', 'trialing'] } },
-                    select: {
-                        id: true,
-                        leagueName: true,
-                        leagueSize: true,
-                        tier: true,
-                        leagueDues: {
-                            select: {
-                                id: true,
-                                leagueName: true,
-                                season: true,
-                                buyInAmount: true,
-                                teamCount: true,
-                                potTotal: true,
-                                status: true,
-                                members: { select: { duesStatus: true } },
-                            },
-                        },
-                    },
-                },
-            },
-        });
-        var subs = repaired?.subscriptions ?? [];
-    } else {
-        var subs = user.subscriptions;
-    }
+    // If user has no commissioner plan and no dues at all, show upgrade prompt
+    const hasPlan = subs.length > 0;
 
     return (
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
@@ -125,7 +77,7 @@ export default async function DuesPage() {
                     <p className="text-gray-400 text-sm mt-1">One tracker per commissioner league. Track buy-ins, manage payouts, and run polls.</p>
                 </div>
 
-                {subs.length === 0 ? (
+                {!hasPlan && allDues.length === 0 ? (
                     <div className="bg-gray-900 border border-gray-800 rounded-2xl p-10 text-center">
                         <div className="text-4xl mb-4">🏆</div>
                         <h2 className="text-lg font-bold mb-2">No Commissioner Plans</h2>
@@ -137,60 +89,78 @@ export default async function DuesPage() {
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        {subs.map((sub) => {
-                            const dues = sub.leagueDues;
-                            const fullPot = dues ? dues.buyInAmount * dues.teamCount : 0;
-                            const paidCount = dues?.members.filter(m => m.duesStatus === 'paid').length ?? 0;
-                            const totalMembers = dues?.members.length ?? 0;
-                            const progress = dues ? potProgress(dues.potTotal, fullPot) : 0;
-                            const st = dues ? statusLabel(dues.status) : null;
+                        {/* Existing dues trackers — all seasons, all leagues */}
+                        {allDues.map((dues) => {
+                            const fullPot   = dues.buyInAmount * dues.teamCount;
+                            const paidCount = dues.members.filter(m => m.duesStatus === 'paid').length;
+                            const total     = dues.members.length;
+                            const progress  = potProgress(dues.potTotal, fullPot);
+                            const st        = statusLabel(dues.status);
+
+                            // Find matching subscription for league metadata
+                            const matchedSub = subs.find(
+                                s => s.leagueName?.toLowerCase().trim() === dues.leagueName.toLowerCase().trim()
+                            );
 
                             return (
-                                <div key={sub.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+                                <div key={dues.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
                                     <div className="flex items-start justify-between gap-4 flex-wrap">
                                         <div>
-                                            <p className="font-bold text-white text-lg">{sub.leagueName ?? 'Unnamed League'}</p>
-                                            <p className="text-gray-500 text-sm mt-0.5">{sub.leagueSize}-Team League</p>
+                                            <p className="font-bold text-white text-lg">{dues.leagueName}</p>
+                                            <p className="text-gray-500 text-sm mt-0.5">
+                                                {dues.season} Season
+                                                {matchedSub?.leagueSize ? ` · ${matchedSub.leagueSize}-Team League` : ''}
+                                            </p>
                                         </div>
                                         <div className="flex items-center gap-3">
-                                            {st && (
-                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${st.className}`}>
-                                                    {st.label}
-                                                </span>
-                                            )}
+                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${st.className}`}>
+                                                {st.label}
+                                            </span>
                                             <Link
-                                                href={dues
-                                                    ? `/dashboard/commissioner/dues/${dues.id}`
-                                                    : `/dashboard/commissioner/dues/setup?subId=${sub.id}&leagueName=${encodeURIComponent(sub.leagueName ?? '')}&leagueSize=${sub.leagueSize ?? ''}`}
+                                                href={`/dashboard/commissioner/dues/${dues.id}`}
                                                 className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-black font-bold px-4 py-2 rounded-lg text-sm transition">
-                                                {dues ? 'Open Tracker' : 'Set Up Tracker'}
+                                                Open Tracker
                                             </Link>
                                         </div>
                                     </div>
 
-                                    {dues ? (
-                                        <div className="mt-5 space-y-3">
-                                            <div className="flex items-center justify-between text-sm">
-                                                <span className="text-gray-400">{dues.season} Season · ${dues.buyInAmount}/team · {dues.teamCount} teams</span>
-                                                <span className="text-gray-300 font-semibold">${dues.potTotal.toFixed(2)} / ${fullPot.toFixed(2)}</span>
-                                            </div>
-                                            <div className="w-full bg-gray-800 rounded-full h-2">
-                                                <div
-                                                    className="bg-[#D4AF37] h-2 rounded-full transition-all"
-                                                    style={{ width: `${progress}%` }}
-                                                />
-                                            </div>
-                                            <div className="flex gap-4 text-xs text-gray-500">
-                                                <span>{paidCount}/{totalMembers} members paid</span>
-                                                <span>{progress}% of pot collected</span>
-                                            </div>
+                                    <div className="mt-5 space-y-3">
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span className="text-gray-400">${dues.buyInAmount}/team · {dues.teamCount} teams</span>
+                                            <span className="text-gray-300 font-semibold">${dues.potTotal.toFixed(2)} / ${fullPot.toFixed(2)}</span>
                                         </div>
-                                    ) : (
-                                        <p className="mt-4 text-gray-500 text-sm">No tracker set up yet. Click Set Up Tracker to get started.</p>
-                                    )}
+                                        <div className="w-full bg-gray-800 rounded-full h-2">
+                                            <div
+                                                className="bg-[#D4AF37] h-2 rounded-full transition-all"
+                                                style={{ width: `${progress}%` }}
+                                            />
+                                        </div>
+                                        <div className="flex gap-4 text-xs text-gray-500">
+                                            <span>{paidCount}/{total} members paid</span>
+                                            <span>{progress}% of pot collected</span>
+                                        </div>
+                                    </div>
                                 </div>
                             );
                         })}
+
+                        {/* Subscriptions with no dues tracker yet */}
+                        {subsWithoutDues.map((sub) => (
+                            <div key={sub.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+                                <div className="flex items-start justify-between gap-4 flex-wrap">
+                                    <div>
+                                        <p className="font-bold text-white text-lg">{sub.leagueName ?? 'Unnamed League'}</p>
+                                        <p className="text-gray-500 text-sm mt-0.5">{sub.leagueSize}-Team League</p>
+                                    </div>
+                                    <Link
+                                        href={`/dashboard/commissioner/dues/setup?subId=${sub.id}&leagueName=${encodeURIComponent(sub.leagueName ?? '')}&leagueSize=${sub.leagueSize ?? ''}`}
+                                        className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-black font-bold px-4 py-2 rounded-lg text-sm transition">
+                                        Set Up Tracker
+                                    </Link>
+                                </div>
+                                <p className="mt-4 text-gray-500 text-sm">No tracker set up yet. Click Set Up Tracker to get started.</p>
+                            </div>
+                        ))}
                     </div>
                 )}
             </div>
