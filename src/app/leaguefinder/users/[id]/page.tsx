@@ -17,7 +17,7 @@ export default async function UserProfilePage({
     const session = await auth();
     const isMe    = session?.user?.id === id;
 
-    const [user, commissionerProfile] = await Promise.all([
+    const [user, commissionerProfile, activeLeagueCount] = await Promise.all([
         prisma.user.findUnique({
             where:  { id },
             select: {
@@ -51,6 +51,9 @@ export default async function UserProfilePage({
         prisma.lFCommissioner.findUnique({
             where:   { ownerId: id },
             include: { leagues: { select: { id: true, name: true } } },
+        }),
+        prisma.league.count({
+            where: { userId: id, isHistorical: false },
         }),
     ]);
 
@@ -173,16 +176,20 @@ export default async function UserProfilePage({
                                 <PRSBar label="Behavior"            pts={user.prsRecord?.behaviorScore     ?? 0} max={100} detail="conduct & rule adherence" />
                             </div>
                         </div>
-                        {!user.prsRecord && (
-                            <p className="text-[10px] text-gray-500">
-                                Score updates nightly once your connected leagues are synced.
-                            </p>
-                        )}
-                        {user.prsRecord && (
-                            <p className="text-[10px] text-gray-600">
-                                Score updates nightly based on your activity across connected leagues.
-                            </p>
-                        )}
+                        <div className="flex items-center justify-between">
+                            {activeLeagueCount > 0 ? (
+                                <p className="text-[10px] text-gray-500">
+                                    <span className="text-gray-300 font-semibold">{activeLeagueCount}</span> active league{activeLeagueCount !== 1 ? 's' : ''} tracked
+                                </p>
+                            ) : (
+                                <p className="text-[10px] text-gray-600">No synced leagues yet</p>
+                            )}
+                            {!user.prsRecord ? (
+                                <p className="text-[10px] text-gray-600">Score updates nightly once leagues are synced</p>
+                            ) : (
+                                <p className="text-[10px] text-gray-600">Updates nightly</p>
+                            )}
+                        </div>
                     </div>
                 </section>
 
