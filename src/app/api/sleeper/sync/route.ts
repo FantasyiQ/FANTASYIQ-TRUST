@@ -24,9 +24,16 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     try {
         const nflState = await getNflState();
-        const userLeagues = await getSleeperLeagues(sleeperUserId, nflState.season);
+        const [userLeagues, exclusions] = await Promise.all([
+            getSleeperLeagues(sleeperUserId, nflState.season),
+            prisma.syncExclusion.findMany({
+                where: { userId, platform: 'sleeper' },
+                select: { leagueId: true },
+            }),
+        ]);
         const validIds = new Set(userLeagues.map((l) => l.league_id));
-        const toSync = leagues.filter((l) => validIds.has(l.league_id));
+        const excludedIds = new Set(exclusions.map((e) => e.leagueId));
+        const toSync = leagues.filter((l) => validIds.has(l.league_id) && !excludedIds.has(l.league_id));
         if (toSync.length === 0) return Response.json({ error: 'No valid leagues to sync' }, { status: 400 });
 
         const sharedFields = (league: SleeperLeague) => {

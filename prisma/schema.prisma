@@ -84,6 +84,25 @@ model User {
     // Auth tokens
     passwordResetTokens      PasswordResetToken[]
     emailVerificationTokens  EmailVerificationToken[]
+
+    syncExclusions    SyncExclusion[]
+}
+
+// ── Sync Exclusions ──────────────────────────────────────────────────────────
+// Records leagues the user has explicitly unsynced so they are never
+// automatically recreated by a future re-sync from the sync page.
+
+model SyncExclusion {
+    id        String   @id @default(cuid())
+    userId    String
+    platform  String   // "sleeper" | "espn" | "yahoo"
+    leagueId  String   // external platform league ID
+    createdAt DateTime @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, platform, leagueId])
+    @@index([userId])
 }
 
 // ── Internal Data System (IDS) ───────────────────────────────────────────────

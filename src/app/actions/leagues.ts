@@ -8,15 +8,29 @@ export async function unsyncLeague(leagueId: string, platform = 'sleeper'): Prom
     const session = await auth();
     if (!session?.user?.id) redirect('/sign-in');
 
-    await prisma.league.delete({
-        where: {
-            userId_platform_leagueId: {
-                userId: session.user.id,
-                platform,
-                leagueId,
+    await prisma.$transaction([
+        prisma.league.delete({
+            where: {
+                userId_platform_leagueId: {
+                    userId: session.user.id,
+                    platform,
+                    leagueId,
+                },
             },
-        },
-    });
+        }),
+        // Record the exclusion so re-sync never recreates this league
+        prisma.syncExclusion.upsert({
+            where: {
+                userId_platform_leagueId: {
+                    userId: session.user.id,
+                    platform,
+                    leagueId,
+                },
+            },
+            create: { userId: session.user.id, platform, leagueId },
+            update: {},
+        }),
+    ]);
 
     redirect('/dashboard');
 }
