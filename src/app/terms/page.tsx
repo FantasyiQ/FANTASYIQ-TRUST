@@ -15,7 +15,7 @@ export default function TermsOfServicePage() {
                 <div className="space-y-2 border-b border-gray-800 pb-8">
                     <p className="text-[10px] font-bold tracking-widest text-[#D4AF37] uppercase">Legal</p>
                     <h1 className="text-3xl font-bold text-white">Terms of Service</h1>
-                    <p className="text-gray-500 text-sm">Last updated: June 4, 2026</p>
+                    <p className="text-gray-500 text-sm">Last updated: June 6, 2026</p>
                 </div>
 
                 <LegalSection title="1. Acceptance of Terms">
@@ -135,15 +135,15 @@ export default function TermsOfServicePage() {
 
                 <LegalSection title="9. Limitation of Liability">
                     <p>
-                        TO THE FULLEST EXTENT PERMITTED BY APPLICABLE LAW, FANTASYIQ AND ITS OFFICERS, DIRECTORS, EMPLOYEES,
+                        TO THE FULLEST EXTENT PERMITTED BY APPLICABLE LAW, FANTASYIQ TRUST AND ITS OFFICERS, DIRECTORS, EMPLOYEES,
                         AGENTS, AND LICENSORS SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, PUNITIVE,
                         OR EXEMPLARY DAMAGES, INCLUDING WITHOUT LIMITATION DAMAGES FOR LOSS OF PROFITS, REVENUE, DATA, GOODWILL,
                         OR OTHER INTANGIBLE LOSSES, ARISING OUT OF OR RELATED TO YOUR USE OF OR INABILITY TO USE THE SERVICE,
-                        EVEN IF FANTASYIQ HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+                        EVEN IF FANTASYIQ TRUST HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
                     </p>
                     <p>
-                        IN NO EVENT SHALL FANTASYIQ&apos;S TOTAL AGGREGATE LIABILITY TO YOU FOR ALL CLAIMS ARISING OUT OF OR RELATED
-                        TO THESE TERMS OR YOUR USE OF THE SERVICE EXCEED THE GREATER OF (A) THE AMOUNT YOU PAID TO FANTASYIQ IN
+                        IN NO EVENT SHALL FANTASYIQ TRUST&apos;S TOTAL AGGREGATE LIABILITY TO YOU FOR ALL CLAIMS ARISING OUT OF OR RELATED
+                        TO THESE TERMS OR YOUR USE OF THE SERVICE EXCEED THE GREATER OF (A) THE AMOUNT YOU PAID TO FANTASYIQ TRUST IN
                         THE TWELVE MONTHS PRECEDING THE CLAIM OR (B) ONE HUNDRED DOLLARS (USD $100.00).
                     </p>
                     <p>
@@ -170,7 +170,7 @@ export default function TermsOfServicePage() {
                     <p>
                         You may terminate your account at any time by contacting us or by using the account deletion feature in your
                         account settings. Upon termination, your right to use the Service ceases immediately. Sections 6, 7, 8, 9,
-                        10, 14, and 15 of these Terms survive termination.
+                        10, 13, 14, 15, and 16 of these Terms survive termination.
                     </p>
                 </LegalSection>
 
@@ -210,7 +210,30 @@ export default function TermsOfServicePage() {
                     </p>
                 </LegalSection>
 
-                <LegalSection title="14. Governing Law and Dispute Resolution">
+                <LegalSection title="14. League Finder and Public Profiles">
+                    <p>
+                        FantasyiQ Trust operates a <strong className="text-white">League Finder</strong> feature that allows commissioners
+                        to publicly list their leagues and register commissioner profiles. By listing a league or registering a commissioner
+                        profile in the League Finder, you acknowledge and agree that:
+                    </p>
+                    <ul>
+                        <li>Your commissioner display name, league name, and league details will be visible to all visitors of the Service, including unauthenticated users</li>
+                        <li>Your <strong className="text-white">Player Reliability Score (PRS)</strong> — a score derived from your in-platform activity and commissioner ratings — may be displayed alongside your public profile</li>
+                        <li>Other users may submit ratings and reviews of your commissioner profile, which will be publicly visible</li>
+                        <li>Users may submit join requests to your league, which you may accept or decline at your sole discretion</li>
+                    </ul>
+                    <p className="mt-2">
+                        FantasyiQ Trust does not guarantee the accuracy of user-submitted ratings or reviews. If you believe a rating
+                        or review violates these Terms, contact us using the information in Section 18.
+                    </p>
+                    <p>
+                        You may remove your league or commissioner profile from the League Finder at any time through your account settings.
+                        Removal does not delete reviews or ratings that have already been submitted; those remain as part of the platform&apos;s
+                        integrity record.
+                    </p>
+                </LegalSection>
+
+                <LegalSection title="15. Governing Law and Dispute Resolution">
                     <p>
                         These Terms are governed by and construed in accordance with the laws of the State of Florida, United States,
                         without regard to its conflict-of-law principles. Any dispute arising out of or related to these Terms or your
@@ -223,7 +246,7 @@ export default function TermsOfServicePage() {
                     </p>
                 </LegalSection>
 
-                <LegalSection title="15. Changes to These Terms">
+                <LegalSection title="16. Changes to These Terms">
                     <p>
                         We may modify these Terms at any time by posting the revised Terms on the Service and updating the
                         &ldquo;Last updated&rdquo; date. For material changes, we will provide additional notice. Your continued use of the
@@ -232,7 +255,7 @@ export default function TermsOfServicePage() {
                     </p>
                 </LegalSection>
 
-                <LegalSection title="16. Miscellaneous">
+                <LegalSection title="17. Miscellaneous">
                     <p>
                         These Terms, together with our <Link href="/privacy" className="text-[#D4AF37] hover:underline">Privacy Policy</Link> and{' '}
                         <Link href="/cookies" className="text-[#D4AF37] hover:underline">Cookie Notice</Link>, constitute the entire agreement
@@ -243,7 +266,7 @@ export default function TermsOfServicePage() {
                     </p>
                 </LegalSection>
 
-                <LegalSection title="17. Contact">
+                <LegalSection title="18. Contact">
                     <p>If you have questions about these Terms, please contact us at:</p>
                     <div className="mt-3 bg-gray-900 border border-gray-800 rounded-xl px-5 py-4 text-sm text-gray-300 space-y-0.5">
                         <p className="font-semibold text-white">FantasyiQ Trust</p>

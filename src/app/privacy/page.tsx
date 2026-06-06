@@ -15,7 +15,7 @@ export default function PrivacyPolicyPage() {
                 <div className="space-y-2 border-b border-gray-800 pb-8">
                     <p className="text-[10px] font-bold tracking-widest text-[#D4AF37] uppercase">Legal</p>
                     <h1 className="text-3xl font-bold text-white">Privacy Policy</h1>
-                    <p className="text-gray-500 text-sm">Last updated: June 2, 2026</p>
+                    <p className="text-gray-500 text-sm">Last updated: June 6, 2026</p>
                 </div>
 
                 <LegalSection title="1. Introduction">
@@ -55,25 +55,54 @@ export default function PrivacyPolicyPage() {
                             the name and email address associated with your Google account. We do not store plain-text passwords.
                         </p>
                     </Subsection>
-                    <Subsection title="3.3 Payment and Billing Data">
+                    <Subsection title="3.3 Platform Authentication Credentials">
+                        <p>
+                            To enable ongoing sync with certain fantasy platforms, we store platform-specific authentication tokens in
+                            our database:
+                        </p>
+                        <ul>
+                            <li>
+                                <strong className="text-white">ESPN:</strong> When you connect an ESPN fantasy league using our browser
+                                extension, the extension reads your ESPN session cookies (<code className="text-gray-300 bg-gray-800 px-1 rounded">espn_s2</code> and{' '}
+                                <code className="text-gray-300 bg-gray-800 px-1 rounded">SWID</code>) from your browser and transmits them
+                                to our server over an encrypted connection. These tokens are stored in our database solely to make API
+                                calls to ESPN on your behalf and to re-sync your league data. They are never used for any other purpose.
+                                You can revoke access at any time by disconnecting your ESPN league from your dashboard.
+                            </li>
+                            <li>
+                                <strong className="text-white">Yahoo:</strong> When you connect a Yahoo Fantasy league via OAuth, we
+                                receive and store a Yahoo OAuth access token. This token is stored solely to make API calls to Yahoo
+                                Fantasy on your behalf. You can revoke access at any time by disconnecting your Yahoo league from your
+                                dashboard or from your Yahoo account&apos;s connected apps settings.
+                            </li>
+                        </ul>
+                    </Subsection>
+                    <Subsection title="3.4 Payment and Billing Data">
                         <p>
                             Subscription payments are processed by Stripe, Inc. FantasyiQ Trust does not store your payment card details.
                             We do store subscription status, plan tier, and Stripe customer and subscription identifiers so we can
                             manage your access and send billing-related notifications.
                         </p>
                     </Subsection>
-                    <Subsection title="3.4 Usage and Analytics Data">
+                    <Subsection title="3.5 Player Reliability Score (PRS)">
                         <p>
-                            We collect anonymised usage data (pages visited, feature interactions, session duration) via
-                            privacy-respecting analytics tools. This data is aggregated and cannot reasonably be used to
-                            identify you individually.
+                            FantasyiQ Trust computes a <strong className="text-white">Player Reliability Score (PRS)</strong> for each
+                            account based on observable in-platform signals: season participation, roster retention, league engagement,
+                            and commissioner ratings you receive. This score is updated periodically.
+                        </p>
+                        <p>
+                            <strong className="text-white">Your PRS may be publicly visible.</strong> If you or a commissioner registers
+                            a league or commissioner profile in the League Finder, your PRS score may be displayed on your public
+                            commissioner profile and on league listing cards visible to all visitors. If you do not use the League
+                            Finder, your PRS is not publicly exposed.
                         </p>
                     </Subsection>
-                    <Subsection title="3.5 Log Data">
+                    <Subsection title="3.6 Log Data">
                         <p>
                             Our hosting infrastructure automatically records standard server log data (IP address, browser type,
                             referring URL, timestamp) for security and operational purposes. Log data is retained for no more
-                            than 30 days and is not linked to individual accounts.
+                            than 30 days. We also use IP addresses for rate limiting (processed via Upstash Redis); these are
+                            not linked to individual accounts and are not retained beyond the sliding rate-limit window.
                         </p>
                     </Subsection>
                 </LegalSection>
@@ -83,7 +112,6 @@ export default function PrivacyPolicyPage() {
                     <ul>
                         <li><strong className="text-white">Authentication:</strong> Session cookies keep you signed in across page loads.</li>
                         <li><strong className="text-white">Session Management:</strong> Short-lived tokens enable secure server interactions.</li>
-                        <li><strong className="text-white">Analytics:</strong> First-party or privacy-preserving analytics scripts measure aggregate usage patterns.</li>
                     </ul>
                     <p className="mt-3">
                         We do <strong className="text-white">not</strong> use advertising cookies, cross-site tracking pixels, or any cookie
@@ -97,6 +125,7 @@ export default function PrivacyPolicyPage() {
                     <ul>
                         <li>Provide, operate, and improve the Service</li>
                         <li>Compute analytics, projections, and intelligence features for your leagues</li>
+                        <li>Compute and display your Player Reliability Score (PRS)</li>
                         <li>Authenticate your account and maintain security</li>
                         <li>Send transactional and service emails (dues reminders, payment confirmations, subscription updates)</li>
                         <li>Process subscription payments and manage billing through Stripe</li>
@@ -115,7 +144,8 @@ export default function PrivacyPolicyPage() {
                         <li>
                             <strong className="text-white">Service Providers:</strong> We engage a small number of infrastructure
                             providers who process data solely on our behalf, including: Vercel (hosting), Neon (database), Stripe
-                            (payment processing), Pusher (real-time notifications), and Sentry (error monitoring). Each provider
+                            (payment processing), Resend (transactional email delivery), Pusher (real-time notifications),
+                            Upstash (rate limiting — processes IP addresses only), and Sentry (error monitoring). Each provider
                             is bound by a data-processing agreement or equivalent contractual obligation.
                         </li>
                         <li>
@@ -137,11 +167,14 @@ export default function PrivacyPolicyPage() {
                     </p>
                     <ul>
                         <li><strong className="text-white">Sleeper</strong> — fantasy league data sync</li>
-                        <li><strong className="text-white">ESPN</strong> — fantasy league data sync</li>
-                        <li><strong className="text-white">Yahoo Sports</strong> — fantasy league data sync</li>
+                        <li><strong className="text-white">ESPN</strong> — fantasy league data sync (see §3.3 for credential handling)</li>
+                        <li><strong className="text-white">Yahoo Sports</strong> — fantasy league data sync (see §3.3 for credential handling)</li>
                         <li><strong className="text-white">NFL.com</strong> — fantasy league data sync</li>
+                        <li><strong className="text-white">Google</strong> — optional sign-in via Google OAuth</li>
                         <li><strong className="text-white">Stripe</strong> — payment processing; Stripe&apos;s privacy policy governs how it handles your payment information</li>
+                        <li><strong className="text-white">Resend</strong> — transactional email delivery; your email address is transmitted to Resend solely to send emails you request or that are required for the Service</li>
                         <li><strong className="text-white">Pusher</strong> — real-time in-app notifications</li>
+                        <li><strong className="text-white">Upstash</strong> — rate limiting; IP addresses are processed transiently and not retained</li>
                         <li><strong className="text-white">Sentry</strong> — error and performance monitoring; error reports may include anonymised request context</li>
                     </ul>
                     <p className="mt-3">
@@ -150,15 +183,38 @@ export default function PrivacyPolicyPage() {
                     </p>
                 </LegalSection>
 
-                <LegalSection title="8. Data Retention">
+                <LegalSection title="8. Browser Extension">
+                    <p>
+                        FantasyiQ Trust publishes the <strong className="text-white">FiQ ESPN Connector</strong> browser extension
+                        for Google Chrome, available on the Chrome Web Store. This extension:
+                    </p>
+                    <ul>
+                        <li>Reads only the <code className="text-gray-300 bg-gray-800 px-1 rounded">espn_s2</code> and{' '}
+                            <code className="text-gray-300 bg-gray-800 px-1 rounded">SWID</code> cookies set by ESPN on the{' '}
+                            <code className="text-gray-300 bg-gray-800 px-1 rounded">espn.com</code> domain</li>
+                        <li>Transmits those values to FantasyiQ Trust servers over an encrypted connection when you initiate an ESPN league sync</li>
+                        <li>Does <strong className="text-white">not</strong> read any other cookies, browser history, keystrokes, or any other data</li>
+                        <li>Does <strong className="text-white">not</strong> run in the background or transmit any data without your explicit action</li>
+                    </ul>
+                    <p className="mt-3">
+                        The extension is open for review in the Chrome Web Store. You may uninstall it at any time from your browser&apos;s
+                        extension manager without affecting your FantasyiQ Trust account.
+                    </p>
+                </LegalSection>
+
+                <LegalSection title="9. Data Retention">
                     <p>
                         We retain fantasy league data and account information for as long as your account remains active or as
                         needed to provide the Service. If you delete your account, we will remove your data within 30 days,
                         except where retention is required by law or for legitimate security purposes.
                     </p>
+                    <p>
+                        Platform authentication credentials (ESPN session cookies, Yahoo OAuth tokens) are deleted when you
+                        disconnect the associated league or delete your account.
+                    </p>
                 </LegalSection>
 
-                <LegalSection title="9. Your Rights and Data Deletion">
+                <LegalSection title="10. Your Rights and Data Deletion">
                     <p>Depending on your jurisdiction, you may have the right to:</p>
                     <ul>
                         <li>Access the data we hold about you</li>
@@ -177,12 +233,12 @@ export default function PrivacyPolicyPage() {
                     </ul>
                     <p className="mt-3">
                         For any rights not covered by the above self-service tools, or for questions about your data, contact us
-                        using the information in Section 13. We will respond within 30 days. We may need to verify your identity
+                        using the information in Section 14. We will respond within 30 days. We may need to verify your identity
                         before fulfilling a request.
                     </p>
                 </LegalSection>
 
-                <LegalSection title="10. Age Restriction">
+                <LegalSection title="11. Age Restriction">
                     <p>
                         FantasyiQ Trust is intended for users who are <strong className="text-white">at least 18 years of age</strong>.
                         Because the Service involves paid subscriptions, league dues, and financial transactions, use by minors is
@@ -190,12 +246,12 @@ export default function PrivacyPolicyPage() {
                     </p>
                     <p>
                         We do not knowingly collect or process personal data from individuals under 18. If you believe a minor has
-                        created an account, please contact us immediately using the information in Section 13 and we will promptly
+                        created an account, please contact us immediately using the information in Section 14 and we will promptly
                         close the account and delete associated data.
                     </p>
                 </LegalSection>
 
-                <LegalSection title="11. Security">
+                <LegalSection title="12. Security">
                     <p>
                         We implement commercially reasonable technical and organizational measures to protect data against
                         unauthorized access, alteration, disclosure, or destruction. These include encrypted data transmission
@@ -204,7 +260,7 @@ export default function PrivacyPolicyPage() {
                     </p>
                 </LegalSection>
 
-                <LegalSection title="12. Changes to This Policy">
+                <LegalSection title="13. Changes to This Policy">
                     <p>
                         We may update this Privacy Policy from time to time. When we do, we will revise the &ldquo;Last updated&rdquo; date
                         at the top of this page. For material changes, we will provide additional notice (such as a notice on
@@ -213,7 +269,7 @@ export default function PrivacyPolicyPage() {
                     </p>
                 </LegalSection>
 
-                <LegalSection title="13. Contact">
+                <LegalSection title="14. Contact">
                     <p>
                         If you have questions about this Privacy Policy or wish to exercise your data rights, please contact us at:
                     </p>

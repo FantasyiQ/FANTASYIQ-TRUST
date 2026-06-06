@@ -15,7 +15,7 @@ export default function CookieNoticePage() {
                 <div className="space-y-2 border-b border-gray-800 pb-8">
                     <p className="text-[10px] font-bold tracking-widest text-[#D4AF37] uppercase">Legal</p>
                     <h1 className="text-3xl font-bold text-white">Cookie Notice</h1>
-                    <p className="text-gray-500 text-sm">Last updated: May 21, 2026</p>
+                    <p className="text-gray-500 text-sm">Last updated: June 6, 2026</p>
                 </div>
 
                 <LegalSection title="1. What Are Cookies">
@@ -47,12 +47,6 @@ export default function CookieNoticePage() {
                             duration="Session"
                             purpose="Short-lived tokens that enable secure interactions between your browser and our servers. These expire when you close your browser or after a short idle period."
                         />
-                        <CookieRow
-                            name="Analytics"
-                            type="Analytics"
-                            duration="Up to 2 years"
-                            purpose="Aggregate, anonymised data about pages visited, feature interactions, and session duration — collected via privacy-respecting analytics tooling (such as Vercel Analytics). This data cannot reasonably be used to identify you individually and is used solely to understand how the Service is used and to improve it."
-                        />
                     </div>
                 </LegalSection>
 
@@ -68,24 +62,34 @@ export default function CookieNoticePage() {
 
                 <LegalSection title="4. Third-Party Cookies">
                     <p>
-                        FantasyiQ Trust does not knowingly load third-party advertising or analytics scripts that set their own cookies
-                        on your device. Any analytics tooling we use is configured to operate in a privacy-preserving, first-party
-                        context. We do not control cookies set directly by Sleeper, ESPN, NFL Fantasy, Yahoo Fantasy, or other third-party platforms you
+                        FantasyiQ Trust does not load third-party advertising or analytics scripts that set their own cookies on your device.
+                        We do not control cookies set directly by Sleeper, ESPN, NFL Fantasy, Yahoo Fantasy, or other third-party platforms you
                         access independently; please refer to those platforms&apos; own cookie notices for details.
                     </p>
                 </LegalSection>
 
-                <LegalSection title="5. Consent">
+                <LegalSection title="5. Browser Extension">
                     <p>
-                        By continuing to use FantasyiQ Trust after this notice has been made available to you, you consent to the
-                        placement of the cookies described in Section 2. Because all cookies we use are either strictly necessary
-                        for the Service to function or are privacy-respecting analytics with no cross-site tracking, we do not
-                        display a cookie-consent banner. If you do not consent to these cookies, please discontinue use of the
-                        Service.
+                        The <strong className="text-white">FiQ ESPN Connector</strong> browser extension does not set cookies itself.
+                        When you initiate an ESPN league sync, the extension reads the{' '}
+                        <code className="text-gray-300 bg-gray-800 px-1 rounded">espn_s2</code> and{' '}
+                        <code className="text-gray-300 bg-gray-800 px-1 rounded">SWID</code> cookies set by ESPN on the{' '}
+                        <code className="text-gray-300 bg-gray-800 px-1 rounded">espn.com</code> domain and transmits them to FantasyiQ Trust
+                        servers over an encrypted connection solely to authenticate your ESPN league sync. These values are not stored in
+                        your browser by us; they are stored in our database as described in the Privacy Policy (§3.3).
                     </p>
                 </LegalSection>
 
-                <LegalSection title="6. Managing and Disabling Cookies">
+                <LegalSection title="6. Consent">
+                    <p>
+                        By continuing to use FantasyiQ Trust after this notice has been made available to you, you consent to the
+                        placement of the cookies described in Section 2. Because all cookies we use are strictly necessary for the
+                        Service to function, we do not display a cookie-consent banner. If you do not consent to these cookies,
+                        please discontinue use of the Service.
+                    </p>
+                </LegalSection>
+
+                <LegalSection title="7. Managing and Disabling Cookies">
                     <p>
                         You can control cookies through your browser settings. Most browsers allow you to:
                     </p>
@@ -110,7 +114,7 @@ export default function CookieNoticePage() {
                     </p>
                 </LegalSection>
 
-                <LegalSection title="7. Changes to This Notice">
+                <LegalSection title="8. Changes to This Notice">
                     <p>
                         We may update this Cookie Notice from time to time to reflect changes in the cookies we use or applicable
                         law. When we do, we will revise the &ldquo;Last updated&rdquo; date at the top of this page. Your continued use of the
@@ -118,7 +122,7 @@ export default function CookieNoticePage() {
                     </p>
                 </LegalSection>
 
-                <LegalSection title="8. Contact">
+                <LegalSection title="9. Contact">
                     <p>
                         If you have questions about our use of cookies or this notice, please contact us at:
                     </p>
