@@ -40,7 +40,7 @@ export async function getLeagueData(id: string): Promise<LeagueData> {
     // (or if the initial sync pre-dated this field) the DB may still be null.
     // Rather than forcing the commissioner to manually save every time, we fetch
     // from Sleeper once and write the values so the card shows "Configured".
-    if (league.platform !== 'espn' && (league.playoffWeekStart === null || league.champWeek === null)) {
+    if (league.platform === 'sleeper' && (league.playoffWeekStart === null || league.champWeek === null)) {
         try {
             const sleeperLeague   = await getLeague(league.leagueId);
             const playoffWeekStart = sleeperLeague.settings?.playoff_week_start ?? null;
@@ -61,13 +61,13 @@ export async function getLeagueData(id: string): Promise<LeagueData> {
         } catch { /* Sleeper unreachable — leave as null, card stays editable */ }
     }
 
-    // Commissioner check: ESPN leagues gate on having a commissioner plan assigned.
-    // (league.userId === session.user.id is always true by line 36, so we need
-    // a plan-level signal instead.) Sleeper verifies via the Sleeper API.
+    // Commissioner check.
+    // Sleeper: verify via the Sleeper API (is_owner field on league members).
+    // ESPN / NFL / Yahoo: no external API — gate on having a commissioner plan assigned.
+    // (league.userId === session.user.id is always true by line 36, so ownership alone
+    // is not a reliable signal; we need the plan-level assignment instead.)
     let is_owner = false;
-    if (league.platform === 'espn') {
-        is_owner = league.assignedPlanType === 'commissioner';
-    } else {
+    if (league.platform === 'sleeper') {
         const mySleeperUserId = dbUser?.sleeperUserId ?? league.sleeperUserId ?? null;
         try {
             const members = await getLeagueUsers(league.leagueId);
@@ -77,6 +77,9 @@ export async function getLeagueData(id: string): Promise<LeagueData> {
                 m => m.is_owner && String(m.user_id).trim() === String(mySleeperUserId).trim()
             );
         } catch { /* Sleeper unreachable */ }
+    } else {
+        // ESPN, NFL Fantasy, Yahoo
+        is_owner = league.assignedPlanType === 'commissioner';
     }
 
     const dues = await prisma.leagueDues.findFirst({
