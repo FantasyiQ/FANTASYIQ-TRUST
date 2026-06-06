@@ -10,7 +10,7 @@ export type LeagueData = {
         leagueName:       string;
         season:           string;
         leagueId:         string;
-        platform:         'sleeper';
+        platform:         string;
         is_owner:         boolean;
         playoffWeekStart: number | null;
         champWeek:        number | null;
@@ -25,7 +25,7 @@ export async function getLeagueData(id: string): Promise<LeagueData> {
     const [league, dbUser] = await Promise.all([
         prisma.league.findUnique({
             where:  { id },
-            select: { id: true, userId: true, leagueId: true, leagueName: true, season: true, sleeperUserId: true, platform: true, playoffWeekStart: true, champWeek: true },
+            select: { id: true, userId: true, leagueId: true, leagueName: true, season: true, sleeperUserId: true, platform: true, playoffWeekStart: true, champWeek: true, assignedPlanType: true },
         }),
         prisma.user.findUnique({
             where:  { id: session.user.id },
@@ -61,10 +61,12 @@ export async function getLeagueData(id: string): Promise<LeagueData> {
         } catch { /* Sleeper unreachable — leave as null, card stays editable */ }
     }
 
-    // Commissioner check: ESPN leagues use DB ownership; Sleeper uses API
+    // Commissioner check: ESPN leagues gate on having a commissioner plan assigned.
+    // (league.userId === session.user.id is always true by line 36, so we need
+    // a plan-level signal instead.) Sleeper verifies via the Sleeper API.
     let is_owner = false;
     if (league.platform === 'espn') {
-        is_owner = league.userId === session.user.id;
+        is_owner = league.assignedPlanType === 'commissioner';
     } else {
         const mySleeperUserId = dbUser?.sleeperUserId ?? league.sleeperUserId ?? null;
         try {
@@ -88,7 +90,7 @@ export async function getLeagueData(id: string): Promise<LeagueData> {
             leagueName:       league.leagueName,
             season:           league.season,
             leagueId:         league.leagueId,
-            platform:         'sleeper',
+            platform:         league.platform,
             is_owner,
             playoffWeekStart: league.playoffWeekStart ?? null,
             champWeek:        league.champWeek        ?? null,
