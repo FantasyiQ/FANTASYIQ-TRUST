@@ -185,7 +185,7 @@ function ExtensionConnector({
                 <div className="flex flex-col sm:flex-row items-start gap-2 pt-1">
                     {EXTENSION_ID ? (
                         <a
-                            href={`https://chrome.google.com/webstore/detail/${EXTENSION_ID}`}
+                            href={`https://chromewebstore.google.com/detail/fiq-espn-connector/${EXTENSION_ID}`}
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex items-center gap-2 bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-4 py-2 rounded-lg transition text-sm"
