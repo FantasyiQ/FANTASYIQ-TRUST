@@ -232,8 +232,8 @@ export const FAQ_ITEMS: FAQItem[] = [
         id:       'payout-process',
         category: 'dues-payouts',
         question: 'How do payouts work?',
-        answer:   'Once you approve a payout proposal, FiQ generates a secure payment link for each winner. Winners receive a notification with their link and can claim their payout directly. The funds come from your league\'s payment method — FiQ never holds money.\n\nYou can track payout status (sent, claimed, pending) from the Payouts dashboard.',
-        tags:     ['payout', 'winners', 'payment', 'link', 'claim', 'funds'],
+        answer:   'Once you approve a payout proposal, FiQ records the winner assignments and notifies each winner that their payout has been approved. You then arrange payment directly to your winners — cash, Venmo, PayPal, bank transfer, whatever works for your league.\n\nFiQ tracks the full payout record so there\'s always an auditable history. You can mark each payout as paid from your Payouts dashboard once you\'ve sent the money.',
+        tags:     ['payout', 'winners', 'payment', 'approve', 'funds'],
     },
     {
         id:       'dues-fees',

@@ -1,12 +1,9 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { stripe } from '@/lib/stripe';
+import { notify } from '@/lib/notifications/service';
+import { NotificationType } from '@/lib/notifications/types';
 import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
-
-function appUrl() {
-    return (() => { const u = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL; if (!u) throw new Error('NEXTAUTH_URL is not configured'); return u; })();
-}
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ duesId: string }> }): Promise<Response> {
 
@@ -16,7 +13,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const session = await auth();
     if (!session?.user?.email) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const user = await prisma.user.findUnique({ where: { email: session.user.email }, select: { id: true, stripeCustomerId: true } });
+    const user = await prisma.user.findUnique({ where: { email: session.user.email }, select: { id: true } });
     if (!user) return Response.json({ error: 'User not found.' }, { status: 404 });
 
     const dues = await prisma.leagueDues.findUnique({
@@ -54,51 +51,36 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         return Response.json({ error: 'Invalid member assignment.' }, { status: 400 });
     }
 
-    // Batch update all item member assignments in a single transaction
-    await prisma.$transaction(
-        Object.entries(assignments).map(([itemId, memberId]) =>
-            prisma.payoutProposalItem.update({ where: { id: itemId }, data: { memberId } })
-        )
-    );
-
-    // Create Stripe payment links for each winner
+    // Approve each item: record the winner assignment and mark approved
     for (const item of proposal.items) {
         const memberId = assignments[item.id];
         if (!memberId) continue;
 
         const member = await prisma.duesMember.findUnique({
             where: { id: memberId },
-            select: { email: true, displayName: true },
+            select: { displayName: true, userId: true },
         });
 
-        try {
-            const paymentLink = await stripe.paymentLinks.create({
-                line_items: [{
-                    quantity: 1,
-                    price_data: {
-                        currency: 'usd',
-                        unit_amount: Math.round(item.amount * 100),
-                        product_data: {
-                            name: `${item.payoutSpot.label} Payout — ${dues.leagueName}`,
-                            description: `Congratulations ${member?.displayName ?? ''}! Claim your winnings.`,
-                        },
-                    },
-                }],
-                after_completion: {
-                    type: 'redirect',
-                    redirect: { url: `${appUrl()}/api/dues/payout/claimed?itemId=${item.id}` },
-                },
-            });
+        await prisma.payoutProposalItem.update({
+            where: { id: item.id },
+            data: { memberId, status: 'approved' },
+        });
 
-            await prisma.payoutProposalItem.update({
-                where: { id: item.id },
+        // Notify the winner if they have a linked FiQ account
+        if (member?.userId) {
+            notify({
+                userId: member.userId,
+                type:   NotificationType.PAYOUTS_RELEASED,
+                title:  `Payout approved — ${dues.leagueName}`,
+                body:   `Your ${item.payoutSpot.label} payout of $${item.amount} for ${dues.leagueName} has been approved. Your commissioner will arrange payment.`,
                 data: {
-                    memberId,
-                    stripePaymentLinkId: paymentLink.id,
-                    status: 'payment_link_sent',
+                    leagueId:   duesId,
+                    leagueName: dues.leagueName,
+                    duesId,
+                    amount:     item.amount,
                 },
-            });
-        } catch { /* non-fatal — link can be resent */ }
+            }).catch(err => console.error('[approve] notify winner failed', err));
+        }
     }
 
     await prisma.$transaction([
