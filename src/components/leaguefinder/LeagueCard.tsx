@@ -27,6 +27,7 @@ interface Props {
         displayName:  string;
         avgRating:    number;
         reviewsCount: number;
+        prsScore:     number | null;
     };
 }
 
@@ -122,7 +123,7 @@ export default function LeagueCard({
                 <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-[10px] font-bold text-white shrink-0">
                     {commissioner.displayName.charAt(0).toUpperCase()}
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                     <Link
                         href={`/leaguefinder/commissioners/${commissioner.id}`}
                         className="text-xs font-semibold text-gray-300 hover:text-white transition truncate"
@@ -136,6 +137,14 @@ export default function LeagueCard({
                         </span>
                     </div>
                 </div>
+                {commissioner.prsScore != null && (
+                    <span
+                        className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded border ${PRS_TIER_STYLES[prsTier(commissioner.prsScore)]}`}
+                        title={`Commissioner PRS: ${commissioner.prsScore}/100 (${PRS_TIER_LABELS[prsTier(commissioner.prsScore)]})`}
+                    >
+                        PRS {commissioner.prsScore}
+                    </span>
+                )}
             </div>
         </div>
     );

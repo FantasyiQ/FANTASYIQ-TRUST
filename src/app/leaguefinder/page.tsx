@@ -53,7 +53,7 @@ export default async function LeagueFinderPage({
     const leagues = await prisma.lFLeague.findMany({
         where,
         orderBy: [{ rankingScore: 'desc' }, { commissioner: { avgRating: 'desc' } }, { stabilityScore: 'desc' }],
-        include: { commissioner: true },
+        include: { commissioner: { include: { owner: { select: { prsScore: true } } } } },
         take:    50,
     });
 
@@ -127,6 +127,7 @@ export default async function LeagueFinderPage({
                                         displayName:  l.commissioner.displayName,
                                         avgRating:    l.commissioner.avgRating,
                                         reviewsCount: l.commissioner.reviewsCount,
+                                        prsScore:     l.commissioner.owner?.prsScore ?? null,
                                     }}
                                 />
                             ))}
