@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 
-interface Member { id: string; displayName: string; teamName: string | null; }
+interface Member { id: string; userId: string | null; displayName: string; teamName: string | null; }
 interface ProposalItem {
     id: string;
     amount: number;
@@ -31,13 +31,19 @@ export default function ProposalPage() {
     const params = useParams();
     const duesId = params.duesId as string;
 
-    const [data, setData] = useState<DuesData | null>(null);
+    const [data, setData]             = useState<DuesData | null>(null);
     const [assignments, setAssignments] = useState<Record<string, string>>({});
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState('');
-    const [retrying, setRetrying] = useState<Record<string, boolean>>({});
+    const [loading, setLoading]       = useState(true);
+    const [saving, setSaving]         = useState(false);
+    const [error, setError]           = useState('');
+    const [retrying, setRetrying]     = useState<Record<string, boolean>>({});
     const [retryMessages, setRetryMessages] = useState<Record<string, string>>({});
+
+    // Reassign modal state
+    const [reassignItem, setReassignItem]       = useState<ProposalItem | null>(null);
+    const [reassignMemberId, setReassignMemberId] = useState('');
+    const [reassignLoading, setReassignLoading] = useState(false);
+    const [reassignError, setReassignError]     = useState('');
 
     const loadData = useCallback(() => {
         fetch(`/api/dues/${duesId}?include=proposals`)
@@ -119,6 +125,46 @@ export default function ProposalPage() {
         loadData();
     }
 
+    function openReassign(item: ProposalItem) {
+        setReassignItem(item);
+        setReassignMemberId('');
+        setReassignError('');
+    }
+
+    function closeReassign() {
+        setReassignItem(null);
+        setReassignMemberId('');
+        setReassignError('');
+    }
+
+    async function handleReassign() {
+        if (!reassignItem || !reassignMemberId) return;
+        setReassignLoading(true);
+        setReassignError('');
+
+        const res = await fetch(`/api/dues/${duesId}/proposal/reassign`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ itemId: reassignItem.id, newMemberId: reassignMemberId }),
+        });
+        const resData = await res.json() as { ok?: boolean; newRecipient?: string; error?: string };
+
+        if (!res.ok) {
+            setReassignError(resData.error ?? 'Reassignment failed.');
+            setReassignLoading(false);
+            return;
+        }
+
+        setReassignLoading(false);
+        closeReassign();
+        loadData();
+    }
+
+    // Selected member in the reassign modal — used for FiQ account validation
+    const reassignSelectedMember = data?.members.find(m => m.id === reassignMemberId) ?? null;
+    const reassignBlocked = reassignSelectedMember !== null && !reassignSelectedMember.userId;
+    const reassignReady   = !!reassignMemberId && !reassignBlocked && reassignMemberId !== reassignItem?.member.id;
+
     if (loading) return <main className="min-h-screen bg-gray-950 text-white pt-24 px-6"><p className="text-gray-500">Loading...</p></main>;
     if (!proposal) return <main className="min-h-screen bg-gray-950 text-white pt-24 px-6"><p className="text-gray-500">No proposal found.</p></main>;
 
@@ -153,32 +199,45 @@ export default function ProposalPage() {
                 )}
 
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl divide-y divide-gray-800">
-                    {proposal.items.map((item) => (
-                        <div key={item.id} className="px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
-                            <div>
-                                <p className="font-semibold text-white">{item.payoutSpot.label}</p>
-                                <p className="text-[#D4AF37] text-sm font-bold">${item.amount.toFixed(2)}</p>
-                                {isApproved && (
-                                    <p className={`text-xs mt-0.5 ${item.status === 'failed' ? 'text-red-400' : 'text-gray-500'}`}>
-                                        {STATUS_LABEL[item.status] ?? item.status}
-                                    </p>
+                    {proposal.items.map((item) => {
+                        const canReassign = isApproved && item.status === 'pending';
+                        return (
+                            <div key={item.id} className="px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
+                                <div>
+                                    <p className="font-semibold text-white">{item.payoutSpot.label}</p>
+                                    <p className="text-[#D4AF37] text-sm font-bold">${item.amount.toFixed(2)}</p>
+                                    {isApproved && (
+                                        <p className={`text-xs mt-0.5 ${item.status === 'failed' ? 'text-red-400' : 'text-gray-500'}`}>
+                                            {STATUS_LABEL[item.status] ?? item.status}
+                                        </p>
+                                    )}
+                                </div>
+                                {isApproved || isPoll ? (
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-gray-300 text-sm">{item.member.displayName}</span>
+                                        {canReassign && (
+                                            <button
+                                                onClick={() => openReassign(item)}
+                                                className="text-xs text-[#D4AF37]/60 hover:text-[#D4AF37] border border-[#D4AF37]/20 hover:border-[#D4AF37]/50 px-2.5 py-1 rounded-lg transition"
+                                            >
+                                                Reassign →
+                                            </button>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <select
+                                        value={assignments[item.id] ?? ''}
+                                        onChange={e => setAssignments(prev => ({ ...prev, [item.id]: e.target.value }))}
+                                        className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-[#D4AF37]/60 min-w-[180px]">
+                                        <option value="">— Select Winner —</option>
+                                        {data?.members.map(m => (
+                                            <option key={m.id} value={m.id}>{m.displayName}{m.teamName ? ` (${m.teamName})` : ''}</option>
+                                        ))}
+                                    </select>
                                 )}
                             </div>
-                            {isApproved || isPoll ? (
-                                <span className="text-gray-300 text-sm">{item.member.displayName}</span>
-                            ) : (
-                                <select
-                                    value={assignments[item.id] ?? ''}
-                                    onChange={e => setAssignments(prev => ({ ...prev, [item.id]: e.target.value }))}
-                                    className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-[#D4AF37]/60 min-w-[180px]">
-                                    <option value="">— Select Winner —</option>
-                                    {data?.members.map(m => (
-                                        <option key={m.id} value={m.id}>{m.displayName}{m.teamName ? ` (${m.teamName})` : ''}</option>
-                                    ))}
-                                </select>
-                            )}
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
 
                 {/* Failed transfers — commissioner retry panel */}
@@ -232,6 +291,70 @@ export default function ProposalPage() {
                     </div>
                 )}
             </div>
+
+            {/* ── Reassign Payout Modal ──────────────────────────────────── */}
+            {reassignItem && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-sm w-full space-y-5 shadow-2xl">
+                        <div>
+                            <h3 className="font-bold text-white">Reassign Payout</h3>
+                            <p className="text-gray-400 text-sm mt-1">
+                                {reassignItem.payoutSpot.label} · <span className="text-[#D4AF37] font-semibold">${reassignItem.amount.toFixed(2)}</span>
+                            </p>
+                        </div>
+
+                        <div className="rounded-xl bg-gray-800/50 border border-gray-700 px-4 py-3 text-xs text-gray-400 leading-relaxed">
+                            Currently assigned to{' '}
+                            <span className="text-white font-semibold">{reassignItem.member.displayName}</span>.
+                            Select a replacement below. The new recipient must have a FiQ account to receive payouts.
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs text-gray-400 font-medium">New recipient</label>
+                            <select
+                                value={reassignMemberId}
+                                onChange={e => { setReassignMemberId(e.target.value); setReassignError(''); }}
+                                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-[#D4AF37]/60"
+                            >
+                                <option value="">— Select member —</option>
+                                {data?.members
+                                    .filter(m => m.id !== reassignItem.member.id)
+                                    .map(m => (
+                                        <option key={m.id} value={m.id}>
+                                            {m.displayName}{m.teamName ? ` (${m.teamName})` : ''}{!m.userId ? ' ⚠ No FiQ account' : ''}
+                                        </option>
+                                    ))}
+                            </select>
+
+                            {/* FiQ account warning */}
+                            {reassignBlocked && (
+                                <div className="rounded-lg bg-amber-900/20 border border-amber-800/40 px-3 py-2.5 text-xs text-amber-400">
+                                    <span className="font-semibold">{reassignSelectedMember?.displayName}</span> must create a FiQ account before they can receive payouts.
+                                    Ask them to sign up at <span className="font-mono">fantasyiqtrust.com</span>.
+                                </div>
+                            )}
+
+                            {reassignError && (
+                                <p className="text-red-400 text-xs">{reassignError}</p>
+                            )}
+                        </div>
+
+                        <div className="flex gap-3 pt-1">
+                            <button
+                                onClick={closeReassign}
+                                className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold py-2.5 rounded-xl text-sm transition border border-gray-700">
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleReassign}
+                                disabled={!reassignReady || reassignLoading}
+                                className="flex-1 bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-40 disabled:cursor-not-allowed text-black font-bold py-2.5 rounded-xl text-sm transition">
+                                {reassignLoading ? 'Saving…' : 'Confirm Reassign'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </main>
     );
 }

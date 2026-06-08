@@ -16,7 +16,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ due
     const dues = await prisma.leagueDues.findUnique({
         where: { id: duesId },
         include: {
-            members: { select: { id: true, displayName: true, teamName: true, duesStatus: true }, orderBy: { createdAt: 'asc' } },
+            members: { select: { id: true, userId: true, displayName: true, teamName: true, duesStatus: true }, orderBy: { createdAt: 'asc' } },
             payoutSpots: { orderBy: { sortOrder: 'asc' } },
             ...(includeProposals ? {
                 proposals: {
