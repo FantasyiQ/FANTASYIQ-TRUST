@@ -65,8 +65,11 @@ export default async function AdminOverviewPage() {
         commSubCount,
         totalLeagues,
         leaguesSyncedToday,
+        leaguesThisYear,
+        leaguesLastYear,
         recentUsers30d,
         platformBreakdown,
+        platformBreakdownThisYear,
         subsByStatus,
         topFeatures,
     ] = await Promise.all([
@@ -78,14 +81,18 @@ export default async function AdminOverviewPage() {
         prisma.subscription.count({ where: { type: 'commissioner', status: { in: ['active', 'trialing'] } } }),
         prisma.league.count(),
         prisma.league.count({ where: { lastSyncedAt: { gte: startOf(0) } } }),
+        prisma.league.count({ where: { season: '2026' } }),
+        prisma.league.count({ where: { season: '2025' } }),
         // New users per day last 14 days
         prisma.user.findMany({
             where:   { createdAt: { gte: startOf(13) } },
             select:  { createdAt: true },
             orderBy: { createdAt: 'asc' },
         }),
-        // Leagues by platform
+        // Leagues by platform (all time)
         prisma.league.groupBy({ by: ['platform'], _count: { _all: true } }),
+        // Leagues by platform (current year)
+        prisma.league.groupBy({ by: ['platform'], where: { season: '2026' }, _count: { _all: true } }),
         // Subs by status
         prisma.subscription.groupBy({ by: ['status'], _count: { _all: true } }),
         // Top features last 30 days
@@ -113,7 +120,11 @@ export default async function AdminOverviewPage() {
         count,
     }));
 
-    const platformData = Object.fromEntries(platformBreakdown.map(p => [p.platform, p._count._all]));
+    const platformData         = Object.fromEntries(platformBreakdown.map(p => [p.platform, p._count._all]));
+    const platformDataThisYear = Object.fromEntries(platformBreakdownThisYear.map(p => [p.platform, p._count._all]));
+    const yoyChange = leaguesLastYear > 0
+        ? Math.round(((leaguesThisYear - leaguesLastYear) / leaguesLastYear) * 100)
+        : null;
     const activeByStatus = Object.fromEntries(subsByStatus.map(s => [s.status, s._count._all]));
 
     return (
@@ -127,7 +138,7 @@ export default async function AdminOverviewPage() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard label="Total Users"       value={totalUsers.toLocaleString()} accent />
                 <StatCard label="Active Subs"       value={activeSubCount} sub={`${commSubCount} commissioner`} />
-                <StatCard label="Total Leagues"     value={totalLeagues} sub={`${leaguesSyncedToday} synced today`} />
+                <StatCard label="2026 Leagues" value={leaguesThisYear.toLocaleString()} sub={yoyChange !== null ? `${yoyChange >= 0 ? '+' : ''}${yoyChange}% vs 2025 · ${totalLeagues} all-time` : `${leaguesSyncedToday} synced today`} accent />
                 <StatCard label="New Today"         value={newUsersToday} sub={`${newUsersThisWeek} this week`} />
             </div>
 
@@ -157,25 +168,41 @@ export default async function AdminOverviewPage() {
 
                 {/* Leagues by platform */}
                 <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-3">
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Leagues by Platform</p>
+                    <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Leagues by Platform</p>
+                        <div className="flex gap-3 text-[10px] text-gray-600">
+                            <span>2026</span>
+                            <span>All-time</span>
+                        </div>
+                    </div>
                     {(['sleeper', 'espn', 'yahoo'] as const).map(platform => {
-                        const count = platformData[platform] ?? 0;
-                        const total = totalLeagues || 1;
+                        const total     = platformData[platform] ?? 0;
+                        const thisYear  = platformDataThisYear[platform] ?? 0;
+                        const barMax    = totalLeagues || 1;
                         return (
                             <div key={platform}>
                                 <div className="flex items-center justify-between mb-1">
                                     <span className="text-sm text-gray-400 capitalize">{platform}</span>
-                                    <span className="font-bold text-white tabular-nums">{count}</span>
+                                    <div className="flex gap-4 tabular-nums">
+                                        <span className="font-bold text-[#D4AF37]">{thisYear}</span>
+                                        <span className="font-bold text-white">{total}</span>
+                                    </div>
                                 </div>
                                 <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
                                     <div
                                         className="h-full bg-[#D4AF37]/60 rounded-full"
-                                        style={{ width: `${(count / total) * 100}%` }}
+                                        style={{ width: `${(total / barMax) * 100}%` }}
                                     />
                                 </div>
                             </div>
                         );
                     })}
+                    <div className="pt-1 border-t border-gray-800 flex items-center justify-between text-xs">
+                        <span className="text-gray-500">Year-over-year</span>
+                        <span className={`font-bold ${yoyChange !== null && yoyChange >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {yoyChange !== null ? `${yoyChange >= 0 ? '+' : ''}${yoyChange}% vs 2025` : '—'}
+                        </span>
+                    </div>
                 </div>
 
                 {/* Subscription status */}
