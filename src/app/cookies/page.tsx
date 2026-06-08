@@ -70,7 +70,7 @@ export default function CookieNoticePage() {
 
                 <LegalSection title="5. Browser Extension">
                     <p>
-                        The <strong className="text-white">FiQ ESPN Connector</strong> browser extension does not set cookies itself.
+                        The <strong className="text-white">FantasyiQ Trust ESPN Connector</strong> browser extension does not set cookies itself.
                         When you initiate an ESPN league sync, the extension reads the{' '}
                         <code className="text-gray-300 bg-gray-800 px-1 rounded">espn_s2</code> and{' '}
                         <code className="text-gray-300 bg-gray-800 px-1 rounded">SWID</code> cookies set by ESPN on the{' '}
@@ -101,8 +101,7 @@ export default function CookieNoticePage() {
                     </ul>
                     <p className="mt-3">
                         Please note that disabling strictly necessary cookies (authentication and session management) will prevent
-                        you from signing in to FantasyiQ Trust and using most features of the Service. Disabling analytics cookies will
-                        not affect your ability to use the Service.
+                        you from signing in to FantasyiQ Trust and using most features of the Service.
                     </p>
                     <p>
                         Browser-specific instructions for managing cookies can be found in your browser&apos;s help documentation.

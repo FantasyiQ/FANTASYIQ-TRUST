@@ -71,11 +71,11 @@ export default function TermsOfServicePage() {
 
                 <LegalSection title="4. No Responsibility for Platform Outages">
                     <p>
-                        The Service depends on third-party APIs (including Sleeper, ESPN, NFL Fantasy, and Yahoo Fantasy) and infrastructure providers. FantasyiQ Trust
+                        The Service depends on third-party data services (including Sleeper, ESPN, NFL Fantasy, and Yahoo Fantasy) and infrastructure providers. FantasyiQ Trust
                         is not liable for any service interruption, data unavailability, inaccuracy, or degradation caused by:
                     </p>
                     <ul>
-                        <li>Outages, rate limits, or API changes by Sleeper, ESPN, NFL Fantasy, Yahoo Fantasy, or any third-party data provider</li>
+                        <li>Outages, rate limits, or service changes by Sleeper, ESPN, NFL Fantasy, Yahoo Fantasy, or any third-party data provider</li>
                         <li>Hosting or infrastructure failures beyond our reasonable control</li>
                         <li>Scheduled or unscheduled maintenance</li>
                         <li>Cyberattacks, force majeure events, or other circumstances outside our control</li>
@@ -199,14 +199,24 @@ export default function TermsOfServicePage() {
                         for any sales, use, value-added, or similar taxes imposed by your jurisdiction.</p>
                 </LegalSection>
 
-                <LegalSection title="13. League Dues Protected">
+                <LegalSection title="13. League Dues and Payment Custody">
                     <p>
-                        &ldquo;League Dues Protected&rdquo; refers to FantasyiQ Trust&apos;s verification and tracking of league dues payments,
-                        including fraud-prevention measures, chargeback handling, payment dispute support, and maintaining an auditable
-                        record of all dues activity within a league. FantasyiQ Trust does not hold league funds, act as an escrow
-                        service, guarantee payouts, or issue refunds on behalf of commissioners or league members. All funds are
-                        collected and managed directly by the league commissioner, who is solely responsible for distributing payouts,
-                        issuing refunds, and resolving any financial disputes between league participants.
+                        When a league uses the dues-collection feature of the Service, member payments are processed and held by
+                        Stripe, Inc., a federally regulated payment processor, on behalf of FantasyiQ Trust. Neither FantasyiQ Trust
+                        nor the league commissioner holds, controls, or has direct withdrawal access to league funds at any time
+                        prior to commissioner-approved payouts. Stripe acts as the sole custodian and payment processor.
+                    </p>
+                    <p>
+                        Upon commissioner approval of payout distributions within the Service, FantasyiQ Trust instructs Stripe to
+                        transfer the approved amounts to verified winners. Winners are required to complete identity verification
+                        through Stripe prior to receiving any payout, as required by applicable federal regulations governing
+                        electronic fund transfers.
+                    </p>
+                    <p>
+                        FantasyiQ Trust does not guarantee payouts in the event of Stripe service interruptions, payment disputes,
+                        chargebacks, or fraud. FantasyiQ Trust maintains an auditable record of all dues activity within a league
+                        and provides fraud-prevention measures and payment dispute support as part of the &ldquo;League Dues Protected&rdquo;
+                        feature. FantasyiQ Trust does not issue refunds on behalf of commissioners or league members.
                     </p>
                 </LegalSection>
 

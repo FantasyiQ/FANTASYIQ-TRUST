@@ -42,7 +42,7 @@ export default function PrivacyPolicyPage() {
                     <Subsection title="3.1 Fantasy League Data">
                         <p>
                             When you connect a Sleeper, ESPN, NFL Fantasy, or Yahoo Fantasy league, we receive and store fantasy-football league data transmitted
-                            by those platforms via their public APIs. This data includes league IDs, roster IDs, matchup data,
+                            by those platforms via their application programming interfaces. This data includes league IDs, roster IDs, matchup data,
                             weekly projections, player statistics, standings, and scoring settings. This data does not constitute
                             personally identifiable information under most privacy frameworks; however, team names or usernames
                             chosen by you on those platforms may be incidentally included.
@@ -65,13 +65,12 @@ export default function PrivacyPolicyPage() {
                                 <strong className="text-white">ESPN:</strong> When you connect an ESPN fantasy league using our browser
                                 extension, the extension reads your ESPN session cookies (<code className="text-gray-300 bg-gray-800 px-1 rounded">espn_s2</code> and{' '}
                                 <code className="text-gray-300 bg-gray-800 px-1 rounded">SWID</code>) from your browser and transmits them
-                                to our server over an encrypted connection. These tokens are stored in our database solely to make API
-                                calls to ESPN on your behalf and to re-sync your league data. They are never used for any other purpose.
+                                to our server over an encrypted connection. These tokens are stored in our database solely to make authenticated requests to ESPN on your behalf and to re-sync your league data. They are never used for any other purpose.
                                 You can revoke access at any time by disconnecting your ESPN league from your dashboard.
                             </li>
                             <li>
                                 <strong className="text-white">Yahoo:</strong> When you connect a Yahoo Fantasy league via OAuth, we
-                                receive and store a Yahoo OAuth access token. This token is stored solely to make API calls to Yahoo
+                                receive and store a Yahoo authorization token. This token is stored solely to make authenticated requests to Yahoo
                                 Fantasy on your behalf. You can revoke access at any time by disconnecting your Yahoo league from your
                                 dashboard or from your Yahoo account&apos;s connected apps settings.
                             </li>
@@ -99,9 +98,9 @@ export default function PrivacyPolicyPage() {
                     </Subsection>
                     <Subsection title="3.6 Log Data">
                         <p>
-                            Our hosting infrastructure automatically records standard server log data (IP address, browser type,
-                            referring URL, timestamp) for security and operational purposes. Log data is retained for no more
-                            than 30 days. We also use IP addresses for rate limiting (processed via Upstash Redis); these are
+                            Our hosting infrastructure automatically records standard server log data (Internet Protocol address, browser type,
+                            referring web address, timestamp) for security and operational purposes. Log data is retained for no more
+                            than 30 days. We also use Internet Protocol addresses for rate limiting (processed via Upstash Redis); these are
                             not linked to individual accounts and are not retained beyond the sliding rate-limit window.
                         </p>
                     </Subsection>
@@ -145,7 +144,7 @@ export default function PrivacyPolicyPage() {
                             <strong className="text-white">Service Providers:</strong> We engage a small number of infrastructure
                             providers who process data solely on our behalf, including: Vercel (hosting), Neon (database), Stripe
                             (payment processing), Resend (transactional email delivery), Pusher (real-time notifications),
-                            Upstash (rate limiting — processes IP addresses only), and Sentry (error monitoring). Each provider
+                            Upstash (rate limiting — processes Internet Protocol addresses only), and Sentry (error monitoring). Each provider
                             is bound by a data-processing agreement or equivalent contractual obligation.
                         </li>
                         <li>
@@ -174,7 +173,7 @@ export default function PrivacyPolicyPage() {
                         <li><strong className="text-white">Stripe</strong> — payment processing; Stripe&apos;s privacy policy governs how it handles your payment information</li>
                         <li><strong className="text-white">Resend</strong> — transactional email delivery; your email address is transmitted to Resend solely to send emails you request or that are required for the Service</li>
                         <li><strong className="text-white">Pusher</strong> — real-time in-app notifications</li>
-                        <li><strong className="text-white">Upstash</strong> — rate limiting; IP addresses are processed transiently and not retained</li>
+                        <li><strong className="text-white">Upstash</strong> — rate limiting; Internet Protocol addresses are processed transiently and not retained</li>
                         <li><strong className="text-white">Sentry</strong> — error and performance monitoring; error reports may include anonymised request context</li>
                     </ul>
                     <p className="mt-3">
@@ -185,7 +184,7 @@ export default function PrivacyPolicyPage() {
 
                 <LegalSection title="8. Browser Extension">
                     <p>
-                        FantasyiQ Trust publishes the <strong className="text-white">FiQ ESPN Connector</strong> browser extension
+                        FantasyiQ Trust publishes the <strong className="text-white">FantasyiQ Trust ESPN Connector</strong> browser extension
                         for Google Chrome, available on the Chrome Web Store. This extension:
                     </p>
                     <ul>
@@ -255,7 +254,7 @@ export default function PrivacyPolicyPage() {
                     <p>
                         We implement commercially reasonable technical and organizational measures to protect data against
                         unauthorized access, alteration, disclosure, or destruction. These include encrypted data transmission
-                        (TLS), access controls, and regular security reviews. No method of transmission over the internet is
+                        (Transport Layer Security encryption), access controls, and regular security reviews. No method of transmission over the internet is
                         completely secure; we cannot guarantee absolute security.
                     </p>
                 </LegalSection>

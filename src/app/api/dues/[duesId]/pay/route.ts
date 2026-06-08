@@ -10,7 +10,8 @@ function appUrl() {
 
 // POST /api/dues/[duesId]/pay
 // Creates a Stripe Checkout session for the authenticated member's buy-in.
-// Commissioners must use "Record Cash Received" instead.
+// Funds land on FiQ's platform account — no transfer_data.destination.
+// FiQ transfers to winners when commissioner approves payouts.
 export async function POST(
     req: NextRequest,
     { params }: { params: Promise<{ duesId: string }> },
@@ -34,12 +35,10 @@ export async function POST(
     });
     if (!dues) return Response.json({ error: 'Dues not found' }, { status: 404 });
 
-    // Commissioners use "Record Cash Received" — block this flow for them
     if (dues.commissionerId === user.id) {
         return Response.json({ error: 'Commissioners use Record Cash Received.' }, { status: 403 });
     }
 
-    // Find the DuesMember row linked to this user
     const member = await prisma.duesMember.findFirst({
         where: { leagueDuesId: duesId, userId: user.id },
         select: { id: true, duesStatus: true, displayName: true },
@@ -47,7 +46,6 @@ export async function POST(
     if (!member) return Response.json({ error: 'Member record not found for your account.' }, { status: 403 });
     if (member.duesStatus === 'paid') return Response.json({ error: 'Already paid.' }, { status: 400 });
 
-    // Find this user's League record to build success/cancel URLs
     const userLeague = await prisma.league.findFirst({
         where: {
             userId: user.id,
@@ -57,7 +55,6 @@ export async function POST(
         select: { id: true },
     });
 
-    // Get or create Stripe customer
     let customerId = user.stripeCustomerId;
     if (!customerId) {
         const customer = await stripe.customers.create({

@@ -1,13 +1,30 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 
 interface Member { id: string; displayName: string; teamName: string | null; }
-interface ProposalItem { id: string; amount: number; status: string; payoutSpot: { label: string }; member: Member; }
+interface ProposalItem {
+    id: string;
+    amount: number;
+    status: string;
+    winnerClaimToken: string | null;
+    failedReason: string | null;
+    payoutSpot: { label: string };
+    member: Member;
+}
 interface Proposal { id: string; status: string; items: ProposalItem[]; }
 interface DuesData { leagueName: string; members: Member[]; proposals: Proposal[]; }
+
+const STATUS_LABEL: Record<string, string> = {
+    pending:            'Pending',
+    approved:           'Approved',
+    claim_sent:         'Claim link sent',
+    transfer_initiated: 'Transfer sent',
+    paid_out:           'Paid out',
+    failed:             'Transfer failed',
+};
 
 export default function ProposalPage() {
     const router = useRouter();
@@ -19,18 +36,19 @@ export default function ProposalPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
+    const [retrying, setRetrying] = useState<Record<string, boolean>>({});
+    const [retryMessages, setRetryMessages] = useState<Record<string, string>>({});
 
-    useEffect(() => {
+    const loadData = useCallback(() => {
         fetch(`/api/dues/${duesId}?include=proposals`)
             .then(r => r.json())
             .then((d: DuesData) => {
                 setData(d);
-                // Initialize assignments from existing proposal items
                 const proposal = d.proposals?.[0];
                 if (proposal) {
                     const init: Record<string, string> = {};
                     for (const item of proposal.items) {
-                        init[item.id] = item.member.id;
+                        if (item.member?.id) init[item.id] = item.member.id;
                     }
                     setAssignments(init);
                 }
@@ -38,11 +56,12 @@ export default function ProposalPage() {
             });
     }, [duesId]);
 
+    useEffect(() => { loadData(); }, [loadData]);
+
     const proposal = data?.proposals?.[0];
 
     async function handleApprove() {
         setError('');
-        // Validate all spots have unique member assignments
         const assigned = Object.values(assignments);
         if (assigned.some(v => !v)) { setError('Assign a winner to every payout spot.'); return; }
         const unique = new Set(assigned);
@@ -71,11 +90,41 @@ export default function ProposalPage() {
         router.push(`/dashboard/commissioner/dues/${duesId}/poll`);
     }
 
+    async function handleRetry(item: ProposalItem) {
+        if (!item.winnerClaimToken) return;
+        setRetrying(prev => ({ ...prev, [item.id]: true }));
+        setRetryMessages(prev => ({ ...prev, [item.id]: '' }));
+
+        const res = await fetch('/api/stripe/connect/winner-retry', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ claimToken: item.winnerClaimToken }),
+        });
+        const resData = await res.json() as { action?: string; url?: string; transferId?: string; error?: string };
+
+        if (!res.ok) {
+            setRetryMessages(prev => ({ ...prev, [item.id]: resData.error ?? 'Retry failed.' }));
+            setRetrying(prev => ({ ...prev, [item.id]: false }));
+            return;
+        }
+
+        if (resData.action === 'onboard' && resData.url) {
+            window.open(resData.url, '_blank');
+            setRetryMessages(prev => ({ ...prev, [item.id]: 'New onboarding link opened — share it with the winner.' }));
+        } else if (resData.action === 'transferred') {
+            setRetryMessages(prev => ({ ...prev, [item.id]: `Transfer sent (${resData.transferId}).` }));
+        }
+
+        setRetrying(prev => ({ ...prev, [item.id]: false }));
+        loadData();
+    }
+
     if (loading) return <main className="min-h-screen bg-gray-950 text-white pt-24 px-6"><p className="text-gray-500">Loading...</p></main>;
     if (!proposal) return <main className="min-h-screen bg-gray-950 text-white pt-24 px-6"><p className="text-gray-500">No proposal found.</p></main>;
 
-    const isPoll = proposal.status === 'polling';
-    const isApproved = proposal.status === 'approved' || proposal.status === 'poll_passed';
+    const isPoll      = proposal.status === 'polling';
+    const isApproved  = proposal.status === 'approved' || proposal.status === 'poll_passed';
+    const failedItems = proposal.items.filter(i => i.status === 'failed');
 
     return (
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
@@ -97,7 +146,7 @@ export default function ProposalPage() {
                     </div>
                 )}
 
-                {isApproved && (
+                {isApproved && failedItems.length === 0 && (
                     <div className="bg-green-900/20 border border-green-800/50 rounded-xl px-4 py-3 text-green-400 text-sm">
                         This proposal has been approved. Payment links will be sent to winners.
                     </div>
@@ -109,6 +158,11 @@ export default function ProposalPage() {
                             <div>
                                 <p className="font-semibold text-white">{item.payoutSpot.label}</p>
                                 <p className="text-[#D4AF37] text-sm font-bold">${item.amount.toFixed(2)}</p>
+                                {isApproved && (
+                                    <p className={`text-xs mt-0.5 ${item.status === 'failed' ? 'text-red-400' : 'text-gray-500'}`}>
+                                        {STATUS_LABEL[item.status] ?? item.status}
+                                    </p>
+                                )}
                             </div>
                             {isApproved || isPoll ? (
                                 <span className="text-gray-300 text-sm">{item.member.displayName}</span>
@@ -126,6 +180,40 @@ export default function ProposalPage() {
                         </div>
                     ))}
                 </div>
+
+                {/* Failed transfers — commissioner retry panel */}
+                {failedItems.length > 0 && (
+                    <div className="bg-red-950/30 border border-red-800/40 rounded-2xl divide-y divide-red-900/30">
+                        <div className="px-6 py-4">
+                            <p className="font-semibold text-red-400 text-sm">Failed Transfers</p>
+                            <p className="text-red-400/70 text-xs mt-0.5">
+                                These payouts did not complete. Retry to re-send the winner&apos;s onboarding link or re-attempt the transfer.
+                            </p>
+                        </div>
+                        {failedItems.map(item => (
+                            <div key={item.id} className="px-6 py-4 space-y-3">
+                                <div className="flex items-start justify-between gap-4 flex-wrap">
+                                    <div>
+                                        <p className="text-white text-sm font-semibold">{item.member.displayName}</p>
+                                        <p className="text-gray-400 text-xs">{item.payoutSpot.label} · ${item.amount.toFixed(2)}</p>
+                                        {item.failedReason && (
+                                            <p className="text-red-400/70 text-xs mt-1 font-mono break-all">{item.failedReason}</p>
+                                        )}
+                                    </div>
+                                    <button
+                                        onClick={() => handleRetry(item)}
+                                        disabled={retrying[item.id]}
+                                        className="shrink-0 bg-red-800/40 hover:bg-red-800/60 disabled:opacity-50 border border-red-700/50 text-red-300 font-semibold text-xs px-4 py-2 rounded-xl transition">
+                                        {retrying[item.id] ? 'Retrying…' : 'Retry Payout'}
+                                    </button>
+                                </div>
+                                {retryMessages[item.id] && (
+                                    <p className="text-xs text-gray-400">{retryMessages[item.id]}</p>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
 
                 {!isApproved && !isPoll && (
                     <div className="flex gap-3">

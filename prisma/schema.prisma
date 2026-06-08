@@ -400,6 +400,7 @@ model DuesMember {
     paymentMethod   String?   // "stripe_direct" | "stripe_on_behalf" | null
     stripePaymentId  String?   // Stripe payment intent or checkout session ID
     stripeReceiptUrl String?   // Stripe hosted receipt URL — surfaced to paid member
+    stripeConnectAccountId String? // Set when winner completes payout onboarding
     createdAt        DateTime  @default(now())
     updatedAt       DateTime  @updatedAt
 
@@ -452,10 +453,12 @@ model PayoutProposalItem {
     memberId     String
     payoutSpotId String
     amount       Float
-    // pending | payment_link_sent | claimed | paid_out
+    // pending | approved | claim_sent | transfer_initiated | paid_out | failed
     status       String  @default("pending")
-    stripePaymentLinkId String?
+    stripeTransferId    String?  // Stripe transfer ID once funds sent to winner
+    winnerClaimToken    String?  @unique  // secure token for winner "Claim Your Winnings" link
     claimedAt    DateTime?
+    failedReason String?  // populated when status = 'failed'
 
     proposal     PayoutProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
     member       DuesMember     @relation(fields: [memberId], references: [id], onDelete: Cascade)
