@@ -394,6 +394,12 @@ export default function DuesManager({
                                                             {new Date(member.paidAt).toLocaleDateString()}
                                                         </p>
                                                     )}
+                                                    <span
+                                                        title="This seat is paid and locked. Paid members cannot be removed or altered."
+                                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20 cursor-help"
+                                                    >
+                                                        🔒 Seat Locked
+                                                    </span>
                                                 </div>
                                             ) : isOwnRow ? (
                                                 /* ── Own row (commissioner viewing themselves) ── */

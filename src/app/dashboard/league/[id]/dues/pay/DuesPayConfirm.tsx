@@ -57,7 +57,7 @@ export default function DuesPayConfirm({ leagueName, season, memberName, amount,
                 <p className="text-xs font-bold text-[#D4AF37]">League Integrity Protected</p>
                 <ul className="space-y-1">
                     {[
-                        'Paid members cannot be removed by the commissioner',
+                        'Paid seats are locked — commissioners cannot remove paid members or alter their prize pool allocations',
                         'Prize pool cannot be altered once dues are collected',
                         'Commissioners never have direct access to league funds',
                         'Payouts go directly to verified winners via Stripe',

@@ -47,6 +47,13 @@ export async function PATCH(
     const wasAlreadyPaid = member.duesStatus === 'paid';
     const nowPaid = status === 'paid';
 
+    // Paid seats are permanently locked — no reversals.
+    if (wasAlreadyPaid && !nowPaid) {
+        return Response.json({
+            error: 'Paid seats are locked. This payment cannot be reverted.',
+        }, { status: 403 });
+    }
+
     // Enforce pot balance before marking paid.
     // collectedAmount must cover all currently-paid members plus this new one.
     if (nowPaid && !wasAlreadyPaid) {
