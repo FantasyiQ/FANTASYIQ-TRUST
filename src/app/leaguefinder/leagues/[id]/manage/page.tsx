@@ -8,6 +8,7 @@ import WaitlistManager     from './_WaitlistManager';
 import SeasonManager       from './_SeasonManager';
 import PRSBadge            from '@/components/leaguefinder/PRSBadge';
 import HistoryImportForm   from './_HistoryImportForm';
+import DelistButton        from './_DelistButton';
 
 export default async function ManageLeaguePage({
     params,
@@ -62,12 +63,20 @@ export default async function ManageLeaguePage({
                     </nav>
                     <div className="flex items-center justify-between gap-4 flex-wrap">
                         <h1 className="text-2xl font-bold text-white">{league.name}</h1>
-                        <Link
-                            href={`/leaguefinder/leagues/${id}`}
-                            className="text-xs text-gray-500 hover:text-gray-300 transition"
-                        >
-                            ← View public page
-                        </Link>
+                        <div className="flex items-center gap-3">
+                            <Link
+                                href={`/leaguefinder/leagues/${id}/edit`}
+                                className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-[#D4AF37]/40 text-[#D4AF37] hover:bg-[#D4AF37]/10 transition"
+                            >
+                                Edit Listing
+                            </Link>
+                            <Link
+                                href={`/leaguefinder/leagues/${id}`}
+                                className="text-xs text-gray-500 hover:text-gray-300 transition"
+                            >
+                                ← View public page
+                            </Link>
+                        </div>
                     </div>
                 </div>
 
@@ -179,6 +188,12 @@ export default async function ManageLeaguePage({
                             notes:       s.notes,
                         }))}
                     />
+                </section>
+
+                {/* ── Danger Zone ─────────────────────────────────────── */}
+                <section className="space-y-3 pt-4 border-t border-gray-800">
+                    <h2 className="text-sm font-bold text-gray-600 uppercase tracking-wider">Danger Zone</h2>
+                    <DelistButton leagueId={id} leagueName={league.name} />
                 </section>
             </div>
         </div>
