@@ -183,20 +183,25 @@ export async function runLeagueHealthCheck(): Promise<{
 
     let nudged = 0;
     if (toNudge.length > 0) {
-        // Check cooldown per userId
-        const userIds     = [...new Set(toNudge.map(l => l.userId))];
-        const recentNudges= await prisma.notification.findMany({
+        // Deduplicate by leagueId — prevents double-nudging the same league
+        // across concurrent cron runs or multiple unhealthy leagues per user.
+        const userIds      = [...new Set(toNudge.map(l => l.userId))];
+        const recentNudges = await prisma.notification.findMany({
             where: {
                 userId:    { in: userIds },
                 type:      'league_health',
                 createdAt: { gte: cooldownCutoff },
             },
-            select: { userId: true },
+            select: { data: true },
         });
-        const nudgedSet = new Set(recentNudges.map(n => n.userId));
+        const nudgedLeagueIds = new Set(
+            recentNudges
+                .map(n => (n.data as Record<string, unknown>)?.leagueId as string | undefined)
+                .filter((id): id is string => !!id)
+        );
 
         const notifications = toNudge
-            .filter(l => !nudgedSet.has(l.userId))
+            .filter(l => !nudgedLeagueIds.has(l.id))
             .map(l => {
                 const msg = pickNudgeMessage(l.signals, l.leagueName);
                 if (!msg) return null;

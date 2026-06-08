@@ -187,17 +187,41 @@ const NUDGE_MSGS: Partial<Record<ActivationStage, { title: string; body: string 
 };
 
 export async function nudgeStuckCommissioners(): Promise<{ nudged: number; skipped: number }> {
-    const now           = Date.now();
+    const now            = Date.now();
     const cooldownCutoff = new Date(now - NUDGE_COOLDOWN_MS);
 
-    let nudged = 0, skipped = 0;
+    // Collect ALL user IDs that received any commissioner_nudge in the cooldown window
+    // up front — this prevents double-nudging within a single run AND across concurrent runs.
+    const allCandidateIds = new Set<string>();
+    for (const stage of Object.keys(MIN_DAYS_AT_STAGE) as ActivationStage[]) {
+        const minDays    = MIN_DAYS_AT_STAGE[stage]!;
+        const cutoffDate = new Date(now - minDays * 24 * 60 * 60 * 1000);
+        const stageWhere = stageFilter(stage, cutoffDate);
+        if (!stageWhere) continue;
+        const candidates = await prisma.user.findMany({ where: stageWhere, take: 500, select: { id: true } });
+        candidates.forEach(u => allCandidateIds.add(u.id));
+    }
+
+    if (allCandidateIds.size === 0) return { nudged: 0, skipped: 0 };
+
+    const recentlyNudged = await prisma.notification.findMany({
+        where: {
+            userId:    { in: [...allCandidateIds] },
+            type:      'commissioner_nudge',
+            createdAt: { gte: cooldownCutoff },
+        },
+        select: { userId: true },
+    });
+    // Global set of users already nudged — shared across all stage iterations
+    const nudgedSet = new Set(recentlyNudged.map(n => n.userId));
+
+    let nudged = 0, skipped = nudgedSet.size;
 
     for (const stage of Object.keys(MIN_DAYS_AT_STAGE) as ActivationStage[]) {
         const minDays    = MIN_DAYS_AT_STAGE[stage]!;
         const cutoffDate = new Date(now - minDays * 24 * 60 * 60 * 1000);
         const msg        = NUDGE_MSGS[stage]!;
 
-        // Find users at this exact stage (conditions cascade — each stage implies all prior stages)
         const stageWhere = stageFilter(stage, cutoffDate);
         if (!stageWhere) continue;
 
@@ -209,22 +233,7 @@ export async function nudgeStuckCommissioners(): Promise<{ nudged: number; skipp
 
         if (candidates.length === 0) continue;
 
-        const candidateIds = candidates.map(u => u.id);
-
-        // Find who was nudged recently
-        const recentlyNudged = await prisma.notification.findMany({
-            where: {
-                userId:    { in: candidateIds },
-                type:      'commissioner_nudge',
-                createdAt: { gte: cooldownCutoff },
-            },
-            select: { userId: true },
-        });
-        const nudgedSet = new Set(recentlyNudged.map(n => n.userId));
-
-        const toNudge = candidateIds.filter(id => !nudgedSet.has(id));
-        skipped += nudgedSet.size;
-
+        const toNudge = candidates.map(u => u.id).filter(id => !nudgedSet.has(id));
         if (toNudge.length === 0) continue;
 
         await prisma.notification.createMany({
@@ -236,6 +245,9 @@ export async function nudgeStuckCommissioners(): Promise<{ nudged: number; skipp
                 data:  { stage },
             })),
         });
+
+        // Mark as nudged so subsequent stage iterations skip them
+        toNudge.forEach(id => nudgedSet.add(id));
         nudged += toNudge.length;
     }
 
