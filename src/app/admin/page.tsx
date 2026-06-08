@@ -4,6 +4,9 @@ import { prisma } from '@/lib/prisma';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+const CURRENT_YEAR = String(new Date().getFullYear());
+const LAST_YEAR    = String(new Date().getFullYear() - 1);
+
 function startOf(daysAgo: number): Date {
     const d = new Date();
     d.setDate(d.getDate() - daysAgo);
@@ -81,8 +84,8 @@ export default async function AdminOverviewPage() {
         prisma.subscription.count({ where: { type: 'commissioner', status: { in: ['active', 'trialing'] } } }),
         prisma.league.count(),
         prisma.league.count({ where: { lastSyncedAt: { gte: startOf(0) } } }),
-        prisma.league.count({ where: { season: '2026' } }),
-        prisma.league.count({ where: { season: '2025' } }),
+        prisma.league.count({ where: { season: CURRENT_YEAR } }),
+        prisma.league.count({ where: { season: LAST_YEAR } }),
         // New users per day last 14 days
         prisma.user.findMany({
             where:   { createdAt: { gte: startOf(13) } },
@@ -92,7 +95,7 @@ export default async function AdminOverviewPage() {
         // Leagues by platform (all time)
         prisma.league.groupBy({ by: ['platform'], _count: { _all: true } }),
         // Leagues by platform (current year)
-        prisma.league.groupBy({ by: ['platform'], where: { season: '2026' }, _count: { _all: true } }),
+        prisma.league.groupBy({ by: ['platform'], where: { season: CURRENT_YEAR }, _count: { _all: true } }),
         // Subs by status
         prisma.subscription.groupBy({ by: ['status'], _count: { _all: true } }),
         // Top features last 30 days
@@ -138,7 +141,7 @@ export default async function AdminOverviewPage() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard label="Total Users"       value={totalUsers.toLocaleString()} accent />
                 <StatCard label="Active Subs"       value={activeSubCount} sub={`${commSubCount} commissioner`} />
-                <StatCard label="2026 Leagues" value={leaguesThisYear.toLocaleString()} sub={yoyChange !== null ? `${yoyChange >= 0 ? '+' : ''}${yoyChange}% vs 2025 · ${totalLeagues} all-time` : `${leaguesSyncedToday} synced today`} accent />
+                <StatCard label={`${CURRENT_YEAR} Leagues`} value={leaguesThisYear.toLocaleString()} sub={yoyChange !== null ? `${yoyChange >= 0 ? '+' : ''}${yoyChange}% vs ${LAST_YEAR} · ${totalLeagues} all-time` : `${leaguesSyncedToday} synced today`} accent />
                 <StatCard label="New Today"         value={newUsersToday} sub={`${newUsersThisWeek} this week`} />
             </div>
 
@@ -171,7 +174,7 @@ export default async function AdminOverviewPage() {
                     <div className="flex items-center justify-between">
                         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Leagues by Platform</p>
                         <div className="flex gap-3 text-[10px] text-gray-600">
-                            <span>2026</span>
+                            <span>{CURRENT_YEAR}</span>
                             <span>All-time</span>
                         </div>
                     </div>
@@ -200,7 +203,7 @@ export default async function AdminOverviewPage() {
                     <div className="pt-1 border-t border-gray-800 flex items-center justify-between text-xs">
                         <span className="text-gray-500">Year-over-year</span>
                         <span className={`font-bold ${yoyChange !== null && yoyChange >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {yoyChange !== null ? `${yoyChange >= 0 ? '+' : ''}${yoyChange}% vs 2025` : '—'}
+                            {yoyChange !== null ? `${yoyChange >= 0 ? '+' : ''}${yoyChange}% vs ${LAST_YEAR}` : '—'}
                         </span>
                     </div>
                 </div>
