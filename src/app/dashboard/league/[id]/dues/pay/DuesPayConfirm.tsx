@@ -38,6 +38,15 @@ export default function DuesPayConfirm({ leagueName, season, memberName, amount,
                 <span className="text-xl font-black text-white">${amount.toFixed(2)}</span>
             </div>
 
+            {/* ── Non-refundable acknowledgment ───────────────── */}
+            <div className="rounded-xl border border-yellow-900/40 bg-yellow-950/20 px-4 py-3.5 space-y-1.5">
+                <p className="text-xs font-bold text-yellow-400">No-Refund Policy</p>
+                <p className="text-xs text-gray-400 leading-snug">
+                    League dues payments are <strong className="text-white">non-refundable</strong>. If you leave the league
+                    after paying, your dues payment is forfeited. No exceptions.
+                </p>
+            </div>
+
             {/* ── TOS checkbox ────────────────────────────────── */}
             <div className="flex items-start gap-2">
                 <input
@@ -48,9 +57,9 @@ export default function DuesPayConfirm({ leagueName, season, memberName, amount,
                     className="mt-0.5 h-4 w-4 shrink-0 accent-[#D4AF37] cursor-pointer"
                 />
                 <label htmlFor={checkboxId} className="text-xs text-gray-400 leading-snug cursor-pointer">
-                    I agree to the{' '}
-                    <Link href="/terms" className="text-[#D4AF37] underline" target="_blank">Terms of Service</Link>
-                    , including the <strong className="text-gray-300">No-Refund Policy</strong>.
+                    I understand that league dues are <strong className="text-white">non-refundable</strong>. If I leave
+                    the league after paying, my payment is forfeited. I agree to the{' '}
+                    <Link href="/terms" className="text-[#D4AF37] underline" target="_blank">Terms of Service</Link>.
                 </label>
             </div>
 
@@ -60,8 +69,8 @@ export default function DuesPayConfirm({ leagueName, season, memberName, amount,
                     🛡️ Protected League Dues
                 </p>
                 <p className="text-xs text-gray-400 leading-snug">
-                    Your payment is protected against fraud, chargebacks, and payment disputes through FantasyiQ Trust.
-                    Commissioners manage all league funds and handle any refunds.
+                    Your payment is held securely by Stripe and paid out directly to verified winners at season end.
+                    Commissioners approve payouts but never have direct access to league funds.
                 </p>
             </div>
 
