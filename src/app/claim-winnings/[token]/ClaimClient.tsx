@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 interface Props {
@@ -15,6 +15,25 @@ interface Props {
 export default function ClaimClient({ token, leagueName, spotLabel, amount, status, alreadyDone }: Props) {
     const [loading, setLoading] = useState(false);
     const [error,   setError]   = useState<string | null>(null);
+
+    // Poll for status changes when Stripe is still verifying the account
+    useEffect(() => {
+        if (status !== 'pending') return;
+
+        const poll = async () => {
+            try {
+                const res  = await fetch(`/api/dues/payout/claim-status?token=${token}`);
+                if (!res.ok) return;
+                const json = await res.json();
+                if (json.status === 'paid_out' || json.status === 'transfer_initiated') {
+                    window.location.href = `/claim-winnings/${token}?status=success`;
+                }
+            } catch { /* silent — next tick will retry */ }
+        };
+
+        const id = setInterval(poll, 5000);
+        return () => clearInterval(id);
+    }, [status, token]);
 
     async function handleClaim() {
         setLoading(true);
