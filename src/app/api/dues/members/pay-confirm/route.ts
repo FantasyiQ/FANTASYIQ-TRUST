@@ -36,10 +36,11 @@ export async function GET(request: NextRequest): Promise<Response> {
                 prisma.duesMember.update({
                     where: { id: memberId },
                     data: {
-                        duesStatus: 'paid',
-                        paidAt: new Date(),
-                        paymentMethod: 'stripe_on_behalf',
-                        stripePaymentId: cs.id,
+                        duesStatus:           'paid',
+                        paidAt:               new Date(),
+                        paymentMethod:        'stripe_on_behalf',
+                        stripePaymentId:      cs.id,
+                        stripePaymentIntentId: typeof cs.payment_intent === 'string' ? cs.payment_intent : null,
                     },
                 }),
                 prisma.leagueDues.update({

@@ -400,9 +400,10 @@ model DuesMember {
     duesStatus      String    @default("unpaid")
     paidAt          DateTime?
     paymentMethod   String?   // "stripe_direct" | "stripe_on_behalf" | null
-    stripePaymentId  String?   // Stripe payment intent or checkout session ID
-    stripeReceiptUrl String?   // Stripe hosted receipt URL — surfaced to paid member
-    stripeConnectAccountId String? // Set when winner completes payout onboarding
+    stripePaymentId       String?   // Stripe payment intent (direct) or checkout session ID (on_behalf)
+    stripePaymentIntentId String?   // Always the pi_xxx — used for dispute/refund webhook lookup
+    stripeReceiptUrl      String?   // Stripe hosted receipt URL — surfaced to paid member
+    stripeConnectAccountId String?  // Set when winner completes payout onboarding
     createdAt        DateTime  @default(now())
     updatedAt       DateTime  @updatedAt
 

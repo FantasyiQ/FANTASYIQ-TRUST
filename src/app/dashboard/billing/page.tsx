@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { stripe } from '@/lib/stripe';
+import { reconcileStripeSubscriptions } from '@/lib/stripe-reconcile';
 import type Stripe from 'stripe';
 
 function formatTier(tier: string): string {
@@ -55,6 +56,10 @@ interface SubWithInvoices {
 export default async function BillingHistoryPage() {
     const session = await auth();
     if (!session?.user?.id) redirect('/sign-in');
+
+    // Belt-and-suspenders: if checkout.session.completed webhook failed, upsert
+    // any active Stripe subscriptions that are missing from the DB before rendering.
+    await reconcileStripeSubscriptions(session.user.id).catch(() => {});
 
     const subscriptions = await prisma.subscription.findMany({
         where: {

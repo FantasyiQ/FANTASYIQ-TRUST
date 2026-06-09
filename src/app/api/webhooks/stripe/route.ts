@@ -15,14 +15,23 @@ const PLAYER_TIERS = new Set<SubscriptionTier>(['PLAYER_PRO', 'PLAYER_ALL_PRO', 
 // stripe_direct stores the pi_xxx directly; stripe_on_behalf stores the cs_xxx
 // (checkout session), so we fall back to a session lookup when needed.
 async function findDuesMemberByPaymentIntent(paymentIntentId: string) {
-    // Try direct match first (stripe_direct path)
-    const direct = await prisma.duesMember.findFirst({
-        where:   { stripePaymentId: paymentIntentId },
+    // Check both stripePaymentId (stripe_direct stores the PI directly) and
+    // stripePaymentIntentId (stripe_on_behalf stores PI here since 2026-06-09;
+    // older records only have the checkout session ID in stripePaymentId).
+    const member = await prisma.duesMember.findFirst({
+        where: {
+            OR: [
+                { stripePaymentId:       paymentIntentId },
+                { stripePaymentIntentId: paymentIntentId },
+            ],
+        },
         include: { leagueDues: { select: { id: true, buyInAmount: true, commissionerId: true, leagueName: true } } },
     });
-    if (direct) return direct;
+    if (member) return member;
 
-    // Fall back: find the checkout session that used this payment intent (stripe_on_behalf path)
+    // Legacy fallback only: pre-2026-06-09 stripe_on_behalf records store the checkout
+    // session ID in stripePaymentId with no PI ID — must ask Stripe to resolve it.
+    // This path will become a no-op once all existing paid members age out of dispute windows.
     try {
         const sessions = await stripe.checkout.sessions.list({ payment_intent: paymentIntentId, limit: 1 });
         const csId = sessions.data[0]?.id;
