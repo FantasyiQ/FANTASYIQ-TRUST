@@ -18,6 +18,16 @@ function run(cmd) {
     execSync(cmd, { stdio: 'inherit' });
 }
 
+// Neon's connection pooler (PgBouncer in transaction mode) doesn't support
+// pg_advisory_lock, which Prisma migrate requires. Swap to the direct URL
+// (same host but without '-pooler') so advisory locks work.
+const poolerUrl = process.env.DATABASE_URL ?? '';
+const directUrl = poolerUrl.replace(/-pooler\./, '.');
+if (directUrl !== poolerUrl) {
+    process.env.DATABASE_URL = directUrl;
+    console.log('[migrate] Switched to direct URL for advisory lock support');
+}
+
 // Attempt migrate deploy; capture output to detect P3005.
 const result = spawnSync('npx', ['prisma', 'migrate', 'deploy'], {
     stdio: ['inherit', 'inherit', 'pipe'],
