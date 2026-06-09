@@ -15,7 +15,7 @@ export default function TermsOfServicePage() {
                 <div className="space-y-2 border-b border-gray-800 pb-8">
                     <p className="text-[10px] font-bold tracking-widest text-[#D4AF37] uppercase">Legal</p>
                     <h1 className="text-3xl font-bold text-white">Terms of Service</h1>
-                    <p className="text-gray-500 text-sm">Last updated: June 6, 2026</p>
+                    <p className="text-gray-500 text-sm">Last updated: June 9, 2026</p>
                 </div>
 
                 <LegalSection title="1. Acceptance of Terms">
@@ -170,7 +170,7 @@ export default function TermsOfServicePage() {
                     <p>
                         You may terminate your account at any time by contacting us or by using the account deletion feature in your
                         account settings. Upon termination, your right to use the Service ceases immediately. Sections 6, 7, 8, 9,
-                        10, 13, 14, 15, and 16 of these Terms survive termination.
+                        10, 13, 14, 15, 16, and 17 of these Terms survive termination.
                     </p>
                 </LegalSection>
 
@@ -218,9 +218,62 @@ export default function TermsOfServicePage() {
                         and provides fraud-prevention measures and payment dispute support as part of the &ldquo;League Dues Protected&rdquo;
                         feature. FantasyiQ Trust does not issue refunds on behalf of commissioners or league members.
                     </p>
+                    <p>
+                        <strong className="text-white">Unclaimed payout window.</strong> When a commissioner approves a payout
+                        distribution, each designated winner receives a secure claim link via email and in-app notification.
+                        Winners must complete Stripe identity verification and claim their payout within{' '}
+                        <strong className="text-white">90 days</strong> of the claim link being issued. Claim links not redeemed
+                        within 90 days will expire; the payout item will be marked failed and the commissioner will be notified.
+                        The commissioner may reissue a claim link at their discretion from the proposal management page, subject
+                        to available platform balance. <strong className="text-white">FantasyiQ Trust is not liable for
+                        unclaimed or expired payouts.</strong>
+                    </p>
+                    <p>
+                        <strong className="text-white">Chargebacks and payment disputes.</strong> If a league member files a
+                        payment dispute (chargeback) with their card issuer regarding their dues payment, FantasyiQ Trust will
+                        immediately reverse the disputed amount from the league&apos;s pot total and flag the member&apos;s seat as
+                        pending dispute. If the chargeback is resolved in the merchant&apos;s favor, the payment will be restored
+                        and the pot total updated accordingly. If the chargeback is resolved against the merchant — meaning the
+                        disputed amount is returned to the member by the card issuer — the dues payment is{' '}
+                        <strong className="text-white">permanently removed</strong> from the league pot.{' '}
+                        <strong className="text-white">FantasyiQ Trust does not absorb chargeback losses; the financial impact
+                        is borne entirely by the league&apos;s pot.</strong> FantasyiQ Trust is not liable for any reduction to
+                        the league pot resulting from a resolved chargeback.
+                    </p>
+                    <p>
+                        <strong className="text-white">Payment processing and money transmission.</strong> FantasyiQ Trust is
+                        not a bank, money services business, or licensed money transmitter. All payment processing, fund custody,
+                        and electronic money transmission in connection with the Service is performed exclusively by{' '}
+                        <strong className="text-white">Stripe, Inc.</strong> and its affiliates, which hold applicable licenses
+                        and registrations as required by law. FantasyiQ Trust acts solely as a software platform that instructs
+                        Stripe to process payments and disburse funds pursuant to commissioner-approved payout distributions.
+                        By using the dues and payout features of the Service, you agree to be bound by Stripe&apos;s Terms of Service
+                        and Stripe Connect Account Agreement, available at stripe.com.
+                    </p>
                 </LegalSection>
 
-                <LegalSection title="14. League Finder and Public Profiles">
+                <LegalSection title="14. Fantasy Sports Legality and Jurisdiction">
+                    <p>
+                        Fantasy sports contests involving real-money dues, buy-ins, or prizes may be subject to state, local,
+                        or federal laws and regulations in your jurisdiction. The legality of paid fantasy sports varies by location
+                        and may be restricted or prohibited in certain jurisdictions.
+                    </p>
+                    <p>
+                        <strong className="text-white">FantasyiQ Trust does not represent or warrant that participation in
+                        paid fantasy sports is legal in your jurisdiction.</strong> You are solely responsible for determining
+                        whether participation in paid fantasy sports leagues, dues collection, and prize payouts is lawful under
+                        all applicable laws in the jurisdiction where you reside or access the Service. By using the dues and
+                        payout features of the Service, you represent and warrant that your participation is lawful.
+                    </p>
+                    <p>
+                        FantasyiQ Trust is not responsible for any legal consequences, fines, penalties, or liability arising
+                        from your participation in fantasy sports activities that may be prohibited or regulated in your
+                        jurisdiction. If you are uncertain about the legality of paid fantasy sports in your area, you should
+                        consult a qualified legal professional before participating.
+                    </p>
+                </LegalSection>
+
+                <LegalSection title="15. League Finder and Public Profiles">
                     <p>
                         FantasyiQ Trust operates a <strong className="text-white">League Finder</strong> feature that allows commissioners
                         to publicly list their leagues and register commissioner profiles. By listing a league or registering a commissioner
@@ -234,7 +287,7 @@ export default function TermsOfServicePage() {
                     </ul>
                     <p className="mt-2">
                         FantasyiQ Trust does not guarantee the accuracy of user-submitted ratings or reviews. If you believe a rating
-                        or review violates these Terms, contact us using the information in Section 18.
+                        or review violates these Terms, contact us using the information in Section 19.
                     </p>
                     <p>
                         You may remove your league or commissioner profile from the League Finder at any time through your account settings.
@@ -243,7 +296,7 @@ export default function TermsOfServicePage() {
                     </p>
                 </LegalSection>
 
-                <LegalSection title="15. Governing Law and Dispute Resolution">
+                <LegalSection title="16. Governing Law and Dispute Resolution">
                     <p>
                         These Terms are governed by and construed in accordance with the laws of the State of Florida, United States,
                         without regard to its conflict-of-law principles. Any dispute arising out of or related to these Terms or your
@@ -256,7 +309,7 @@ export default function TermsOfServicePage() {
                     </p>
                 </LegalSection>
 
-                <LegalSection title="16. Changes to These Terms">
+                <LegalSection title="17. Changes to These Terms">
                     <p>
                         We may modify these Terms at any time by posting the revised Terms on the Service and updating the
                         &ldquo;Last updated&rdquo; date. For material changes, we will provide additional notice. Your continued use of the
@@ -265,7 +318,7 @@ export default function TermsOfServicePage() {
                     </p>
                 </LegalSection>
 
-                <LegalSection title="17. Miscellaneous">
+                <LegalSection title="18. Miscellaneous">
                     <p>
                         These Terms, together with our <Link href="/privacy" className="text-[#D4AF37] hover:underline">Privacy Policy</Link> and{' '}
                         <Link href="/cookies" className="text-[#D4AF37] hover:underline">Cookie Notice</Link>, constitute the entire agreement
@@ -276,7 +329,7 @@ export default function TermsOfServicePage() {
                     </p>
                 </LegalSection>
 
-                <LegalSection title="18. Contact">
+                <LegalSection title="19. Contact">
                     <p>If you have questions about these Terms, please contact us at:</p>
                     <div className="mt-3 bg-gray-900 border border-gray-800 rounded-xl px-5 py-4 text-sm text-gray-300 space-y-0.5">
                         <p className="font-semibold text-white">FantasyiQ Trust</p>
