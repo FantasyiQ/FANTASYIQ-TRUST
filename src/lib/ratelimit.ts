@@ -6,14 +6,23 @@
 
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
+import { captureError } from '@/lib/sentry';
 
 // Shared limiter instances (lazily created, reused across warm invocations)
 let _search:   Ratelimit | null = null;
 let _public:   Ratelimit | null = null;
 let _mutation: Ratelimit | null = null;
 
+// Alert once per cold start so production ops knows rate limiting is bypassed.
+let _alertedMissingConfig = false;
+
 function isConfigured(): boolean {
-    return !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+    const ok = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+    if (!ok && !_alertedMissingConfig && process.env.NODE_ENV === 'production') {
+        _alertedMissingConfig = true;
+        captureError(new Error('Rate limiting is DISABLED — UPSTASH env vars not set; all rate limits are bypassed'));
+    }
+    return ok;
 }
 
 function getRedis(): Redis {
