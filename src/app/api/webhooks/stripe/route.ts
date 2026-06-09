@@ -141,49 +141,6 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
 
     try {
-        // ── transfer.paid: not in SDK v22 type union, handled before switch ──
-        // Fires when a platform transfer settles into the winner's Express account.
-        if ((event.type as string) === 'transfer.paid') {
-            const transfer = event.data.object as Stripe.Transfer;
-            const itemId   = transfer.metadata?.proposalItemId;
-
-            if (itemId) {
-                const item = await prisma.payoutProposalItem.findUnique({
-                    where:   { id: itemId },
-                    include: {
-                        proposal:   { include: { leagueDues: { select: { leagueName: true, commissionerId: true } } } },
-                        member:     { select: { displayName: true, email: true } },
-                        payoutSpot: { select: { label: true } },
-                    },
-                });
-
-                if (item && item.status === 'transfer_initiated') {
-                    await prisma.payoutProposalItem.update({
-                        where: { id: item.id },
-                        data:  { status: 'paid_out' },
-                    });
-
-                    const { leagueName, commissionerId } = item.proposal.leagueDues;
-                    const winnerName = item.member.displayName ?? item.member.email ?? 'Winner';
-
-                    await notify({
-                        userId:     commissionerId,
-                        type:       NotificationType.PAYOUTS_RELEASED,
-                        title:      'Payout delivered',
-                        body:       `${winnerName}'s ${item.payoutSpot.label} payout of $${item.amount.toFixed(2)} for ${leagueName} has been delivered to their account.`,
-                        inApp:      true,
-                        email:      false,
-                        throttleMs: 0,
-                        data:       { itemId: item.id, leagueName, winnerName, transferId: transfer.id },
-                    }).catch(err => captureError(err, { event: 'transfer.paid', itemId: item.id }));
-                }
-            }
-
-            prisma.processedStripeEvent.create({ data: { id: event.id } })
-                .catch(err => captureError(err, { event: event.id, context: 'idempotency_write' }));
-            return Response.json({ received: true });
-        }
-
         switch (event.type) {
             case 'checkout.session.completed': {
                 const cs = event.data.object as Stripe.Checkout.Session;
@@ -682,7 +639,7 @@ export async function POST(request: NextRequest): Promise<Response> {
                             await prisma.payoutProposalItem.update({
                                 where: { id: item.id },
                                 data:  {
-                                    status:           'transfer_initiated',
+                                    status:           'paid_out',
                                     stripeTransferId: transfer.id,
                                     claimedAt:        new Date(),
                                     failedReason:     null,
@@ -723,7 +680,7 @@ export async function POST(request: NextRequest): Promise<Response> {
                     const pendingItems = await prisma.payoutProposalItem.findMany({
                         where: {
                             memberId: { in: memberIds },
-                            status:   { in: ['pending', 'claim_sent', 'transfer_initiated'] },
+                            status:   { in: ['pending', 'claim_sent'] },
                         },
                         include: {
                             proposal: { include: { leagueDues: { select: { leagueName: true, commissionerId: true } } } },

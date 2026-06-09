@@ -59,7 +59,7 @@ export async function GET(req: NextRequest): Promise<Response> {
         await prisma.payoutProposalItem.update({
             where: { id: item.id },
             data: {
-                status:           'transfer_initiated',
+                status:           'paid_out',
                 stripeTransferId: transfer.id,
                 claimedAt:        new Date(),
             },

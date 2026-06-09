@@ -73,7 +73,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const [stripeBalance, allPendingItems] = await Promise.all([
         stripe.balance.retrieve(),
         prisma.payoutProposalItem.findMany({
-            where:  { status: { in: ['claim_sent', 'transfer_initiated'] } },
+            where:  { status: 'claim_sent' },
             select: { amount: true },
         }),
     ]);
