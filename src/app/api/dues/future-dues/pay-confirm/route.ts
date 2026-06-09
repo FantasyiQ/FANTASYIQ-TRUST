@@ -33,9 +33,15 @@ export async function GET(request: NextRequest): Promise<never> {
             });
 
             if (obligation && obligation.status !== 'paid') {
+                const piId = typeof cs.payment_intent === 'string' ? cs.payment_intent : null;
                 await prisma.futureDuesObligation.update({
                     where: { id: obligationId },
-                    data: { status: 'paid', paidAt: new Date(), paymentMethod: 'stripe_on_behalf' },
+                    data: {
+                        status:               'paid',
+                        paidAt:               new Date(),
+                        paymentMethod:        'stripe_on_behalf',
+                        stripePaymentIntentId: piId,
+                    },
                 });
 
                 // Credit the future season's tracker pot if it exists

@@ -543,11 +543,12 @@ model FutureDuesObligation {
     amount        Float
     notes         String?   // e.g. "Acquired 2027 1st round pick from Team X"
     // pending | paid
-    status        String    @default("pending")
-    paidAt        DateTime?
-    paymentMethod String?   // "stripe_on_behalf" | "manual" | null
-    createdAt     DateTime  @default(now())
-    updatedAt     DateTime  @updatedAt
+    status              String    @default("pending")
+    paidAt              DateTime?
+    paymentMethod       String?   // "stripe_on_behalf" | "manual" | null
+    stripePaymentIntentId String? // pi_xxx — stored for dispute reversal in webhook
+    createdAt           DateTime  @default(now())
+    updatedAt           DateTime  @updatedAt
 
     leagueDues    LeagueDues  @relation(fields: [leagueDuesId], references: [id], onDelete: Cascade)
     member        DuesMember  @relation(fields: [memberId], references: [id], onDelete: Cascade)
