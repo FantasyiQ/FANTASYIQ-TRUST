@@ -16,6 +16,12 @@ export async function GET(request: NextRequest): Promise<never> {
     try {
         const cs = await stripe.checkout.sessions.retrieve(sessionId);
         if (cs.payment_status === 'paid') {
+            // Validate session was created for this exact obligation — prevents IDOR
+            // where an attacker reuses a valid paid session_id with a different obligationId.
+            if (cs.metadata?.obligationId !== obligationId || cs.metadata?.duesId !== duesId) {
+                redirect('/dashboard/commissioner/dues');
+            }
+
             const obligation = await prisma.futureDuesObligation.findUnique({
                 where: { id: obligationId },
                 select: {
