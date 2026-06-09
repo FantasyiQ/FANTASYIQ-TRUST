@@ -9,6 +9,95 @@ import type { SubscriptionTier } from '@prisma/client';
 
 const PLAYER_TIERS = new Set<SubscriptionTier>(['PLAYER_PRO', 'PLAYER_ALL_PRO', 'PLAYER_ELITE']);
 
+// ── Chargeback / refund helpers ───────────────────────────────────────────────
+
+// Find the DuesMember whose Stripe payment matches the given payment intent.
+// stripe_direct stores the pi_xxx directly; stripe_on_behalf stores the cs_xxx
+// (checkout session), so we fall back to a session lookup when needed.
+async function findDuesMemberByPaymentIntent(paymentIntentId: string) {
+    // Try direct match first (stripe_direct path)
+    const direct = await prisma.duesMember.findFirst({
+        where:   { stripePaymentId: paymentIntentId },
+        include: { leagueDues: { select: { id: true, buyInAmount: true, commissionerId: true, leagueName: true } } },
+    });
+    if (direct) return direct;
+
+    // Fall back: find the checkout session that used this payment intent (stripe_on_behalf path)
+    try {
+        const sessions = await stripe.checkout.sessions.list({ payment_intent: paymentIntentId, limit: 1 });
+        const csId = sessions.data[0]?.id;
+        if (!csId) return null;
+        return prisma.duesMember.findFirst({
+            where:   { stripePaymentId: csId },
+            include: { leagueDues: { select: { id: true, buyInAmount: true, commissionerId: true, leagueName: true } } },
+        });
+    } catch {
+        return null;
+    }
+}
+
+// Reverse a dues payment: flip member to pending_refund, decrement pot totals.
+// Idempotent — only acts when member is currently 'paid'.
+async function reverseDuesPayment(paymentIntentId: string): Promise<{ reversed: boolean; commissionerId: string | null; leagueName: string | null; memberName: string | null }> {
+    const member = await findDuesMemberByPaymentIntent(paymentIntentId);
+    if (!member || member.duesStatus !== 'paid') {
+        return { reversed: false, commissionerId: null, leagueName: null, memberName: null };
+    }
+
+    const buyIn = member.leagueDues.buyInAmount;
+    await prisma.$transaction([
+        prisma.duesMember.update({
+            where: { id: member.id },
+            data:  { duesStatus: 'pending_refund' },
+        }),
+        prisma.leagueDues.update({
+            where: { id: member.leagueDuesId },
+            data:  {
+                potTotal:        { decrement: buyIn },
+                collectedAmount: { decrement: buyIn },
+            },
+        }),
+    ]);
+
+    return {
+        reversed:        true,
+        commissionerId:  member.leagueDues.commissionerId,
+        leagueName:      member.leagueDues.leagueName,
+        memberName:      member.displayName,
+    };
+}
+
+// Restore a dues payment that was reversed after a dispute that we WON.
+// Idempotent — only acts when member is currently 'pending_refund'.
+async function restoreDuesPayment(paymentIntentId: string): Promise<{ restored: boolean; commissionerId: string | null; leagueName: string | null; memberName: string | null }> {
+    const member = await findDuesMemberByPaymentIntent(paymentIntentId);
+    if (!member || member.duesStatus !== 'pending_refund') {
+        return { restored: false, commissionerId: null, leagueName: null, memberName: null };
+    }
+
+    const buyIn = member.leagueDues.buyInAmount;
+    await prisma.$transaction([
+        prisma.duesMember.update({
+            where: { id: member.id },
+            data:  { duesStatus: 'paid' },
+        }),
+        prisma.leagueDues.update({
+            where: { id: member.leagueDuesId },
+            data:  {
+                potTotal:        { increment: buyIn },
+                collectedAmount: { increment: buyIn },
+            },
+        }),
+    ]);
+
+    return {
+        restored:        true,
+        commissionerId:  member.leagueDues.commissionerId,
+        leagueName:      member.leagueDues.leagueName,
+        memberName:      member.displayName,
+    };
+}
+
 // Derive plan type using the tier prefix as the authoritative signal.
 // Metadata alone can be missing or wrong; the tier string never lies.
 function resolveSubType(
@@ -481,7 +570,91 @@ export async function POST(request: NextRequest): Promise<Response> {
                 }).catch(err => captureError(err, { event: 'customer.subscription.deleted', notify: true }));
                 break;
             }
-        }
+
+            // ── Chargeback: dispute opened ────────────────────────────────────
+            case 'charge.dispute.created': {
+                const dispute = event.data.object as Stripe.Dispute;
+                const piId = typeof dispute.payment_intent === 'string' ? dispute.payment_intent : null;
+                if (!piId) break;
+
+                const { reversed, commissionerId, leagueName, memberName } = await reverseDuesPayment(piId);
+                if (!reversed || !commissionerId) break;
+
+                await notify({
+                    userId:     commissionerId,
+                    type:       NotificationType.DUES_PAYMENT_REMOVED,
+                    title:      'Chargeback filed — pot adjusted',
+                    body:       `${memberName ?? 'A member'} filed a payment dispute on their dues for ${leagueName ?? 'your league'}. Their seat has been flagged and the pot total reduced while the dispute is open.`,
+                    inApp:      true,
+                    email:      true,
+                    throttleMs: 0,
+                    data:       { disputeId: dispute.id, piId, leagueName: leagueName ?? undefined, memberName: memberName ?? undefined },
+                }).catch(err => captureError(err, { event: 'charge.dispute.created', notify: true }));
+                break;
+            }
+
+            // ── Chargeback: dispute resolved ──────────────────────────────────
+            case 'charge.dispute.closed': {
+                const dispute = event.data.object as Stripe.Dispute;
+                const piId = typeof dispute.payment_intent === 'string' ? dispute.payment_intent : null;
+                if (!piId) break;
+
+                if (dispute.status === 'won') {
+                    // Merchant won — restore the payment
+                    const { restored, commissionerId, leagueName, memberName } = await restoreDuesPayment(piId);
+                    if (!restored || !commissionerId) break;
+
+                    await notify({
+                        userId:     commissionerId,
+                        type:       NotificationType.DUES_PAYMENT_CONFIRMED,
+                        title:      'Dispute won — pot restored',
+                        body:       `The payment dispute from ${memberName ?? 'a member'} for ${leagueName ?? 'your league'} was resolved in your favor. Their dues are confirmed and the pot has been restored.`,
+                        inApp:      true,
+                        email:      true,
+                        throttleMs: 0,
+                        data:       { disputeId: dispute.id, piId, leagueName: leagueName ?? undefined, memberName: memberName ?? undefined },
+                    }).catch(err => captureError(err, { event: 'charge.dispute.closed.won', notify: true }));
+                } else if (dispute.status === 'lost' || dispute.status === 'warning_closed') {
+                    // Merchant lost — payment is permanently gone; member stays as pending_refund
+                    const member = await findDuesMemberByPaymentIntent(piId);
+                    if (!member) break;
+
+                    await notify({
+                        userId:     member.leagueDues.commissionerId,
+                        type:       NotificationType.DUES_PAYMENT_REMOVED,
+                        title:      'Dispute lost — payment permanently reversed',
+                        body:       `The payment dispute from ${member.displayName} for ${member.leagueDues.leagueName} was decided against you. The buy-in has been permanently removed from the pot.`,
+                        inApp:      true,
+                        email:      true,
+                        throttleMs: 0,
+                        data:       { disputeId: dispute.id, piId, leagueName: member.leagueDues.leagueName, memberName: member.displayName },
+                    }).catch(err => captureError(err, { event: 'charge.dispute.closed.lost', notify: true }));
+                }
+                break;
+            }
+
+            // ── Refund issued (non-dispute) ───────────────────────────────────
+            case 'charge.refunded': {
+                const charge = event.data.object as Stripe.Charge;
+                const piId = typeof charge.payment_intent === 'string' ? charge.payment_intent : null;
+                if (!piId) break;
+
+                const { reversed, commissionerId, leagueName, memberName } = await reverseDuesPayment(piId);
+                if (!reversed || !commissionerId) break;
+
+                await notify({
+                    userId:     commissionerId,
+                    type:       NotificationType.DUES_PAYMENT_REMOVED,
+                    title:      'Dues payment refunded — pot adjusted',
+                    body:       `${memberName ?? 'A member'}'s dues payment for ${leagueName ?? 'your league'} was refunded. Their seat has been marked unpaid and the pot total reduced.`,
+                    inApp:      true,
+                    email:      true,
+                    throttleMs: 0,
+                    data:       { chargeId: charge.id, piId, leagueName: leagueName ?? undefined, memberName: memberName ?? undefined },
+                }).catch(err => captureError(err, { event: 'charge.refunded', notify: true }));
+                break;
+            }
+        } // end switch
     } catch (err) {
         captureError(err, { event: event.type });
         return Response.json({ error: 'Webhook handler failed' }, { status: 500 });
