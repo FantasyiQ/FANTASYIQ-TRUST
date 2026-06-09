@@ -7,6 +7,9 @@ export async function POST(
     request: Request,
     { params }: { params: Promise<{ id: string }> },
 ) {
+    const rl = await checkMutationLimit(getClientIp(request));
+    if (rl.limited) return rl.response!;
+
     const session = await auth();
     if (!session?.user?.id) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });

@@ -7,6 +7,9 @@ export async function PATCH(
     request: Request,
     { params }: { params: Promise<{ id: string }> },
 ) {
+    const rl = await checkMutationLimit(getClientIp(request));
+    if (rl.limited) return rl.response!;
+
     const session = await auth();
     if (!session?.user?.id) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -40,9 +43,12 @@ export async function PATCH(
 
 // DELETE — remove a season record
 export async function DELETE(
-    _request: Request,
+    request: Request,
     { params }: { params: Promise<{ id: string }> },
 ) {
+    const rl = await checkMutationLimit(getClientIp(request));
+    if (rl.limited) return rl.response!;
+
     const session = await auth();
     if (!session?.user?.id) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });

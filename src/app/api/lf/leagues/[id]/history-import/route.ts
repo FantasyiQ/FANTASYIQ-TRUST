@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { calculateAndSavePrs } from '@/lib/prs';
 import { notify } from '@/lib/notifications/service';
 import { NotificationType } from '@/lib/notifications/types';
+import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -40,6 +41,9 @@ export async function POST(
     request: Request,
     { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
+    const rl = await checkMutationLimit(getClientIp(request));
+    if (rl.limited) return rl.response!;
+
     const session = await auth();
     if (!session?.user?.id) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });

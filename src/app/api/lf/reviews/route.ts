@@ -45,10 +45,17 @@ export async function POST(request: Request) {
     if (!validRating(ratingStability)) return Response.json({ error: 'ratingStability must be 1-5' }, { status: 400 });
 
     // Verify league + commissioner exist and are linked
-    const league = await prisma.lFLeague.findUnique({ where: { id: leagueId } });
+    const league = await prisma.lFLeague.findUnique({
+        where:   { id: leagueId },
+        include: { commissioner: { select: { ownerId: true } } },
+    });
     if (!league) return Response.json({ error: 'League not found' },       { status: 404 });
     if (league.commissionerId !== commissionerId) {
         return Response.json({ error: 'Commissioner does not match league' }, { status: 400 });
+    }
+    // Commissioners cannot review their own leagues
+    if (league.commissioner.ownerId === reviewerId) {
+        return Response.json({ error: 'You cannot review your own league' }, { status: 403 });
     }
 
     // Create review (unique constraint: one review per user per league per season)
