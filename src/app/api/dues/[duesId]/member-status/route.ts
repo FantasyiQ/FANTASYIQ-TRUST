@@ -91,6 +91,17 @@ export async function PATCH(
         });
     }
 
+    // Immutable audit trail
+    prisma.paymentAuditLog.create({
+        data: {
+            leagueDuesId: duesId,
+            memberId,
+            actorId:  user.id,
+            action:   nowPaid ? 'mark_paid' : 'remove_payment',
+            amount:   dues.buyInAmount,
+        },
+    }).catch(err => console.error('[member-status] audit log failed', err));
+
     // Fire notifications for manual payment recording
     if (nowPaid && !wasAlreadyPaid) {
         // Notify member if they have a FantasyIQ account

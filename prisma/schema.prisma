@@ -50,6 +50,7 @@ model User {
     leagues          League[]
     commissionerDues LeagueDues[]      @relation("CommissionerDues")
     duesMemberships  DuesMember[]      @relation("MemberDues")
+    paymentAuditLogs PaymentAuditLog[] @relation("AuditLogActor")
     announcements    Announcement[]    @relation("AuthorAnnouncements")
     leagueInvites    LeagueInvite[]    @relation("LeagueInvites")
     notifications         Notification[]
@@ -363,6 +364,7 @@ model LeagueDues {
     futureDues           FutureDuesObligation[]
     announcements        Announcement[]
     winners              LeagueWinner[]
+    auditLogs            PaymentAuditLog[]
 
     @@index([commissionerId])
 }
@@ -780,6 +782,22 @@ model NotificationPreference {
 model ProcessedStripeEvent {
     id          String   @id                         // Stripe event ID (evt_...)
     processedAt DateTime @default(now())
+}
+
+// Immutable log of every manual payment action taken by a commissioner.
+// Written on: mark-paid, remove-payment, manual cash collection.
+model PaymentAuditLog {
+    id            String   @id @default(cuid())
+    leagueDuesId  String
+    memberId      String?                             // null for cash collection entries
+    actorId       String                              // commissioner user ID
+    action        String                              // "mark_paid" | "remove_payment" | "cash_collected"
+    amount        Float
+    note          String?                             // optional commissioner note
+    createdAt     DateTime @default(now())
+
+    leagueDues    LeagueDues  @relation(fields: [leagueDuesId], references: [id], onDelete: Cascade)
+    actor         User        @relation("AuditLogActor", fields: [actorId], references: [id])
 }
 
 model PasswordResetToken {

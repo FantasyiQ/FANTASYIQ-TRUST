@@ -125,7 +125,7 @@ export async function POST(req: NextRequest): Promise<Response> {
             destination: winnerAccountId,
             description: `${item.payoutSpot.label} payout — ${item.proposal.leagueDues.leagueName}`,
             metadata:    { proposalItemId: item.id, claimToken, duesId: item.proposal.leagueDues.id, retry: 'true' },
-        });
+        }, { idempotencyKey: `${claimToken}-retry` });
 
         await prisma.payoutProposalItem.update({
             where: { id: item.id },

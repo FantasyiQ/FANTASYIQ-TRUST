@@ -107,7 +107,7 @@ export async function POST(request: NextRequest): Promise<Response> {
                 planType:   newInfo.type,
                 leagueSize: newInfo.leagueSize != null ? String(newInfo.leagueSize) : '',
             },
-        });
+        }, { idempotencyKey: `upgrade-${stripeSubscriptionId}-${priceId}` });
 
         // Sync DB
         const updatedItem = updated.items.data[0];

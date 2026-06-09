@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
+import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
 
 function appUrl() {
     const u = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL;
@@ -13,6 +14,9 @@ function appUrl() {
 // Creates a Stripe Express account for the winner and returns an onboarding link.
 // Called from the /claim-winnings/[token] page.
 export async function POST(req: NextRequest): Promise<Response> {
+    const rl = await checkMutationLimit(getClientIp(req));
+    if (rl.limited) return rl.response!;
+
     const { claimToken } = await req.json() as { claimToken?: string };
     if (!claimToken) return Response.json({ error: 'Missing claimToken' }, { status: 400 });
 

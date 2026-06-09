@@ -25,15 +25,23 @@ export async function PATCH(
 
     const dues = await prisma.leagueDues.findUnique({
         where: { id: duesId },
-        select: { commissionerId: true },
+        select: { commissionerId: true, buyInAmount: true, teamCount: true, collectedAmount: true },
     });
     if (!dues) return Response.json({ error: 'Not found.' }, { status: 404 });
     if (dues.commissionerId !== user.id) return Response.json({ error: 'Forbidden.' }, { status: 403 });
 
-    const body = await request.json() as { amount?: number };
-    const amount = body.amount;
+    const body = await request.json() as { amount?: number; note?: string };
+    const { amount, note } = body;
     if (typeof amount !== 'number' || isNaN(amount) || amount <= 0) {
         return Response.json({ error: 'amount must be a positive number.' }, { status: 400 });
+    }
+
+    // Guard: cannot collect more than the full pot (buyIn × teamCount)
+    const maxPot = dues.buyInAmount * dues.teamCount;
+    if (dues.collectedAmount + amount > maxPot) {
+        return Response.json({
+            error: `Cannot record more than the full pot ($${maxPot.toFixed(2)}). Current collected: $${dues.collectedAmount.toFixed(2)}.`,
+        }, { status: 409 });
     }
 
     const updated = await prisma.leagueDues.update({
@@ -41,6 +49,17 @@ export async function PATCH(
         data: { collectedAmount: { increment: amount } },
         select: { collectedAmount: true },
     });
+
+    // Audit log
+    prisma.paymentAuditLog.create({
+        data: {
+            leagueDuesId: duesId,
+            actorId:  user.id,
+            action:   'cash_collected',
+            amount,
+            note: note ?? null,
+        },
+    }).catch(err => console.error('[collect] audit log failed', err));
 
     return Response.json({ collectedAmount: updated.collectedAmount });
 }

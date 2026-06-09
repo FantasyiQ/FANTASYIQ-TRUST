@@ -634,7 +634,7 @@ export async function POST(request: NextRequest): Promise<Response> {
                                 destination: account.id,
                                 description: `${item.payoutSpot.label} payout — ${leagueName}`,
                                 metadata:    { proposalItemId: item.id, duesId: item.proposal.leagueDues.id, autoRetry: 'true' },
-                            });
+                            }, { idempotencyKey: `${item.id}-auto-retry` });
 
                             await prisma.payoutProposalItem.update({
                                 where: { id: item.id },
@@ -769,6 +769,32 @@ export async function POST(request: NextRequest): Promise<Response> {
                         throttleMs: 0,
                         data:       { disputeId: dispute.id, piId, leagueName: member.leagueDues.leagueName, memberName: member.displayName },
                     }).catch(err => captureError(err, { event: 'charge.dispute.closed.lost', notify: true }));
+                } else {
+                    // Intermediate states: needs_response, under_review, evidence_submitted,
+                    // warning_needs_response, warning_under_review — member is already pending_refund,
+                    // just notify the commissioner of the status update.
+                    const member = await findDuesMemberByPaymentIntent(piId);
+                    if (!member) break;
+
+                    const statusLabel: Record<string, string> = {
+                        needs_response:          'needs your response',
+                        under_review:            'is under review by the bank',
+                        evidence_submitted:      'has evidence submitted, awaiting bank decision',
+                        warning_needs_response:  'needs your response (inquiry)',
+                        warning_under_review:    'is under review (inquiry)',
+                    };
+                    const label = statusLabel[dispute.status] ?? dispute.status;
+
+                    await notify({
+                        userId:     member.leagueDues.commissionerId,
+                        type:       NotificationType.DUES_PAYMENT_REMOVED,
+                        title:      `Dispute update — ${dispute.status.replace(/_/g, ' ')}`,
+                        body:       `The payment dispute from ${member.displayName} for ${member.leagueDues.leagueName} ${label}. Log in to your Stripe dashboard to take action if required.`,
+                        inApp:      true,
+                        email:      false,
+                        throttleMs: 0,
+                        data:       { disputeId: dispute.id, piId, disputeStatus: dispute.status, leagueName: member.leagueDues.leagueName, memberName: member.displayName },
+                    }).catch(err => captureError(err, { event: 'charge.dispute.closed.intermediate', status: dispute.status }));
                 }
                 break;
             }
