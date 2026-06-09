@@ -50,6 +50,7 @@ export default async function PlayerPlanPage() {
                 },
             },
             leagues: {
+                where:   { isHistorical: false },
                 orderBy: { leagueName: 'asc' },
                 select: {
                     id: true, leagueName: true, season: true, totalRosters: true,

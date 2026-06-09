@@ -87,6 +87,7 @@ export default async function DashboardPage({
                 select: { id: true, leagueName: true, platform: true, createdAt: true },
             },
             leagues: {
+                where:   { isHistorical: false },
                 orderBy: { leagueName: 'asc' },
                 select: {
                     id: true, leagueId: true, leagueName: true, platform: true,
