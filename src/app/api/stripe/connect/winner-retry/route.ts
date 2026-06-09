@@ -65,7 +65,7 @@ export async function POST(req: NextRequest): Promise<Response> {
             country:      'US',
             email:        item.member.email ?? undefined,
             capabilities: { transfers: { requested: true } },
-            metadata:     { memberId: item.member.id, claimToken, proposalItemId: item.id },
+            metadata:     { memberId: item.member.id, proposalItemId: item.id },
         });
 
         await prisma.duesMember.update({
@@ -124,7 +124,7 @@ export async function POST(req: NextRequest): Promise<Response> {
             currency:    'usd',
             destination: winnerAccountId,
             description: `${item.payoutSpot.label} payout — ${item.proposal.leagueDues.leagueName}`,
-            metadata:    { proposalItemId: item.id, claimToken, duesId: item.proposal.leagueDues.id, retry: 'true' },
+            metadata:    { proposalItemId: item.id, duesId: item.proposal.leagueDues.id, retry: 'true' },
         }, { idempotencyKey: `${claimToken}-retry` });
 
         await prisma.payoutProposalItem.update({

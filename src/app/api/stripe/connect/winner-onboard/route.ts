@@ -56,7 +56,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         country: 'US',
         email:   winnerEmail,
         capabilities: { transfers: { requested: true } },
-        metadata: { memberId: item.member.id, claimToken, proposalItemId: item.id },
+        metadata: { memberId: item.member.id, proposalItemId: item.id },
     });
 
     await prisma.duesMember.update({

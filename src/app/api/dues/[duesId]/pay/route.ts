@@ -92,10 +92,9 @@ export async function POST(
             ? `${base}/dashboard/league/${leagueDbId}?dues_cancelled=true`
             : `${base}/dashboard`,
         metadata: {
-            type:        'LEAGUE_DUES',
+            type:     'LEAGUE_DUES',
             duesId,
-            memberId:    member.id,
-            buyInAmount: String(dues.buyInAmount),
+            memberId: member.id,
         },
     });
 

@@ -71,9 +71,9 @@ export async function POST(request: NextRequest): Promise<Response> {
         success_url: `${appUrl()}/api/dues/future-dues/pay-confirm?session_id={CHECKOUT_SESSION_ID}&obligationId=${id}&duesId=${duesId}`,
         cancel_url:  `${appUrl()}/dashboard/commissioner/dues/${duesId}/future-dues`,
         metadata: {
-            type:          'future_dues_on_behalf',
-            obligationId:  id,
+            type:           'FUTURE_DUES_ON_BEHALF',
             duesId,
+            obligationId:   id,
             commissionerId: user.id,
         },
     });

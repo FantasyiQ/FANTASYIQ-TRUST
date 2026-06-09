@@ -53,7 +53,7 @@ export async function GET(req: NextRequest): Promise<Response> {
             currency:    'usd',
             destination: winnerAccountId,
             description: `${item.payoutSpot.label} payout — ${item.proposal.leagueDues.leagueName}`,
-            metadata:    { proposalItemId: item.id, claimToken, duesId: item.proposal.leagueDues.id },
+            metadata:    { proposalItemId: item.id, duesId: item.proposal.leagueDues.id },
         }, { idempotencyKey: claimToken });
 
         await prisma.payoutProposalItem.update({

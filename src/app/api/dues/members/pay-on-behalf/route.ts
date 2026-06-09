@@ -71,9 +71,9 @@ export async function POST(request: NextRequest): Promise<Response> {
         success_url: `${appUrl()}/api/dues/members/pay-confirm?session_id={CHECKOUT_SESSION_ID}&memberId=${memberId}&duesId=${duesId}`,
         cancel_url: `${appUrl()}/dashboard/commissioner/dues/${duesId}`,
         metadata: {
-            type: 'league_dues_on_behalf',
-            memberId,
+            type:           'LEAGUE_DUES_ON_BEHALF',
             duesId,
+            memberId,
             commissionerId: user.id,
         },
     });
