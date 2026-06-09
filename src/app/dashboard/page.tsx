@@ -287,7 +287,12 @@ export default async function DashboardPage({
 
     const hasPastDueSub = subscriptions.some(s => s.status === 'past_due');
     const hasAnyActiveSub = activeSubs.length > 0;
-    const displayTier = (playerSubTier !== 'FREE' ? playerSubTier : subscriptionTier) as SubscriptionTier;
+    // When payment has failed and no subscription is active/trialing, degrade to FREE.
+    // subscriptionTier on the User record persists through past_due so we can't trust it here.
+    const displayTier = (playerSubTier !== 'FREE'
+        ? playerSubTier
+        : (hasPastDueSub && !hasAnyActiveSub ? 'FREE' : subscriptionTier)
+    ) as SubscriptionTier;
     const isElite = displayTier === 'PLAYER_ELITE' || displayTier === 'COMMISSIONER_ELITE';
 
     const leagueLimitKey = tierToLimitKey(displayTier);
@@ -343,11 +348,15 @@ export default async function DashboardPage({
 
                 {/* Payment failed banner */}
                 {hasPastDueSub && (
-                    <div className="rounded-xl bg-yellow-900/20 border border-yellow-700/50 px-5 py-3.5 flex items-center justify-between gap-4 flex-wrap">
-                        <p className="text-yellow-400 font-medium text-sm">
-                            ⚠️ Your last payment failed. Update your payment method to keep your plan active.
-                        </p>
-                        <a href="/dashboard/plan/player" className="text-yellow-300 font-semibold text-sm hover:underline shrink-0">
+                    <div className="rounded-xl bg-yellow-900/20 border border-yellow-700/50 px-5 py-4 flex items-start justify-between gap-4 flex-wrap">
+                        <div>
+                            <p className="text-yellow-400 font-semibold text-sm">Payment failed — features paused</p>
+                            <p className="text-yellow-400/70 text-xs mt-0.5">
+                                Your last payment didn&apos;t go through. Paid features are paused until your payment method is updated.
+                                Stripe will retry automatically, or you can update it now.
+                            </p>
+                        </div>
+                        <a href="/dashboard/billing" className="text-yellow-300 font-semibold text-sm hover:underline shrink-0 mt-0.5">
                             Update payment →
                         </a>
                     </div>

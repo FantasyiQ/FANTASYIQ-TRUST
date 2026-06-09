@@ -36,11 +36,12 @@ export async function requirePaidTier(userId: string): Promise<Response | null> 
         },
     });
 
-    // Accept either a paid subscriptionTier on the user record (player plans set this)
-    // or any active subscription with a paid tier (commissioner plans don't set subscriptionTier).
+    // subscriptions query is already filtered to active|trialing — past_due won't appear.
+    // subscriptionTier on the User record persists through past_due (only cleared on cancel),
+    // so we must verify it's backed by an active/trialing subscription before trusting it.
     const hasTier = user && (
-        PAID_TIERS.has(user.subscriptionTier) ||
-        user.subscriptions.some(s => PAID_TIERS.has(s.tier))
+        user.subscriptions.some(s => PAID_TIERS.has(s.tier)) ||
+        (PAID_TIERS.has(user.subscriptionTier) && user.subscriptions.length > 0)
     );
 
     if (!hasTier) {
