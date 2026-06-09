@@ -82,7 +82,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
         await prisma.payoutProposalItem.update({
             where: { id: item.id },
-            data:  { status: 'claim_sent', failedReason: null },
+            data:  { status: 'claim_sent', failedReason: null, claimSentAt: new Date() },
         });
 
         return Response.json({ action: 'onboard', url: link.url });
@@ -101,7 +101,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
         await prisma.payoutProposalItem.update({
             where: { id: item.id },
-            data:  { status: 'claim_sent', failedReason: null },
+            data:  { status: 'claim_sent', failedReason: null, claimSentAt: new Date() },
         });
 
         return Response.json({ action: 'onboard', url: link.url });

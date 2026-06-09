@@ -457,6 +457,7 @@ model PayoutProposalItem {
     status       String  @default("pending")
     stripeTransferId    String?  // Stripe transfer ID once funds sent to winner
     winnerClaimToken    String?  @unique  // secure token for winner "Claim Your Winnings" link
+    claimSentAt  DateTime?  // when the claim link was last issued (for 90-day expiry cron)
     claimedAt    DateTime?
     failedReason String?  // populated when status = 'failed'
 

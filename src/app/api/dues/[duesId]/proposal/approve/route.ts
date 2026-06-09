@@ -104,7 +104,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
         await prisma.payoutProposalItem.update({
             where: { id: item.id },
-            data:  { memberId, status: 'claim_sent', winnerClaimToken: claimToken },
+            data:  { memberId, status: 'claim_sent', winnerClaimToken: claimToken, claimSentAt: new Date() },
         });
 
         const claimUrl = `${base}/claim-winnings/${claimToken}`;

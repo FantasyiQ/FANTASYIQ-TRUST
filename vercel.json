@@ -103,6 +103,10 @@
     {
       "path": "/api/cron/dss-calculate",
       "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/cron/payout-claim-expiry",
+      "schedule": "0 17 * * *"
     }
   ]
 }
