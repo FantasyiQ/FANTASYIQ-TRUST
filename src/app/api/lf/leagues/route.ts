@@ -32,6 +32,10 @@ export async function POST(request: Request) {
 
     const commissionerExists = await prisma.lFCommissioner.findUnique({ where: { id: commissionerId } });
     if (!commissionerExists) return Response.json({ error: 'Commissioner not found' }, { status: 404 });
+    // Prevent attaching leagues to another user's commissioner profile
+    if (commissionerExists.ownerId !== session.user.id) {
+        return Response.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     // stabilityScore = completedSeasons * 20, capped at 100
     const seasons        = typeof completedSeasons === 'number' && completedSeasons >= 0 ? Math.floor(completedSeasons) : 0;

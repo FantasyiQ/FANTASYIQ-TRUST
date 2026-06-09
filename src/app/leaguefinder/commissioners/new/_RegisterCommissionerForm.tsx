@@ -27,8 +27,6 @@ export default function RegisterCommissionerForm() {
             });
             if (res.ok) {
                 const data = await res.json() as { id: string };
-                // Immediately claim it
-                await fetch(`/api/lf/commissioners/${data.id}/claim`, { method: 'POST' });
                 router.push(`/leaguefinder/commissioners/${data.id}`);
                 router.refresh();
             } else {

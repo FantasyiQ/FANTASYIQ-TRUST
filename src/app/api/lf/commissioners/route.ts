@@ -25,10 +25,20 @@ export async function POST(request: Request) {
         return Response.json({ error: 'platformHandles must be an object' }, { status: 400 });
     }
 
+    // One commissioner profile per user
+    const existing = await prisma.lFCommissioner.findUnique({ where: { ownerId: session.user.id } });
+    if (existing) {
+        return Response.json({ error: 'You already own a commissioner profile' }, { status: 409 });
+    }
+
+    // Claim immediately at creation — eliminates the race window where a separate
+    // /claim call could be intercepted by another user before the creator calls it.
     const commissioner = await prisma.lFCommissioner.create({
         data: {
             displayName:     displayName.trim(),
             platformHandles: platformHandles as Record<string, string>,
+            ownerId:         session.user.id,
+            claimed:         true,
         },
     });
 
