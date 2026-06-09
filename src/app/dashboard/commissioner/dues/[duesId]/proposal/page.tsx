@@ -39,6 +39,11 @@ export default function ProposalPage() {
     const [retrying, setRetrying]     = useState<Record<string, boolean>>({});
     const [retryMessages, setRetryMessages] = useState<Record<string, string>>({});
 
+    const [balanceCheck, setBalanceCheck] = useState<{
+        availableUsd: number; outstandingUsd: number; bufferUsd: number;
+        isLow: boolean; isCritical: boolean;
+    } | null>(null);
+
     // Reassign modal state
     const [reassignItem, setReassignItem]       = useState<ProposalItem | null>(null);
     const [reassignMemberId, setReassignMemberId] = useState('');
@@ -63,6 +68,13 @@ export default function ProposalPage() {
     }, [duesId]);
 
     useEffect(() => { loadData(); }, [loadData]);
+
+    useEffect(() => {
+        fetch('/api/platform/balance-check')
+            .then(r => r.ok ? r.json() : null)
+            .then(d => { if (d) setBalanceCheck(d); })
+            .catch(() => {});
+    }, []);
 
     const proposal = data?.proposals?.[0];
 
@@ -271,6 +283,26 @@ export default function ProposalPage() {
                                 )}
                             </div>
                         ))}
+                    </div>
+                )}
+
+                {!isApproved && !isPoll && balanceCheck?.isLow && (
+                    <div className={`rounded-xl px-4 py-3 text-sm border ${
+                        balanceCheck.isCritical
+                            ? 'bg-red-900/20 border-red-800/50 text-red-400'
+                            : 'bg-amber-900/20 border-amber-800/40 text-amber-400'
+                    }`}>
+                        <p className="font-semibold">
+                            {balanceCheck.isCritical ? 'Platform balance critical' : 'Platform balance low'}
+                        </p>
+                        <p className="mt-0.5 text-xs opacity-80">
+                            Available: <span className="font-mono">${balanceCheck.availableUsd.toFixed(2)}</span>
+                            {' · '}Outstanding: <span className="font-mono">${balanceCheck.outstandingUsd.toFixed(2)}</span>
+                            {' · '}Buffer: <span className="font-mono">${balanceCheck.bufferUsd.toFixed(2)}</span>
+                        </p>
+                        {balanceCheck.isCritical && (
+                            <p className="mt-1 text-xs">Approving this proposal may cause transfers to fail. Add funds to the platform Stripe account before proceeding.</p>
+                        )}
                     </div>
                 )}
 

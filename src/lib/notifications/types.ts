@@ -79,6 +79,9 @@ export const NotificationType = {
   // League Finder
   LF_JOIN_REQUEST:              'lf.join_request',           // player requested to join commissioner's league
   LF_PRS_HISTORY_ADDED:         'lf.prs_history_added',      // commissioner imported history for this player
+
+  // Platform ops (admin-only)
+  PLATFORM_BALANCE_LOW:         'platform.balance_low',
 } as const;
 
 export type NotificationType = typeof NotificationType[keyof typeof NotificationType];
@@ -127,6 +130,9 @@ export const THROTTLE_MS: Partial<Record<NotificationType, number>> = {
   [NotificationType.LEAGUE_HEALTH]:                 7 * DAY,
   [NotificationType.FEATURE_SUGGESTION]:            14 * DAY,
   [NotificationType.LEAGUE_SYNC_REMINDER]:          7 * DAY,
+
+  // Platform ops — daily max so persistent low balance doesn't spam
+  [NotificationType.PLATFORM_BALANCE_LOW]:            DAY,
 
   // No throttle (undefined): dues.payment.confirmed, dues.payment.manual_recorded,
   // member.joined_league, member.linked_to_dues_slot, payouts.released,
