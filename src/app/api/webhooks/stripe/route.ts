@@ -571,6 +571,146 @@ export async function POST(request: NextRequest): Promise<Response> {
                 break;
             }
 
+            // ── Stripe Connect account status changed ─────────────────────────
+            case 'account.updated': {
+                const account  = event.data.object as Stripe.Account;
+                const prevAttrs = (event.data as { previous_attributes?: Partial<Stripe.Account> }).previous_attributes ?? {};
+
+                // Only act when payouts_enabled or charges_enabled changed — this event fires
+                // for all kinds of account changes; ignore irrelevant ones.
+                const relevant = 'payouts_enabled' in prevAttrs || 'charges_enabled' in prevAttrs;
+                if (!relevant) break;
+
+                // Find all winners linked to this Connect account
+                const members = await prisma.duesMember.findMany({
+                    where:  { stripeConnectAccountId: account.id },
+                    select: { id: true, displayName: true },
+                });
+                if (members.length === 0) break;
+
+                const memberIds = members.map(m => m.id);
+                const memberMap = new Map(members.map(m => [m.id, m.displayName]));
+
+                if (account.payouts_enabled && account.charges_enabled) {
+                    // ── Account recovered → auto-retry stuck payouts ──────────
+                    const stuckItems = await prisma.payoutProposalItem.findMany({
+                        where: {
+                            memberId: { in: memberIds },
+                            status:   { in: ['failed', 'claim_sent'] },
+                        },
+                        include: {
+                            proposal:   { include: { leagueDues: { select: { id: true, leagueName: true, commissionerId: true } } } },
+                            payoutSpot: { select: { label: true } },
+                        },
+                    });
+
+                    for (const item of stuckItems) {
+                        const { leagueName, commissionerId } = item.proposal.leagueDues;
+                        const winnerName = memberMap.get(item.memberId) ?? 'Winner';
+
+                        // Balance check per item
+                        const bal          = await stripe.balance.retrieve();
+                        const available    = bal.available.find(b => b.currency === 'usd')?.amount ?? 0;
+                        const needed       = Math.round(item.amount * 100);
+
+                        if (available < needed) {
+                            await notify({
+                                userId:     commissionerId,
+                                type:       NotificationType.PAYOUT_FAILED,
+                                title:      'Payout account ready but balance insufficient',
+                                body:       `${winnerName}'s Stripe account for ${leagueName} is now active, but the platform balance ($${(available / 100).toFixed(2)}) is too low to complete the $${item.amount.toFixed(2)} transfer. Contact support.`,
+                                inApp:      true,
+                                email:      true,
+                                throttleMs: 0,
+                                data:       { itemId: item.id, leagueName, winnerName },
+                            }).catch(err => captureError(err, { event: 'account.updated.balance', itemId: item.id }));
+                            continue;
+                        }
+
+                        try {
+                            const transfer = await stripe.transfers.create({
+                                amount:      needed,
+                                currency:    'usd',
+                                destination: account.id,
+                                description: `${item.payoutSpot.label} payout — ${leagueName}`,
+                                metadata:    { proposalItemId: item.id, duesId: item.proposal.leagueDues.id, autoRetry: 'true' },
+                            });
+
+                            await prisma.payoutProposalItem.update({
+                                where: { id: item.id },
+                                data:  {
+                                    status:           'transfer_initiated',
+                                    stripeTransferId: transfer.id,
+                                    claimedAt:        new Date(),
+                                    failedReason:     null,
+                                },
+                            });
+
+                            await notify({
+                                userId:     commissionerId,
+                                type:       NotificationType.PAYOUTS_RELEASED,
+                                title:      'Payout auto-retried successfully',
+                                body:       `${winnerName}'s account for ${leagueName} is now active. The $${item.amount.toFixed(2)} transfer was automatically retried and is on its way.`,
+                                inApp:      true,
+                                email:      false,
+                                throttleMs: 0,
+                                data:       { itemId: item.id, leagueName, winnerName, transferId: transfer.id },
+                            }).catch(err => captureError(err, { event: 'account.updated.auto_retry', itemId: item.id }));
+                        } catch (err) {
+                            const reason = err instanceof Error ? err.message : String(err);
+                            await prisma.payoutProposalItem.update({
+                                where: { id: item.id },
+                                data:  { status: 'failed', failedReason: reason },
+                            }).catch(dbErr => captureError(dbErr, { context: 'account.updated auto_retry db write' }));
+
+                            await notify({
+                                userId:     commissionerId,
+                                type:       NotificationType.PAYOUT_FAILED,
+                                title:      'Auto-retry failed',
+                                body:       `${winnerName}'s account for ${leagueName} is active but the automatic transfer failed: ${reason}. Retry manually from the proposal page.`,
+                                inApp:      true,
+                                email:      true,
+                                throttleMs: 0,
+                                data:       { itemId: item.id, leagueName, winnerName },
+                            }).catch(notifyErr => captureError(notifyErr, { event: 'account.updated.auto_retry_failed', itemId: item.id }));
+                        }
+                    }
+                } else if (!account.payouts_enabled) {
+                    // ── Account restricted → alert commissioner ───────────────
+                    const pendingItems = await prisma.payoutProposalItem.findMany({
+                        where: {
+                            memberId: { in: memberIds },
+                            status:   { in: ['pending', 'claim_sent', 'transfer_initiated'] },
+                        },
+                        include: {
+                            proposal: { include: { leagueDues: { select: { leagueName: true, commissionerId: true } } } },
+                        },
+                    });
+
+                    // Dedupe notifications per commissioner — one alert covers multiple items
+                    const notified = new Set<string>();
+                    for (const item of pendingItems) {
+                        const { leagueName, commissionerId } = item.proposal.leagueDues;
+                        const winnerName = memberMap.get(item.memberId) ?? 'A winner';
+                        const key = `${commissionerId}:${account.id}`;
+                        if (notified.has(key)) continue;
+                        notified.add(key);
+
+                        await notify({
+                            userId:     commissionerId,
+                            type:       NotificationType.PAYOUT_FAILED,
+                            title:      "Winner's payout account restricted",
+                            body:       `${winnerName}'s Stripe account for ${leagueName} has been restricted by Stripe. Their payout is paused until they resolve the issue with Stripe directly.`,
+                            inApp:      true,
+                            email:      true,
+                            throttleMs: 0,
+                            data:       { accountId: account.id, leagueName, winnerName },
+                        }).catch(err => captureError(err, { event: 'account.updated.restricted', itemId: item.id }));
+                    }
+                }
+                break;
+            }
+
             // ── Chargeback: dispute opened ────────────────────────────────────
             case 'charge.dispute.created': {
                 const dispute = event.data.object as Stripe.Dispute;
