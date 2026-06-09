@@ -13,6 +13,21 @@ export async function DELETE(): Promise<Response> {
 
     const userId = session.user.id;
 
+    // Block deletion if any winner has an unclaimed payout — cascade delete would
+    // orphan the money in FiQ's Stripe balance with no DB record to pay it out from.
+    const activeClaims = await prisma.payoutProposalItem.count({
+        where: {
+            status:   'claim_sent',
+            proposal: { leagueDues: { commissionerId: userId } },
+        },
+    });
+    if (activeClaims > 0) {
+        return Response.json(
+            { error: `You have ${activeClaims} pending winner payout${activeClaims === 1 ? '' : 's'} that must be resolved before deleting your account. Visit your proposal pages to cancel or reissue them.` },
+            { status: 409 },
+        );
+    }
+
     // Fetch the Stripe customer ID and any active subscriptions before deletion
     const user = await prisma.user.findUnique({
         where:  { id: userId },

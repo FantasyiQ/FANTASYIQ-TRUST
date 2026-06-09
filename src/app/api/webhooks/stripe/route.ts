@@ -929,6 +929,104 @@ export async function POST(request: NextRequest): Promise<Response> {
                 }).catch(err => captureError(err, { event: 'charge.refunded', notify: true }));
                 break;
             }
+            // ── Transfer reversed by Stripe ───────────────────────────────────
+            case 'transfer.reversed': {
+                const transfer = event.data.object as Stripe.Transfer;
+                const proposalItemId = transfer.metadata?.proposalItemId;
+                if (!proposalItemId) break;
+
+                const item = await prisma.payoutProposalItem.findUnique({
+                    where:   { id: proposalItemId },
+                    include: {
+                        member:     { select: { displayName: true } },
+                        proposal:   { include: { leagueDues: { select: { leagueName: true, commissionerId: true } } } },
+                        payoutSpot: { select: { label: true } },
+                    },
+                });
+                if (!item) break;
+
+                const { leagueName, commissionerId } = item.proposal.leagueDues;
+                const winnerName = item.member.displayName ?? 'Winner';
+
+                await prisma.payoutProposalItem.update({
+                    where: { id: item.id },
+                    data:  { status: 'failed', failedReason: 'Transfer reversed by Stripe', stripeTransferId: null },
+                });
+
+                await notify({
+                    userId:     commissionerId,
+                    type:       NotificationType.PAYOUT_FAILED,
+                    title:      'Payout transfer reversed by Stripe',
+                    body:       `${winnerName}'s $${item.amount.toFixed(2)} ${item.payoutSpot.label} payout for ${leagueName} was reversed by Stripe (transfer ID: ${transfer.id}). The funds have returned to FiQ's balance. Contact support to reissue the payout.`,
+                    inApp:      true,
+                    email:      true,
+                    throttleMs: 0,
+                    data:       { transferId: transfer.id, itemId: item.id, leagueName, winnerName },
+                }).catch(err => captureError(err, { event: 'transfer.reversed', itemId: item.id }));
+                break;
+            }
+
+            // ── Winner revoked Express account access ─────────────────────────
+            case 'account.application.deauthorized': {
+                const account = event.data.object as Stripe.Application;
+                const accountId = (account as unknown as { id: string }).id;
+                if (!accountId) break;
+
+                // Find all members linked to this now-deauthorized account
+                const members = await prisma.duesMember.findMany({
+                    where:  { stripeConnectAccountId: accountId },
+                    select: { id: true, displayName: true },
+                });
+                if (members.length === 0) break;
+
+                const memberIds = members.map(m => m.id);
+
+                // Clear the Connect account ID so the retry cron and onboard flow can start fresh
+                await prisma.duesMember.updateMany({
+                    where: { id: { in: memberIds } },
+                    data:  { stripeConnectAccountId: null },
+                });
+
+                // Reset any stuck items back to claim_sent so commissioner can reissue
+                const stuckItems = await prisma.payoutProposalItem.findMany({
+                    where: {
+                        memberId: { in: memberIds },
+                        status:   { in: ['claim_sent', 'failed'] },
+                    },
+                    include: {
+                        member:     { select: { displayName: true } },
+                        proposal:   { include: { leagueDues: { select: { leagueName: true, commissionerId: true } } } },
+                        payoutSpot: { select: { label: true } },
+                    },
+                });
+
+                const notifiedCommissioners = new Set<string>();
+                for (const item of stuckItems) {
+                    await prisma.payoutProposalItem.update({
+                        where: { id: item.id },
+                        data:  { status: 'failed', failedReason: 'Winner revoked Stripe account access', winnerClaimToken: null },
+                    }).catch(err => captureError(err, { event: 'account.application.deauthorized', itemId: item.id }));
+
+                    const { leagueName, commissionerId } = item.proposal.leagueDues;
+                    const key = `${commissionerId}:${accountId}`;
+                    if (notifiedCommissioners.has(key)) continue;
+                    notifiedCommissioners.add(key);
+
+                    const winnerName = item.member.displayName ?? 'A winner';
+                    await notify({
+                        userId:     commissionerId,
+                        type:       NotificationType.PAYOUT_FAILED,
+                        title:      "Winner disconnected their Stripe account",
+                        body:       `${winnerName} has disconnected their Stripe payout account for ${leagueName}. Their pending payout has been reset — reissue the claim link from the proposal page so they can reconnect.`,
+                        inApp:      true,
+                        email:      true,
+                        throttleMs: 0,
+                        data:       { accountId, leagueName, winnerName },
+                    }).catch(err => captureError(err, { event: 'account.application.deauthorized', commissionerId }));
+                }
+                break;
+            }
+
         } // end switch
     } catch (err) {
         captureError(err, { event: event.type });
