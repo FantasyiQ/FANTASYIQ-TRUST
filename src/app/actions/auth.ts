@@ -1,6 +1,7 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 import { AuthError } from 'next-auth';
 import bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
@@ -10,6 +11,12 @@ import { notify } from '@/lib/notifications/service';
 import { NotificationType } from '@/lib/notifications/types';
 import { sendEmail } from '@/lib/notifications/email';
 import { renderTemplate } from '@/lib/notifications/templates';
+import { checkMutationLimit } from '@/lib/ratelimit';
+
+async function getIp(): Promise<string> {
+    const h = await headers();
+    return h.get('x-real-ip') ?? h.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+}
 
 export type AuthActionState = { error: string } | null;
 
@@ -23,6 +30,9 @@ export async function signUpAction(
     _prevState: AuthActionState,
     formData: FormData
 ): Promise<AuthActionState> {
+    const rl = await checkMutationLimit(await getIp());
+    if (rl.limited) return { error: 'Too many attempts. Please wait a moment and try again.' };
+
     const name = (formData.get('name') as string)?.trim();
     const email = (formData.get('email') as string)?.trim().toLowerCase();
     const password = formData.get('password') as string;
@@ -89,6 +99,9 @@ export async function signInAction(
     _prevState: AuthActionState,
     formData: FormData
 ): Promise<AuthActionState> {
+    const rl = await checkMutationLimit(await getIp());
+    if (rl.limited) return { error: 'Too many attempts. Please wait a moment and try again.' };
+
     const email = (formData.get('email') as string)?.trim().toLowerCase();
     const password = formData.get('password') as string;
     const redirectTo = safeRedirectTo(formData.get('redirectTo'));

@@ -5,17 +5,29 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { calculateAndSavePrs, IMMEDIATE_TRIGGER_EVENTS } from '@/lib/prs';
+import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
 import type { PrsEventType } from '@prisma/client';
 
-const VALID_EVENT_TYPES = new Set<PrsEventType>([
+// Low-trust events: user-generated activity that a player legitimately self-reports.
+const USER_EVENT_TYPES = new Set<PrsEventType>([
+    'lineup_set', 'lineup_missed', 'trade_response', 'trade_ignored', 'waiver_active',
+]);
+
+// High-trust events: must originate from admin tools, server-side crons, or commissioner
+// actions — never from the user themselves.  Self-reporting these would inflate PRS scores.
+const SYSTEM_EVENT_TYPES = new Set<PrsEventType>([
     'verified_season', 'season_abandoned', 'retention_stayed', 'retention_left',
-    'retention_removed', 'lineup_set', 'lineup_missed', 'trade_response',
-    'trade_ignored', 'waiver_active', 'commish_approval', 'commish_endorsement',
+    'retention_removed', 'commish_approval', 'commish_endorsement',
     'commish_flag', 'commish_ban', 'veto_abuse', 'collusion_flag',
     'tanking_flag', 'toxicity_report', 'rule_violation',
 ]);
 
+const VALID_EVENT_TYPES = new Set<PrsEventType>([...USER_EVENT_TYPES, ...SYSTEM_EVENT_TYPES]);
+
 export async function POST(request: Request): Promise<Response> {
+    const rl = await checkMutationLimit(getClientIp(request));
+    if (rl.limited) return rl.response!;
+
     const session = await auth();
     if (!session?.user?.id) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -44,13 +56,22 @@ export async function POST(request: Request): Promise<Response> {
         return Response.json({ error: 'event_value must be a number' }, { status: 400 });
     }
 
-    // Non-admins may only record events for themselves.
-    if (session.user.id !== user_id) {
+    const isSelf = session.user.id === user_id;
+
+    // Non-admins writing for themselves are restricted to low-trust user events.
+    // System events (commish actions, verified seasons, bans, etc.) require admin.
+    let isAdmin = false;
+    if (!isSelf || SYSTEM_EVENT_TYPES.has(event_type as PrsEventType)) {
         const caller = await prisma.user.findUnique({
-            where: { id: session.user.id },
+            where:  { id: session.user.id },
             select: { isAdmin: true },
         });
-        if (!caller?.isAdmin) {
+        isAdmin = !!caller?.isAdmin;
+
+        if (!isSelf && !isAdmin) {
+            return Response.json({ error: 'Forbidden' }, { status: 403 });
+        }
+        if (isSelf && SYSTEM_EVENT_TYPES.has(event_type as PrsEventType) && !isAdmin) {
             return Response.json({ error: 'Forbidden' }, { status: 403 });
         }
     }
