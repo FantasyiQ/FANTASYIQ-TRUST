@@ -288,7 +288,90 @@ export async function POST(request: NextRequest): Promise<Response> {
                     }
                     break;
                 }
-                // ── End league dues ───────────────────────────────────────────────
+                // ── League dues — commissioner pays on behalf of member ───────────
+                if (cs.metadata?.type === 'LEAGUE_DUES_ON_BEHALF') {
+                    if (cs.payment_status === 'paid') {
+                        const { duesId, memberId } = cs.metadata;
+                        if (duesId && memberId) {
+                            const [member, dues] = await Promise.all([
+                                prisma.duesMember.findUnique({
+                                    where:  { id: memberId },
+                                    select: { duesStatus: true, leagueDuesId: true },
+                                }),
+                                prisma.leagueDues.findUnique({
+                                    where:  { id: duesId },
+                                    select: { buyInAmount: true },
+                                }),
+                            ]);
+                            if (member && dues && member.leagueDuesId === duesId && member.duesStatus !== 'paid') {
+                                const piId = typeof cs.payment_intent === 'string' ? cs.payment_intent : null;
+                                await prisma.$transaction([
+                                    prisma.duesMember.update({
+                                        where: { id: memberId },
+                                        data: {
+                                            duesStatus:            'paid',
+                                            paidAt:                new Date(),
+                                            paymentMethod:         'stripe_on_behalf',
+                                            stripePaymentId:       cs.id,
+                                            stripePaymentIntentId: piId,
+                                        },
+                                    }),
+                                    prisma.leagueDues.update({
+                                        where: { id: duesId },
+                                        data:  { potTotal: { increment: dues.buyInAmount }, status: 'active' },
+                                    }),
+                                ]);
+                            }
+                        }
+                    }
+                    break;
+                }
+
+                // ── Future dues — commissioner pays next season obligation ────────
+                if (cs.metadata?.type === 'FUTURE_DUES_ON_BEHALF') {
+                    if (cs.payment_status === 'paid') {
+                        const { obligationId } = cs.metadata;
+                        if (obligationId) {
+                            const obligation = await prisma.futureDuesObligation.findUnique({
+                                where:   { id: obligationId },
+                                select: {
+                                    status: true,
+                                    season: true,
+                                    amount: true,
+                                    leagueDues: { select: { commissionerId: true, leagueName: true } },
+                                },
+                            });
+                            if (obligation && obligation.status !== 'paid') {
+                                const piId = typeof cs.payment_intent === 'string' ? cs.payment_intent : null;
+                                await prisma.futureDuesObligation.update({
+                                    where: { id: obligationId },
+                                    data: {
+                                        status:                'paid',
+                                        paidAt:               new Date(),
+                                        paymentMethod:        'stripe_on_behalf',
+                                        stripePaymentIntentId: piId,
+                                    },
+                                });
+
+                                const futureTracker = await prisma.leagueDues.findFirst({
+                                    where: {
+                                        commissionerId: obligation.leagueDues.commissionerId,
+                                        leagueName:     obligation.leagueDues.leagueName,
+                                        season:         obligation.season,
+                                    },
+                                    select: { id: true },
+                                });
+                                if (futureTracker) {
+                                    await prisma.leagueDues.update({
+                                        where: { id: futureTracker.id },
+                                        data:  { potTotal: { increment: obligation.amount }, status: 'active' },
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
 
                 const customerId   = cs.customer as string;
                 const stripeSubId  = cs.subscription as string | null;
