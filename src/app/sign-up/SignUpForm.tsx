@@ -1,13 +1,10 @@
 'use client';
 
-import { useActionState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { signUpAction, signInWithGoogle } from '@/app/actions/auth';
+import { signInWithGoogle } from '@/app/actions/auth';
 
 export default function SignUpForm({ redirect }: { redirect: string }) {
-    const [state, action, pending] = useActionState(signUpAction, null);
-
     return (
         <main className="min-h-screen bg-gray-950 flex items-center justify-center px-4 py-16">
             <div className="w-full max-w-md">
@@ -23,86 +20,14 @@ export default function SignUpForm({ redirect }: { redirect: string }) {
                     <h1 className="text-2xl font-bold text-white mb-1">Create your account</h1>
                     <p className="text-gray-400 text-sm mb-6">Start protecting your league today.</p>
 
-                    {/* Google */}
                     <form action={signInWithGoogle}>
                         <input type="hidden" name="redirectTo" value={redirect} />
                         <button
                             type="submit"
-                            className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-100 text-gray-900 font-semibold py-2.5 rounded-lg transition mb-4"
+                            className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-100 text-gray-900 font-semibold py-2.5 rounded-lg transition"
                         >
                             <GoogleIcon />
                             Sign up with Google
-                        </button>
-                    </form>
-
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="flex-1 h-px bg-gray-800" />
-                        <span className="text-gray-500 text-xs">or</span>
-                        <div className="flex-1 h-px bg-gray-800" />
-                    </div>
-
-                    {/* Error */}
-                    {state?.error && (
-                        <div className="mb-4 px-4 py-3 rounded-lg bg-red-950/50 border border-red-800 text-red-400 text-sm">
-                            {state.error}
-                        </div>
-                    )}
-
-                    {/* Credentials form */}
-                    <form action={action} className="space-y-4">
-                        <input type="hidden" name="redirectTo" value={redirect} />
-                        <div>
-                            <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-1.5">
-                                Name
-                            </label>
-                            <input
-                                id="name"
-                                name="name"
-                                type="text"
-                                autoComplete="name"
-                                required
-                                className="w-full bg-gray-800 border border-gray-700 text-white placeholder-gray-500 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#D4AF37] transition"
-                                placeholder="Your name"
-                            />
-                        </div>
-
-                        <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1.5">
-                                Email
-                            </label>
-                            <input
-                                id="email"
-                                name="email"
-                                type="email"
-                                autoComplete="email"
-                                required
-                                className="w-full bg-gray-800 border border-gray-700 text-white placeholder-gray-500 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#D4AF37] transition"
-                                placeholder="you@example.com"
-                            />
-                        </div>
-
-                        <div>
-                            <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1.5">
-                                Password
-                            </label>
-                            <input
-                                id="password"
-                                name="password"
-                                type="password"
-                                autoComplete="new-password"
-                                required
-                                minLength={8}
-                                className="w-full bg-gray-800 border border-gray-700 text-white placeholder-gray-500 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#D4AF37] transition"
-                                placeholder="Minimum 8 characters"
-                            />
-                        </div>
-
-                        <button
-                            type="submit"
-                            disabled={pending}
-                            className="w-full bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-60 disabled:cursor-not-allowed text-gray-950 font-bold py-2.5 rounded-lg transition"
-                        >
-                            {pending ? 'Creating account…' : 'Create account'}
                         </button>
                     </form>
                 </div>
