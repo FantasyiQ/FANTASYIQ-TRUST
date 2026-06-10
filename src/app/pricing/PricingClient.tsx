@@ -527,6 +527,14 @@ function CommPlanCard({ name, price, period, badge, badgeGold, ring, features, p
                                     , including the <strong className="text-gray-300">No-Refund Policy</strong>.
                                 </label>
                             </div>
+                            <div className="rounded-lg border border-gray-700 bg-gray-800/50 px-3 py-2.5 mb-3 space-y-0.5">
+                                <p className="text-[10px] font-bold text-white flex items-center gap-1">
+                                    🛡️ Protected Payments
+                                </p>
+                                <p className="text-[10px] text-gray-400 leading-snug">
+                                    Your purchase is protected against fraud, chargebacks, and payment disputes through FantasyiQ Trust.
+                                </p>
+                            </div>
                             <button type="submit" disabled={!canCheckout}
                                 className="w-full py-3 rounded-xl font-bold transition-colors bg-[#D4AF37] text-black hover:bg-[#b8912a] disabled:opacity-40 disabled:cursor-not-allowed"
                                 title={!leagueName.trim() ? 'Enter your league name above' : !acceptTerms ? 'Accept Terms of Service to continue' : undefined}>
