@@ -51,6 +51,9 @@ export default async function AdminRevenuePage() {
         newSubsThisMonth,
         canceledThisMonth,
         recentSubs,
+        duesAgg,
+        winnersAgg,
+        leaguesWithDues,
     ] = await Promise.all([
         prisma.subscription.findMany({
             where:  { status: { in: ['active', 'trialing'] } },
@@ -71,11 +74,44 @@ export default async function AdminRevenuePage() {
                 stripeSubscriptionId: true,
             },
         }),
+        // Total dues collected across all leagues
+        prisma.leagueDues.aggregate({
+            _sum: { potTotal: true },
+        }),
+        // Winners: paid out vs pending
+        prisma.leagueWinner.groupBy({
+            by:    ['paidOut'],
+            _sum:  { amount: true },
+            _count: { id: true },
+        }),
+        // Per-league breakdown for the escrow table
+        prisma.leagueDues.findMany({
+            select: {
+                id:            true,
+                leagueName:    true,
+                season:        true,
+                status:        true,
+                potTotal:      true,
+                buyInAmount:   true,
+                teamCount:     true,
+                winners:       { select: { amount: true, paidOut: true } },
+                _count:        { select: { members: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+        }),
     ]);
 
     // MRR: prices are annual, so MRR = annual / 12
     const arr = activeSubs.reduce((sum, s) => sum + commPrice(s.tier, s.leagueSize), 0);
     const mrr = arr / 12;
+
+    // Balance split
+    const totalDuesCollected = duesAgg._sum.potTotal ?? 0;
+    const paidOutRow   = winnersAgg.find(r => r.paidOut === true);
+    const pendingRow   = winnersAgg.find(r => r.paidOut === false);
+    const alreadyPaidOut  = paidOutRow?._sum.amount  ?? 0;
+    const pendingPayouts  = pendingRow?._sum.amount  ?? 0;
+    const stillInEscrow   = totalDuesCollected - alreadyPaidOut;
 
     // Break down by tier
     const byTier = new Map<string, number>();
@@ -189,6 +225,73 @@ export default async function AdminRevenuePage() {
                             </div>
                         );
                     })}
+                </div>
+            </div>
+
+            {/* ── Balance Breakdown ─────────────────────────────────────────── */}
+            <div>
+                <h2 className="text-lg font-bold text-white mb-1">Stripe Balance Breakdown</h2>
+                <p className="text-gray-500 text-sm mb-4">What&apos;s yours vs. what belongs to league winners.</p>
+
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <StatCard label="Total Dues Collected" value={fmt(totalDuesCollected)} sub="Members paid in" />
+                    <StatCard label="Already Paid Out"     value={fmt(alreadyPaidOut)}     sub="Sent to winners" />
+                    <StatCard label="Pending Payouts"      value={fmt(pendingPayouts)}      sub="Winners set, not paid" />
+                    <StatCard label="Still in Escrow"      value={fmt(stillInEscrow)}       sub="Don't transfer this" accent />
+                </div>
+
+                <div className="bg-amber-950/30 border border-amber-800/40 rounded-xl px-5 py-4 mb-6 text-sm text-amber-300">
+                    <span className="font-bold">Safe to transfer out of Stripe:</span>{' '}
+                    subscription revenue only. The <span className="font-bold">{fmt(stillInEscrow)}</span> still in escrow belongs to league winners — leave it in Stripe until payouts are complete.
+                </div>
+
+                {/* Per-league escrow table */}
+                <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+                    <div className="px-5 py-4 border-b border-gray-800">
+                        <p className="text-sm font-semibold text-white">Escrow by League</p>
+                        <p className="text-xs text-gray-600">How much of the pot each league still holds</p>
+                    </div>
+                    <div className="divide-y divide-gray-800">
+                        {leaguesWithDues.map(league => {
+                            const paid    = league.winners.filter(w => w.paidOut).reduce((s, w) => s + w.amount, 0);
+                            const pending = league.winners.filter(w => !w.paidOut).reduce((s, w) => s + w.amount, 0);
+                            const held    = league.potTotal - paid;
+                            const statusColor =
+                                league.status === 'paid_out'  ? 'text-emerald-400' :
+                                league.status === 'approved'  ? 'text-blue-400'    :
+                                league.status === 'active'    ? 'text-[#D4AF37]'   : 'text-gray-500';
+                            return (
+                                <div key={league.id} className="px-5 py-3 flex items-center justify-between gap-4">
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-sm text-white">{league.leagueName}</p>
+                                        <p className="text-xs text-gray-600">
+                                            Season {league.season} · {fmt(league.buyInAmount)} buy-in · {league._count.members} members
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-4 shrink-0 text-right">
+                                        <div>
+                                            <p className="text-xs text-gray-500">Collected</p>
+                                            <p className="text-sm font-bold text-white tabular-nums">{fmt(league.potTotal)}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-gray-500">Held</p>
+                                            <p className="text-sm font-bold tabular-nums" style={{ color: held > 0 ? '#D4AF37' : '#6b7280' }}>{fmt(held)}</p>
+                                        </div>
+                                        {pending > 0 && (
+                                            <div>
+                                                <p className="text-xs text-gray-500">Pending</p>
+                                                <p className="text-sm font-bold text-blue-400 tabular-nums">{fmt(pending)}</p>
+                                            </div>
+                                        )}
+                                        <span className={`text-xs font-semibold ${statusColor}`}>{league.status.replace(/_/g, ' ')}</span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        {leaguesWithDues.length === 0 && (
+                            <p className="px-5 py-4 text-sm text-gray-600">No leagues with dues yet.</p>
+                        )}
+                    </div>
                 </div>
             </div>
 
