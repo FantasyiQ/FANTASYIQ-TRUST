@@ -27,16 +27,17 @@ export async function GET(request: Request): Promise<Response> {
         });
 
         // Deduplicate: one Sleeper API call per unique leagueId
-        const uniqueLeagueIds = [...new Map(leagues.map((l) => [l.leagueId, l])).values()];
+        const uniqueLeagues = [...new Map(leagues.map((l) => [l.leagueId, l])).values()];
 
-        let updated = 0;
-
-        for (const league of uniqueLeagueIds) {
-            try {
+        // ── Phase 1: fetch all Sleeper data before touching the DB ───────────
+        // Keeping API calls and DB writes separate avoids holding a connection
+        // open during slow network calls, which caused connection timeout errors.
+        type MatchupPayload = { leagueId: string; data: object[] };
+        const results = await Promise.allSettled(
+            uniqueLeagues.map(async (league): Promise<MatchupPayload> => {
                 const matchups = await getLeagueMatchups(league.leagueId, nflState.week);
-                const active = matchups.filter((m) => m.matchup_id !== null);
+                const active   = matchups.filter((m) => m.matchup_id !== null);
 
-                // Group into pairs by matchup_id
                 const pairs = new Map<number, typeof active>();
                 for (const m of active) {
                     const id = m.matchup_id!;
@@ -44,25 +45,37 @@ export async function GET(request: Request): Promise<Response> {
                     pairs.get(id)!.push(m);
                 }
 
-                const matchupData = [...pairs.entries()].map(([id, teams]) => ({
-                    matchupId: id,
-                    week: nflState.week,
-                    teams: teams.map((t) => ({
-                        rosterId: t.roster_id,
-                        points: t.custom_points ?? t.points,
+                return {
+                    leagueId: league.leagueId,
+                    data: [...pairs.entries()].map(([id, teams]) => ({
+                        matchupId: id,
+                        week:      nflState.week,
+                        teams:     teams.map((t) => ({
+                            rosterId: t.roster_id,
+                            points:   t.custom_points ?? t.points,
+                        })),
                     })),
-                }));
+                };
+            })
+        );
 
-                // Update all DB rows for this leagueId
-                await prisma.league.updateMany({
-                    where: { leagueId: league.leagueId },
-                    data: { currentMatchup: matchupData },
-                });
-                updated++;
-            } catch { /* skip this league */ }
-        }
+        const payloads = results
+            .filter((r): r is PromiseFulfilledResult<MatchupPayload> => r.status === 'fulfilled')
+            .map((r) => r.value);
 
-        return Response.json({ ok: true, updated, week: nflState.week });
+        // ── Phase 2: batch all DB writes in a single transaction ─────────────
+        // One transaction replaces N sequential updateMany calls, eliminating
+        // the N+1 query pattern Sentry flagged on this route.
+        await prisma.$transaction(
+            payloads.map(({ leagueId, data }) =>
+                prisma.league.updateMany({
+                    where: { leagueId },
+                    data:  { currentMatchup: data },
+                })
+            )
+        );
+
+        return Response.json({ ok: true, updated: payloads.length, week: nflState.week });
     } catch (err) {
         captureError(err, { cron: 'sleeper-matchups' });
         const message = err instanceof Error ? err.message : 'Matchup poll failed';

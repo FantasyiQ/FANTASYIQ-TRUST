@@ -15,7 +15,7 @@ function createClient() {
         connectionString: process.env.DATABASE_URL!,
         max:                    1,      // 1 connection per function instance
         idleTimeoutMillis:  10_000,     // release idle connections after 10 s
-        connectionTimeoutMillis: 5_000, // fail fast if pool is saturated
+        connectionTimeoutMillis: 15_000, // allow time for cold-start DB wake
     });
     const adapter = new PrismaPg(pool);
     return new PrismaClient({ adapter });
