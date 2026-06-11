@@ -192,7 +192,19 @@ export async function GET(req: NextRequest): Promise<Response> {
     let boardPlayers: MockPlayer[] = [];
 
     if (isRookieDraft) {
-        // Dynasty rookie draft: FiQ rookie rankings as the pool
+        // Dynasty rookie draft: FiQ rookie rankings as the pool.
+        //
+        // Position scarcity multipliers: dynasty values RBs above same-tier WRs because
+        // RBs age faster, contribute earlier, and are scarcer at the top of any class.
+        // Without this adjustment, WRs (which tend to score higher in raw FiQ) would
+        // dominate round 1 and elite RBs like Coleman/Singleton/Johnson fall to round 2.
+        const DYNASTY_POS_MULT: Record<string, number> = {
+            QB: superflex ? 1.10 : 1.00,  // QB premium only meaningful in SF leagues
+            RB: 1.12,                      // dynasty RB scarcity premium
+            WR: 1.00,                      // baseline
+            TE: 1.03,                      // slight TE1 premium
+        };
+
         const season = league.season ?? '2026';
         const rookies = await prisma.rookieRankingsPlayer.findMany({
             where:   { season, position: { in: ['QB', 'RB', 'WR', 'TE'] } },
@@ -208,24 +220,29 @@ export async function GET(req: NextRequest): Promise<Response> {
             : [];
         const spByName = new Map(sleeperPlayers.map(p => [p.fullName.toLowerCase(), p]));
 
-        boardPlayers = rookies.map((r, i) => {
-            const sp        = spByName.get(r.playerName.toLowerCase());
-            const tierMatch = r.fiqTier?.match(/(\d+)/);
-            const tier      = tierMatch ? parseInt(tierMatch[1], 10)
-                : Math.min(5, Math.max(1, Math.ceil((i + 1) / Math.max(rookies.length / 5, 1))));
-            return {
-                playerId:     sp?.playerId ?? `rookie-${i}`,
-                name:         r.playerName,
-                position:     r.position as MockPlayer['position'],
-                team:         sp?.team ?? null,
-                age:          sp?.age ?? null,
-                tier:         Math.min(5, Math.max(1, tier)),
-                baseScore:    Math.min(100, Math.max(1, Math.round(r.fiqScore))),
-                isRookie:     true,
-                injuryStatus: sp?.injuryStatus ?? null,
-                imageUrl:     sp ? `https://sleepercdn.com/content/nfl/players/${sp.playerId}.jpg` : null,
-            };
-        });
+        boardPlayers = rookies
+            .map((r, i) => {
+                const sp        = spByName.get(r.playerName.toLowerCase());
+                const mult      = DYNASTY_POS_MULT[r.position] ?? 1.0;
+                const baseScore = Math.min(100, Math.max(1, Math.round(r.fiqScore * mult)));
+                const tierMatch = r.fiqTier?.match(/(\d+)/);
+                const tier      = tierMatch ? parseInt(tierMatch[1], 10)
+                    : Math.min(5, Math.max(1, Math.ceil((i + 1) / Math.max(rookies.length / 5, 1))));
+                return {
+                    playerId:     sp?.playerId ?? `rookie-${i}`,
+                    name:         r.playerName,
+                    position:     r.position as MockPlayer['position'],
+                    team:         sp?.team ?? null,
+                    age:          sp?.age ?? null,
+                    tier:         Math.min(5, Math.max(1, tier)),
+                    baseScore,
+                    isRookie:     true,
+                    injuryStatus: sp?.injuryStatus ?? null,
+                    imageUrl:     sp ? `https://sleepercdn.com/content/nfl/players/${sp.playerId}.jpg` : null,
+                };
+            })
+            // Re-sort by adjusted baseScore so the board reflects dynasty-adjusted BPA
+            .sort((a, b) => b.baseScore - a.baseScore);
     } else {
         // Startup dynasty or redraft: FantasyCalc values
         const needed = totalTeams * totalRounds + 60;
