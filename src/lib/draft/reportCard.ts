@@ -116,11 +116,14 @@ function gradeFromScore(score: number): PickGrade {
     return 'F';
 }
 
+// Thresholds calibrated to dynasty reality: existing-roster fiqScore is
+// derived as ktcValue/90, so typical starters land at 33–56. Grades must
+// reflect the actual distribution, not an absolute-value fantasy.
 function posGrade(avgFiq: number): 'A' | 'B' | 'C' | 'D' | 'F' {
-    if (avgFiq >= 80) return 'A';
-    if (avgFiq >= 70) return 'B';
-    if (avgFiq >= 60) return 'C';
-    if (avgFiq >= 50) return 'D';
+    if (avgFiq >= 65) return 'A';  // elite group (avg KTC ~5850)
+    if (avgFiq >= 50) return 'B';  // solid starters (avg KTC ~4500)
+    if (avgFiq >= 35) return 'C';  // functional depth (avg KTC ~3150)
+    if (avgFiq >= 20) return 'D';  // thin (avg KTC ~1800)
     return 'F';
 }
 
@@ -424,8 +427,9 @@ function computeWinProbDelta(picks: PickAlignment[], totalTeams: number, avgScor
     return Math.min(10, Math.max(0, rounded));
 }
 
-// ── Dynasty Outlook v3.3 ──────────────────────────────────────────────────────
-// Tone: positive anchor → directional clarity → 1-2 actionable insights → momentum
+// ── Dynasty Outlook v3.5 ──────────────────────────────────────────────────────
+// Anchored on league-relative overallScore (0–100 vs leaguemates), not
+// absolute position grades. Position grades are secondary color only.
 
 function generateDynastyOutlook(
     traj: TrajectoryWindow,
@@ -434,47 +438,46 @@ function generateDynastyOutlook(
     coreStrength: PositionCoreScore[],
     ageCurve: { young: number; prime: number; aging: number },
     avgScore: number,
+    overallScore: number,   // league-relative: computed against actual leaguemates
 ): string {
     const strongPositions = coreStrength.filter(cs => cs.grade === 'A' || cs.grade === 'B').map(cs => cs.position);
     const weakPositions   = coreStrength.filter(cs => cs.grade === 'D' || cs.grade === 'F').map(cs => cs.position);
     const elite = tierDist.T1 + tierDist.T2;
 
-    // Positive anchor — what the draft added
-    const draftAnchor =
-        elite >= 3         ? `Your draft added ${elite} T1/T2 playmakers` :
-        tierDist.T2 >= 2   ? `Your draft strengthened your core with ${tierDist.T2} T2 players` :
-        tierDist.T3 >= 2   ? `Your draft added depth and developmental upside` :
-        `Your draft addressed key roster needs`;
+    // ── Primary anchor: league-relative standing ──────────────────────────────
+    const leagueStanding =
+        overallScore >= 70 ? 'one of the top franchises in this league' :
+        overallScore >= 55 ? 'a competitive franchise in this league' :
+        overallScore >= 40 ? 'a middle-of-the-pack franchise right now' :
+        overallScore >= 25 ? 'a franchise with a clear runway ahead of you' :
+        'a franchise in rebuild mode';
 
-    // Age narrative
-    const ageNarrative =
-        ageCurve.young >= 3 ? 'a young, dynamic core with room to grow' :
-        ageCurve.aging >= 3 ? 'a proven, experienced core entering its peak' :
-        'a balanced roster mix';
+    // ── Draft contribution ────────────────────────────────────────────────────
+    const draftContrib =
+        elite >= 3       ? `added ${elite} T1/T2 playmakers` :
+        tierDist.T2 >= 2 ? `added ${tierDist.T2} T2 contributors to your core` :
+        tierDist.T3 >= 2 ? `added developmental depth to your pipeline` :
+        `addressed key roster needs`;
 
-    // Draft quality signal
-    const draftSignal =
-        avgScore >= 19 ? 'perfectly aligned with your long-term window' :
-        avgScore >= 15 ? 'directionally aligned with your build' :
-        'with some picks that open up new options going forward';
-
-    // Strength + gap note
+    // ── Position strengths — only surface if they're genuinely there ──────────
     const posStrength = strongPositions.length > 0
-        ? `Your ${strongPositions.join(' and ')} corps are built to compete`
-        : 'your roster balance is improving across all positions';
-
-    const actionNote = weakPositions.length > 0
-        ? ` Targeting ${weakPositions.join(' and ')} depth in the next window will accelerate your timeline.`
+        ? ` Your ${strongPositions.join(' and ')} corps stand out as genuine strengths.`
         : '';
 
-    // Trajectory-specific momentum close
-    const momentum =
-        traj === 'WIN_NOW'   ? `Push the window now — the pieces are there.` :
-        traj === 'ASCENDING' ? `You're on track to be a serious contender within ${horizonYears} years.` :
-        traj === 'REBUILD'   ? `Stay patient and keep stacking. The upside is real.` :
-        `Monitor your window closely — one or two additions could shift your trajectory.`;
+    // ── Gaps — only flag when the team has room to grow (not for elite teams) ─
+    // Don't tell a top-3 team their roster is broken.
+    const gapNote = weakPositions.length > 0 && overallScore < 60
+        ? ` Targeting ${weakPositions.join(' and ')} depth could be the next lever.`
+        : '';
 
-    return `${draftAnchor}, built around ${ageNarrative}, ${draftSignal}. ${posStrength}.${actionNote} ${momentum}`;
+    // ── Trajectory close ──────────────────────────────────────────────────────
+    const momentum =
+        traj === 'WIN_NOW'   ? 'The window is open — push for it.' :
+        traj === 'ASCENDING' ? `You're trending toward serious contention within ${horizonYears} season${horizonYears > 1 ? 's' : ''}.` :
+        traj === 'REBUILD'   ? 'Stay patient and keep stacking. The upside is real.' :
+        'Stay sharp — one move could shift the balance of power in this league.';
+
+    return `You're ${leagueStanding}. This draft ${draftContrib}.${posStrength}${gapNote} ${momentum}`;
 }
 
 // ── Draft Identity v3.3 ───────────────────────────────────────────────────────
@@ -747,6 +750,7 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
         coreStrength,
         ageCurve,
         avgScore,
+        trajectoryData?.overallScore ?? 50,
     );
 
     // v3.4: "What You Accomplished" bullets
