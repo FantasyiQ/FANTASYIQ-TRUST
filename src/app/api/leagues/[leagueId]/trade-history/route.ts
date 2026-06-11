@@ -10,6 +10,7 @@ import {
     getActiveDraftPicks,
     getPlayers,
     type SleeperTransaction,
+    type SleeperDraftPickEntry,
 } from '@/lib/sleeper';
 
 const WEEKS = Array.from({ length: 19 }, (_, i) => i); // 0–18
@@ -33,37 +34,41 @@ async function collectLeagueChain(startId: string): Promise<string[]> {
     return ids;
 }
 
-// Build a map of season_round_originalRosterId → { playerName, position, pickNo }
-// for all completed drafts across the league chain.
-async function buildDraftedPlayerMap(
-    leagueIds: string[],
-    playerMap: Record<string, { full_name: string; position: string }>,
-): Promise<Map<string, { name: string; position: string; pickNo: number }>> {
-    const result = new Map<string, { name: string; position: string; pickNo: number }>();
+interface DraftPickData {
+    season:     string;
+    picks:      SleeperDraftPickEntry[];
+    slotToRosterId: Map<number, number>; // draft_slot → roster_id (original team)
+}
+
+// For each league in the chain, fetch completed drafts + their picks + slot→roster mapping.
+async function fetchAllDraftData(leagueIds: string[]): Promise<DraftPickData[]> {
+    const results: DraftPickData[] = [];
 
     await Promise.all(leagueIds.map(async leagueId => {
-        const drafts = await getLeagueDrafts(leagueId).catch(() => []);
+        const [drafts, rosters] = await Promise.all([
+            getLeagueDrafts(leagueId).catch(() => []),
+            getLeagueRosters(leagueId).catch(() => []),
+        ]);
+
         const completed = drafts.filter(d => d.status === 'complete');
 
         await Promise.all(completed.map(async draft => {
             const picks = await getActiveDraftPicks(draft.draft_id).catch(() => []);
-            for (const pick of picks) {
-                if (!pick.player_id) continue;
-                // slot_roster_id = original team's roster_id (present when pick was traded)
-                // Falls back to roster_id (the team that made the pick) for untraded picks.
-                const slotRosterId = pick.metadata?.slot_roster_id ?? String(pick.roster_id);
-                const key = `${draft.season}_${pick.round}_${slotRosterId}`;
-                const player = playerMap[pick.player_id];
-                result.set(key, {
-                    name:     player?.full_name ?? pick.player_id,
-                    position: player?.position  ?? '',
-                    pickNo:   pick.pick_no,
-                });
+            if (!picks.length) return;
+
+            // Build slot → rosterId from draft_order (userId → slot) + rosters (owner_id → roster_id)
+            const ownerToRoster = new Map(rosters.map(r => [r.owner_id, r.roster_id]));
+            const slotToRosterId = new Map<number, number>();
+            for (const [userId, slot] of Object.entries(draft.draft_order ?? {})) {
+                const rosterId = ownerToRoster.get(userId);
+                if (rosterId != null) slotToRosterId.set(slot as number, rosterId);
             }
+
+            results.push({ season: draft.season, picks, slotToRosterId });
         }));
     }));
 
-    return result;
+    return results;
 }
 
 export async function GET(
@@ -92,17 +97,56 @@ export async function GET(
     const rosterToOwner = new Map(rosters.map(r => [r.roster_id, r.owner_id]));
     const userMap = new Map(users.map(u => [u.user_id, { displayName: u.display_name, avatar: u.avatar }]));
 
-    const allTrades = (await Promise.all(
-        leagueIds.map(id => fetchTradesForLeague(id))
-    )).flat().sort((a, b) => b.status_updated - a.status_updated);
+    // Fetch all trades + all draft pick data in parallel
+    const [allTrades, allDraftData] = await Promise.all([
+        Promise.all(leagueIds.map(fetchTradesForLeague)).then(r => r.flat()),
+        fetchAllDraftData(leagueIds),
+    ]);
 
-    // Bulk player name lookup for all traded players
-    const allPlayerIds = [...new Set(allTrades.flatMap(t => Object.keys(t.adds ?? {})))];
+    allTrades.sort((a, b) => b.status_updated - a.status_updated);
+
+    // Build drafted-player lookup: `season_round_originalRosterId` → pick info
+    // Key: season + round + the roster_id that ORIGINALLY owned the pick (before any trades)
+    // For each pick entry, determine the original roster via:
+    //   1. metadata.slot_roster_id (set by Sleeper for traded picks)
+    //   2. slotToRosterId[pick.draft_slot] (derived from draft_order — works for all picks)
+    const draftPickPlayerIds = new Set<string>();
+    const rawDraftMap = new Map<string, { playerId: string; pickNo: number }>();
+
+    for (const { season, picks, slotToRosterId } of allDraftData) {
+        for (const pick of picks) {
+            if (!pick.player_id) continue;
+            draftPickPlayerIds.add(pick.player_id);
+
+            const slotRosterId =
+                pick.metadata?.slot_roster_id != null
+                    ? Number(pick.metadata.slot_roster_id)
+                    : slotToRosterId.get(pick.draft_slot);
+
+            if (slotRosterId == null) continue;
+            const key = `${season}_${pick.round}_${slotRosterId}`;
+            rawDraftMap.set(key, { playerId: pick.player_id, pickNo: pick.pick_no });
+        }
+    }
+
+    // Bulk fetch player names for both traded players and drafted players
+    const tradedPlayerIds = [...new Set(allTrades.flatMap(t => Object.keys(t.adds ?? {})))];
+    const allPlayerIds = [...new Set([...tradedPlayerIds, ...draftPickPlayerIds])];
     const playerMap = allPlayerIds.length > 0 ? await getPlayers(allPlayerIds) : {};
 
-    // Build drafted-player lookup for completed drafts (picks in past seasons)
-    const draftedMap = await buildDraftedPlayerMap(leagueIds, playerMap as Record<string, { full_name: string; position: string }>);
+    // Final drafted player lookup with names resolved
+    const draftedMap = new Map(
+        [...rawDraftMap.entries()].map(([key, { playerId, pickNo }]) => [
+            key,
+            {
+                name:     playerMap[playerId]?.full_name ?? playerId,
+                position: playerMap[playerId]?.position  ?? '',
+                pickNo,
+            },
+        ])
+    );
 
+    // Enrich trades
     const enriched = allTrades.map(t => {
         const sides = t.roster_ids.map(rosterId => {
             const ownerId = rosterToOwner.get(rosterId);
@@ -123,13 +167,13 @@ export async function GET(
                     const origOwnerId = rosterToOwner.get(p.roster_id);
                     const origUser    = origOwnerId ? userMap.get(origOwnerId) : null;
                     const draftKey    = `${p.season}_${p.round}_${p.roster_id}`;
-                    const drafted     = draftedMap.get(draftKey);
+                    const drafted     = draftedMap.get(draftKey) ?? null;
                     return {
                         type:              'pick' as const,
                         season:            p.season,
                         round:             p.round,
                         originalOwnerName: origUser?.displayName ?? `Team ${p.roster_id}`,
-                        draftedPlayer:     drafted ?? null,
+                        draftedPlayer:     drafted,
                     };
                 });
 
