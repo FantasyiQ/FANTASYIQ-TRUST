@@ -234,10 +234,6 @@ export default function Home() {
               <p className="text-gray-400 text-base leading-relaxed mb-6">
                 Every tool is calibrated to your league&apos;s exact scoring format, roster construction, and league size — not industry averages. A TE in a TE-premium league ranks differently than in standard. Waiver targets depend on what your roster actually needs. Your advice should reflect your league.
               </p>
-              <div className="inline-flex items-center gap-2 bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-lg px-3 py-1.5 mb-4">
-                <span className="text-[#D4AF37] text-xs font-bold">≠</span>
-                <span className="text-[#D4AF37] text-xs font-semibold">Not FantasyPros. Not generic rankings.</span>
-              </div>
               <Link href="/pricing" className="inline-flex items-center gap-2 text-[#D4AF37] hover:underline font-semibold text-sm">
                 See all plan features →
               </Link>
