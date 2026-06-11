@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import type { MockDraftResult } from '@/lib/mock-draft/types';
 
 const POS_COLORS: Record<string, string> = {
@@ -10,20 +11,24 @@ const POS_COLORS: Record<string, string> = {
 };
 
 interface Props {
-    results: MockDraftResult[];
+    results:    MockDraftResult[];
     yourTeamId: string;
 }
 
 export default function DraftHistoryPanel({ results, yourTeamId }: Props) {
+    const bottomRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [results.length]);
+
     if (results.length === 0) {
-        return (
-            <p className="text-gray-600 text-xs text-center py-4">No picks yet</p>
-        );
+        return <p className="text-gray-600 text-xs text-center py-4">No picks yet</p>;
     }
 
     return (
         <div className="space-y-1 max-h-[480px] overflow-y-auto pr-1">
-            {[...results].reverse().map(r => {
+            {results.map(r => {
                 const isUser = r.teamId === yourTeamId;
                 return (
                     <div
@@ -36,9 +41,7 @@ export default function DraftHistoryPanel({ results, yourTeamId }: Props) {
                         ].join(' ')}
                     >
                         <span className="text-gray-600 w-6 shrink-0 text-right">{r.pick.overall}</span>
-                        <span
-                            className={`shrink-0 px-1 py-px rounded border text-[9px] font-bold ${POS_COLORS[r.player.position] ?? 'bg-gray-800 text-gray-400 border-gray-700'}`}
-                        >
+                        <span className={`shrink-0 px-1 py-px rounded border text-[9px] font-bold ${POS_COLORS[r.player.position] ?? 'bg-gray-800 text-gray-400 border-gray-700'}`}>
                             {r.player.position}
                         </span>
                         <span className={`flex-1 font-medium truncate ${isUser ? 'text-[#D4AF37]' : 'text-gray-200'}`}>
@@ -51,6 +54,7 @@ export default function DraftHistoryPanel({ results, yourTeamId }: Props) {
                     </div>
                 );
             })}
+            <div ref={bottomRef} />
         </div>
     );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import type { MockPlayer, NeedsProfile, MockDraftPick, MockLeagueContext, MockDraftState } from '@/lib/mock-draft/types';
 import { rankCandidatesForTeam } from '@/lib/mock-draft/ScoringEngine';
 
@@ -117,6 +117,11 @@ export default function OnTheClockPanel({
 }: Props) {
     const [tab, setTab] = useState<Tab>('bpa');
     const [posFilter, setPosFilter] = useState<string>('ALL');
+    const historyBottomRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        historyBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [draftState.results.length]);
 
     const userTeam  = context.teams.find(t => t.teamId === context.yourTeamId);
     const userNeeds = draftState.teamNeeds.get(context.yourTeamId) ?? userTeam?.needsProfile;
@@ -252,7 +257,7 @@ export default function OnTheClockPanel({
                             <p className="text-gray-600 text-xs">No picks yet</p>
                         ) : (
                             <div className="space-y-1 max-h-[320px] overflow-y-auto">
-                                {[...draftState.results].reverse().slice(0, 20).map(r => (
+                                {draftState.results.map(r => (
                                     <div
                                         key={`${r.pick.overall}-${r.player.playerId}`}
                                         className={[
@@ -268,6 +273,7 @@ export default function OnTheClockPanel({
                                         <span className="text-gray-600 shrink-0 truncate max-w-[56px]">{r.ownerName}</span>
                                     </div>
                                 ))}
+                                <div ref={historyBottomRef} />
                             </div>
                         )}
                     </div>

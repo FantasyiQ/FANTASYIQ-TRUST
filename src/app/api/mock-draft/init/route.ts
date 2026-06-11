@@ -22,7 +22,7 @@ import type {
     NeedsProfile,
     PersonalityProfile,
 } from '@/lib/mock-draft/types';
-import { computeNeedsProfile }    from '@/lib/mock-draft/NeedsEngine';
+import { computeNeedsProfile, computeRookieDraftNeeds } from '@/lib/mock-draft/NeedsEngine';
 import { countStartersPerTeam }   from '@/lib/draft/draftStrategyUtils';
 
 export const maxDuration = 30;
@@ -280,15 +280,39 @@ export async function GET(req: NextRequest): Promise<Response> {
         });
     }
 
-    // ── Build existing roster position lookup ─────────────────────────────────
+    // ── Build existing roster position + name lookup ──────────────────────────
     const existingPlayerIds = [...new Set(rosters.flatMap(r => r.players ?? []).filter(Boolean))];
     const existingSleeperPlayers = existingPlayerIds.length > 0
         ? await prisma.sleeperPlayer.findMany({
             where:  { playerId: { in: existingPlayerIds } },
-            select: { playerId: true, position: true },
+            select: { playerId: true, position: true, fullName: true },
           })
         : [];
-    const positionByPlayerId = new Map(existingSleeperPlayers.map(p => [p.playerId, p.position]));
+    const existingPlayerById = new Map(existingSleeperPlayers.map(p => [p.playerId, p]));
+
+    // ── For rookie drafts: load FC dynasty values to compute quality-based needs ─
+    // Raw player counts always show 0% on a full dynasty roster (teams have 6+ WRs).
+    // Quality needs count "meaningful dynasty assets" (value > threshold) vs. target depth.
+    const QUALITY_THRESHOLD = 1500;  // meaningful dynasty piece (~tier 4+)
+
+    const fcValueByName = new Map<string, number>();  // playerName.lower → dynastyValue
+    if (isRookieDraft && existingSleeperPlayers.length > 0) {
+        const names = existingSleeperPlayers
+            .filter(p => ['QB', 'RB', 'WR', 'TE'].includes(p.position))
+            .map(p => p.fullName)
+            .filter((n): n is string => Boolean(n));
+
+        if (names.length > 0) {
+            const fcRows = await prisma.fantasyCalcValue.findMany({
+                where:  { playerName: { in: names } },
+                select: { playerName: true, dynastyValue: true, dynastyValueSf: true },
+            });
+            for (const row of fcRows) {
+                const val = superflex ? row.dynastyValueSf : row.dynastyValue;
+                fcValueByName.set(row.playerName.toLowerCase(), val);
+            }
+        }
+    }
 
     // ── Build teams ────────────────────────────────────────────────────────────
     const teams: MockTeam[] = rosters.map(r => {
@@ -299,10 +323,27 @@ export async function GET(req: NextRequest): Promise<Response> {
 
         const rosterByPosition: Record<string, number> = {};
         for (const pid of (r.players ?? [])) {
-            const pos = positionByPlayerId.get(pid);
-            if (pos && ['QB', 'RB', 'WR', 'TE'].includes(pos)) {
-                rosterByPosition[pos] = (rosterByPosition[pos] ?? 0) + 1;
+            const sp = existingPlayerById.get(pid);
+            if (sp?.position && ['QB', 'RB', 'WR', 'TE'].includes(sp.position)) {
+                rosterByPosition[sp.position] = (rosterByPosition[sp.position] ?? 0) + 1;
             }
+        }
+
+        let needsProfile;
+        if (isRookieDraft) {
+            // Count quality assets (meaningful dynasty value) per position
+            const qualityCount: Record<string, number> = {};
+            for (const pid of (r.players ?? [])) {
+                const sp = existingPlayerById.get(pid);
+                if (!sp?.position || !['QB', 'RB', 'WR', 'TE'].includes(sp.position)) continue;
+                const val = sp.fullName ? (fcValueByName.get(sp.fullName.toLowerCase()) ?? 0) : 0;
+                if (val > QUALITY_THRESHOLD) {
+                    qualityCount[sp.position] = (qualityCount[sp.position] ?? 0) + 1;
+                }
+            }
+            needsProfile = computeRookieDraftNeeds(qualityCount);
+        } else {
+            needsProfile = computeNeedsProfile(rosterByPosition, settings);
         }
 
         return {
@@ -310,8 +351,8 @@ export async function GET(req: NextRequest): Promise<Response> {
             ownerName,
             isUser,
             rosterByPosition,
-            needsProfile: computeNeedsProfile(rosterByPosition, settings),
-            personality:  buildPersonality(teamId, isUser),
+            needsProfile,
+            personality: buildPersonality(teamId, isUser),
         };
     });
 

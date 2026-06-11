@@ -2,6 +2,39 @@ import type { MockPlayer, NeedsProfile, MockDraftSettings } from './types';
 
 const FLEX_ELIGIBLE = new Set(['RB', 'WR', 'TE']);
 
+// ── Rookie-draft needs ────────────────────────────────────────────────────────
+// Dynasty teams already have full rosters, so counting raw players always returns
+// 0% urgency. Instead we count "quality assets" — players with meaningful dynasty
+// value — and compare against a target depth per position.
+//
+// qualityCountByPosition: how many dynasty assets above the value threshold each
+// team has at each position. Passed in from the API route after loading FC values.
+
+const ROOKIE_DEPTH_TARGETS: Record<string, number> = {
+    QB: 2,   // starter + 1 quality backup
+    RB: 5,   // 2 starters + 3 depth pieces
+    WR: 6,   // 2–3 starters + 3 depth pieces
+    TE: 2,   // starter + 1 backup
+};
+
+export function computeRookieDraftNeeds(
+    qualityCountByPosition: Record<string, number>,
+): NeedsProfile {
+    const need = (pos: string): number => {
+        const target = ROOKIE_DEPTH_TARGETS[pos] ?? 3;
+        const have   = qualityCountByPosition[pos] ?? 0;
+        return Math.max(0, Math.min(1, (target - have) / target));
+    };
+
+    return {
+        QB:   need('QB'),
+        RB:   need('RB'),
+        WR:   need('WR'),
+        TE:   need('TE'),
+        FLEX: Math.max(need('RB'), need('WR')) * 0.6,
+    };
+}
+
 export function computeNeedsProfile(
     rosterByPosition: Record<string, number>,
     settings: MockDraftSettings,
