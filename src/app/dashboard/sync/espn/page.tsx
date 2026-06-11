@@ -31,6 +31,7 @@ const EXTENSION_ID = process.env.NEXT_PUBLIC_ESPN_EXTENSION_ID ?? '';
 
 type ExtensionState =
     | 'checking'        // probing for extension on mount
+    | 'mobile'          // mobile browser — extension not supported
     | 'not_installed'   // extension not detected
     | 'detected'        // extension found, ready to connect
     | 'connecting'      // waiting for cookie read + save
@@ -100,6 +101,13 @@ function ExtensionConnector({
     useEffect(() => {
         setExtState('checking');
 
+        // Chrome extensions don't run on any mobile browser (iOS Chrome uses WebKit,
+        // no extension support). Show a clear desktop-required message instead.
+        if (/Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+            setExtState('mobile');
+            return;
+        }
+
         if (!EXTENSION_ID) {
             setExtState('not_installed');
             return;
@@ -168,6 +176,37 @@ function ExtensionConnector({
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 flex items-center gap-3">
                 <div className="w-4 h-4 border-2 border-[#D4AF37]/30 border-t-[#D4AF37] rounded-full animate-spin shrink-0" />
                 <p className="text-gray-400 text-sm">Checking for FiQ ESPN Connector…</p>
+            </div>
+        );
+    }
+
+    if (extState === 'mobile') {
+        return (
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
+                <div className="flex items-center gap-3">
+                    <span className="text-2xl">💻</span>
+                    <div>
+                        <p className="font-semibold text-white text-sm">Desktop browser required</p>
+                        <p className="text-gray-500 text-xs mt-0.5">The FiQ ESPN Connector only works on Chrome for Mac or Windows.</p>
+                    </div>
+                </div>
+                <div className="bg-gray-800/60 rounded-xl px-4 py-3 space-y-1">
+                    <p className="text-gray-300 text-xs font-semibold">To connect your ESPN league:</p>
+                    <ol className="space-y-1 text-xs text-gray-400 list-decimal list-inside">
+                        <li>Open this page on your Mac or Windows computer</li>
+                        <li>Use Chrome and install the FiQ ESPN Connector</li>
+                        <li>Click "Connect ESPN Automatically"</li>
+                    </ol>
+                </div>
+                {onManual && (
+                    <button
+                        type="button"
+                        onClick={onManual}
+                        className="text-xs text-gray-500 hover:text-gray-300 transition"
+                    >
+                        Enter credentials manually instead →
+                    </button>
+                )}
             </div>
         );
     }
