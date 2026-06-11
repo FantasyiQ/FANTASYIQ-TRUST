@@ -2,9 +2,9 @@
 // Universe data comes from /api/players/universe and /api/players/delta.
 
 export interface UniverseMeta {
-    generatedAt:  string;       // ISO — when this response was generated
-    ktcSyncedAt:  string | null; // ISO — when KTC data was last synced
-    playerCount:  number;
+    generatedAt:   string;       // ISO — when this response was generated
+    valueSyncedAt: string | null; // ISO — when dynasty data was last synced
+    playerCount:   number;
 }
 
 export interface UniverseResponse {
@@ -17,10 +17,10 @@ export interface UniversePlayer {
     position:        string;
     team:            string | null;
     age:             number | null;
-    dynasty:         number;       // 0–100 normalised KTC 1QB dynasty
-    dynastySf:       number;       // 0–100 normalised KTC superflex dynasty
-    redraft:         number;       // 0–100 normalised KTC 1QB redraft
-    redraftSf:       number;       // 0–100 normalised KTC superflex redraft
+    dynasty:         number;       // 0–100 normalised dynasty value (1QB)
+    dynastySf:       number;       // 0–100 normalised dynasty value (superflex)
+    redraft:         number;       // 0–100 normalised redraft value (1QB)
+    redraftSf:       number;       // 0–100 normalised redraft value (superflex)
     trend:           number | null;
     injuryStatus:    string | null;
     birthDate:       string | null;  // ISO date from Sleeper — runtime age source
@@ -119,7 +119,7 @@ export function comparePlayerValues(
 }
 
 // ── Value computation ─────────────────────────────────────────────────────────
-// Picks the right KTC value for a league format then applies PPR/size/scoring adjustments.
+// Picks the right dynasty value for a league format then applies PPR/size/scoring adjustments.
 // Used in TradeEvaluator, LeagueDetailTabs, and LeagueTradeEvaluator.
 export function computePlayerBaseValue(
     u: Pick<UniversePlayer, 'dynasty' | 'dynastySf' | 'redraft' | 'redraftSf'>,

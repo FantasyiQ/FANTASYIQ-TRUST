@@ -120,8 +120,8 @@ export default function PlayerRankings({
                         {leagueType === 'Dynasty'
                             ? 'Values adjust for age curve, position scarcity, and your league\'s scoring format.'
                             : 'Values adjust for position scarcity and your league\'s scoring format.'}
-                        {universeMeta?.ktcSyncedAt && (
-                            <span className="ml-2 text-gray-600">· Updated {timeAgo(universeMeta.ktcSyncedAt)}</span>
+                        {universeMeta?.valueSyncedAt && (
+                            <span className="ml-2 text-gray-600">· Updated {timeAgo(universeMeta.valueSyncedAt)}</span>
                         )}
                     </p>
                 </div>

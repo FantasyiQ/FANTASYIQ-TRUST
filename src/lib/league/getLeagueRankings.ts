@@ -58,16 +58,16 @@ export type LeagueRankingsData = {
     playerRankings: PlayerRankingRow[];
     teamRankings:   TeamRankingRow[];
     powerRankings:  PowerRankingRow[];
-    ktcSyncedAt:    string | null;
+    valueSyncedAt:    string | null;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const KTC_CAP = 9999;
+const VALUE_CAP = 9999;
 const SKILL_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE']);
 
 function normalise(raw: number): number {
-    return Math.min(100, Math.max(1, Math.round((raw / KTC_CAP) * 100)));
+    return Math.min(100, Math.max(1, Math.round((raw / VALUE_CAP) * 100)));
 }
 
 function normalizeName(name: string): string {
@@ -202,7 +202,7 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
     const leagueSize      = league.totalRosters;
 
     // ── Fetch shared DB data (no Sleeper API yet) ─────────────────────────────
-    const [ktcRows, sleeperPlayers, latestSync] = await Promise.all([
+    const [fcRows, sleeperPlayers, latestSync] = await Promise.all([
         prisma.fantasyCalcValue.findMany({
             where: {
                 position: { in: ['QB', 'RB', 'WR', 'TE'] },
@@ -243,7 +243,7 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
     const dtvByExactName = new Map<string, UniverseEntry>(); // lowercase name → entry (ESPN name matching)
     const dtvByNormName  = new Map<string, UniverseEntry>(); // normalized name → entry (ESPN name matching)
 
-    for (const r of ktcRows) {
+    for (const r of fcRows) {
         if (!SKILL_POSITIONS.has(r.position)) continue;
         const exact    = r.nameLower;
         const normd    = normalizeName(r.nameLower);
@@ -367,7 +367,7 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
             .sort((a, b) => b.powerScore - a.powerScore || b.rosterDtv - a.rosterDtv)
             .map((r, i) => ({ ...r, rank: i + 1 }));
 
-        return { league: leagueResult, playerRankings, teamRankings, powerRankings, ktcSyncedAt: latestSync?.updatedAt.toISOString() ?? null };
+        return { league: leagueResult, playerRankings, teamRankings, powerRankings, valueSyncedAt: latestSync?.updatedAt.toISOString() ?? null };
     }
 
     // ── Sleeper branch: fetch live rosters + members ──────────────────────────
@@ -434,5 +434,5 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
         .sort((a, b) => b.powerScore - a.powerScore || b.rosterDtv - a.rosterDtv)
         .map((r, i) => ({ ...r, rank: i + 1 }));
 
-    return { league: leagueResult, playerRankings, teamRankings, powerRankings, ktcSyncedAt: latestSync?.updatedAt.toISOString() ?? null };
+    return { league: leagueResult, playerRankings, teamRankings, powerRankings, valueSyncedAt: latestSync?.updatedAt.toISOString() ?? null };
 }

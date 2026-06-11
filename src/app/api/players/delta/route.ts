@@ -3,9 +3,9 @@ import { prisma } from '@/lib/prisma';
 import type { DeltaEntry, DeltaResponse } from '@/lib/player-universe';
 import { checkPublicLimit, getClientIp } from '@/lib/ratelimit';
 
-const KTC_CAP = 9999;
+const VALUE_CAP = 9999;
 function normalise(raw: number): number {
-    return Math.min(100, Math.max(1, Math.round((raw / KTC_CAP) * 100)));
+    return Math.min(100, Math.max(1, Math.round((raw / VALUE_CAP) * 100)));
 }
 
 export async function GET(request: NextRequest): Promise<Response> {

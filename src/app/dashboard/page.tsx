@@ -451,7 +451,7 @@ export default async function DashboardPage({
                                 <span className="mt-0.5 w-5 h-5 rounded-full bg-gray-800 border border-gray-700 text-gray-600 text-xs flex items-center justify-center shrink-0 font-bold">3</span>
                                 <div>
                                     <p className="text-sm font-semibold text-gray-400">Explore trade values &amp; analytics</p>
-                                    <p className="text-xs text-gray-600">Dynasty trade values, roster grades, start/sit — powered by live KTC data.</p>
+                                    <p className="text-xs text-gray-600">Dynasty trade values, roster grades, start/sit — updated daily.</p>
                                 </div>
                             </li>
                         </ol>

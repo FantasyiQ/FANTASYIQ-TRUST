@@ -405,7 +405,7 @@ export async function loadDraftContext(params: {
         const spByNormalName2 = new Map(sleeperPlayers.map(p => [normalizeDraftName(p.fullName), p]));
         const spLookup2 = (name: string) => spByName2.get(name) ?? spByNormalName2.get(normalizeDraftName(name));
 
-        // Pass 1: FiQ baseline pick — global rank across allowed positions by KTC value (fcFpdo already sorted desc).
+        // Pass 1: FiQ baseline pick — global rank across allowed positions by dynasty value (fcFpdo already sorted desc).
         // delta = myNextPick - fiqBaselineRank: positive = player available later than FiQ suggests.
         // Uses fcFpdo (value > 50) so the full draftable universe is ranked, not just top-300.
         let fiqBaselineRank = 0;
@@ -419,7 +419,7 @@ export async function loadDraftContext(params: {
                 playerId:      sp.playerId,
                 isRookie:      false,
                 isVet:         true,
-                adpRankInPool: fiqBaselineRank,   // FiQ baseline pick: global KTC rank in pool
+                adpRankInPool: fiqBaselineRank,   // FiQ baseline pick: global dynasty value rank in pool
                 adpSource:     'fa',
             };
         }
@@ -429,8 +429,8 @@ export async function loadDraftContext(params: {
             if (!allowedPositions.has(normalizePosition(fcv.position))) continue;
             const sp = spLookup2(fcv.playerName);
             if (sp && draftedIds.has(sp.playerId)) continue;
-            const ktcValue = superflex ? fcv.dynastyValueSf : fcv.dynastyValue;
-            const fiqScore = Math.min(100, Math.round(ktcValue / 90));
+            const dynastyValue = superflex ? fcv.dynastyValueSf : fcv.dynastyValue;
+            const fiqScore = Math.min(100, Math.round(dynastyValue / 90));
             availablePlayers.push({
                 sleeperPlayerId: sp?.playerId ?? '',
                 name:            fcv.playerName,
@@ -461,8 +461,8 @@ export async function loadDraftContext(params: {
 
     function toRosterProfile(p: { fullName?: string | null; position: string; age?: number | null }): RosterProfile {
         const fc       = p.fullName ? fcByName.get(p.fullName) : undefined;
-        const ktcValue = fc ? (superflex ? fc.dynastyValueSf : fc.dynastyValue) : null;
-        const fiqScore = ktcValue != null ? Math.min(100, Math.round(ktcValue / 90)) : null;
+        const dynastyValue = fc ? (superflex ? fc.dynastyValueSf : fc.dynastyValue) : null;
+        const fiqScore = dynastyValue != null ? Math.min(100, Math.round(dynastyValue / 90)) : null;
         return { position: normalizePosition(p.position), age: p.age ?? null, fiqScore };
     }
 

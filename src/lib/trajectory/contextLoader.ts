@@ -34,20 +34,20 @@ function youthScore(age: number, position: string): number {
 interface RichPlayer {
     position: string;
     age:      number | null;
-    ktcValue: number;
+    dynastyValue: number;
 }
 
 function computeStarterQuality(players: RichPlayer[]): number {
-    const sorted   = [...players].sort((a, b) => b.ktcValue - a.ktcValue);
+    const sorted   = [...players].sort((a, b) => b.dynastyValue - a.dynastyValue);
     const starters = sorted.slice(0, 8);
     if (starters.length === 0) return 0;
-    const avg = starters.reduce((s, p) => s + p.ktcValue, 0) / starters.length;
-    // KTC meaningful range ~500–8000 → normalize to 0–100
+    const avg = starters.reduce((s, p) => s + p.dynastyValue, 0) / starters.length;
+    // Dynasty value range ~500–8000 → normalize to 0–100
     return Math.max(0, Math.min(100, Math.round((avg - 500) / 75)));
 }
 
 function computeAgeCurveScore(players: RichPlayer[]): number {
-    const skill = players.filter(p => SKILL_POSITIONS.has(p.position) && p.ktcValue > 0);
+    const skill = players.filter(p => SKILL_POSITIONS.has(p.position) && p.dynastyValue > 0);
     if (skill.length === 0) return 50;
 
     let weightedYouth = 0;
@@ -56,15 +56,15 @@ function computeAgeCurveScore(players: RichPlayer[]): number {
     for (const p of skill) {
         const age = p.age ?? 26;
         const youth = youthScore(age, p.position);
-        weightedYouth += youth * p.ktcValue;
-        totalWeight   += p.ktcValue;
+        weightedYouth += youth * p.dynastyValue;
+        totalWeight   += p.dynastyValue;
     }
 
     return totalWeight > 0 ? Math.round(weightedYouth / totalWeight) : 50;
 }
 
 function computeFutureVsProduction(players: RichPlayer[]): number {
-    const skill = players.filter(p => SKILL_POSITIONS.has(p.position) && p.ktcValue > 0);
+    const skill = players.filter(p => SKILL_POSITIONS.has(p.position) && p.dynastyValue > 0);
     if (skill.length === 0) return 50;
 
     let futureWeight = 0;
@@ -74,8 +74,8 @@ function computeFutureVsProduction(players: RichPlayer[]): number {
         const age = p.age ?? 26;
         // Future weight: 22 → 1.0, 30 → 0.0 (linear)
         const fw = Math.max(0, Math.min(1, 1 - (age - 22) / 8));
-        futureWeight += p.ktcValue * fw;
-        totalValue   += p.ktcValue;
+        futureWeight += p.dynastyValue * fw;
+        totalValue   += p.dynastyValue;
     }
 
     return totalValue > 0 ? Math.round(futureWeight / totalValue * 100) : 50;
@@ -138,35 +138,35 @@ export async function getLeagueContext(
     )];
 
     // Batch fetch SleeperPlayer + FantasyCalcValue
-    const [sleeperPlayers, ktcRecords] = await Promise.all([
+    const [sleeperPlayers, fcRecords] = await Promise.all([
         allPlayerIds.length > 0
             ? prisma.sleeperPlayer.findMany({
                 where:  { playerId: { in: allPlayerIds } },
                 select: { playerId: true, fullName: true, position: true, age: true },
             })
             : Promise.resolve([]),
-        // We'll join KTC by name after getting names
+        // We'll join dynasty values by name after getting names
         Promise.resolve([] as { nameLower: string; position: string; dynastyValue: number; dynastyValueSf: number; redraftValue: number; redraftValueSf: number; age: number | null }[]),
     ]);
 
     // Build id → SleeperPlayer map
     const playerById = new Map(sleeperPlayers.map(p => [p.playerId, p]));
 
-    // Fetch KTC values by name
+    // Fetch dynasty values by name
     const names = sleeperPlayers.map(p => p.fullName.toLowerCase().trim());
-    const ktcData = names.length > 0
+    const fcData = names.length > 0
         ? await prisma.fantasyCalcValue.findMany({
             where:  { nameLower: { in: names } },
             select: { nameLower: true, position: true, dynastyValue: true, dynastyValueSf: true, redraftValue: true, redraftValueSf: true, age: true },
         })
         : [];
-    void ktcRecords;
+    void fcRecords;
 
-    // Two-level map: nameLower → position → ktcRecord (handle name collisions)
-    const ktcByNamePos = new Map<string, Map<string, typeof ktcData[0]>>();
-    for (const rec of ktcData) {
-        if (!ktcByNamePos.has(rec.nameLower)) ktcByNamePos.set(rec.nameLower, new Map());
-        ktcByNamePos.get(rec.nameLower)!.set(rec.position, rec);
+    // Two-level map: nameLower → position → dynasty record (handle name collisions)
+    const fcByNamePos = new Map<string, Map<string, typeof fcData[0]>>();
+    for (const rec of fcData) {
+        if (!fcByNamePos.has(rec.nameLower)) fcByNamePos.set(rec.nameLower, new Map());
+        fcByNamePos.get(rec.nameLower)!.set(rec.position, rec);
     }
 
     const seasonNum    = parseInt(season, 10) || new Date().getFullYear();
@@ -183,19 +183,19 @@ export async function getLeagueContext(
                 if (!sp) return null;
 
                 const nameLower = sp.fullName.toLowerCase().trim();
-                const byPos     = ktcByNamePos.get(nameLower);
-                const ktcRec    = byPos?.get(sp.position) ?? (byPos?.size === 1 ? byPos.values().next().value : undefined);
+                const byPos     = fcByNamePos.get(nameLower);
+                const fcRec    = byPos?.get(sp.position) ?? (byPos?.size === 1 ? byPos.values().next().value : undefined);
 
-                let ktcValue = 0;
-                if (ktcRec) {
-                    ktcValue = isDynasty
-                        ? (superflex ? ktcRec.dynastyValueSf : ktcRec.dynastyValue)
-                        : (superflex ? ktcRec.redraftValueSf : ktcRec.redraftValue);
+                let dynastyValue = 0;
+                if (fcRec) {
+                    dynastyValue = isDynasty
+                        ? (superflex ? fcRec.dynastyValueSf : fcRec.dynastyValue)
+                        : (superflex ? fcRec.redraftValueSf : fcRec.redraftValue);
                 }
 
-                const age = sp.age ?? (ktcRec?.age ? Math.round(Number(ktcRec.age)) : null);
+                const age = sp.age ?? (fcRec?.age ? Math.round(Number(fcRec.age)) : null);
 
-                return { position: sp.position, age, ktcValue } satisfies RichPlayer;
+                return { position: sp.position, age, dynastyValue } satisfies RichPlayer;
             })
             .filter((p): p is RichPlayer => p !== null);
     }

@@ -2,11 +2,11 @@ import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { checkPublicLimit, getClientIp } from '@/lib/ratelimit';
 
-// Normalise KTC raw value (0–9999) to our 0–100 DTV scale.
-const KTC_CAP = 9999;
+// Normalise raw value (0–9999) to our 0–100 DTV scale.
+const VALUE_CAP = 9999;
 
 function normalise(raw: number): number {
-    return Math.min(100, Math.max(1, Math.round((raw / KTC_CAP) * 100)));
+    return Math.min(100, Math.max(1, Math.round((raw / VALUE_CAP) * 100)));
 }
 
 // Normalise a player name for cross-source matching.
@@ -25,7 +25,7 @@ function normalizeName(name: string): string {
 }
 
 // Returns a map of lowercase player name → { dynasty, redraft, team, age, trend, injuryStatus }
-// Used by TradeEvaluator to overlay live KTC values onto hardcoded baseValues.
+// Used by TradeEvaluator to overlay live dynasty values onto hardcoded baseValues.
 export async function GET(request: NextRequest): Promise<Response> {
     const rl = await checkPublicLimit(getClientIp(request));
     if (rl.limited) return rl.response;
@@ -72,15 +72,15 @@ export async function GET(request: NextRequest): Promise<Response> {
         if (!teamNormalized.has(normd)) teamNormalized.set(normd, team);
     }
 
-    // Build set of normalized KTC names for the warn pass below
-    const ktcNormalized = new Set(rows.map(r => normalizeName(r.nameLower)));
+    // Build set of normalized names for the warn pass below
+    const fcNormalized = new Set(rows.map(r => normalizeName(r.nameLower)));
 
-    // Warn about Sleeper players with injuries that have no KTC counterpart
+    // Warn about Sleeper players with injuries that have no dynasty value counterpart
     for (const p of sleeperPlayers) {
         if (!p.injuryStatus) continue;
         const normd = normalizeName(p.fullName);
-        if (!ktcNormalized.has(normd)) {
-            console.warn(`[DTV] No KTC match for: ${p.fullName} (normalized: ${normd})`);
+        if (!fcNormalized.has(normd)) {
+            console.warn(`[DTV] No dynasty value match for: ${p.fullName} (normalized: ${normd})`);
         }
     }
 
@@ -111,7 +111,7 @@ export async function GET(request: NextRequest): Promise<Response> {
             dynastySf:    normalise(r.dynastyValueSf),
             redraft:      normalise(r.redraftValue),
             redraftSf:    normalise(r.redraftValueSf),
-            team:         sleeperTeam ?? r.team,   // Sleeper authoritative, KTC fallback
+            team:         sleeperTeam ?? r.team,   // Sleeper authoritative, dynasty data fallback
             age:          r.age ? Math.round(r.age) : null,
             trend:        r.trend30Day,
             injuryStatus,
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest): Promise<Response> {
 
     return Response.json(map, {
         headers: {
-            // Cache for 5 min; KTC syncs daily but we want fresh values after each sync
+            // Cache for 5 min; data syncs daily but we want fresh values after each sync
             'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
         },
     });

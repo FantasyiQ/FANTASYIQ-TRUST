@@ -6,11 +6,11 @@ import type { Player, LeagueSettings, LeagueType } from '@/lib/trade-engine';
 import { computePlayerBaseValue } from '@/lib/player-universe';
 import type { UniversePlayer } from '@/lib/player-universe';
 
-const KTC_CAP = 9999;
+const VALUE_CAP = 9999;
 const SKILL_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE']);
 
 function normalise(raw: number): number {
-    return Math.min(100, Math.max(1, Math.round((raw / KTC_CAP) * 100)));
+    return Math.min(100, Math.max(1, Math.round((raw / VALUE_CAP) * 100)));
 }
 
 function normalizeName(name: string): string {
@@ -113,7 +113,7 @@ export async function GET(
     const leagueSize = league.totalRosters;
 
     // Fetch universe data directly from DB (same logic as /api/players/universe)
-    const [ktcRows, sleeperPlayers] = await Promise.all([
+    const [fcRows, sleeperPlayers] = await Promise.all([
         prisma.fantasyCalcValue.findMany({
             where: {
                 position: { in: ['QB', 'RB', 'WR', 'TE'] },
@@ -136,7 +136,7 @@ export async function GET(
         if (!sleeperNormalized.has(normd)) sleeperNormalized.set(normd, p);
     }
 
-    const universePlayers: UniversePlayer[] = ktcRows
+    const universePlayers: UniversePlayer[] = fcRows
         .filter(r => SKILL_POSITIONS.has(r.position))
         .map(r => {
             const sleeper = sleeperExact.get(r.nameLower) ?? sleeperNormalized.get(normalizeName(r.nameLower)) ?? null;

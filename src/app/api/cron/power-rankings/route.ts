@@ -13,11 +13,11 @@ const LEAGUE_BATCH_SIZE = 15; // leagues processed in parallel per batch
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const KTC_CAP = 9999;
+const VALUE_CAP = 9999;
 const SKILL_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE']);
 
 function normalise(raw: number): number {
-    return Math.min(100, Math.max(1, Math.round((raw / KTC_CAP) * 100)));
+    return Math.min(100, Math.max(1, Math.round((raw / VALUE_CAP) * 100)));
 }
 
 function normalizeName(name: string): string {
@@ -71,7 +71,7 @@ function computePowerScore(
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type SleeperInfo = { playerId: string; team: string | null; injuryStatus: string | null; birthDate: string | null; age: number | null };
-type KtcEntry    = { playerName: string; position: string; u: UniversePlayer };
+type DtvEntry    = { playerName: string; position: string; u: UniversePlayer };
 
 type UniqueLeague = {
     leagueId:        string;
@@ -84,7 +84,7 @@ type UniqueLeague = {
 
 type Ctx = {
     week:          number;
-    ktcByPlayerId: Map<string, KtcEntry>;
+    dtvByPlayerId: Map<string, DtvEntry>;
 };
 
 // ── Per-league processor ──────────────────────────────────────────────────────
@@ -107,7 +107,7 @@ async function processLeague(league: UniqueLeague, ctx: Ctx): Promise<void> {
     const rosterRows = rosters.map(r => {
         const playerIds = r.players ?? [];
         const rosterDtv = playerIds.reduce((sum, pid) => {
-            const entry = ctx.ktcByPlayerId.get(pid);
+            const entry = ctx.dtvByPlayerId.get(pid);
             if (!entry) return sum;
             const baseValue = computePlayerBaseValue(entry.u, entry.position, {
                 leagueType, superflex, ppr, leagueSize,
@@ -171,8 +171,8 @@ export async function GET(request: Request): Promise<Response> {
             return Response.json({ ok: true, message: 'No in-season leagues', week });
         }
 
-        // Load KTC + Sleeper player data once for all leagues
-        const [ktcRows, sleeperPlayers] = await Promise.all([
+        // Load dynasty values + Sleeper player data once for all leagues
+        const [fcRows, sleeperPlayers] = await Promise.all([
             prisma.fantasyCalcValue.findMany({
                 where: {
                     position: { in: ['QB', 'RB', 'WR', 'TE'] },
@@ -200,8 +200,8 @@ export async function GET(request: Request): Promise<Response> {
             if (!sleeperNormalized.has(normd)) sleeperNormalized.set(normd, val);
         }
 
-        const ktcByPlayerId = new Map<string, KtcEntry>();
-        for (const r of ktcRows) {
+        const dtvByPlayerId = new Map<string, DtvEntry>();
+        for (const r of fcRows) {
             if (!SKILL_POSITIONS.has(r.position)) continue;
             const exact = r.nameLower;
             const normd = normalizeName(r.nameLower);
@@ -221,10 +221,10 @@ export async function GET(request: Request): Promise<Response> {
                 birthDate:      sl.birthDate ?? null,
                 playerImageUrl: null,
             };
-            ktcByPlayerId.set(sl.playerId, { playerName: r.playerName, position: r.position, u });
+            dtvByPlayerId.set(sl.playerId, { playerName: r.playerName, position: r.position, u });
         }
 
-        const ctx: Ctx = { week, ktcByPlayerId };
+        const ctx: Ctx = { week, dtvByPlayerId };
         let saved  = 0;
         let errors = 0;
 

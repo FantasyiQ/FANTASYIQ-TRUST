@@ -1,29 +1,29 @@
 /**
  * FantasyiQ Trust Value Engine
  *
- * dynastyValue = raw KTC scrape. No transformation, no composite override.
- * The engine assigns tiers based on KTC-native thresholds and computes
+ * dynastyValue = raw dynasty trade value. No transformation, no composite override.
+ * The engine assigns tiers based on value thresholds and computes
  * analytics (opportunityScore, schemeScore, composite) for player cards,
  * insights, and dashboards — but never overwrites dynastyValue.
  *
  * Architecture:
- *   KTC dynastyValue  → value backbone (untouched)
+ *   dynastyValue      → value backbone (untouched)
  *   Composite score   → analytics only (not the value)
- *   Tier              → assigned from KTC thresholds (7-tier system)
+ *   Tier              → assigned from value thresholds (7-tier system)
  */
 
-// ── KTC-native tier thresholds (7-tier system) ─────────────────────────────────
-// Tuned to KTC's actual distribution so positional shapes, scarcity,
+// ── Dynasty value tier thresholds (7-tier system) ──────────────────────────────
+// Tuned to the actual distribution so positional shapes, scarcity,
 // class strength, and mock draft ordering all behave correctly.
 
-function computeKTCTier(ktcValue: number): number {
-    if (ktcValue >= 7000) return 1;  // Elite
-    if (ktcValue >= 5500) return 2;  // Star
-    if (ktcValue >= 4000) return 3;  // Starter
-    if (ktcValue >= 2500) return 4;  // Flex
-    if (ktcValue >= 1500) return 5;  // Depth
-    if (ktcValue >= 800)  return 6;  // Fringe
-    return 7;                         // Stash
+function computeDtvTier(dynastyVal: number): number {
+    if (dynastyVal >= 7000) return 1;  // Elite
+    if (dynastyVal >= 5500) return 2;  // Star
+    if (dynastyVal >= 4000) return 3;  // Starter
+    if (dynastyVal >= 2500) return 4;  // Flex
+    if (dynastyVal >= 1500) return 5;  // Depth
+    if (dynastyVal >= 800)  return 6;  // Fringe
+    return 7;                           // Stash
 }
 
 // ── Analytics helpers (kept for player cards, insights, future features) ───────
@@ -79,15 +79,15 @@ export function computeCompositeScores<T extends {
     const result = new Map<string, number>();
 
     for (const posGroup of byPosition.values()) {
-        const toKtcNorm = zNorm(posGroup.map(p => p.dynastyValue));
+        const toDtvNorm = zNorm(posGroup.map(p => p.dynastyValue));
 
         const rawComposite = posGroup.map(p => {
-            const ktc         = toKtcNorm(p.dynastyValue);
+            const dtv         = toDtvNorm(p.dynastyValue);
             const opportunity = (p.opportunityScore ?? 0.5)  * 100;
             const scheme      = (p.schemeScore      ?? 0.65) * 100;
             const depth       = depthScore(p.depthChartRank);
             const penalty     = injuryPenalty(p.injuryStatus);
-            return { id: p.playerId, v: Math.max(0, ktc * 0.50 + opportunity * 0.30 + scheme * 0.10 + depth * 0.10 - penalty) };
+            return { id: p.playerId, v: Math.max(0, dtv * 0.50 + opportunity * 0.30 + scheme * 0.10 + depth * 0.10 - penalty) };
         });
 
         const toCompNorm = zNorm(rawComposite.map(x => x.v));
@@ -99,11 +99,11 @@ export function computeCompositeScores<T extends {
     return result;
 }
 
-// ── Main export: assign KTC-native tiers, leave dynastyValue untouched ─────────
+// ── Main export: assign value tiers, leave dynastyValue untouched ──────────────
 
 /**
- * Assigns correct KTC-native tiers to each player.
- * dynastyValue is NEVER modified — it stays as the raw KTC scrape.
+ * Assigns value tiers to each player.
+ * dynastyValue is NEVER modified — it stays as the raw scraped value.
  * All analytics (composite, scheme, opportunity) remain in their own fields.
  */
 export function applyFIQValues<T extends {
@@ -113,6 +113,6 @@ export function applyFIQValues<T extends {
 }>(players: T[]): T[] {
     return players.map(p => ({
         ...p,
-        tier: computeKTCTier(p.dynastyValue),
+        tier: computeDtvTier(p.dynastyValue),
     }));
 }

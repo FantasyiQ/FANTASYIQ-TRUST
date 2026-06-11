@@ -4,11 +4,11 @@ import type { UniversePlayer, UniverseResponse } from '@/lib/player-universe';
 import { calculateAge } from '@/lib/calculateAge';
 import { checkPublicLimit, getClientIp } from '@/lib/ratelimit';
 
-const KTC_CAP = 9999;
+const VALUE_CAP = 9999;
 const SKILL_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE']);
 
 function normalise(raw: number): number {
-    return Math.min(100, Math.max(1, Math.round((raw / KTC_CAP) * 100)));
+    return Math.min(100, Math.max(1, Math.round((raw / VALUE_CAP) * 100)));
 }
 
 function normalizeName(name: string): string {
@@ -20,12 +20,12 @@ function normalizeName(name: string): string {
         .trim();
 }
 
-// Returns the full dynamic player universe: all KTC-ranked skill-position players
+// Returns the full dynamic player universe: all ranked skill-position players
 // merged with live Sleeper team/injury/age data, sorted by dynasty value desc.
 export async function GET(request: NextRequest): Promise<Response> {
     const rl = await checkPublicLimit(getClientIp(request));
     if (rl.limited) return rl.response;
-    const [ktcRows, sleeperPlayers, latestSync] = await Promise.all([
+    const [fcRows, sleeperPlayers, latestSync] = await Promise.all([
         prisma.fantasyCalcValue.findMany({
             where: {
                 position: { in: ['QB', 'RB', 'WR', 'TE'] },
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest): Promise<Response> {
             where:  { active: true, position: { in: ['QB', 'RB', 'WR', 'TE'] } },
             select: { playerId: true, fullName: true, team: true, injuryStatus: true, birthDate: true, age: true },
         }),
-        // Latest KTC sync time — max updatedAt across all rows
+        // Latest sync time — max updatedAt across all rows
         prisma.fantasyCalcValue.findFirst({
             orderBy: { updatedAt: 'desc' },
             select:  { updatedAt: true },
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest): Promise<Response> {
         if (!sleeperNormalized.has(normd)) sleeperNormalized.set(normd, p);
     }
 
-    const players: UniversePlayer[] = ktcRows
+    const players: UniversePlayer[] = fcRows
         .filter(r => SKILL_POSITIONS.has(r.position))
         .map(r => {
             const exact   = r.nameLower;
@@ -96,7 +96,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     const body: UniverseResponse = {
         meta: {
             generatedAt: new Date().toISOString(),
-            ktcSyncedAt: latestSync?.updatedAt.toISOString() ?? null,
+            valueSyncedAt: latestSync?.updatedAt.toISOString() ?? null,
             playerCount: players.length,
         },
         players,
@@ -104,7 +104,7 @@ export async function GET(request: NextRequest): Promise<Response> {
 
     return Response.json(body, {
         headers: {
-            // 5-min cache — KTC and Sleeper both sync daily
+            // 5-min cache — dynasty data and Sleeper both sync daily
             'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
         },
     });

@@ -6,7 +6,7 @@
 import { getPlayerIntel, ageCurveDynasty } from './player-intelligence';
 export type { ContractTier } from './player-intelligence';
 
-/** IDP positions — no KTC dynasty value exists; show "—" in DTV displays */
+/** IDP positions — no dynasty trade value exists; show "—" in DTV displays */
 export const IDP_POSITIONS = new Set([
     'DL','DE','DT','NT','EDGE',
     'LB','OLB','ILB','MLB',
@@ -93,12 +93,12 @@ export const DEFAULT_LEAGUE_SETTINGS: LeagueSettings = {
     qbSlots: 1, rbSlots: 2, wrSlots: 2, teSlots: 1, flexSlots: 1, sfSlots: 0,
 };
 
-// KTC assumes a standard 1QB PPR format — these are the baseline slot counts
-// that KTC values are calibrated against.
-const KTC_BASE_SLOTS = { QB: 1, RB: 2, WR: 2, TE: 1, FLEX: 1, SF: 0 };
+// Dynasty values assume a standard 1QB PPR format — these are the baseline slot counts
+// that values are calibrated against.
+const BASE_SLOTS = { QB: 1, RB: 2, WR: 2, TE: 1, FLEX: 1, SF: 0 };
 
-// Returns a scarcity multiplier relative to what KTC already prices in.
-// Each slot above/below the KTC baseline shifts value ±6% per slot.
+// Returns a scarcity multiplier relative to what the base values already price in.
+// Each slot above/below the baseline shifts value ±6% per slot.
 // FLEX and SF slots count at 40% weight toward RB/WR demand,
 // and SF adds to QB demand at 65% (a SF start often goes to a QB).
 function computeScarcity(pos: string, s: LeagueSettings): number {
@@ -108,22 +108,22 @@ function computeScarcity(pos: string, s: LeagueSettings): number {
     switch (pos) {
         case 'QB': {
             const leagueDemand = s.qbSlots + s.sfSlots * 0.65;
-            const baseDemand   = KTC_BASE_SLOTS.QB + KTC_BASE_SLOTS.SF * 0.65;
+            const baseDemand   = BASE_SLOTS.QB + BASE_SLOTS.SF * 0.65;
             return 1.0 + (leagueDemand - baseDemand) * K;
         }
         case 'RB': {
             const leagueDemand = s.rbSlots + s.flexSlots * 0.40;
-            const baseDemand   = KTC_BASE_SLOTS.RB + KTC_BASE_SLOTS.FLEX * 0.40;
+            const baseDemand   = BASE_SLOTS.RB + BASE_SLOTS.FLEX * 0.40;
             return 1.0 + (leagueDemand - baseDemand) * K;
         }
         case 'WR': {
             const leagueDemand = s.wrSlots + s.flexSlots * 0.40;
-            const baseDemand   = KTC_BASE_SLOTS.WR + KTC_BASE_SLOTS.FLEX * 0.40;
+            const baseDemand   = BASE_SLOTS.WR + BASE_SLOTS.FLEX * 0.40;
             return 1.0 + (leagueDemand - baseDemand) * K;
         }
         case 'TE': {
             const leagueDemand = s.teSlots + s.flexSlots * 0.20;
-            const baseDemand   = KTC_BASE_SLOTS.TE + KTC_BASE_SLOTS.FLEX * 0.20;
+            const baseDemand   = BASE_SLOTS.TE + BASE_SLOTS.FLEX * 0.20;
             return 1.0 + (leagueDemand - baseDemand) * K;
         }
         default: return 1.0;

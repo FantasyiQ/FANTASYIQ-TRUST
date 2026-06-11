@@ -117,13 +117,13 @@ function gradeFromScore(score: number): PickGrade {
 }
 
 // Thresholds calibrated to dynasty reality: existing-roster fiqScore is
-// derived as ktcValue/90, so typical starters land at 33–56. Grades must
+// derived as dynastyValue/90, so typical starters land at 33–56. Grades must
 // reflect the actual distribution, not an absolute-value fantasy.
 function posGrade(avgFiq: number): 'A' | 'B' | 'C' | 'D' | 'F' {
-    if (avgFiq >= 65) return 'A';  // elite group (avg KTC ~5850)
-    if (avgFiq >= 50) return 'B';  // solid starters (avg KTC ~4500)
-    if (avgFiq >= 35) return 'C';  // functional depth (avg KTC ~3150)
-    if (avgFiq >= 20) return 'D';  // thin (avg KTC ~1800)
+    if (avgFiq >= 65) return 'A';  // elite group
+    if (avgFiq >= 50) return 'B';  // solid starters
+    if (avgFiq >= 35) return 'C';  // functional depth
+    if (avgFiq >= 20) return 'D';  // thin
     return 'F';
 }
 
@@ -366,7 +366,7 @@ export interface RichRosterPlayer {
     position:    string;
     age:         number | null;
     fiqScore:    number;
-    rawValue?:   number;        // v3.4: KTC dynasty value (for DTV delta)
+    rawValue?:   number;        // v3.4: dynasty value (for DTV delta)
     playerName?: string | null; // v3.4: for pre-pick positional state lookup
     isDraftPick?: boolean;      // v3.4: true if added in this draft
 }

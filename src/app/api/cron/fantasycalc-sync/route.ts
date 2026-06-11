@@ -13,7 +13,7 @@ type KtcPlayer = {
     superflexValues: { value: number };
 };
 
-/** Parse the embedded playersArray from a KTC HTML page */
+/** Parse the embedded playersArray from the dynasty rankings page */
 function parsePlayersArray(html: string): KtcPlayer[] {
     const varIdx = html.indexOf('var playersArray = ');
     if (varIdx === -1) throw new Error('playersArray not found in HTML');
@@ -38,7 +38,7 @@ async function fetchKtcPage(url: string): Promise<KtcPlayer[]> {
         cache: 'no-store',
         headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FantasyiQ/1.0)' },
     });
-    if (!res.ok) throw new Error(`KTC responded ${res.status} for ${url}`);
+    if (!res.ok) throw new Error(`Dynasty data source responded ${res.status} for ${url}`);
     return parsePlayersArray(await res.text());
 }
 
@@ -105,7 +105,7 @@ export async function GET(request: Request): Promise<Response> {
         const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
         await prisma.fantasyCalcSnapshot.deleteMany({ where: { takenAt: { lt: cutoff } } });
     
-        // ── Step 2: Fetch fresh KTC values ────────────────────────────────────────
+        // ── Step 2: Fetch fresh dynasty values ────────────────────────────────────────
         let dynastyPlayers: KtcPlayer[], redraftPlayers: KtcPlayer[];
         try {
             [dynastyPlayers, redraftPlayers] = await Promise.all([
@@ -116,7 +116,7 @@ export async function GET(request: Request): Promise<Response> {
             return Response.json({ error: String(err) }, { status: 502 });
         }
     
-        // KTC uses different playerIDs for the same player on dynasty vs redraft pages.
+        // The data source uses different playerIDs for the same player on dynasty vs redraft pages.
         // Match by name (lowercased) to correctly link redraft values.
         const redraftMap = new Map<string, number>();
         const redraftSfMap = new Map<string, number>();
@@ -132,8 +132,8 @@ export async function GET(request: Request): Promise<Response> {
         let upserted = 0;
     
         // Upsert by nameLower (not fcId) so that rows originally created with old
-        // FantasyCalc IDs get updated correctly — KTC uses different playerIDs.
-        // Also update fcId so it reflects the current KTC ID.
+        // FantasyCalc IDs get updated correctly — The data source uses different playerIDs.
+        // Also update fcId so it reflects the current data source ID.
         for (let i = 0; i < entries.length; i += BATCH) {
             const batch = entries.slice(i, i + BATCH);
             await Promise.all(batch.map(async p => {
@@ -183,7 +183,7 @@ export async function GET(request: Request): Promise<Response> {
             upserted += batch.length;
         }
     
-        return Response.json({ ok: true, source: 'KTC', upserted });
+        return Response.json({ ok: true, source: 'FantasyCalc', upserted });
     } catch (err) {
         captureError(err, { cron: 'fantasycalc-sync' });
         return Response.json({ error: 'Cron failed' }, { status: 500 });

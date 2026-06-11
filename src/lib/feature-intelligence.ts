@@ -40,7 +40,7 @@ const FEATURE_COMBOS: Array<{
         trigger: 'league_refresh',
         suggest: 'roster_values',
         title:   "See your roster's trade value",
-        body:    "You've been refreshing your league — check Roster Values to see your team's KTC trade value and find moves worth making.",
+        body:    "You've been refreshing your league — check Roster Values to see your team's dynasty trade value and find moves worth making.",
     },
     {
         trigger: 'trade_evaluator',

@@ -70,11 +70,11 @@ export interface RosterValuesResponse {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-const KTC_CAP = 9999;
+const VALUE_CAP = 9999;
 const SKILL_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE']);
 
 function normalise(raw: number): number {
-    return Math.min(100, Math.max(1, Math.round((raw / KTC_CAP) * 100)));
+    return Math.min(100, Math.max(1, Math.round((raw / VALUE_CAP) * 100)));
 }
 
 function normalizeName(name: string): string {
@@ -173,8 +173,8 @@ export async function GET(
     const superflex       = leagueSettings.sfSlots > 0;
     const leagueSize      = league.totalRosters;
 
-    // 2. Fetch Sleeper rosters + members + KTC universe in parallel
-    const [rosters, members, ktcRows, sleeperAllPlayers, latestSnapshot] = await Promise.all([
+    // 2. Fetch Sleeper rosters + members + dynasty universe in parallel
+    const [rosters, members, fcRows, sleeperAllPlayers, latestSnapshot] = await Promise.all([
         getLeagueRosters(leagueId),
         getLeagueUsers(leagueId),
         prisma.fantasyCalcValue.findMany({
@@ -216,7 +216,7 @@ export async function GET(
 
     // 5. Build DTV map keyed by lowercase name
     const dtvByName = new Map<string, { universe: UniversePlayer; finalDtv: number }>();
-    for (const r of ktcRows) {
+    for (const r of fcRows) {
         const exact  = r.nameLower;
         const normd  = normalizeName(r.nameLower);
         const sl     = sleeperExact.get(exact) ?? sleeperNormalized.get(normd) ?? null;

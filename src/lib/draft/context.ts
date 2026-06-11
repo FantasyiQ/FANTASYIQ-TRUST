@@ -130,8 +130,8 @@ export function computeTeamMode(profiles: RosterProfile[]): TeamMode {
 
 /**
  * Pool-relative ADP entry for a single player.
- * adpRankInPool = FiQ baseline pick: 1-based global rank by FiQ/KTC value across ALL positions.
- * Rookies sorted by fiqScore desc; startup/FA sorted by KTC value desc.
+ * adpRankInPool = FiQ baseline pick: 1-based global rank by FiQ dynasty value across ALL positions.
+ * Rookies sorted by fiqScore desc; startup/FA sorted by dynasty value desc.
  * Rank 1 = highest-value player in the pool, regardless of position.
  * delta = myNextPick - adpRankInPool: positive = value (player available later than FiQ suggests).
  */

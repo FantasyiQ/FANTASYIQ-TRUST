@@ -142,7 +142,7 @@ export default function LeagueTradeEvaluator({
     // Depth base values for unranked / non-skill-position players
     const DEPTH_BASE: Record<string, number> = {
         QB: 22, RB: 18, WR: 18, TE: 14, K: 8, DEF: 8,
-        // IDP positions — no KTC value; DTV shown as "—" in UI
+        // IDP positions — no dynasty value; DTV shown as "—" in UI
         DL: 0, LB: 0, DB: 0, DE: 0, DT: 0, NT: 0,
         OLB: 0, ILB: 0, MLB: 0, EDGE: 0,
         CB: 0, S: 0, SS: 0, FS: 0, SAF: 0, NB: 0,

@@ -555,8 +555,8 @@ export default function TradeEvaluator({
     // whose names come from Sleeper and may already be Player-shaped objects).
     const patchPlayer = useCallback((p: Player): Player => {
         if (p.position === 'PICK') return p;
-        // IDP/K/DEF: use defensive engine score, not KTC universe (which is offense-only).
-        // This must run before the KTC lookup so IDP players not in KTC are handled correctly.
+        // IDP/K/DEF: use defensive engine score, not dynasty universe (which is offense-only).
+        // This must run before the dynasty value lookup so IDP players are handled correctly.
         const IDP_POSITIONS = new Set(['DL','LB','DB','DE','DT','NT','OLB','ILB','MLB','EDGE','CB','S','SS','FS','K','DEF']);
         if (IDP_POSITIONS.has(p.position)) {
             const defScore = p.id ? defenseValues[p.id] : undefined;
@@ -1107,8 +1107,8 @@ export default function TradeEvaluator({
                             {leagueType === 'Dynasty'
                                 ? 'Values adjust for age curve, position scarcity, and your league\'s scoring format.'
                                 : 'Values adjust for position scarcity and your league\'s scoring format.'}
-                            {universeMeta?.ktcSyncedAt && (
-                                <span className="ml-2 text-gray-600">· Updated {timeAgo(universeMeta.ktcSyncedAt)}</span>
+                            {universeMeta?.valueSyncedAt && (
+                                <span className="ml-2 text-gray-600">· Updated {timeAgo(universeMeta.valueSyncedAt)}</span>
                             )}
                         </p>
                     </div>

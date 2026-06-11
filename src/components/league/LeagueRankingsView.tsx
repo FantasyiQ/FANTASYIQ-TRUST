@@ -48,7 +48,7 @@ function PlayerRankingsTable({
     position,
     onSearch,
     onPosition,
-    ktcSyncedAt,
+    valueSyncedAt,
     leagueType,
 }: {
     rankings:    PlayerRankingRow[];
@@ -56,7 +56,7 @@ function PlayerRankingsTable({
     position:    string;
     onSearch:    (v: string) => void;
     onPosition:  (v: string) => void;
-    ktcSyncedAt: string | null;
+    valueSyncedAt: string | null;
     leagueType:  string;
 }) {
     const filtered = useMemo(() => {
@@ -72,12 +72,12 @@ function PlayerRankingsTable({
     return (
         <div>
             <div className="px-6 py-3 border-b border-gray-800">
-                {ktcSyncedAt && (
+                {valueSyncedAt && (
                     <p className="text-gray-500 text-xs mb-2">
                         {leagueType === 'Dynasty'
                             ? 'Values adjust for age curve, position scarcity, and your league\'s scoring format.'
                             : 'Values adjust for position scarcity and your league\'s scoring format.'}
-                        <span className="ml-2 text-gray-600">· Updated {timeAgo(ktcSyncedAt)}</span>
+                        <span className="ml-2 text-gray-600">· Updated {timeAgo(valueSyncedAt)}</span>
                     </p>
                 )}
             <div className="flex items-center justify-between flex-wrap gap-3">
@@ -232,7 +232,7 @@ export function LeagueRankingsView({
     playerRankings,
     teamRankings,
     powerRankings,
-    ktcSyncedAt,
+    valueSyncedAt,
     preseason,
     search,
     position,
@@ -283,7 +283,7 @@ export function LeagueRankingsView({
                     position={position}
                     onSearch={onSearch}
                     onPosition={onPosition}
-                    ktcSyncedAt={ktcSyncedAt}
+                    valueSyncedAt={valueSyncedAt}
                     leagueType={league.leagueType}
                 />
             )}

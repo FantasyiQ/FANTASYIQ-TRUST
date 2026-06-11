@@ -15,7 +15,7 @@ interface DraftStorylineInput {
     classStrength:    ClassStrength;
 }
 
-function formatKTC(value: number): string {
+function formatDynastyValue(value: number): string {
     if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
     return String(value);
 }
@@ -52,7 +52,7 @@ export function computeDraftStoryline(input: DraftStorylineInput): string {
             : 'you still found pieces that open new options going forward';
 
     const dtvLine = dtvSnapshot && dtvSnapshot.delta > 0
-        ? ` The draft added ${formatKTC(dtvSnapshot.delta)} in dynasty trade value.`
+        ? ` The draft added ${formatDynastyValue(dtvSnapshot.delta)} in dynasty trade value.`
         : '';
 
     const middle = `You worked ${classFeel} efficiently — ${quality}.${dtvLine}`;

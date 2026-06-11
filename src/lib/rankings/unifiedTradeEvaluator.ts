@@ -9,7 +9,7 @@
 //   - The offensive DTV table and the defensive valueScore table are read-only inputs.
 //
 // Design:
-//   - Offensive values arrive as raw finalDtv numbers (KTC-based, roughly 0–100).
+//   - Offensive values arrive as raw finalDtv numbers (dynasty-based, roughly 0–100).
 //   - Defensive values arrive already normalized to 0–100 (from defensiveEngine).
 //   - Offensive values are z-score normalized to 0–100 to match the defensive scale.
 //   - A unified lookup prefers defenseValues over offenseScore for any player ID.
@@ -17,7 +17,7 @@
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-/** Raw offensive values: playerId → finalDtv (KTC-based, un-normalized). */
+/** Raw offensive values: playerId → finalDtv (dynasty-based, un-normalized). */
 export type OffenseValues   = Readonly<Record<string, number>>;
 
 /** Defensive values: playerId → valueScore (0–100, from defensiveEngine). */
@@ -55,7 +55,7 @@ function statsFromValues(values: number[]): { mean: number; stdDev: number } {
 // ── Step 1: Normalize offensive values ────────────────────────────────────────
 
 /**
- * Converts raw offensive DTV values (KTC-based) into a 0–100 scale that mirrors
+ * Converts raw offensive DTV values (dynasty-based) into a 0–100 scale that mirrors
  * the defensive engine's normalization (mean=50, 1 stdDev ≈ 15 points).
  *
  * Pure function — returns a new object, never mutates the input.
@@ -102,7 +102,7 @@ export function buildGetPlayerValue(
         if (defenseValues[id] !== undefined) {
             return { value: defenseValues[id], source: 'defense' };
         }
-        // Offense fallback: look up by player name (KTC universe is name-keyed)
+        // Offense fallback: look up by player name (dynasty universe is name-keyed)
         if (normalizedOffense[name] !== undefined) {
             return { value: normalizedOffense[name], source: 'offense' };
         }
