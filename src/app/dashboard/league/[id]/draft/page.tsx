@@ -45,11 +45,11 @@ export default async function DraftCenterPage({
             badge:       'Dynasty only',
         },
         {
-            href:        null,
+            href:        `${base}/mock`,
             icon:        '🎯',
             title:       'Mock Draft',
-            description: 'Practice draft scenarios against AI-simulated opponents before your real draft. Coming soon.',
-            badge:       'Coming soon',
+            description: 'Practice draft scenarios against AI opponents calibrated to your league — scoring format, roster needs, and positional weights included.',
+            badge:       null,
         },
     ];
 

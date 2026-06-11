@@ -4,9 +4,10 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const TABS = [
-    { key: 'strategy',  label: 'Draft Board',  path: 'strategy'  },
-    { key: 'assistant', label: 'Live Draft',       path: 'assistant' },
-    { key: 'report',    label: 'Draft Report',     path: 'report'    },
+    { key: 'strategy',  label: 'Draft Board',   path: 'strategy'  },
+    { key: 'assistant', label: 'Live Draft',     path: 'assistant' },
+    { key: 'report',    label: 'Draft Report',   path: 'report'    },
+    { key: 'mock',      label: 'Mock Draft',     path: 'mock'      },
 ] as const;
 
 export default function DraftCenterTabBar({ leagueId }: { leagueId: string }) {
