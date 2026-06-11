@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect, useRef } from 'react';
 import type { MockPlayer, NeedsProfile, MockDraftPick, MockLeagueContext, MockDraftState } from '@/lib/mock-draft/types';
-import { rankCandidatesForTeam } from '@/lib/mock-draft/ScoringEngine';
+import { rankBestFitForTeam } from '@/lib/mock-draft/ScoringEngine';
 
 const POS_COLORS: Record<string, string> = {
     QB: 'bg-red-900/40 text-red-300 border-red-800',
@@ -130,10 +130,8 @@ export default function OnTheClockPanel({
 
     const bestFit = useMemo(() => {
         if (!userNeeds) return bpaTop10;
-        const personality = userTeam?.personality ?? { riskTolerance: 'MEDIUM' as const, needBias: 0.5, chaosBias: 0.0 };
-        const noChaosPers = { ...personality, chaosBias: 0 };
-        return rankCandidatesForTeam(availablePlayers, userNeeds, noChaosPers).map(r => r.player);
-    }, [availablePlayers, userNeeds, userTeam]);
+        return rankBestFitForTeam(availablePlayers, userNeeds).map(r => r.player);
+    }, [availablePlayers, userNeeds]);
 
     const displayList = tab === 'bpa' ? bpaTop10 : bestFit;
 

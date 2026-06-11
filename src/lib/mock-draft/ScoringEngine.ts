@@ -57,6 +57,24 @@ export function scorePlayerForTeam(
     };
 }
 
+// Best Fit: looks at a wider pool (top 30) and weights need heavily (60%) over
+// base score (40%), with no chaos. Surfaces the best available player at positions
+// you actually need, even if they sit outside the top 10 BPA window.
+export function rankBestFitForTeam(
+    available: MockPlayer[],
+    needs:     NeedsProfile,
+): { player: MockPlayer; score: number }[] {
+    const pool = available.slice(0, 30);
+    return pool
+        .map(player => {
+            const base = player.baseScore / 100;
+            const need = getNeedForPosition(needs, player.position);
+            const score = 0.40 * base + 0.60 * need;
+            return { player, score };
+        })
+        .sort((a, b) => b.score - a.score);
+}
+
 // Ranks the top 10 BPA candidates for a team. One chaos roll per position per
 // call — so across a single pick, all WRs share the same positional chaos weight,
 // all RBs share theirs, etc. Within a position the original BPA order is preserved.
