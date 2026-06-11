@@ -202,7 +202,7 @@ export async function GET(req: NextRequest): Promise<Response> {
             QB: 1.00,
             RB: 1.06,                      // dynasty RB scarcity premium
             WR: 1.00,                      // baseline
-            TE: 1.03,                      // slight TE1 premium
+            TE: 1.00,
         };
 
         const season = league.season ?? '2026';
