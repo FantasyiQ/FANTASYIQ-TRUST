@@ -7,14 +7,11 @@ import type {
 } from './types';
 import { filterAvailablePlayers } from './DraftBoardEngine';
 import { rankCandidatesForTeam } from './ScoringEngine';
-import { computeNeedsProfile, updateNeedsAfterPick } from './NeedsEngine';
+import { updateNeedsAfterPick } from './NeedsEngine';
 
 export function initializeDraftState(context: MockLeagueContext): MockDraftState {
     const teamNeeds = new Map(
-        context.teams.map(t => [
-            t.teamId,
-            computeNeedsProfile(t.rosterByPosition, context.settings),
-        ]),
+        context.teams.map(t => [t.teamId, t.needsProfile]),
     );
     return {
         currentPickIndex: 0,
