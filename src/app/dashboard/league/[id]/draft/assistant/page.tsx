@@ -39,7 +39,7 @@ export default async function DraftAssistantPage({
             <div className="space-y-6">
                 <div className="flex items-start justify-between gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-white">Draft Center</h1>
+                        <h1 className="text-2xl font-bold text-white">Draft War Room</h1>
                         <p className="text-gray-500 text-sm mt-0.5">{league.leagueName}</p>
                     </div>
                 </div>
@@ -98,7 +98,7 @@ export default async function DraftAssistantPage({
         <div className="space-y-6">
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">Draft Center</h1>
+                    <h1 className="text-2xl font-bold text-white">Draft War Room</h1>
                     <p className="text-gray-500 text-sm mt-0.5">{league.leagueName}</p>
                 </div>
                 <div className="shrink-0 text-right">
