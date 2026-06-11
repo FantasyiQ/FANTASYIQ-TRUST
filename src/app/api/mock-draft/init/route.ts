@@ -201,7 +201,7 @@ export async function GET(req: NextRequest): Promise<Response> {
         const DYNASTY_POS_MULT: Record<string, number> = {
             QB: 0.97,
             RB: 1.05,                      // dynasty RB scarcity premium
-            WR: 1.00,                      // baseline
+            WR: 0.97,                      // baseline
             TE: 0.95,
         };
 
