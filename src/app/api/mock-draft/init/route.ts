@@ -200,7 +200,7 @@ export async function GET(req: NextRequest): Promise<Response> {
         // dominate round 1 and elite RBs like Coleman/Singleton/Johnson fall to round 2.
         const DYNASTY_POS_MULT: Record<string, number> = {
             QB: 1.00,
-            RB: 1.06,                      // dynasty RB scarcity premium
+            RB: 1.03,                      // dynasty RB scarcity premium
             WR: 1.00,                      // baseline
             TE: 0.95,
         };
