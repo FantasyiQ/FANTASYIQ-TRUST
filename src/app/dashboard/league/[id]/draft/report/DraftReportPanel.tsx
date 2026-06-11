@@ -235,6 +235,7 @@ export default function DraftReportPanel({
     const [selectedDraftId,  setSelectedDraftId]  = useState(draftOptions[0]?.draftId ?? '');
     const [selectedRosterId, setSelectedRosterId] = useState(myRosterId ?? rosterOptions[0]?.rosterId ?? '');
     const [report,           setReport]           = useState<DraftReportCard | null>(null);
+    const [noPicks,          setNoPicks]          = useState(false);
     const [loading,          setLoading]          = useState(false);
     const [error,            setError]            = useState<string | null>(null);
 
@@ -242,11 +243,14 @@ export default function DraftReportPanel({
         if (!selectedDraftId || !selectedRosterId) return;
         setLoading(true);
         setError(null);
+        setNoPicks(false);
+        setReport(null);
         try {
             const url = `/api/draft-report?leagueId=${leagueId}&sleeperDraftId=${selectedDraftId}&myRosterId=${selectedRosterId}`;
             const res  = await fetch(url);
             const data = await res.json();
             if (!res.ok) throw new Error(data.error ?? 'Failed to load report');
+            if (data.noPicks) { setNoPicks(true); return; }
             setReport(data.reportCard);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load report');
@@ -331,6 +335,19 @@ export default function DraftReportPanel({
                 </div>
                 {error && <p className="text-red-400 text-xs">{error}</p>}
             </div>
+
+            {noPicks && (
+                <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center space-y-2">
+                    <p className="text-2xl">📋</p>
+                    <p className="text-white font-semibold">No Picks Found for This Team</p>
+                    <p className="text-gray-400 text-sm leading-relaxed max-w-sm mx-auto">
+                        This team did not make any picks in this draft. A FiQ Report Card requires at least one pick to generate meaningful analysis.
+                    </p>
+                    <p className="text-gray-600 text-xs mt-2">
+                        If this looks wrong, the draft data may still be syncing from Sleeper. Try refreshing in a few minutes.
+                    </p>
+                </div>
+            )}
 
             {report && (
                 <>

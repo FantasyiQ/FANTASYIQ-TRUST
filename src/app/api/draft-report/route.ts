@@ -260,6 +260,11 @@ export async function GET(req: NextRequest): Promise<Response> {
         }),
     ];
 
+    // ── Guard: no picks → return clear signal, not a fabricated report ────────
+    if (myPicksRaw.length === 0) {
+        return Response.json({ noPicks: true, totalPicks: sortedAllPicks.length });
+    }
+
     // ── Build report card ──────────────────────────────────────────────────────
     const myPickInputs = myPicksRaw.map(p => ({
         pickOverall:     p.pick_no,
