@@ -4,13 +4,13 @@ import { useEffect, useState } from 'react';
 import Image from 'next/image';
 
 interface TradeItem {
-    type:          'player' | 'pick';
-    playerId?:     string;
-    name?:         string;
-    position?:     string | null;
-    season?:       string;
-    round?:        number;
-    originalOwner?: number;
+    type:               'player' | 'pick';
+    playerId?:          string;
+    name?:              string;
+    position?:          string | null;
+    season?:            string;
+    round?:             number;
+    originalOwnerName?: string;
 }
 
 interface TradeSide {
@@ -55,8 +55,13 @@ function Avatar({ avatar, name }: { avatar: string | null; name: string }) {
 function ItemChip({ item }: { item: TradeItem }) {
     if (item.type === 'pick') {
         return (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-indigo-900/40 text-indigo-300 border border-indigo-700">
-                {item.season} R{item.round}
+            <span className="inline-flex items-center gap-1.5 text-xs">
+                <span className="px-1.5 py-px rounded text-[10px] font-bold border bg-indigo-900/40 text-indigo-300 border-indigo-700">
+                    {item.season} R{item.round}
+                </span>
+                {item.originalOwnerName && (
+                    <span className="text-gray-500">from {item.originalOwnerName}</span>
+                )}
             </span>
         );
     }
@@ -145,7 +150,7 @@ export default function TradeHistoryPanel({ leagueId }: { leagueId: string }) {
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between gap-4 flex-wrap">
-                <p className="text-gray-500 text-sm">{trades.length} trades this season</p>
+                <p className="text-gray-500 text-sm">{trades.length} trades all-time</p>
                 <input
                     type="text"
                     placeholder="Search by team or player…"

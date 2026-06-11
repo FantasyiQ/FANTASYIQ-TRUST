@@ -85,7 +85,16 @@ export async function GET(
                 }));
             const picks = (t.draft_picks ?? [])
                 .filter(p => p.owner_id === rosterId)
-                .map(p => ({ type: 'pick' as const, season: p.season, round: p.round, originalOwner: p.roster_id }));
+                .map(p => {
+                    const origOwnerId = rosterToOwner.get(p.roster_id);
+                    const origUser    = origOwnerId ? userMap.get(origOwnerId) : null;
+                    return {
+                        type:              'pick' as const,
+                        season:            p.season,
+                        round:             p.round,
+                        originalOwnerName: origUser?.displayName ?? `Team ${p.roster_id}`,
+                    };
+                });
             return {
                 rosterId,
                 displayName: user?.displayName ?? `Team ${rosterId}`,
