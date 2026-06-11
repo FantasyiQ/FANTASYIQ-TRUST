@@ -1,7 +1,37 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getLeagueTransactions, getLeagueRosters, getLeagueUsers, getNflState, getPlayers } from '@/lib/sleeper';
+import {
+    getLeague,
+    getLeagueTransactions,
+    getLeagueRosters,
+    getLeagueUsers,
+    getPlayers,
+    type SleeperTransaction,
+} from '@/lib/sleeper';
+
+const WEEKS = Array.from({ length: 19 }, (_, i) => i); // 0–18
+
+// Fetch all completed trades for one Sleeper league ID across all weeks.
+async function fetchTradesForLeague(sleeperLeagueId: string): Promise<SleeperTransaction[]> {
+    const all = (await Promise.all(
+        WEEKS.map(w => getLeagueTransactions(sleeperLeagueId, w).catch(() => [] as SleeperTransaction[]))
+    )).flat();
+    return all.filter(t => t.type === 'trade' && t.status === 'complete');
+}
+
+// Walk the previous_league_id chain to collect all historical Sleeper league IDs.
+async function collectLeagueChain(startId: string): Promise<string[]> {
+    const ids: string[] = [startId];
+    let current = startId;
+    for (let depth = 0; depth < 10; depth++) {
+        const league = await getLeague(current).catch(() => null);
+        if (!league?.previous_league_id) break;
+        ids.push(league.previous_league_id);
+        current = league.previous_league_id;
+    }
+    return ids;
+}
 
 export async function GET(
     req: NextRequest,
@@ -20,46 +50,37 @@ export async function GET(
 
     const sleeperLeagueId = league.leagueId;
 
-    // Fetch rosters, users, and NFL state in parallel to build lookup maps
-    const [rosters, users, nflState] = await Promise.all([
+    // Walk all historical seasons + fetch rosters/users for current league in parallel
+    const [leagueIds, rosters, users] = await Promise.all([
+        collectLeagueChain(sleeperLeagueId),
         getLeagueRosters(sleeperLeagueId),
         getLeagueUsers(sleeperLeagueId),
-        getNflState(),
     ]);
 
-    // Maps for enriching transactions
+    // Build roster → owner and user display maps from current season
     const rosterToOwner = new Map(rosters.map(r => [r.roster_id, r.owner_id]));
     const userMap = new Map(users.map(u => [u.user_id, { displayName: u.display_name, avatar: u.avatar }]));
 
-    // Fetch transactions for weeks 0–current (0 = off-season trading)
-    const maxWeek = Math.max(nflState.week ?? 18, 1);
-    const weeks = Array.from({ length: maxWeek + 1 }, (_, i) => i); // 0..maxWeek
+    // Fetch all trades across all seasons in parallel
+    const allTrades = (await Promise.all(
+        leagueIds.map(id => fetchTradesForLeague(id))
+    )).flat().sort((a, b) => b.status_updated - a.status_updated);
 
-    const allTransactions = (await Promise.all(
-        weeks.map(w => getLeagueTransactions(sleeperLeagueId, w).catch(() => []))
-    )).flat();
-
-    const trades = allTransactions
-        .filter(t => t.type === 'trade' && t.status === 'complete')
-        .sort((a, b) => b.status_updated - a.status_updated);
-
-    // Collect all player IDs across trades for bulk name lookup
-    const allPlayerIds = [...new Set(
-        trades.flatMap(t => Object.keys(t.adds ?? {}))
-    )];
+    // Bulk player name lookup
+    const allPlayerIds = [...new Set(allTrades.flatMap(t => Object.keys(t.adds ?? {})))];
     const playerMap = allPlayerIds.length > 0 ? await getPlayers(allPlayerIds) : {};
 
-    // Enrich each trade with team info
-    const enriched = trades.map(t => {
+    // Enrich each trade with team + player info
+    const enriched = allTrades.map(t => {
         const sides = t.roster_ids.map(rosterId => {
-            const ownerId  = rosterToOwner.get(rosterId);
-            const user     = ownerId ? userMap.get(ownerId) : null;
+            const ownerId = rosterToOwner.get(rosterId);
+            const user    = ownerId ? userMap.get(ownerId) : null;
             const received = Object.entries(t.adds ?? {})
                 .filter(([, rid]) => rid === rosterId)
                 .map(([playerId]) => ({
-                    type: 'player' as const,
+                    type:     'player' as const,
                     playerId,
-                    name: playerMap[playerId]?.full_name ?? playerId,
+                    name:     playerMap[playerId]?.full_name ?? playerId,
                     position: playerMap[playerId]?.position ?? null,
                 }));
             const picks = (t.draft_picks ?? [])
@@ -68,13 +89,13 @@ export async function GET(
             return {
                 rosterId,
                 displayName: user?.displayName ?? `Team ${rosterId}`,
-                avatar: user?.avatar ?? null,
-                received: [...received, ...picks],
+                avatar:      user?.avatar ?? null,
+                received:    [...received, ...picks],
             };
         });
         return {
             transactionId: t.transaction_id,
-            date: t.status_updated,
+            date:          t.status_updated,
             sides,
         };
     });
