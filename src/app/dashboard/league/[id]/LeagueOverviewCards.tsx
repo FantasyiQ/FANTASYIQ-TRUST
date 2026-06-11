@@ -375,7 +375,22 @@ export default function LeagueOverviewCards({
                 </div>
             </CollapsibleCard>
 
-            {/* Card 5: Trade Evaluator */}
+            {/* Card 5: Trade History */}
+            <CollapsibleCard title="Trade History">
+                <div className="px-6 py-5">
+                    <p className="text-gray-500 text-sm mb-4">
+                        Every trade in this league — players and picks exchanged, by team, searchable.
+                    </p>
+                    <Link
+                        href={`/dashboard/league/${leagueId}/trade-history`}
+                        className="inline-flex items-center text-[#D4AF37] font-semibold text-sm hover:underline"
+                    >
+                        View Trade History →
+                    </Link>
+                </div>
+            </CollapsibleCard>
+
+            {/* Card 6: Trade Evaluator */}
             <CollapsibleCard title="Trade Evaluator">
                 <div className="px-6 py-5">
                     <p className="text-gray-500 text-sm mb-4">
