@@ -268,6 +268,8 @@ export default async function FantasyiQHubPage({ params }: { params: Promise<{ i
                 leagueId={id}
                 week={week}
                 season={season}
+                scoringType={league.scoringType ?? 'std'}
+                totalRosters={league.totalRosters}
                 lineups={<OptimizedLineups optimizations={optimizations} offSeason={offSeason} />}
                 waiver={<WaiverWireTargets  analyses={waiverAnalyses}     offSeason={offSeason} />}
                 trade={<TradeInsights       insights={tradeInsights}       offSeason={offSeason} />}

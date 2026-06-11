@@ -6,20 +6,30 @@ import HubTabBar, { type HubTabKey } from './HubTabBar';
 type SectionTab = 'lineups' | 'waiver' | 'trade' | 'roster';
 
 interface HubContentProps {
-    leagueId:    string;
-    week:        number;
-    season:      string;
+    leagueId:     string;
+    week:         number;
+    season:       string;
+    scoringType:  string;
+    totalRosters: number;
     // Pre-rendered server slots — shown/hidden by client tab state
-    lineups:     React.ReactNode;
-    waiver:      React.ReactNode;
-    trade:       React.ReactNode;
-    roster:      React.ReactNode;
+    lineups:      React.ReactNode;
+    waiver:       React.ReactNode;
+    trade:        React.ReactNode;
+    roster:       React.ReactNode;
+}
+
+function scoringLabel(type: string) {
+    if (type === 'ppr')      return 'PPR';
+    if (type === 'half_ppr') return '0.5 PPR';
+    return 'Standard';
 }
 
 export default function HubContent({
     leagueId,
     week,
     season,
+    scoringType,
+    totalRosters,
     lineups,
     waiver,
     trade,
@@ -44,8 +54,18 @@ export default function HubContent({
                     </p>
                 </div>
                 <div className="shrink-0 text-right">
-                    <div className="text-[10px] font-bold tracking-widest text-[#D4AF37]">FantasyiQ</div>
-
+                    <div className="text-[10px] font-bold tracking-widest text-[#D4AF37] mb-1">FantasyiQ</div>
+                    <div className="flex items-center gap-1 justify-end flex-wrap">
+                        <span className="inline-flex items-center gap-1 bg-[#D4AF37]/10 border border-[#D4AF37]/25 rounded-full px-2 py-0.5 text-[10px] font-semibold text-[#D4AF37]">
+                            {scoringLabel(scoringType)}
+                        </span>
+                        <span className="inline-flex items-center gap-1 bg-gray-800 border border-gray-700 rounded-full px-2 py-0.5 text-[10px] font-semibold text-gray-400">
+                            {totalRosters} Teams
+                        </span>
+                        <span className="inline-flex items-center gap-1 bg-gray-800 border border-gray-700 rounded-full px-2 py-0.5 text-[10px] font-semibold text-gray-400">
+                            League-Calibrated
+                        </span>
+                    </div>
                 </div>
             </div>
 

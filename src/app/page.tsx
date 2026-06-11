@@ -48,13 +48,13 @@ const WHY_ITEMS = [
 ];
 
 const TOOLS = [
-    'Weekly projections',
-    'Matchup analytics',
-    'Waiver optimization',
-    'Trade evaluation tools',
-    'Dynasty & keeper insights',
-    'League health analytics',
-    'Team stability scoring',
+    { label: 'Weekly lineup optimizer', note: 'Built for your roster slots — not a generic depth chart' },
+    { label: 'Matchup win probability', note: 'Calculated using your league\'s actual scoring format' },
+    { label: 'Waiver wire targets', note: 'Ranked by what fills your specific roster holes' },
+    { label: 'Trade evaluator', note: 'Values shift by scoring format — a TE is worth more in TE-premium' },
+    { label: 'Roster intelligence', note: 'Dynasty & keeper insights calibrated to your league settings' },
+    { label: 'League health analytics', note: 'Tracks engagement and reliability across your specific owners' },
+    { label: 'Team stability scoring', note: 'Flags teams at risk based on your league\'s history' },
 ];
 
 const TRUST_ITEMS = [
@@ -228,21 +228,28 @@ export default function Home() {
                 All-Pro &amp; Elite Plans
               </div>
               <h2 className="text-3xl md:text-4xl font-bold mb-4">
-                Fantasy Tools for the<br />
-                <span className="text-[#D4AF37]">Competitive Edge</span>
+                Fantasy Tools Built for<br />
+                <span className="text-[#D4AF37]">Your League, Not the Masses</span>
               </h2>
               <p className="text-gray-400 text-base leading-relaxed mb-6">
-                Commissioners who upgrade unlock the full FantasyiQ analytics suite. FantasyiQ Trust isn&apos;t just a dues engine — it&apos;s a competitive advantage.
+                Every tool is calibrated to your league&apos;s exact scoring format, roster construction, and league size — not industry averages. A TE in a TE-premium league ranks differently than in standard. Waiver targets depend on what your roster actually needs. Your advice should reflect your league.
               </p>
+              <div className="inline-flex items-center gap-2 bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-lg px-3 py-1.5 mb-4">
+                <span className="text-[#D4AF37] text-xs font-bold">≠</span>
+                <span className="text-[#D4AF37] text-xs font-semibold">Not FantasyPros. Not generic rankings.</span>
+              </div>
               <Link href="/pricing" className="inline-flex items-center gap-2 text-[#D4AF37] hover:underline font-semibold text-sm">
                 See all plan features →
               </Link>
             </div>
             <div className="grid grid-cols-1 gap-3">
               {TOOLS.map((tool) => (
-                <div key={tool} className="flex items-center gap-3 bg-[#0A0A0A] border border-gray-800 rounded-lg px-4 py-3">
-                  <span className="text-[#D4AF37] font-bold text-sm">✓</span>
-                  <span className="text-white text-sm font-medium">{tool}</span>
+                <div key={tool.label} className="bg-[#0A0A0A] border border-gray-800 rounded-lg px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-[#D4AF37] font-bold text-sm shrink-0">✓</span>
+                    <span className="text-white text-sm font-medium">{tool.label}</span>
+                  </div>
+                  <p className="text-gray-600 text-xs mt-0.5 ml-7">{tool.note}</p>
                 </div>
               ))}
             </div>
