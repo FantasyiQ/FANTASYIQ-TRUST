@@ -201,8 +201,9 @@ export interface SleeperTransaction {
     roster_ids: number[];
     consenter_ids: string[] | null;  // sleeper user_ids who agreed (trades only)
     creator: string | null;          // sleeper user_id who initiated (waivers/free agents)
-    adds: Record<string, number> | null;   // player_id → roster_id
-    drops: Record<string, number> | null;  // player_id → roster_id
+    adds: Record<string, number> | null;         // player_id → roster_id
+    drops: Record<string, number> | null;        // player_id → roster_id
+    draft_picks: SleeperTradedPick[] | null;     // picks exchanged in the trade
     created: number;        // epoch ms
     status_updated: number; // epoch ms
 }

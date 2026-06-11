@@ -13,6 +13,7 @@ import DuesManager from './DuesManager';
 import type { DuesManagerData, SleeperMember } from './DuesManager';
 import RosterValuesPanel from './RosterValuesPanel';
 import TradePartnersPanel from './TradePartnersPanel';
+import TradeHistoryPanel from './TradeHistoryPanel';
 
 // ── Serialisable prop types ──────────────────────────────────────────────────
 
@@ -75,12 +76,13 @@ interface Props {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-type Tab = 'overview' | 'trade' | 'commish' | 'roster-values' | 'trade-partners';
+type Tab = 'overview' | 'trade' | 'commish' | 'roster-values' | 'trade-partners' | 'trade-history';
 
 const TABS: { id: Tab; label: string }[] = [
     { id: 'overview',       label: 'League Overview' },
     { id: 'commish',        label: 'Commissioner Hub' },
     { id: 'trade',          label: 'Trade Evaluator' },
+    { id: 'trade-history',  label: 'Trade History' },
     { id: 'roster-values',  label: 'Roster Values' },
     { id: 'trade-partners', label: 'Trade Partners' },
 ];
@@ -626,6 +628,11 @@ export default function LeagueDetailTabs({
             {/* ── Roster Values tab ─────────────────────────────────────── */}
             {activeTab === 'roster-values' && (
                 <RosterValuesPanel sleeperLeagueId={sleeperLeagueId} />
+            )}
+
+            {/* ── Trade History tab ─────────────────────────────────────── */}
+            {activeTab === 'trade-history' && (
+                <TradeHistoryPanel leagueId={_leagueId} />
             )}
 
             {/* ── Trade Partners tab ────────────────────────────────────── */}

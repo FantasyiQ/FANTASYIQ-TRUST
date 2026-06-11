@@ -56,15 +56,16 @@ function buildPersonality(teamId: string, isUser: boolean): PersonalityProfile {
 
 // ── Snake draft order builder ──────────────────────────────────────────────────
 
-function buildSnakeDraftOrder(
-    slotToTeamId: string[],   // index = slot-1
+function buildDraftOrder(
+    slotToTeamId: string[],
     totalRounds:  number,
+    isSnake:      boolean,
 ): MockDraftPick[] {
     const N     = slotToTeamId.length;
     const picks: MockDraftPick[] = [];
 
     for (let round = 1; round <= totalRounds; round++) {
-        const isEven = round % 2 === 0;
+        const isEven = isSnake && round % 2 === 0;
         for (let i = 0; i < N; i++) {
             const slot   = isEven ? N - i : i + 1;
             const teamId = slotToTeamId[slot - 1];
@@ -145,7 +146,8 @@ export async function GET(req: NextRequest): Promise<Response> {
     const totalTeams  = rosters.length || (league.totalRosters ?? 12);
     const defaultRounds = isRookieDraft ? 5 : isDynasty ? 20 : 15;
     const totalRounds   = upcomingDraft?.settings?.rounds ?? defaultRounds;
-    const isSnake       = (upcomingDraft?.type ?? 'snake') !== 'linear';
+    const defaultType   = isRookieDraft ? 'linear' : 'snake';
+    const isSnake       = (upcomingDraft?.type ?? defaultType) !== 'linear';
 
     const settings: MockDraftSettings = {
         totalTeams,
@@ -186,7 +188,7 @@ export async function GET(req: NextRequest): Promise<Response> {
         }
     }
 
-    const draftOrder = buildSnakeDraftOrder(slotToTeamId, totalRounds);
+    const draftOrder = buildDraftOrder(slotToTeamId, totalRounds, isSnake);
 
     // ── Load player pool ───────────────────────────────────────────────────────
     let boardPlayers: MockPlayer[] = [];
