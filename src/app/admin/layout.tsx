@@ -13,8 +13,9 @@ const NAV = [
     { href: '/admin/churn',        label: 'Churn Risk',     icon: '⚠️'  },
     { href: '/admin/upsell',       label: 'Upsell',         icon: '📈' },
     { href: '/admin/health',       label: 'League Health',  icon: '🏥' },
-    { href: '/admin/predictions',  label: 'Predictions',    icon: '🧠' },
-    { href: '/admin/messaging',   label: 'Messaging',      icon: '📬' },
+    { href: '/admin/predictions',      label: 'Predictions',    icon: '🧠' },
+    { href: '/admin/messaging',        label: 'Messaging',      icon: '📬' },
+    { href: '/admin/rookie-rankings',  label: 'Rookie Ratings', icon: '🎯' },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
