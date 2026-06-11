@@ -3,6 +3,12 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 
+interface DraftedPlayer {
+    name:     string;
+    position: string;
+    pickNo:   number;
+}
+
 interface TradeItem {
     type:               'player' | 'pick';
     playerId?:          string;
@@ -11,6 +17,7 @@ interface TradeItem {
     season?:            string;
     round?:             number;
     originalOwnerName?: string;
+    draftedPlayer?:     DraftedPlayer | null;
 }
 
 interface TradeSide {
@@ -55,12 +62,27 @@ function Avatar({ avatar, name }: { avatar: string | null; name: string }) {
 function ItemChip({ item }: { item: TradeItem }) {
     if (item.type === 'pick') {
         return (
-            <span className="inline-flex items-center gap-1.5 text-xs">
-                <span className="px-1.5 py-px rounded text-[10px] font-bold border bg-indigo-900/40 text-indigo-300 border-indigo-700">
-                    {item.season} R{item.round}
+            <span className="inline-flex flex-col gap-0.5 text-xs">
+                <span className="inline-flex items-center gap-1.5">
+                    <span className="px-1.5 py-px rounded text-[10px] font-bold border bg-indigo-900/40 text-indigo-300 border-indigo-700">
+                        {item.season} R{item.round}
+                    </span>
+                    {item.originalOwnerName && (
+                        <span className="text-gray-500">from {item.originalOwnerName}</span>
+                    )}
                 </span>
-                {item.originalOwnerName && (
-                    <span className="text-gray-500">from {item.originalOwnerName}</span>
+                {item.draftedPlayer ? (
+                    <span className="inline-flex items-center gap-1.5 pl-0.5">
+                        {item.draftedPlayer.position && (
+                            <span className={`px-1 py-px rounded text-[9px] font-bold border ${POS_COLORS[item.draftedPlayer.position] ?? 'bg-gray-800 text-gray-400 border-gray-700'}`}>
+                                {item.draftedPlayer.position}
+                            </span>
+                        )}
+                        <span className="text-white font-medium">{item.draftedPlayer.name}</span>
+                        <span className="text-gray-600">(#{item.draftedPlayer.pickNo})</span>
+                    </span>
+                ) : (
+                    <span className="text-gray-600 pl-0.5 italic">Pick not yet used</span>
                 )}
             </span>
         );

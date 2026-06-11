@@ -309,10 +309,14 @@ export async function getDraftPicks(leagueId: string): Promise<SleeperTradedPick
 export interface SleeperDraftPickEntry {
     player_id:  string;   // Sleeper player_id of the player selected
     picked_by:  string;   // user_id of the manager who made the pick
-    roster_id:  number;   // roster that received the player
+    roster_id:  number;   // roster that received the player (current owner at draft time)
     round:      number;
     draft_slot: number;   // 1-based draft slot assigned to this team
     pick_no:    number;   // 1-based overall pick number
+    metadata?: {
+        slot_roster_id?: string; // original owner's roster_id (set when pick was traded)
+        [key: string]: string | undefined;
+    };
 }
 
 /** Returns all picks made so far in a specific draft.
