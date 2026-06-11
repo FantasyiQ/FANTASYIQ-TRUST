@@ -52,7 +52,7 @@ export default function RookieRankingsEditor({ players: initial }: { players: Pl
             const res = await fetch('/api/admin/rookie-rankings', {
                 method:  'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ id: player.id, baseFiQScore: val }),
+                body:    JSON.stringify({ id: player.id, fiqScore: val }),
             });
 
             if (!res.ok) throw new Error(await res.text());
@@ -105,9 +105,8 @@ export default function RookieRankingsEditor({ players: initial }: { players: Pl
                             <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Player</th>
                             <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Pos</th>
                             <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Pick</th>
-                            <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Base FiQ</th>
+                            <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">FiQ Score ✏️</th>
                             <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Opp Score</th>
-                            <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">FiQ Score</th>
                             <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Tier</th>
                             <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-20"></th>
                         </tr>
@@ -134,14 +133,13 @@ export default function RookieRankingsEditor({ players: initial }: { players: Pl
                                             min={0}
                                             max={100}
                                             step={0.1}
-                                            value={edits[p.id] ?? p.baseFiQScore.toFixed(1)}
+                                            value={edits[p.id] ?? p.fiqScore.toFixed(1)}
                                             onChange={e => setEdits(ed => ({ ...ed, [p.id]: e.target.value }))}
                                             className="w-20 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-white text-sm focus:border-[#D4AF37] focus:outline-none"
                                         />
                                         {error && <p className="text-red-400 text-[10px] mt-0.5">{error}</p>}
                                     </td>
                                     <td className="px-4 py-2.5 text-gray-400">{p.opportunityScore.toFixed(1)}</td>
-                                    <td className="px-4 py-2.5 font-semibold text-white">{p.fiqScore.toFixed(1)}</td>
                                     <td className={`px-4 py-2.5 font-semibold text-xs ${TIER_COLORS[p.fiqTier] ?? 'text-gray-500'}`}>
                                         {p.fiqTier}
                                     </td>

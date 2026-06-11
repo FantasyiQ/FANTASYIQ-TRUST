@@ -18,21 +18,22 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const { id, baseFiQScore } = await req.json() as { id: string; baseFiQScore: number };
+    const { id, fiqScore } = await req.json() as { id: string; fiqScore: number };
 
-    if (!id || typeof baseFiQScore !== 'number' || baseFiQScore < 0 || baseFiQScore > 100) {
+    if (!id || typeof fiqScore !== 'number' || fiqScore < 0 || fiqScore > 100) {
         return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
     }
 
     const existing = await prisma.rookieRankingsPlayer.findUnique({ where: { id } });
     if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    const fiqScore = Math.round((baseFiQScore * 0.75 + existing.opportunityScore * 0.25) * 10) / 10;
-    const fiqTier  = computeRookieFiQTier(fiqScore);
+    const fiqTier = computeRookieFiQTier(fiqScore);
 
+    // Set baseFiQScore = fiqScore so the nightly cron uses this as the new base.
+    // If opportunityScore is non-zero, the cron will blend it in: baseFiQ*0.75 + opp*0.25.
     const updated = await prisma.rookieRankingsPlayer.update({
         where: { id },
-        data:  { baseFiQScore, fiqScore, fiqTier },
+        data:  { baseFiQScore: fiqScore, fiqScore, fiqTier },
     });
 
     return NextResponse.json({ id: updated.id, baseFiQScore: updated.baseFiQScore, fiqScore: updated.fiqScore, fiqTier: updated.fiqTier });
