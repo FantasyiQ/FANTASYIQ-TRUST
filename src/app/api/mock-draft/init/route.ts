@@ -199,8 +199,8 @@ export async function GET(req: NextRequest): Promise<Response> {
         // Without this adjustment, WRs (which tend to score higher in raw FiQ) would
         // dominate round 1 and elite RBs like Coleman/Singleton/Johnson fall to round 2.
         const DYNASTY_POS_MULT: Record<string, number> = {
-            QB: 1.00,
-            RB: 1.03,                      // dynasty RB scarcity premium
+            QB: 0.97,
+            RB: 1.05,                      // dynasty RB scarcity premium
             WR: 1.00,                      // baseline
             TE: 0.95,
         };
