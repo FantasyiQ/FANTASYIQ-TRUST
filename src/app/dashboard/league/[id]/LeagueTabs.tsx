@@ -4,9 +4,10 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const TABS = [
-    { label: 'Overview',  href: (id: string) => `/dashboard/league/${id}/overview`  },
-    { label: 'Dues & Payouts', href: (id: string) => `/dashboard/league/${id}/dues` },
-    { label: 'Calendar',  href: (id: string) => `/dashboard/league/${id}/calendar`  },
+    { label: 'Overview',      href: (id: string) => `/dashboard/league/${id}/overview`  },
+    { label: 'Dues & Payouts', href: (id: string) => `/dashboard/league/${id}/dues`    },
+    { label: 'Calendar',      href: (id: string) => `/dashboard/league/${id}/calendar`  },
+    { label: 'Draft Center',  href: (id: string) => `/dashboard/league/${id}/draft`     },
 ];
 
 export default function LeagueTabs({ leagueId }: { leagueId: string }) {

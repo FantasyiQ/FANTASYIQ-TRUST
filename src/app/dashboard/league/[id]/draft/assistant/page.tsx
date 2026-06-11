@@ -5,10 +5,10 @@ import { notFound, redirect } from 'next/navigation';
 import { auth }   from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getLeagueDrafts, getLeagueRosters, getLeagueUsers } from '@/lib/sleeper';
-import HubTabBar  from '../HubTabBar';
-import DraftReportPanel from './DraftReportPanel';
+import DraftCenterTabBar from '../DraftCenterTabBar';
+import DraftAssistantPanel from './DraftAssistantPanel';
 
-export default async function DraftReportPage({
+export default async function DraftAssistantPage({
     params,
 }: {
     params: Promise<{ id: string }>;
@@ -37,13 +37,15 @@ export default async function DraftReportPage({
     if (league.platform !== 'sleeper' || league.leagueType !== 'Dynasty') {
         return (
             <div className="space-y-6">
-                <div>
-                    <h1 className="text-2xl font-bold text-white">FantasyiQ Hub</h1>
-                    <p className="text-gray-500 text-sm mt-0.5">{league.leagueName}</p>
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <h1 className="text-2xl font-bold text-white">Draft Center</h1>
+                        <p className="text-gray-500 text-sm mt-0.5">{league.leagueName}</p>
+                    </div>
                 </div>
-                <HubTabBar leagueId={id} activeTab="draft-report" />
+                <DraftCenterTabBar leagueId={id} />
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center">
-                    <p className="text-gray-400 text-sm">Draft Report Card is available for Sleeper Dynasty leagues only.</p>
+                    <p className="text-gray-400 text-sm">Live Draft Assistant is available for Sleeper Dynasty leagues only.</p>
                 </div>
             </div>
         );
@@ -59,10 +61,15 @@ export default async function DraftReportPage({
             getLeagueRosters(league.leagueId),
             getLeagueUsers(league.leagueId),
         ]);
-    } catch { /* Sleeper unreachable */ }
+    } catch { /* Sleeper unreachable — show empty state */ }
 
-    // Show only completed drafts
-    const completedDrafts = drafts.filter(d => d.status === 'complete');
+    const relevantDrafts = drafts
+        .filter(d => d.status === 'drafting' || d.status === 'pre_draft')
+        .sort((a, b) => {
+            if (a.status === 'drafting' && b.status !== 'drafting') return -1;
+            if (b.status === 'drafting' && a.status !== 'drafting') return  1;
+            return 0;
+        });
 
     const userDisplayName = new Map(
         members.map(m => [m.user_id, m.metadata?.team_name || m.display_name || m.username])
@@ -79,20 +86,19 @@ export default async function DraftReportPage({
         ? rosterOptions.find(r => r.ownerId === mySleeperUserId)
         : null;
 
-    const draftOptions = completedDrafts.map(d => ({
+    const draftOptions = relevantDrafts.map(d => ({
         draftId: d.draft_id,
         label:   d.name ?? d.metadata?.name ?? (d.metadata?.type === 'rookie' ? 'Rookie Draft' : 'Startup Draft'),
         status:  d.status,
         rounds:  d.settings.rounds,
         teams:   d.settings.teams,
-        season:  d.season,
     }));
 
     return (
         <div className="space-y-6">
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">FantasyiQ Hub</h1>
+                    <h1 className="text-2xl font-bold text-white">Draft Center</h1>
                     <p className="text-gray-500 text-sm mt-0.5">{league.leagueName}</p>
                 </div>
                 <div className="shrink-0 text-right">
@@ -100,9 +106,9 @@ export default async function DraftReportPage({
                 </div>
             </div>
 
-            <HubTabBar leagueId={id} activeTab="draft-report" />
+            <DraftCenterTabBar leagueId={id} />
 
-            <DraftReportPanel
+            <DraftAssistantPanel
                 leagueId={id}
                 draftOptions={draftOptions}
                 rosterOptions={rosterOptions}

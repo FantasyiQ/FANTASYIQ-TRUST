@@ -2,23 +2,20 @@
 
 import { useRouter } from 'next/navigation';
 
-export type HubTabKey = 'lineups' | 'start-sit' | 'waiver' | 'trade' | 'roster' | 'dfs' | 'draft-strategy' | 'draft-assistant' | 'draft-report';
+export type HubTabKey = 'lineups' | 'start-sit' | 'waiver' | 'trade' | 'roster' | 'dfs';
 
 const TABS: { key: HubTabKey; label: string }[] = [
-    { key: 'lineups',          label: 'Optimized Lineups' },
-    { key: 'start-sit',        label: 'Start/Sit Intelligence' },
-    { key: 'waiver',           label: 'Waiver Wire Intelligence' },
-    { key: 'trade',            label: 'Trade Insights' },
-    { key: 'roster',           label: 'Roster Intelligence' },
-    { key: 'draft-strategy',   label: 'Draft Strategy' },
-    { key: 'draft-assistant',  label: 'Live Draft' },
-    { key: 'draft-report',     label: 'Draft Report' },
-    { key: 'dfs',              label: 'Weekly DFS Challenge' },
+    { key: 'lineups',   label: 'Optimized Lineups'       },
+    { key: 'start-sit', label: 'Start/Sit Intelligence'  },
+    { key: 'waiver',    label: 'Waiver Wire Intelligence' },
+    { key: 'trade',     label: 'Trade Insights'          },
+    { key: 'roster',    label: 'Roster Intelligence'     },
+    { key: 'dfs',       label: 'Weekly DFS Challenge'    },
 ];
 
 // Section tabs live on the main /fantasyiq page (no route change — state only).
 // Route tabs navigate to a nested sub-route.
-const ROUTE_TABS = new Set<HubTabKey>(['start-sit', 'dfs', 'draft-strategy', 'draft-assistant', 'draft-report']);
+const ROUTE_TABS = new Set<HubTabKey>(['start-sit', 'dfs']);
 
 interface HubTabBarProps {
     leagueId:         string;
@@ -31,11 +28,8 @@ export default function HubTabBar({ leagueId, activeTab, onSectionChange }: HubT
     const base   = `/dashboard/league/${leagueId}/fantasyiq`;
 
     function routeHref(key: HubTabKey) {
-        if (key === 'start-sit')        return `${base}/start-sit`;
-        if (key === 'dfs')              return `${base}/dfs`;
-        if (key === 'draft-strategy')   return `${base}/draft-strategy`;
-        if (key === 'draft-assistant')  return `${base}/draft-assistant`;
-        if (key === 'draft-report')     return `${base}/draft-report`;
+        if (key === 'start-sit') return `${base}/start-sit`;
+        if (key === 'dfs')       return `${base}/dfs`;
         return base;
     }
 

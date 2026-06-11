@@ -5,7 +5,7 @@ import { redirect, notFound } from 'next/navigation';
 import { auth }   from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getNflState } from '@/lib/sleeper';
-import HubTabBar  from '../HubTabBar';
+import DraftCenterTabBar from '../DraftCenterTabBar';
 import RookieDynastyRankings from './RookieDynastyRankings';
 import PhaseDebugStrip from '@/components/dev/PhaseDebugStrip';
 import TeamIntelligenceCard from '@/components/league/TeamIntelligenceCard';
@@ -56,8 +56,8 @@ export default async function DraftStrategyPage({
     });
 
     // ── Team Trajectory ───────────────────────────────────────────────────────
-    const isDynasty   = league.leagueType === 'Dynasty';
-    const superflex   = (league.rosterPositions as string[]).includes('SUPER_FLEX');
+    const isDynasty = league.leagueType === 'Dynasty';
+    const superflex = (league.rosterPositions as string[]).includes('SUPER_FLEX');
 
     const dbUser = await prisma.user.findUnique({
         where:  { id: session.user.id },
@@ -91,10 +91,8 @@ export default async function DraftStrategyPage({
     const hasKicker = rosterPos.has('K');
     const IDP_PLAYER_POSITIONS = new Set(['DE','DT','NT','DL','EDGE','OLB','ILB','MLB','LB','CB','FS','SS','NB','S','DB','SAF']);
 
-    // ── Rookie class to display ───────────────────────────────────────────────
     const displaySeason = '2026';
 
-    // ── Player fetch ──────────────────────────────────────────────────────────
     const rawPlayers = await prisma.rookieRankingsPlayer.findMany({
         where:   { season: displaySeason },
         orderBy: { fiqScore: 'desc' },
@@ -119,16 +117,12 @@ export default async function DraftStrategyPage({
         },
     });
 
-    // Enrich with Sleeper player data (image, team, height, weight)
     const names = rawPlayers.map(p => p.playerName);
     const sleeperPlayers = await prisma.sleeperPlayer.findMany({
         where:  { fullName: { in: names } },
         select: { fullName: true, playerId: true, position: true, team: true, height: true, weight: true, age: true },
     });
 
-    // Build two-level map: name → position → player. When there are multiple
-    // Sleeper players with the same name (e.g. two "Chris Johnson"), prefer the
-    // one whose position matches the rookie's position.
     const sleeperByNamePos = new Map<string, Map<string, typeof sleeperPlayers[0]>>();
     for (const sp of sleeperPlayers) {
         if (!sleeperByNamePos.has(sp.fullName)) sleeperByNamePos.set(sp.fullName, new Map());
@@ -147,22 +141,21 @@ export default async function DraftStrategyPage({
             const sp = byPos?.get(p.position) ?? (byPos?.size === 1 ? byPos.values().next().value : undefined);
             return {
                 ...p,
-                playerId:  sp?.playerId ?? null,
-                team:      sp?.team     ?? null,
-                height:    sp?.height   ?? p.height    ?? null,
-                weight:    sp?.weight   ?? p.weight    ?? null,
-                age:       sp?.age      ?? null,
+                playerId: sp?.playerId ?? null,
+                team:     sp?.team     ?? null,
+                height:   sp?.height   ?? p.height ?? null,
+                weight:   sp?.weight   ?? p.weight ?? null,
+                age:      sp?.age      ?? null,
             };
         });
 
-    // Show missing-settings warning only for Dynasty leagues that don't have playoff week data
     const showSettingsAlert = isDynasty && phaseResult.missingSettings;
 
     return (
         <div className="space-y-6">
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">FantasyiQ Hub</h1>
+                    <h1 className="text-2xl font-bold text-white">Draft Center</h1>
                     <p className="text-gray-500 text-sm mt-0.5">{league.leagueName}</p>
                 </div>
                 <div className="shrink-0 text-right">
@@ -170,7 +163,7 @@ export default async function DraftStrategyPage({
                 </div>
             </div>
 
-            <HubTabBar leagueId={id} activeTab="draft-strategy" />
+            <DraftCenterTabBar leagueId={id} />
 
             <PhaseDebugStrip phase={phaseResult} />
 
