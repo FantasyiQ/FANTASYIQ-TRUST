@@ -26,7 +26,7 @@ export default async function DraftCenterPage({
         {
             href:        `${base}/strategy`,
             icon:        '📋',
-            title:       'Draft Strategy',
+            title:       'Draft Board',
             description: 'Rookie rankings, dynasty pick values, and team trajectory — calibrated to your roster settings and league format.',
             badge:       null,
         },
