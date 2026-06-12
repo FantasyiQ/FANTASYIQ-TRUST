@@ -10,7 +10,9 @@ import {
     getLeagueRosters,
     getLeagueUsers,
     getLeagueDrafts,
+    getTradedPicks,
 } from '@/lib/sleeper';
+import type { SleeperTradedPick } from '@/lib/sleeper';
 import type {
     MockLeagueContext,
     MockDraftBoard,
@@ -57,18 +59,19 @@ function buildPersonality(teamId: string, isUser: boolean): PersonalityProfile {
 // ── Snake draft order builder ──────────────────────────────────────────────────
 
 function buildDraftOrder(
-    slotToTeamId: string[],
+    roundSlots: string[][],   // per-round slot arrays (traded pick overrides already applied)
     totalRounds:  number,
     isSnake:      boolean,
 ): MockDraftPick[] {
-    const N     = slotToTeamId.length;
+    const N     = roundSlots[0]?.length ?? 0;
     const picks: MockDraftPick[] = [];
 
     for (let round = 1; round <= totalRounds; round++) {
+        const slots  = roundSlots[round - 1] ?? roundSlots[0];
         const isEven = isSnake && round % 2 === 0;
         for (let i = 0; i < N; i++) {
             const slot   = isEven ? N - i : i + 1;
-            const teamId = slotToTeamId[slot - 1];
+            const teamId = slots[slot - 1];
             if (!teamId) continue;
             picks.push({
                 overall: (round - 1) * N + i + 1,
@@ -123,11 +126,12 @@ export async function GET(req: NextRequest): Promise<Response> {
     };
 
     // ── Parallel Sleeper fetches ───────────────────────────────────────────────
-    const [rosters, members, drafts, dbUser] = await Promise.all([
+    const [rosters, members, drafts, dbUser, tradedPicksRaw] = await Promise.all([
         getLeagueRosters(league.leagueId).catch(() => []),
         getLeagueUsers(league.leagueId).catch(() => []),
         getLeagueDrafts(league.leagueId).catch(() => []),
         prisma.user.findUnique({ where: { id: session.user.id }, select: { sleeperUserId: true } }),
+        getTradedPicks(league.leagueId).catch(() => [] as SleeperTradedPick[]),
     ]);
 
     // ── Identify user's roster ────────────────────────────────────────────────
@@ -188,7 +192,48 @@ export async function GET(req: NextRequest): Promise<Response> {
         }
     }
 
-    const draftOrder = buildDraftOrder(slotToTeamId, totalRounds, isSnake);
+    // Build per-round slot arrays and apply traded-pick overrides.
+    // roster.draft_picks contains picks the roster currently owns (possibly from other teams).
+    // For each traded pick, find the original team's slot and remap it to the new owner.
+    const rosterToOwner = new Map(rosters.map(r => [r.roster_id, r.owner_id]));
+    const currentSeason = upcomingDraft?.season ?? String(new Date().getFullYear());
+    const roundSlots: string[][] = Array.from({ length: totalRounds }, () => [...slotToTeamId]);
+
+    // /traded_picks is a log — if a pick changed hands multiple times (A→B→C),
+    // there are multiple entries. Group by (round, originalRosterId) and find the
+    // terminal owner: the entry whose owner_id isn't anyone else's previous_owner_id.
+    const pickGroups = new Map<string, SleeperTradedPick[]>();
+    for (const dp of tradedPicksRaw) {
+        if (dp.season !== currentSeason) continue;
+        const key = `${dp.round}_${dp.roster_id}`;
+        const g = pickGroups.get(key) ?? [];
+        g.push(dp);
+        pickGroups.set(key, g);
+    }
+
+    if (sleeperOrder) {
+        for (const [key, trades] of pickGroups) {
+            // Find terminal owner (not traded on further)
+            const prevOwnerIds = new Set(trades.map(t => Number(t.previous_owner_id)));
+            const terminal = trades.find(t => !prevOwnerIds.has(Number(t.owner_id)));
+            const currentOwnerRosterId = Number(terminal?.owner_id ?? trades[trades.length - 1].owner_id);
+
+            const [roundStr, origRosterIdStr] = key.split('_');
+            const round = Number(roundStr);
+            const origRosterId = Number(origRosterIdStr);
+
+            if (currentOwnerRosterId === origRosterId) continue;  // not traded (or traded back)
+            if (round < 1 || round > totalRounds) continue;
+
+            const origUserId = rosterToOwner.get(origRosterId);
+            if (!origUserId) continue;
+            const slot = sleeperOrder[origUserId];
+            if (!slot || slot < 1 || slot > totalTeams) continue;
+            roundSlots[round - 1][slot - 1] = String(currentOwnerRosterId);
+        }
+    }
+
+    const draftOrder = buildDraftOrder(roundSlots, totalRounds, isSnake);
 
     // ── Load player pool ───────────────────────────────────────────────────────
     let boardPlayers: MockPlayer[] = [];
@@ -202,9 +247,9 @@ export async function GET(req: NextRequest): Promise<Response> {
         // dominate round 1 and elite RBs like Coleman/Singleton/Johnson fall to round 2.
         const DYNASTY_POS_MULT: Record<string, number> = {
             QB: 0.97,
-            RB: 1.03,                      // dynasty RB scarcity premium
+            RB: 0.97,
             WR: 0.97,                      // baseline
-            TE: 0.95,
+            TE: 1.01,
         };
 
         const season = league.season ?? '2026';
@@ -312,7 +357,14 @@ export async function GET(req: NextRequest): Promise<Response> {
     // ── For rookie drafts: load FC dynasty values to compute quality-based needs ─
     // Raw player counts always show 0% on a full dynasty roster (teams have 6+ WRs).
     // Quality needs count "meaningful dynasty assets" (value > threshold) vs. target depth.
-    const QUALITY_THRESHOLD = 1500;  // meaningful dynasty piece (~tier 4+)
+    // TEs have lower dynasty values overall — a quality starter sits around 1500-2500,
+    // while quality RBs/WRs/QBs are 3000+. Using the same threshold inflates TE need.
+    const QUALITY_THRESHOLD: Record<string, number> = {
+        QB: 3000,
+        RB: 3000,
+        WR: 3000,
+        TE: 1500,
+    };
 
     const fcValueByName = new Map<string, number>();  // playerName.lower → dynastyValue
     if (isRookieDraft && existingSleeperPlayers.length > 0) {
@@ -356,7 +408,8 @@ export async function GET(req: NextRequest): Promise<Response> {
                 const sp = existingPlayerById.get(pid);
                 if (!sp?.position || !['QB', 'RB', 'WR', 'TE'].includes(sp.position)) continue;
                 const val = sp.fullName ? (fcValueByName.get(sp.fullName.toLowerCase()) ?? 0) : 0;
-                if (val > QUALITY_THRESHOLD) {
+                const threshold = QUALITY_THRESHOLD[sp.position] ?? 3000;
+                if (val > threshold) {
                     qualityCount[sp.position] = (qualityCount[sp.position] ?? 0) + 1;
                 }
             }

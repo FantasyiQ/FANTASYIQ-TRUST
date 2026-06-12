@@ -1,10 +1,14 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getSleeperUser, getSleeperLeagues, getNflState } from '@/lib/sleeper';
+import { checkSearchLimit, getClientIp } from '@/lib/ratelimit';
 
 export async function POST(request: NextRequest): Promise<Response> {
     const session = await auth();
     if (!session?.user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const rl = await checkSearchLimit(getClientIp(request));
+    if (rl.limited) return rl.response!;
 
     const body = await request.json() as { username?: string };
     const username = body.username?.trim();
