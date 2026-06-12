@@ -43,23 +43,33 @@ export default async function PayDuesPage({
 
     const dbUser = await prisma.user.findUnique({
         where:  { id: user.id },
-        select: { id: true, email: true, name: true, stripeCustomerId: true },
+        select: { id: true, email: true, name: true, stripeCustomerId: true, sleeperUserId: true },
     });
     if (!dbUser) redirect('/dashboard');
 
     const allMembers = await prisma.duesMember.findMany({
         where:  { leagueDuesId: dues.id },
-        select: { id: true, duesStatus: true, displayName: true, userId: true, email: true },
+        select: { id: true, duesStatus: true, displayName: true, userId: true, email: true, sleeperUserId: true },
     });
 
-    // Three-tier auto-match: userId → email → displayName
+    // Four-tier auto-match: userId → sleeperUserId → email → displayName
     let member = allMembers.find(m =>
-        (m.userId != null && m.userId === user.id) ||
-        (m.email  != null && dbUser.email != null &&
+        (m.userId       != null && m.userId === user.id) ||
+        (m.sleeperUserId != null && dbUser.sleeperUserId != null &&
+            m.sleeperUserId === dbUser.sleeperUserId) ||
+        (m.email        != null && dbUser.email != null &&
             m.email.toLowerCase() === dbUser.email.toLowerCase()) ||
         (m.userId == null && m.email == null && dbUser.name != null &&
             m.displayName.toLowerCase() === dbUser.name.toLowerCase())
     ) ?? null;
+
+    // Persist userId link once matched so future visits skip the lookup entirely
+    if (member && !member.userId) {
+        await prisma.duesMember.update({
+            where: { id: member.id },
+            data:  { userId: user.id },
+        }).catch(() => {}); // ignore unique constraint if another request raced
+    }
 
     // If user manually picked their slot via the picker, use that
     if (!member && pickedMemberId) {

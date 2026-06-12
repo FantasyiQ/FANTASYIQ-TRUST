@@ -51,7 +51,7 @@ export async function POST(
         );
     }
 
-    let teams: { displayName: string; teamName: string | null }[] = [];
+    let teams: { displayName: string; teamName: string | null; sleeperUserId: string | null }[] = [];
 
     if (league.platform === 'espn') {
         // ESPN: build team list from stored standings JSON
@@ -63,7 +63,7 @@ export async function POST(
                 { status: 404 },
             );
         }
-        teams = espnTeams.map(t => ({ displayName: t.name, teamName: t.abbrev ?? null }));
+        teams = espnTeams.map(t => ({ displayName: t.name, teamName: t.abbrev ?? null, sleeperUserId: null }));
     } else {
         // Sleeper: fetch live roster + member data
         const [members, rosters] = await Promise.all([
@@ -75,7 +75,11 @@ export async function POST(
             const member      = roster.owner_id ? memberMap.get(roster.owner_id) : undefined;
             const displayName = member?.display_name ?? `Team ${roster.roster_id}`;
             const teamName    = member?.metadata?.team_name ?? displayName;
-            return { displayName, teamName: teamName !== displayName ? teamName : null };
+            return {
+                displayName,
+                teamName:      teamName !== displayName ? teamName : null,
+                sleeperUserId: roster.owner_id ?? null,
+            };
         });
     }
 
@@ -89,10 +93,11 @@ export async function POST(
 
     await prisma.duesMember.createMany({
         data: toAdd.map(t => ({
-            leagueDuesId: duesId,
-            displayName:  t.displayName,
-            teamName:     t.teamName ?? null,
-            duesStatus:   'unpaid',
+            leagueDuesId:  duesId,
+            displayName:   t.displayName,
+            teamName:      t.teamName ?? null,
+            sleeperUserId: t.sleeperUserId ?? null,
+            duesStatus:    'unpaid',
         })),
     });
 

@@ -397,6 +397,7 @@ model DuesMember {
     id              String    @id @default(cuid())
     leagueDuesId    String
     userId          String?   // null until member creates a FantasyIQ account and links
+    sleeperUserId   String?   // Sleeper user_id — enables auto-match on the pay page without email
     displayName     String    // name entered by commissioner or pulled from platform
     email           String?   // for payment link delivery
     teamName        String?
@@ -420,6 +421,7 @@ model DuesMember {
     @@unique([leagueDuesId, userId])
     @@index([leagueDuesId])
     @@index([userId])
+    @@index([sleeperUserId])
 }
 
 // Configurable payout spots set by the commissioner before season end.
