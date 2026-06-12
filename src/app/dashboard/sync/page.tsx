@@ -62,6 +62,7 @@ function SyncPageInner() {
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [synced, setSynced]   = useState(0);
     const [slotInfo, setSlotInfo] = useState<SlotInfo | null>(null);
+    const [invitedLeagueNotFound, setInvitedLeagueNotFound] = useState(false);
 
     // Fetch slot info once on mount so step 2 can show slot awareness
     useEffect(() => {
@@ -85,15 +86,19 @@ function SyncPageInner() {
             if (!res.ok) { setError(data.error ?? 'Failed to look up username'); return; }
             setResult(data);
             // When coming from an invite, pre-select only the invited league.
-            // If that league isn't found under this username, select all (graceful fallback).
+            // If it's not found, surface a clear warning rather than silently selecting all.
             if (fromInvite && inviteLeagueId) {
                 const hasInvited = data.leagues.some(l => l.league_id === inviteLeagueId);
-                setSelected(hasInvited
-                    ? new Set([inviteLeagueId])
-                    : new Set(data.leagues.map(l => l.league_id))
-                );
+                if (hasInvited) {
+                    setSelected(new Set([inviteLeagueId]));
+                    setInvitedLeagueNotFound(false);
+                } else {
+                    setSelected(new Set());
+                    setInvitedLeagueNotFound(true);
+                }
             } else {
                 setSelected(new Set(data.leagues.map((l) => l.league_id)));
+                setInvitedLeagueNotFound(false);
             }
             setStep('select');
         } catch {
@@ -235,6 +240,27 @@ function SyncPageInner() {
                             </div>
                         </div>
 
+                        {/* Invited league not found warning */}
+                        {invitedLeagueNotFound && inviteLeagueName && (
+                            <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-xl px-4 py-4">
+                                <div className="flex items-start gap-3">
+                                    <span className="text-xl shrink-0">⚠️</span>
+                                    <div>
+                                        <p className="text-yellow-400 font-semibold text-sm">
+                                            &ldquo;{inviteLeagueName}&rdquo; wasn&apos;t found in your Sleeper account
+                                        </p>
+                                        <p className="text-yellow-400/70 text-xs mt-1 leading-relaxed">
+                                            You may not have been added to the league on Sleeper yet — ask your commissioner to add you there first. Or check that you entered the right Sleeper username.
+                                        </p>
+                                        <button type="button" onClick={() => { setStep('username'); setInvitedLeagueNotFound(false); }}
+                                            className="text-yellow-300 text-xs font-semibold mt-2 hover:underline">
+                                            ← Try a different username
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
                             <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
                                 <h2 className="font-semibold">Select leagues to sync</h2>
@@ -265,7 +291,10 @@ function SyncPageInner() {
                             )}
 
                             {result.leagues.length === 0 ? (
-                                <div className="px-5 py-10 text-center text-gray-500 text-sm">No leagues found for {result.season}.</div>
+                                <div className="px-5 py-10 text-center text-gray-500 text-sm">
+                                    No leagues found for {result.season}.
+                                    {fromInvite && <span className="block mt-1 text-yellow-500/80">Make sure you&apos;ve been added to the league on Sleeper first.</span>}
+                                </div>
                             ) : (
                                 <ul className="divide-y divide-gray-800/50">
                                     {result.leagues.map((league) => {
