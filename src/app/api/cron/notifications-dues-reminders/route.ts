@@ -92,7 +92,50 @@ export async function GET(request: Request): Promise<Response> {
             }
         }
 
-        return Response.json({ ok: true, dues: duesWithDeadlines.length, sent });
+        // Also nudge members of active dues with NO deadline — weekly cadence only.
+        // Commissioners who skip the deadline field still get member coverage.
+        const duesNoDeadline = await prisma.leagueDues.findMany({
+            where: {
+                deadline: null,
+                status:   'active',
+                members:  { some: { duesStatus: 'unpaid' } },
+            },
+            select: {
+                id:          true,
+                leagueName:  true,
+                buyInAmount: true,
+                members: {
+                    where:  { duesStatus: 'unpaid' },
+                    select: { id: true, userId: true },
+                },
+            },
+        });
+
+        for (const dues of duesNoDeadline) {
+            for (const member of dues.members) {
+                if (!member.userId) continue;
+                try {
+                    await notify({
+                        userId:    member.userId,
+                        type:      NotificationType.DUES_REMINDER_WEEKLY,
+                        title:     `Dues reminder: ${dues.leagueName}`,
+                        body:      `You still owe $${dues.buyInAmount} for ${dues.leagueName}. Pay early to keep your spot!`,
+                        data: {
+                            leagueId:   dues.id,
+                            leagueName: dues.leagueName,
+                            duesId:     dues.id,
+                            amount:     dues.buyInAmount,
+                        },
+                        throttleMs: 604_800_000, // 7 days
+                    });
+                    sent++;
+                } catch (err) {
+                    console.error('[cron/dues-reminders] no-deadline notify failed', member.userId, err);
+                }
+            }
+        }
+
+        return Response.json({ ok: true, duesWithDeadline: duesWithDeadlines.length, duesNoDeadline: duesNoDeadline.length, sent });
     } catch (err) {
         captureError(err, { cron: 'notifications-dues-reminders' });
         const message = err instanceof Error ? err.message : 'Cron failed';
