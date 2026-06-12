@@ -10,6 +10,7 @@ export type ActivationStage =
     | 'league_synced'
     | 'lf_profile'
     | 'dues_added'
+    | 'members_vouched'
     | 'tools_active'
     | 'renewed';
 
@@ -19,6 +20,7 @@ export const STAGE_ORDER: ActivationStage[] = [
     'league_synced',
     'lf_profile',
     'dues_added',
+    'members_vouched',
     'tools_active',
     'renewed',
 ];
@@ -29,6 +31,7 @@ export const STAGE_LABELS: Record<ActivationStage, string> = {
     league_synced:      'Synced League',
     lf_profile:         'Created LF Profile',
     dues_added:         'Added Dues',
+    members_vouched:    'Vouched Members',
     tools_active:       'Commissioner Tools Active',
     renewed:            'Subscription Renewed',
 };
@@ -38,8 +41,9 @@ export const NEXT_STEP: Record<ActivationStage, { title: string; cta: string; hr
     platform_connected: { title: 'Sync a league to unlock your Commissioner Hub.', cta: 'Go to Dashboard', href: '/dashboard' },
     league_synced:      { title: 'Create your LeagueFinder profile to recruit managers.', cta: 'Create Profile', href: '/leaguefinder/commissioners/new' },
     lf_profile:         { title: 'Set up league dues tracking to manage your league money.', cta: 'Set Up Dues', href: '/dashboard/commissioner/dues' },
-    dues_added:         { title: 'Activate your Commissioner plan to unlock all tools.', cta: 'View Plans', href: '/pricing' },
-    tools_active:       null,  // fully activated — no next step
+    dues_added:         { title: 'Vouch for your trusted members to build their PRS reputation.', cta: 'Go to League', href: '/dashboard' },
+    members_vouched:    { title: 'Activate your Commissioner plan to unlock all tools.', cta: 'View Plans', href: '/pricing' },
+    tools_active:       null,
     renewed:            null,
 };
 
@@ -59,6 +63,7 @@ export async function computeActivationStage(userId: string): Promise<{
             leagues:          { select: { id: true }, take: 1 },
             ownedCommissioner:{ select: { id: true, createdAt: true } },
             commissionerDues: { select: { id: true }, take: 1 },
+            vouchesGiven:     { select: { id: true }, take: 1 },
             subscriptions: {
                 where:   { type: 'commissioner', status: { in: ['active', 'trialing'] } },
                 select:  { id: true, createdAt: true, currentPeriodStart: true },
@@ -83,6 +88,7 @@ export async function computeActivationStage(userId: string): Promise<{
         user.leagues.length > 0,                                                            // league_synced
         !!user.ownedCommissioner,                                                           // lf_profile
         user.commissionerDues.length > 0,                                                   // dues_added
+        user.vouchesGiven.length > 0,                                                       // members_vouched
         toolsActive,                                                                        // tools_active
         renewed,                                                                            // renewed
     ];
@@ -91,9 +97,12 @@ export async function computeActivationStage(userId: string): Promise<{
     const lastIdx         = flags.lastIndexOf(true);
     const stage           = STAGE_ORDER[lastIdx] ?? 'registered';
 
-    // Next step = first non-completed stage
-    const nextStage   = STAGE_ORDER[lastIdx + 1] as ActivationStage | undefined;
-    const nextStep    = nextStage ? (NEXT_STEP[nextStage] ?? NEXT_STEP[stage]) : null;
+    // Next step = first gap in the funnel (not just the step after the last completed one).
+    // This correctly surfaces skipped steps — e.g. a user who used ELITE100 and jumped to
+    // tools_active without doing dues or vouch will see those steps, not null.
+    const firstIncompleteIdx = flags.indexOf(false);
+    const nextStage          = firstIncompleteIdx >= 0 ? STAGE_ORDER[firstIncompleteIdx] : undefined;
+    const nextStep           = nextStage ? (NEXT_STEP[nextStage] ?? null) : null;
 
     return { stage, completedStages, nextStep };
 }
@@ -161,6 +170,7 @@ const MIN_DAYS_AT_STAGE: Partial<Record<ActivationStage, number>> = {
     league_synced:      3,
     lf_profile:         7,
     dues_added:         14,
+    members_vouched:    7,
 };
 
 const NUDGE_MSGS: Partial<Record<ActivationStage, { title: string; body: string }>> = {
@@ -183,6 +193,10 @@ const NUDGE_MSGS: Partial<Record<ActivationStage, { title: string; body: string 
     dues_added: {
         title: 'Activate your Commissioner plan',
         body:  "You're managing dues — upgrade to a Commissioner plan to unlock announcements, calendar, and advanced league tools.",
+    },
+    members_vouched: {
+        title: 'Vouch for your trusted members',
+        body:  "You're all set up — now vouch for managers you trust to strengthen their PRS reputation. Go to any league overview and click the vouch button next to a member.",
     },
 };
 
@@ -294,8 +308,17 @@ function stageFilter(stage: ActivationStage, registeredBefore: Date) {
             return {
                 createdAt:        { lt: registeredBefore },
                 commissionerDues: { some: {} },
+                vouchesGiven:     { none: {} },
                 subscriptions: {
                     none: { type: 'commissioner', status: { in: ['active', 'trialing'] } },
+                },
+            };
+        case 'members_vouched':
+            return {
+                createdAt:    { lt: registeredBefore },
+                vouchesGiven: { none: {} },
+                subscriptions: {
+                    some: { type: 'commissioner', status: { in: ['active', 'trialing'] } },
                 },
             };
         default:

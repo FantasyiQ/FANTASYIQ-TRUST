@@ -10,6 +10,7 @@ import SleeperLeaguesList from './SleeperLeaguesList';
 import SyncedLeaguePicker from './SyncedLeaguePicker';
 import { getLeagueLimit, tierToLimitKey, nextTierName } from '@/lib/league-limits';
 import { computeAutoAssignments } from '@/lib/auto-assign';
+import { computeActivationStage } from '@/lib/commissioner-activation';
 import type { SubscriptionTier } from '@prisma/client';
 
 function formatTier(tier: SubscriptionTier | string): string {
@@ -63,6 +64,7 @@ export default async function DashboardPage({
     const user = await prisma.user.findUnique({
         where: { email: session.user.email },
         select: {
+            id: true,
             name: true,
             image: true,
             emailVerified: true,
@@ -114,7 +116,7 @@ export default async function DashboardPage({
         });
     }
 
-    const { name, image, emailVerified, hashedPassword, subscriptionTier, subscriptions, leagues: rawLeagues } = user;
+    const { id: userId, name, image, emailVerified, hashedPassword, subscriptionTier, subscriptions, leagues: rawLeagues } = user;
 
     // Deduplicate: Sleeper creates a new leagueId every season for the same league name.
     // Keep only the most recent season per league name so the dashboard shows one row per league.
@@ -159,6 +161,11 @@ export default async function DashboardPage({
         }
     }
     const commSubs = [..._seenCommSubs.values()].sort((a, b) => (a.leagueName ?? '').localeCompare(b.leagueName ?? ''));
+
+    // Commissioner activation state — only fetch for users with a commissioner sub
+    const commActivation = commSubs.length > 0
+        ? await computeActivationStage(userId)
+        : null;
 
     // Verify player plan tier against Stripe — heals DB when webhook fires with stale metadata
     // (e.g. billing-portal upgrades where subscription metadata retains the original checkout tier)
@@ -389,6 +396,27 @@ export default async function DashboardPage({
                         <p className="text-emerald-400 font-medium text-sm">
                             Test data reset — your account is now clean.
                         </p>
+                    </div>
+                )}
+
+                {/* Commissioner setup nudge */}
+                {commActivation?.nextStep && (
+                    <div className="bg-gray-900 border border-[#D4AF37]/30 rounded-2xl px-5 py-4 flex items-center justify-between gap-4 flex-wrap">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <span className="text-lg shrink-0">👑</span>
+                            <div className="min-w-0">
+                                <p className="text-xs font-semibold text-[#D4AF37] uppercase tracking-wider">
+                                    Commissioner Setup — {commActivation.completedStages.length} of 8 steps done
+                                </p>
+                                <p className="text-white text-sm mt-0.5 truncate">{commActivation.nextStep.title}</p>
+                            </div>
+                        </div>
+                        <Link
+                            href={commActivation.nextStep.href}
+                            className="shrink-0 bg-[#D4AF37] hover:bg-[#c49b2d] text-black text-sm font-bold px-4 py-2 rounded-lg transition"
+                        >
+                            {commActivation.nextStep.cta}
+                        </Link>
                     </div>
                 )}
 

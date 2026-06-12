@@ -36,8 +36,8 @@ export default async function CommissionerHubPage() {
 
     const { stage, completedStages, nextStep } = await computeActivationStage(session.user.id);
 
-    // Show activation banner unless fully activated
-    const showBanner = stage !== 'renewed' && stage !== 'tools_active';
+    // Show banner whenever there's an incomplete step — including gaps skipped via ELITE100
+    const showBanner = !!nextStep;
     const totalSteps = STAGE_ORDER.length;
     const doneSteps  = completedStages.length;
     const pct        = Math.round((doneSteps / totalSteps) * 100);
