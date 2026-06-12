@@ -95,10 +95,11 @@ export default function JoinRequestButton({ leagueId, leagueName, initialStatus,
         <div className="rounded-xl border border-gray-800 bg-gray-900 p-4 space-y-3">
             <h3 className="text-sm font-bold text-white">Request to join {leagueName}</h3>
             <div>
-                <label className="text-[10px] uppercase tracking-wider text-gray-500 block mb-1">
+                <label htmlFor="join-request-message" className="text-[10px] uppercase tracking-wider text-gray-500 block mb-1">
                     Tell the commissioner about yourself (optional)
                 </label>
                 <textarea
+                    id="join-request-message"
                     value={message}
                     onChange={e => setMessage(e.target.value)}
                     placeholder="Years of experience, play style, what you're looking for..."

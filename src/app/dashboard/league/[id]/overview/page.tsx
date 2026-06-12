@@ -313,6 +313,16 @@ export default async function LeagueOverviewPage({
 
     const dbUserBySleeperId = new Map(registeredUsers.map(u => [u.sleeperUserId!, u]));
 
+    // Pre-fetch commissioner vouches for this league so the member card shows existing vouches.
+    const commissionerUserId = session?.user?.id ?? null;
+    const existingVouches = commissionerUserId
+        ? await prisma.commissionerVouch.findMany({
+            where:  { fromUserId: commissionerUserId },
+            select: { toUserId: true, vouchType: true },
+        })
+        : [];
+    const vouchByUserId = new Map(existingVouches.map(v => [v.toUserId, v.vouchType]));
+
     const membersData: LeagueMemberData[] = members.map(m => {
         const dbUser = dbUserBySleeperId.get(m.user_id);
         const isComm = !!m.is_owner;
@@ -327,6 +337,7 @@ export default async function LeagueOverviewPage({
             prsScore:         dbUser?.prsScore ?? null,
             trustScore:       dbUser?.trustScore ?? null,
             lfCommissioner:   (isComm && commissionerLF) ? commissionerLF : null,
+            existingVouch:    (dbUser?.id ? (vouchByUserId.get(dbUser.id) as LeagueMemberData['existingVouch'] ?? null) : null),
         };
     });
 

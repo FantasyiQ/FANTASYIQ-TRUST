@@ -539,7 +539,7 @@ export default function DuesManager({
                         <p className="text-green-300 font-semibold text-sm">Payment received!</p>
                         <p className="text-green-500 text-xs">Your dues have been recorded. The commissioner will see your payment.</p>
                     </div>
-                    <button onClick={() => setShowPaidBanner(false)} className="ml-auto text-green-600 hover:text-green-400 text-lg leading-none">×</button>
+                    <button onClick={() => setShowPaidBanner(false)} aria-label="Dismiss notification" className="ml-auto text-green-600 hover:text-green-400 text-lg leading-none">×</button>
                 </div>
             )}
 
@@ -547,7 +547,7 @@ export default function DuesManager({
             {showCancelledBanner && (
                 <div className="bg-gray-800/60 border border-gray-700 rounded-xl px-4 py-3 flex items-center gap-3">
                     <span className="text-gray-400 text-sm">Payment cancelled. No charge was made.</span>
-                    <button onClick={() => setShowCancelledBanner(false)} className="ml-auto text-gray-600 hover:text-gray-400 text-lg leading-none">×</button>
+                    <button onClick={() => setShowCancelledBanner(false)} aria-label="Dismiss notification" className="ml-auto text-gray-600 hover:text-gray-400 text-lg leading-none">×</button>
                 </div>
             )}
 

@@ -17,7 +17,7 @@ export default async function UserProfilePage({
     const session = await auth();
     const isMe    = session?.user?.id === id;
 
-    const [user, commissionerProfile, activeLeagueCount] = await Promise.all([
+    const [user, commissionerProfile, activeLeagueCount, vouchesReceived] = await Promise.all([
         prisma.user.findUnique({
             where:  { id },
             select: {
@@ -54,6 +54,19 @@ export default async function UserProfilePage({
         }),
         prisma.league.count({
             where: { userId: id, isHistorical: false },
+        }),
+        prisma.commissionerVouch.findMany({
+            where:   { toUserId: id },
+            orderBy: { createdAt: 'desc' },
+            select:  {
+                id:         true,
+                vouchType:  true,
+                season:     true,
+                note:       true,
+                createdAt:  true,
+                fromUser:   { select: { id: true, name: true } },
+                leagueDbId: true,
+            },
         }),
     ]);
 
@@ -192,6 +205,40 @@ export default async function UserProfilePage({
                         </div>
                     </div>
                 </section>
+
+                {/* ── Commissioner Vouches (public — flags hidden) ─── */}
+                {vouchesReceived.some(v => v.vouchType !== 'flag') && (
+                    <section className="space-y-3">
+                        <h2 className="text-sm font-bold text-white uppercase tracking-wider">Commissioner Trust</h2>
+                        <div className="space-y-2">
+                            {vouchesReceived.filter(v => v.vouchType !== 'flag').map(v => {
+                                const styles = {
+                                    endorsement: 'border-[#D4AF37]/30 bg-[#D4AF37]/5 text-[#D4AF37]',
+                                    approval:    'border-emerald-700/30 bg-emerald-900/10 text-emerald-400',
+                                };
+                                const labels = {
+                                    endorsement: 'Endorsed',
+                                    approval:    'Approved',
+                                };
+                                const style = styles[v.vouchType as keyof typeof styles] ?? styles.approval;
+                                const label = labels[v.vouchType as keyof typeof labels] ?? v.vouchType;
+                                return (
+                                    <div key={v.id} className={`rounded-xl border px-4 py-3 ${style}`}>
+                                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                                            <div>
+                                                <span className="text-xs font-bold">{label}</span>
+                                                <span className="text-[10px] opacity-60 ml-2">by {v.fromUser.name ?? 'A commissioner'} · {v.season} season</span>
+                                            </div>
+                                        </div>
+                                        {v.note && (
+                                            <p className="text-[11px] opacity-80 mt-1 leading-relaxed">{v.note}</p>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </section>
+                )}
 
                 {/* ── DSS Section ─────────────────────────────────── */}
                 {user.dssRecord && (

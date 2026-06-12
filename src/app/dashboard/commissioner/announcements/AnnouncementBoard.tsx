@@ -231,6 +231,7 @@ export default function AnnouncementBoard({ leagueId, leagueName, initial }: Pro
                                     className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/60"
                                 />
                                 <button onClick={() => { setShowMedia(false); setMediaUrl(''); setMediaPreview(''); }}
+                                    aria-label="Remove media"
                                     className="text-gray-600 hover:text-gray-400 text-lg leading-none px-1">×</button>
                             </div>
                             <p className="text-gray-700 text-xs">

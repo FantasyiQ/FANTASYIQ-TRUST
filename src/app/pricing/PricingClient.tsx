@@ -292,7 +292,13 @@ function UpgradeModal({
     const [acceptTerms, setAcceptTerms] = useState(false);
     const checkboxId = useId();
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center px-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Confirm Upgrade"
+            onKeyDown={e => { if (e.key === 'Escape') onCancel(); }}
+        >
             <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onCancel} />
             <div className="relative bg-gray-900 border border-gray-700 rounded-2xl p-8 max-w-md w-full shadow-2xl">
                 <h2 className="text-xl font-bold text-white mb-2">Confirm Upgrade</h2>

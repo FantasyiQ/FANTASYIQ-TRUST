@@ -69,8 +69,9 @@ export default function PhaseSettingsCard({ leagueId, playoffWeekStart, champWee
 
             <form onSubmit={handleSubmit} className="flex items-end gap-3 flex-wrap">
                 <div className="space-y-1">
-                    <label className="text-gray-500 text-xs block">Playoff Start Week</label>
+                    <label htmlFor="phase-playoff-week" className="text-gray-500 text-xs block">Playoff Start Week</label>
                     <input
+                        id="phase-playoff-week"
                         type="number"
                         min={1}
                         max={18}
@@ -81,8 +82,9 @@ export default function PhaseSettingsCard({ leagueId, playoffWeekStart, champWee
                     />
                 </div>
                 <div className="space-y-1">
-                    <label className="text-gray-500 text-xs block">Championship Week</label>
+                    <label htmlFor="phase-champ-week" className="text-gray-500 text-xs block">Championship Week</label>
                     <input
+                        id="phase-champ-week"
                         type="number"
                         min={1}
                         max={18}

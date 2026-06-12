@@ -156,6 +156,7 @@ export default function DocumentsManager({ duesId, leagueName, initialDocuments 
                                             <p className="text-gray-500 text-xs">{(file.size / 1024).toFixed(1)} KB</p>
                                         </div>
                                         <button type="button" onClick={e => { e.stopPropagation(); setFile(null); if (fileRef.current) fileRef.current.value = ''; }}
+                                            aria-label="Remove file"
                                             className="ml-2 text-gray-600 hover:text-red-400 text-sm transition">×</button>
                                     </div>
                                 ) : (

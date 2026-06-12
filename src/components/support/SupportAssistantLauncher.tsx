@@ -144,6 +144,7 @@ function SupportAssistantPanel({ onClose }: { onClose: () => void }) {
                         onChange={e => setInput(e.target.value)}
                         onKeyDown={handleKey}
                         placeholder="Ask a question…"
+                        aria-label="Ask FiQ Support a question"
                         className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/50 resize-none leading-relaxed"
                         style={{ maxHeight: 80 }}
                     />

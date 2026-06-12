@@ -13,6 +13,7 @@ function FAQAccordion({ item }: { item: FAQItem }) {
             <button
                 type="button"
                 onClick={() => setOpen(o => !o)}
+                aria-expanded={open}
                 className="w-full text-left px-5 py-4 flex items-start justify-between gap-4 group"
             >
                 <span className="text-white text-sm font-medium leading-snug group-hover:text-[#D4AF37] transition-colors">

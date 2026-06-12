@@ -132,7 +132,7 @@ function PlayerPicker({
                     className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/60 transition"
                 />
                 {query && (
-                    <button type="button" onClick={clear}
+                    <button type="button" onClick={clear} aria-label="Clear search"
                         className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-400 transition">
                         <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                             <path d="M3 3l10 10M13 3L3 13" />

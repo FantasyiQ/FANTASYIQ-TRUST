@@ -173,7 +173,7 @@ export default function NotificationBell({ userId }: { userId?: string }) {
 
       {/* Bell button */}
       <button
-        onClick={() => { if (open) { router.push('/dashboard/notifications'); setOpen(false); } else { setOpen(true); void markAllReadOnOpen(); } }}
+        onClick={() => { router.push('/dashboard/notifications'); setOpen(false); }}
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
         style={{
           position:        'relative',
@@ -337,7 +337,7 @@ export default function NotificationBell({ userId }: { userId?: string }) {
                   {/* Dismiss */}
                   <button
                     onClick={e => handleDismiss(e, n.id)}
-                    aria-label="Dismiss"
+                    aria-label="Dismiss notification"
                     style={{
                       flexShrink:  0,
                       background:  'none',

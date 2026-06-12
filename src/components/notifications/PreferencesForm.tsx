@@ -243,7 +243,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
             role="switch"
             aria-checked={on}
             onClick={onChange}
-            className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 transition-colors duration-200 focus:outline-none ${
+            className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 ${
                 on ? 'bg-[#D4AF37] border-[#D4AF37]' : 'bg-gray-700 border-gray-700'
             }`}
         >

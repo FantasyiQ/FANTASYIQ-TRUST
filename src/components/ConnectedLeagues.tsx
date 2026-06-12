@@ -246,7 +246,9 @@ export default function ConnectedLeagues({ leagues: initial, syncedLeagues = [],
 
                     <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-end">
                         <div className="flex-1">
+                            <label htmlFor="manual-league-name" className="sr-only">League name</label>
                             <input
+                                id="manual-league-name"
                                 type="text"
                                 placeholder="League name"
                                 value={leagueName}
@@ -256,7 +258,9 @@ export default function ConnectedLeagues({ leagues: initial, syncedLeagues = [],
                                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/60"
                             />
                         </div>
+                        <label htmlFor="manual-league-platform" className="sr-only">Platform</label>
                         <select
+                            id="manual-league-platform"
                             value={platform}
                             onChange={e => setPlatform(e.target.value)}
                             className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-[#D4AF37]/60">

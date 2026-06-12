@@ -135,7 +135,7 @@ function PlayerPill({ result, onRemove, leagueSize, useBucketedPicks = false }: 
                         <p className={`font-bold text-sm ${TIER_COLORS[result.tier]}`}>{result.finalDtv}</p>
                         <p className="text-gray-600 text-xs">{result.tier}</p>
                     </div>
-                    <button onClick={onRemove} className="text-gray-700 hover:text-red-400 transition text-lg leading-none">×</button>
+                    <button onClick={onRemove} aria-label="Remove player" className="text-gray-700 hover:text-red-400 transition text-lg leading-none">×</button>
                 </div>
             </div>
 

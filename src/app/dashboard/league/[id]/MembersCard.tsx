@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+
+export type VouchType = 'endorsement' | 'approval' | 'flag';
 
 export interface LeagueMemberData {
     sleeperUserId:    string;
@@ -26,6 +28,8 @@ export interface LeagueMemberData {
         avgRating:    number;
         reviewsCount: number;
     } | null;
+    /** Existing vouch from the viewing commissioner, null if none yet. */
+    existingVouch: VouchType | null;
 }
 
 // ── PRS helpers ───────────────────────────────────────────────────────────────
@@ -110,6 +114,9 @@ function CommissionerProfile({ member }: { member: LeagueMemberData }) {
                     <p className="text-gray-600 text-xs mt-0.5">@{member.username}</p>
                 )}
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    {member.prsScore !== null && (
+                        <PRSBadge score={member.prsScore} />
+                    )}
                     {member.lfCommissioner && member.lfCommissioner.reviewsCount > 0 && (
                         <span className="flex items-center gap-1.5">
                             <StarRow rating={member.lfCommissioner.avgRating} />
@@ -119,7 +126,7 @@ function CommissionerProfile({ member }: { member: LeagueMemberData }) {
                         </span>
                     )}
                     {!member.userId && (
-                        <span className="text-gray-700 text-[10px]">Not on FantasyiQ</span>
+                        <span className="text-gray-700 text-[10px] italic">Not on FantasyiQ</span>
                     )}
                 </div>
             </div>
@@ -146,13 +153,41 @@ function CommissionerProfile({ member }: { member: LeagueMemberData }) {
 
 // ── Member row ────────────────────────────────────────────────────────────────
 
-function MemberRow({ member }: { member: LeagueMemberData }) {
+function PRSBadge({ score }: { score: number }) {
+    return (
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border ${prsTierStyles(score)}`}>
+            <span className="font-black">{score}</span>
+            <span className="opacity-70 font-semibold">PRS</span>
+        </span>
+    );
+}
+
+const VOUCH_BADGE: Record<VouchType, string> = {
+    endorsement: 'bg-[#D4AF37]/10 border-[#D4AF37]/40 text-[#D4AF37]',
+    approval:    'bg-emerald-900/20 border-emerald-700/50 text-emerald-400',
+    flag:        'bg-red-900/20 border-red-700/50 text-red-400',
+};
+const VOUCH_LABEL: Record<VouchType, string> = {
+    endorsement: 'Endorsed',
+    approval:    'Approved',
+    flag:        'Flagged',
+};
+
+interface MemberRowProps {
+    member:             LeagueMemberData;
+    isViewerCommissioner: boolean;
+    onVouchClick:       (member: LeagueMemberData) => void;
+}
+
+function MemberRow({ member, isViewerCommissioner, onVouchClick }: MemberRowProps) {
+    const showVouch = isViewerCommissioner && !!member.userId && !member.isCommissioner;
+
     const inner = (
         <div className="flex items-center gap-3">
             <Avatar id={member.sleeperAvatarId} name={member.displayName} size="sm" />
             <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-medium text-white text-sm truncate">
+                    <span className={`font-medium text-sm truncate ${member.userId ? 'text-white group-hover:text-[#D4AF37] transition-colors' : 'text-gray-400'}`}>
                         {member.displayName}
                     </span>
                     {member.isCoCommissioner && (
@@ -166,6 +201,23 @@ function MemberRow({ member }: { member: LeagueMemberData }) {
                 )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
+                {showVouch && (
+                    <button
+                        type="button"
+                        onClick={e => { e.preventDefault(); e.stopPropagation(); onVouchClick(member); }}
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition shrink-0 ${
+                            member.existingVouch
+                                ? VOUCH_BADGE[member.existingVouch]
+                                : 'bg-gray-800/60 border-gray-700 text-gray-500 hover:border-gray-500 hover:text-gray-300'
+                        }`}
+                    >
+                        {member.existingVouch ? VOUCH_LABEL[member.existingVouch] : 'Vouch'}
+                    </button>
+                )}
+                {member.prsScore !== null
+                    ? <PRSBadge score={member.prsScore} />
+                    : <span className="text-gray-700 text-[10px] italic">Not on FiQ</span>
+                }
             </div>
         </div>
     );
@@ -174,7 +226,7 @@ function MemberRow({ member }: { member: LeagueMemberData }) {
         return (
             <Link
                 href={`/leaguefinder/users/${member.userId}`}
-                className="block px-4 py-3 hover:bg-gray-800/40 transition-colors rounded-lg"
+                className="group block px-4 py-3 hover:bg-gray-800/40 transition-colors rounded-lg"
             >
                 {inner}
             </Link>
@@ -184,6 +236,134 @@ function MemberRow({ member }: { member: LeagueMemberData }) {
     return (
         <div className="px-4 py-3">
             {inner}
+        </div>
+    );
+}
+
+// ── Vouch Modal ───────────────────────────────────────────────────────────────
+
+const VOUCH_OPTIONS: { type: VouchType; label: string; sublabel: string; color: string; pts: string }[] = [
+    { type: 'endorsement', label: 'Endorse',  sublabel: 'Great league member',   color: 'border-[#D4AF37]/50 bg-[#D4AF37]/10 text-[#D4AF37]',    pts: '+40 PRS' },
+    { type: 'approval',    label: 'Approve',  sublabel: 'Reliable, no issues',   color: 'border-emerald-600/50 bg-emerald-900/20 text-emerald-400', pts: '+25 PRS' },
+    { type: 'flag',        label: 'Flag',     sublabel: 'Problems or concerns',  color: 'border-red-700/50 bg-red-900/20 text-red-400',            pts: '−40 PRS' },
+];
+
+interface VouchModalProps {
+    member:      LeagueMemberData;
+    leagueDbId:  string;
+    season:      string;
+    onClose:     () => void;
+    onSubmitted: (userId: string, vouchType: VouchType) => void;
+}
+
+function VouchModal({ member, leagueDbId, season, onClose, onSubmitted }: VouchModalProps) {
+    const [selected, setSelected] = useState<VouchType | null>(member.existingVouch);
+    const [note, setNote]         = useState('');
+    const [loading, setLoading]   = useState(false);
+    const [error, setError]       = useState<string | null>(null);
+
+    async function submit() {
+        if (!selected || !member.userId) return;
+        setLoading(true);
+        setError(null);
+        try {
+            const res = await fetch('/api/commish/vouch', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ toUserId: member.userId, leagueDbId, season, vouchType: selected, note: note.trim() || undefined }),
+            });
+            if (!res.ok) {
+                const d = await res.json() as { error?: string };
+                setError(d.error ?? 'Failed to save vouch');
+                return;
+            }
+            onSubmitted(member.userId!, selected);
+            onClose();
+        } catch {
+            setError('Network error — try again');
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    useEffect(() => {
+        function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose(); }
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [onClose]);
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+            onClick={onClose}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Commissioner Vouch"
+        >
+            <div
+                className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-2xl"
+                onClick={e => e.stopPropagation()}
+            >
+                <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-white">Commissioner Vouch</h3>
+                    <button onClick={onClose} className="text-gray-500 hover:text-white transition text-lg leading-none">&times;</button>
+                </div>
+
+                <p className="text-xs text-gray-400">
+                    Vouch for <span className="text-white font-semibold">{member.displayName}</span> based on their conduct in your league.
+                    Your vouch affects their Player Reliability Score.
+                </p>
+
+                <div className="space-y-2">
+                    {VOUCH_OPTIONS.map(opt => (
+                        <button
+                            key={opt.type}
+                            type="button"
+                            onClick={() => setSelected(opt.type)}
+                            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition text-left ${
+                                selected === opt.type
+                                    ? opt.color
+                                    : 'border-gray-700 bg-gray-800/40 text-gray-300 hover:border-gray-600 hover:bg-gray-800'
+                            }`}
+                        >
+                            <div>
+                                <div className="font-semibold text-sm">{opt.label}</div>
+                                <div className="text-[10px] opacity-70 mt-0.5">{opt.sublabel}</div>
+                            </div>
+                            <span className="text-[11px] font-bold shrink-0 ml-3 opacity-80">{opt.pts}</span>
+                        </button>
+                    ))}
+                </div>
+
+                <div>
+                    <textarea
+                        value={note}
+                        onChange={e => setNote(e.target.value)}
+                        placeholder="Optional note (not public)"
+                        rows={2}
+                        maxLength={300}
+                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 resize-none focus:outline-none focus:border-gray-500"
+                    />
+                </div>
+
+                {error && <p className="text-red-400 text-xs">{error}</p>}
+
+                <div className="flex gap-2">
+                    <button
+                        onClick={onClose}
+                        className="flex-1 px-4 py-2 rounded-lg border border-gray-700 text-gray-400 text-sm hover:border-gray-500 transition"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={submit}
+                        disabled={!selected || loading}
+                        className="flex-1 px-4 py-2 rounded-lg bg-[#D4AF37] text-gray-950 text-sm font-bold disabled:opacity-40 hover:bg-[#BF9D2F] transition"
+                    >
+                        {loading ? 'Saving…' : 'Save Vouch'}
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }
@@ -204,72 +384,100 @@ function sortMembers(members: LeagueMemberData[]): LeagueMemberData[] {
 // ── Main component ────────────────────────────────────────────────────────────
 
 interface Props {
-    members: LeagueMemberData[];
+    members:              LeagueMemberData[];
+    isViewerCommissioner: boolean;
+    leagueDbId:           string;
+    season:               string;
 }
 
-export default function MembersCard({ members }: Props) {
-    const [open, setOpen] = useState(false);
+export default function MembersCard({ members, isViewerCommissioner, leagueDbId, season }: Props) {
+    const [open, setOpen]             = useState(false);
+    const [vouchTarget, setVouchTarget] = useState<LeagueMemberData | null>(null);
+    const [localMembers, setLocalMembers] = useState(members);
 
-    if (members.length === 0) return null;
+    const handleVouchSubmitted = useCallback((userId: string, vouchType: VouchType) => {
+        setLocalMembers(prev => prev.map(m =>
+            m.userId === userId ? { ...m, existingVouch: vouchType } : m
+        ));
+    }, []);
 
-    const sorted       = sortMembers(members);
+    if (localMembers.length === 0) return null;
+
+    const sorted       = sortMembers(localMembers);
     const commissioner = sorted.find(m => m.isCommissioner);
     const rest         = sorted.filter(m => !m.isCommissioner);
-    const registeredCount = members.filter(m => m.userId != null).length;
+    const registeredCount = localMembers.filter(m => m.userId != null).length;
 
     return (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-            {/* ── Expandable header ─────────────────────────────────────────── */}
-            <button
-                type="button"
-                onClick={() => setOpen(o => !o)}
-                className="w-full text-left px-6 py-4 flex items-center justify-between hover:bg-gray-800/40 transition-colors"
-            >
-                <div className="flex items-center gap-3 flex-wrap">
-                    <h2 className="font-semibold text-lg leading-none">
-                        Members
-                        <span className="text-gray-600 font-normal text-base ml-2">({members.length})</span>
-                    </h2>
-
-                    <span className="inline-flex items-center gap-1.5 text-[10px] text-gray-500 bg-gray-800 border border-gray-700 px-2.5 py-1 rounded-full leading-none">
-                        {registeredCount}/{members.length} on FantasyiQ
-                    </span>
-                </div>
-
-                {/* Chevron */}
-                <svg
-                    className={`w-4 h-4 text-gray-500 shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-                    viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
-                >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-            </button>
-
-            {/* ── Expanded content ──────────────────────────────────────────── */}
-            {open && (
-                <>
-                    <div className="px-6 py-5 space-y-4 border-t border-gray-800">
-                        {/* Commissioner profile */}
-                        {commissioner && (
-                            <CommissionerProfile member={commissioner} />
-                        )}
-
-                        {/* Divider */}
-                        {commissioner && rest.length > 0 && (
-                            <div className="border-t border-gray-800" />
-                        )}
-
-                        {/* Member list */}
-                        {rest.length > 0 && (
-                            <div className="space-y-0.5 -mx-2">
-                                {rest.map(m => (
-                                    <MemberRow key={m.sleeperUserId} member={m} />
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </>
+        <>
+            {vouchTarget && (
+                <VouchModal
+                    member={vouchTarget}
+                    leagueDbId={leagueDbId}
+                    season={season}
+                    onClose={() => setVouchTarget(null)}
+                    onSubmitted={handleVouchSubmitted}
+                />
             )}
-        </div>
+
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+                {/* ── Expandable header ─────────────────────────────────────────── */}
+                <button
+                    type="button"
+                    onClick={() => setOpen(o => !o)}
+                    className="w-full text-left px-6 py-4 flex items-center justify-between hover:bg-gray-800/40 transition-colors"
+                >
+                    <div className="flex items-center gap-3 flex-wrap">
+                        <h2 className="font-semibold text-lg leading-none">
+                            Members
+                            <span className="text-gray-600 font-normal text-base ml-2">({localMembers.length})</span>
+                        </h2>
+
+                        <span className="inline-flex items-center gap-1.5 text-[10px] text-gray-500 bg-gray-800 border border-gray-700 px-2.5 py-1 rounded-full leading-none">
+                            {registeredCount}/{localMembers.length} on FantasyiQ
+                        </span>
+                    </div>
+
+                    {/* Chevron */}
+                    <svg
+                        className={`w-4 h-4 text-gray-500 shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+                        viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+                    >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+
+                {/* ── Expanded content ──────────────────────────────────────────── */}
+                {open && (
+                    <>
+                        <div className="px-6 py-5 space-y-4 border-t border-gray-800">
+                            {/* Commissioner profile */}
+                            {commissioner && (
+                                <CommissionerProfile member={commissioner} />
+                            )}
+
+                            {/* Divider */}
+                            {commissioner && rest.length > 0 && (
+                                <div className="border-t border-gray-800" />
+                            )}
+
+                            {/* Member list */}
+                            {rest.length > 0 && (
+                                <div className="space-y-0.5 -mx-2">
+                                    {rest.map(m => (
+                                        <MemberRow
+                                            key={m.sleeperUserId}
+                                            member={m}
+                                            isViewerCommissioner={isViewerCommissioner}
+                                            onVouchClick={setVouchTarget}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </>
+                )}
+            </div>
+        </>
     );
 }

@@ -153,7 +153,7 @@ export default async function DssLeaderboardPage() {
                                                         {row.user.image ? (
                                                             <Image
                                                                 src={row.user.image}
-                                                                alt=""
+                                                                alt={row.user.name ?? 'User avatar'}
                                                                 width={28}
                                                                 height={28}
                                                                 className="rounded-full"
@@ -209,7 +209,7 @@ export default async function DssLeaderboardPage() {
                                         </span>
 
                                         {row.user.image ? (
-                                            <Image src={row.user.image} alt="" width={32} height={32} className="rounded-full shrink-0" />
+                                            <Image src={row.user.image} alt={row.user.name ?? 'User avatar'} width={32} height={32} className="rounded-full shrink-0" />
                                         ) : (
                                             <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs font-bold text-gray-400 shrink-0">
                                                 {(row.user.name ?? '?')[0]?.toUpperCase()}

@@ -9,6 +9,7 @@ import { getNflState } from '@/lib/sleeper';
 import { getLeaguePhaseResult, phaseLabel } from '@/lib/leaguePhase';
 import type { LeaguePhase } from '@/lib/leaguePhase';
 import LeagueSupportContextPusher from '@/components/support/LeagueSupportContextPusher';
+import CommissionerQuickActions from '@/components/league/CommissionerQuickActions';
 import type { SupportPlatform, SupportSeasonPhase } from '@/lib/support/SupportContextStore';
 
 type DraftVariant = 'none' | 'upcoming' | 'urgent' | 'done';
@@ -90,6 +91,7 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
                 totalRosters: true, scoringType: true,
                 avatar: true, lastSyncedAt: true,
                 sleeperUserId: true, platform: true, userId: true,
+                leagueId: true,
                 draftStartTime: true, draftStatus: true, draftType: true,
                 playoffWeekStart: true, champWeek: true,
             },
@@ -266,6 +268,19 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
                     ) : null}
                 </div>
             </div>
+
+            {/* Commissioner quick-share tools — invite link + dues pay link */}
+            {isCommissioner && (
+                <div className="border-t border-gray-800 pt-3">
+                    <CommissionerQuickActions
+                        leagueDbId={leagueId}
+                        sleeperLeagueId={league.platform !== 'espn' ? (league.leagueId ?? null) : null}
+                        leagueName={league.leagueName ?? ''}
+                        season={league.season ?? ''}
+                        hasDues={!!dues}
+                    />
+                </div>
+            )}
 
             {/* Push league context into FiQ Support Assistant */}
             <LeagueSupportContextPusher

@@ -325,7 +325,7 @@ function AnnouncementsCard({
 export default function LeagueOverviewCards({
     leagueId,
     leagueName,
-    season: _season,
+    season,
     scoringType,
     totalRosters: _totalRosters,
     standingRows,
@@ -350,7 +350,12 @@ export default function LeagueOverviewCards({
             <DuesNavCard leagueId={leagueId} duesData={duesData} isCommissioner={isCommissioner} leagueName={leagueName} />
 
             {/* Members card */}
-            <MembersCard members={membersData} />
+            <MembersCard
+                members={membersData}
+                isViewerCommissioner={isCommissioner}
+                leagueDbId={leagueId}
+                season={season}
+            />
 
             {/* Announcements */}
             <AnnouncementsCard

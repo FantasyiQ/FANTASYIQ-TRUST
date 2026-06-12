@@ -87,6 +87,10 @@ model User {
     emailVerificationTokens  EmailVerificationToken[]
 
     syncExclusions    SyncExclusion[]
+
+    // Commissioner Vouches
+    vouchesGiven      CommissionerVouch[] @relation("VouchesGiven")
+    vouchesReceived   CommissionerVouch[] @relation("VouchesReceived")
 }
 
 // ── Sync Exclusions ──────────────────────────────────────────────────────────
@@ -1018,6 +1022,29 @@ model DssScore {
     user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@index([dss])
+}
+
+// ── Commissioner Vouches ──────────────────────────────────────────────────────
+// One vouch per commissioner per member per league per season.
+// vouchType: "endorsement" (+40 PRS) | "approval" (+25 PRS) | "flag" (-40 PRS)
+
+model CommissionerVouch {
+    id          String   @id @default(cuid())
+    fromUserId  String
+    toUserId    String
+    leagueDbId  String
+    season      String
+    vouchType   String
+    note        String?
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    fromUser    User     @relation("VouchesGiven",    fields: [fromUserId], references: [id], onDelete: Cascade)
+    toUser      User     @relation("VouchesReceived", fields: [toUserId],   references: [id], onDelete: Cascade)
+
+    @@unique([fromUserId, toUserId, season])
+    @@index([toUserId])
+    @@index([fromUserId])
 }
 
 enum LFJoinStatus {

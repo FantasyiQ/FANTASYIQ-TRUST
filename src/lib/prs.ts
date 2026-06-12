@@ -57,10 +57,16 @@ function calcEngagementScore(events: { eventType: PrsEventType }[]): number {
     return clamp(raw);
 }
 
-function calcCommissionerTrust(events: { eventType: PrsEventType }[]): number {
-    const relevant = events.filter(e =>
-        ['commish_approval', 'commish_endorsement', 'commish_flag', 'commish_ban'].includes(e.eventType)
-    );
+function calcCommissionerTrust(events: { eventType: PrsEventType; eventDate: Date }[], now: Date): number {
+    const FLAG_EXPIRY_SEASONS = 3;
+    const expiryYear = now.getFullYear() - FLAG_EXPIRY_SEASONS;
+
+    const relevant = events.filter(e => {
+        if (!['commish_approval', 'commish_endorsement', 'commish_flag', 'commish_ban'].includes(e.eventType)) return false;
+        // Flags expire after 3 seasons; bans, approvals, and endorsements are permanent.
+        if (e.eventType === 'commish_flag' && e.eventDate.getFullYear() <= expiryYear) return false;
+        return true;
+    });
     if (relevant.length === 0) return 50; // neutral default — no commissioner data
 
     let total = 0;
@@ -92,20 +98,24 @@ function calcBehaviorScore(events: { eventType: PrsEventType }[]): number {
 
 function applyEdgeCases(
     prs: number,
-    events: { eventType: PrsEventType }[],
-    hasNoData: boolean
+    events: { eventType: PrsEventType; eventDate: Date }[],
+    hasNoData: boolean,
+    now: Date,
 ): number {
     if (hasNoData) return 10; // Unproven
 
     const banned = events.some(e => e.eventType === 'commish_ban');
     if (banned) return Math.min(prs, 20); // hard cap at 20
 
+    const expiryYear = now.getFullYear() - 3;
     const verifiedCount = events.filter(e => e.eventType === 'verified_season').length;
-    const hasPenalties = events.some(e =>
-        ['season_abandoned', 'retention_removed',
-         'commish_flag', 'commish_ban', 'veto_abuse', 'collusion_flag',
-         'tanking_flag', 'toxicity_report', 'rule_violation'].includes(e.eventType)
-    );
+    // Expired flags don't block the verified-seasons floor.
+    const hasPenalties = events.some(e => {
+        if (e.eventType === 'commish_flag' && e.eventDate.getFullYear() <= expiryYear) return false;
+        return ['season_abandoned', 'retention_removed',
+                'commish_flag', 'commish_ban', 'veto_abuse', 'collusion_flag',
+                'tanking_flag', 'toxicity_report', 'rule_violation'].includes(e.eventType);
+    });
     if (verifiedCount >= 3 && !hasPenalties) return Math.max(prs, 50);
 
     return prs;
@@ -124,16 +134,17 @@ export interface PrsComponents {
 
 export async function computePrs(userId: string): Promise<PrsComponents> {
     const events = await prisma.prsEvent.findMany({
-        where: { userId },
-        select: { eventType: true },
+        where:  { userId },
+        select: { eventType: true, eventDate: true },
     });
 
     const hasNoData = events.length === 0;
+    const now       = new Date();
 
     const seasonScore       = calcSeasonScore(events);
     const retentionScore    = calcRetentionScore(events);
     const engagementScore   = calcEngagementScore(events);
-    const commissionerTrust = calcCommissionerTrust(events);
+    const commissionerTrust = calcCommissionerTrust(events, now);
     const behaviorScore     = calcBehaviorScore(events);
 
     const rawPrs =
@@ -143,7 +154,7 @@ export async function computePrs(userId: string): Promise<PrsComponents> {
         (commissionerTrust * 0.15) +
         (behaviorScore     * 0.10);
 
-    const prs = applyEdgeCases(clamp(Math.round(rawPrs)), events, hasNoData);
+    const prs = applyEdgeCases(clamp(Math.round(rawPrs)), events, hasNoData, now);
 
     return { seasonScore, retentionScore, engagementScore, commissionerTrust, behaviorScore, prs };
 }

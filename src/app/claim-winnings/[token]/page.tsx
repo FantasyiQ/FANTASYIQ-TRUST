@@ -38,7 +38,7 @@ export default async function ClaimWinningsPage({
                 {/* Logo / branding */}
                 <div className="text-center mb-8">
                     <p className="text-[10px] font-bold tracking-widest text-[#D4AF37] uppercase mb-1">FiQ</p>
-                    <p className="text-gray-600 text-xs">Secure Payout Portal</p>
+                    <h1 className="text-gray-600 text-xs font-normal">Secure Payout Portal</h1>
                 </div>
 
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8">

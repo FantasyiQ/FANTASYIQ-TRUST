@@ -274,11 +274,18 @@ function SyncPageInner() {
                                             league.name.toLowerCase().trim()
                                         ) ?? false;
                                         return (
-                                            <li key={league.league_id} onClick={() => toggleLeague(league.league_id)}
+                                            <li key={league.league_id}
+                                                role="checkbox"
+                                                aria-checked={selected.has(league.league_id)}
+                                                tabIndex={0}
+                                                onClick={() => toggleLeague(league.league_id)}
+                                                onKeyDown={e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggleLeague(league.league_id); } }}
                                                 className={`flex items-center gap-4 px-5 py-4 cursor-pointer transition ${isInvited || isCommCovered ? 'bg-[#D4AF37]/5 hover:bg-[#D4AF37]/10' : 'hover:bg-gray-800/30'}`}>
                                                 <input type="checkbox" checked={selected.has(league.league_id)}
                                                     onChange={() => toggleLeague(league.league_id)}
                                                     onClick={(e) => e.stopPropagation()}
+                                                    aria-hidden="true"
+                                                    tabIndex={-1}
                                                     className="w-4 h-4 rounded accent-[#D4AF37]" />
                                                 {league.avatar ? (
                                                     <Image src={`https://sleepercdn.com/avatars/thumbs/${league.avatar}`}

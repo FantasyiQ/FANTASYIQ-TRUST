@@ -14,7 +14,7 @@ const ROOKIE_DEPTH_TARGETS: Record<string, number> = {
     QB: 2,   // starter + 1 quality backup
     RB: 5,   // 2 starters + 3 depth pieces
     WR: 6,   // 2–3 starters + 3 depth pieces
-    TE: 2,   // starter + 1 backup
+    TE: 1,   // one quality starter is enough in dynasty
 };
 
 export function computeRookieDraftNeeds(
@@ -30,7 +30,7 @@ export function computeRookieDraftNeeds(
         QB:   need('QB'),
         RB:   need('RB'),
         WR:   need('WR'),
-        TE:   need('TE'),
+        TE:   Math.min(need('TE'), 0.75), // cap: prevents TE panic-drafting top-2, but allows mid-round urgency
         FLEX: Math.max(need('RB'), need('WR')) * 0.6,
     };
 }

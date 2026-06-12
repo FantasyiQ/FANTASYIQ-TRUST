@@ -110,8 +110,9 @@ export default function ReviewForm({ leagueId, commissionerId, onSuccess }: Prop
             </div>
 
             <div>
-                <label className="block text-sm text-gray-400 mb-1.5">Season Year</label>
+                <label htmlFor="review-season-year" className="block text-sm text-gray-400 mb-1.5">Season Year</label>
                 <select
+                    id="review-season-year"
                     value={seasonYear}
                     onChange={e => setSeasonYear(Number(e.target.value))}
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#D4AF37]/60"
@@ -123,8 +124,9 @@ export default function ReviewForm({ leagueId, commissionerId, onSuccess }: Prop
             </div>
 
             <div>
-                <label className="block text-sm text-gray-400 mb-1.5">Your review (optional)</label>
+                <label htmlFor="review-text" className="block text-sm text-gray-400 mb-1.5">Your review (optional)</label>
                 <textarea
+                    id="review-text"
                     value={text}
                     onChange={e => setText(e.target.value)}
                     rows={3}

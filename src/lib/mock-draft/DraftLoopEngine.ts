@@ -54,11 +54,46 @@ export function runUntilUserPick(
         const available = filterAvailablePlayers(board, drafted);
         if (available.length === 0) break;
 
-        const teamNeeds  = needs.get(pick.teamId) ?? team.needsProfile;
-        const ranked     = rankCandidatesForTeam(available, teamNeeds, team.personality);
-        if (ranked.length === 0) break;
+        const teamNeeds = needs.get(pick.teamId) ?? team.needsProfile;
 
-        const { player, breakdown } = ranked[0];
+        // QB streaming: in superflex rookie drafts, teams gradually load up on QBs
+        // in rounds 3–5. Not every team streams at once — probability scales with
+        // round urgency and personality. This creates organic QB runs rather than
+        // every QB-starved team piling in simultaneously.
+        const isStreamingLeague = context.settings.superflex && context.settings.isRookieDraft;
+        const qbsThisTeam = isStreamingLeague
+            ? results.filter(r => r.teamId === pick.teamId && r.player.position === 'QB').length
+            : Infinity;
+        // Probability of streaming: LOW personality waits, HIGH jumps early.
+        // Round 3: only ~30–60% of QB-less teams stream. Round 4+: much more urgent.
+        const riskMult = team.personality.riskTolerance === 'HIGH' ? 1.4
+            : team.personality.riskTolerance === 'LOW' ? 0.5 : 1.0;
+        const streamProb = pick.round >= 4
+            ? Math.min(0.95, 0.65 * riskMult)   // R4+: 33–91% depending on risk
+            : Math.min(0.70, 0.35 * riskMult);  // R3:  18–49% depending on risk
+        const shouldStreamQB =
+            ((pick.round >= 3 && qbsThisTeam === 0) ||
+             (pick.round >= 4 && qbsThisTeam === 1)) &&
+            Math.random() < streamProb;
+
+        let player: typeof available[number];
+        let breakdown: { base: number; need: number; chaos: number; total: number };
+
+        if (shouldStreamQB) {
+            const bestQB = available.find(p => p.position === 'QB');
+            if (bestQB) {
+                player   = bestQB;
+                breakdown = { base: bestQB.baseScore / 100, need: 1, chaos: 0, total: bestQB.baseScore / 100 };
+            } else {
+                const ranked = rankCandidatesForTeam(available, teamNeeds, team.personality);
+                if (ranked.length === 0) break;
+                ({ player, breakdown } = ranked[0]);
+            }
+        } else {
+            const ranked = rankCandidatesForTeam(available, teamNeeds, team.personality);
+            if (ranked.length === 0) break;
+            ({ player, breakdown } = ranked[0]);
+        }
 
         results.push({
             pick,
