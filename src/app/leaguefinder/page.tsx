@@ -1,9 +1,25 @@
 export const dynamic = 'force-dynamic';
 
+import type { Metadata } from 'next';
 import { prisma }        from '@/lib/prisma';
 import { Prisma }        from '@prisma/client';
 import Link              from 'next/link';
 import LeagueCard        from '@/components/leaguefinder/LeagueCard';
+
+export const metadata: Metadata = {
+    title:       'League Finder — Find Fantasy Football Leagues | FantasyiQ Trust',
+    description: 'Find and join vetted dynasty and redraft fantasy football leagues. Browse by format, scoring, platform, and commissioner rating. Apply directly on FantasyiQ Trust.',
+    openGraph: {
+        title:       'League Finder | FantasyiQ Trust',
+        description: 'Find vetted fantasy football leagues and commissioners. Filter by dynasty, redraft, PPR, buy-in, and more.',
+        type:        'website',
+    },
+    twitter: {
+        card:        'summary',
+        title:       'League Finder | FantasyiQ Trust',
+        description: 'Find vetted fantasy football leagues. Browse by dynasty, redraft, PPR, and commissioner rating.',
+    },
+};
 
 interface SearchParams {
     format?:       string;

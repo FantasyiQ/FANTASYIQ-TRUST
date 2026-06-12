@@ -1,10 +1,38 @@
 export const dynamic = 'force-dynamic';
 
+import type { Metadata } from 'next';
 import { notFound }  from 'next/navigation';
 import { auth }      from '@/lib/auth';
 import { prisma }    from '@/lib/prisma';
 import { Prisma }    from '@prisma/client';
 import Link          from 'next/link';
+
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+    const { id } = await params;
+    const commissioner = await prisma.lFCommissioner.findUnique({
+        where:  { id },
+        select: {
+            displayName:  true,
+            avgRating:    true,
+            reviewsCount: true,
+        },
+    });
+    if (!commissioner) return { title: 'Commissioner Not Found | FantasyiQ Trust' };
+
+    const title = `${commissioner.displayName} — Fantasy Commissioner Profile | FantasyiQ Trust`;
+    const description = `${commissioner.displayName} has ${commissioner.reviewsCount} review${commissioner.reviewsCount !== 1 ? 's' : ''} and a ${commissioner.avgRating.toFixed(1)}★ rating on FantasyiQ Trust. View their leagues, history, and community feedback.`;
+
+    return {
+        title,
+        description,
+        openGraph: { title, description, type: 'profile' },
+        twitter:   { card: 'summary', title, description },
+    };
+}
 import { RatingLabel, StarRating } from '@/components/leaguefinder/StarRating';
 import ReviewFormWrapper  from './_ReviewFormWrapper';
 import ReviewVoteButtons from '@/components/leaguefinder/ReviewVoteButtons';

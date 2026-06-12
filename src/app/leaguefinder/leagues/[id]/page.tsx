@@ -1,10 +1,42 @@
 export const dynamic = 'force-dynamic';
 
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { auth }     from '@/lib/auth';
 import { prisma }   from '@/lib/prisma';
 import { Prisma }   from '@prisma/client';
 import Link         from 'next/link';
+
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+    const { id } = await params;
+    const league = await prisma.lFLeague.findUnique({
+        where:  { id },
+        select: {
+            name:             true,
+            format:           true,
+            scoring:          true,
+            platform:         true,
+            size:             true,
+            completedSeasons: true,
+            commissioner:     { select: { displayName: true, avgRating: true } },
+        },
+    });
+    if (!league) return { title: 'League Not Found | FantasyiQ Trust' };
+
+    const title = `${league.name} — ${league.format} ${league.scoring} League | FantasyiQ Trust`;
+    const description = `${league.size}-team ${league.format} ${league.scoring} on ${league.platform}. ${league.completedSeasons} season${league.completedSeasons !== 1 ? 's' : ''} completed. Commissioner ${league.commissioner.displayName} rated ${league.commissioner.avgRating.toFixed(1)}★. Looking for managers — apply on FantasyiQ Trust.`;
+
+    return {
+        title,
+        description,
+        openGraph: { title, description, type: 'website' },
+        twitter:   { card: 'summary', title, description },
+    };
+}
 import { RatingLabel, StarRating } from '@/components/leaguefinder/StarRating';
 import CommissionerCard   from '@/components/leaguefinder/CommissionerCard';
 import ReviewForm         from '@/components/leaguefinder/ReviewForm';

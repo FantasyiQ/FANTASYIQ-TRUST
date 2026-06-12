@@ -120,6 +120,7 @@ export async function getActivationFunnel() {
         hasLeague,
         hasLfProfile,
         hasDues,
+        hasVouched,
         hasCommSub,
         hasRenewed,
     ] = await Promise.all([
@@ -136,6 +137,7 @@ export async function getActivationFunnel() {
         prisma.user.count({ where: { leagues: { some: {} } } }),
         prisma.user.count({ where: { ownedCommissioner: { isNot: null } } }),
         prisma.user.count({ where: { commissionerDues: { some: {} } } }),
+        prisma.user.count({ where: { vouchesGiven: { some: {} } } }),
         // Count distinct users with active commissioner sub
         prisma.subscription.groupBy({
             by:    ['userId'],
@@ -158,6 +160,7 @@ export async function getActivationFunnel() {
         { stage: 'league_synced'      as ActivationStage, count: hasLeague        },
         { stage: 'lf_profile'         as ActivationStage, count: hasLfProfile     },
         { stage: 'dues_added'         as ActivationStage, count: hasDues          },
+        { stage: 'members_vouched'    as ActivationStage, count: hasVouched       },
         { stage: 'tools_active'       as ActivationStage, count: hasCommSub       },
         { stage: 'renewed'            as ActivationStage, count: hasRenewed       },
     ];
