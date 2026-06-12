@@ -86,7 +86,7 @@ function DuesNavCard({ leagueId, duesData, isCommissioner, leagueName }: {
     const allPaid     = duesData ? paidCount >= totalCount && totalCount > 0 : false;
 
     const inner = (
-        <div className="flex items-start justify-between gap-6">
+        <div className="flex items-start justify-between gap-6 flex-wrap">
             {/* Left: label + description */}
             <div className="min-w-0">
                 <div className="flex items-center gap-2 mb-1">
@@ -120,7 +120,7 @@ function DuesNavCard({ leagueId, duesData, isCommissioner, leagueName }: {
 
             {/* Right: live tracker (only when dues exist) */}
             {duesData && (
-                <div className="shrink-0 min-w-[140px] space-y-2.5">
+                <div className="shrink-0 w-full sm:w-auto sm:min-w-[140px] space-y-2.5">
                     {/* Pot total */}
                     <div className="text-right">
                         <p className="text-xs text-gray-600 uppercase tracking-wider font-semibold">Pot</p>

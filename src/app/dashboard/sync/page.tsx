@@ -363,19 +363,40 @@ function SyncPageInner() {
 
                 {/* Step 3 */}
                 {step === 'done' && (
-                    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-10 text-center space-y-4">
-                        <div className="text-4xl">✅</div>
-                        <h2 className="text-xl font-bold">{synced} league{synced !== 1 ? 's' : ''} synced!</h2>
-                        <p className="text-gray-400 text-sm">Standings will refresh hourly. Live scores update every 3 minutes on game days.</p>
-                        <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-                            <Link href="/dashboard" className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-6 py-2.5 rounded-lg transition text-sm">
-                                Go to Dashboard
-                            </Link>
-                            <button type="button" onClick={() => { setStep('username'); setUsername(''); setResult(null); setSelected(new Set()); setError(''); }}
-                                className="border border-gray-700 hover:border-gray-500 text-gray-300 font-semibold px-6 py-2.5 rounded-lg transition text-sm">
-                                Sync Another Account
-                            </button>
+                    <div className="space-y-4">
+                        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-10 text-center space-y-4">
+                            <div className="text-4xl">✅</div>
+                            <h2 className="text-xl font-bold">{synced} league{synced !== 1 ? 's' : ''} synced!</h2>
+                            <p className="text-gray-400 text-sm">Standings will refresh hourly. Live scores update every 3 minutes on game days.</p>
+                            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+                                <Link href="/dashboard" className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold px-6 py-2.5 rounded-lg transition text-sm">
+                                    Go to Dashboard
+                                </Link>
+                                <button type="button" onClick={() => { setStep('username'); setUsername(''); setResult(null); setSelected(new Set()); setError(''); }}
+                                    className="border border-gray-700 hover:border-gray-500 text-gray-300 font-semibold px-6 py-2.5 rounded-lg transition text-sm">
+                                    Sync Another Account
+                                </button>
+                            </div>
                         </div>
+
+                        {/* LeagueFinder prompt — shown when user has commissioner-covered leagues */}
+                        {slotInfo && slotInfo.commissionerLeagueNames.length > 0 && (
+                            <div className="bg-gray-900 border border-[#D4AF37]/25 rounded-2xl p-6 flex items-start gap-4">
+                                <span className="text-2xl shrink-0">🔍</span>
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-white text-sm">List your league on LeagueFinder</p>
+                                    <p className="text-gray-500 text-xs mt-1">
+                                        Attract replacement managers and grow your league. Takes 2 minutes to set up.
+                                    </p>
+                                </div>
+                                <Link
+                                    href="/leaguefinder/commissioners/new"
+                                    className="shrink-0 bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold text-xs px-4 py-2 rounded-lg transition whitespace-nowrap"
+                                >
+                                    List League →
+                                </Link>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

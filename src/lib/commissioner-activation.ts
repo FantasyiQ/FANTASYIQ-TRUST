@@ -1,6 +1,8 @@
 // FantasyiQ Trust — Commissioner Activation Engine (Phase 3, Engine 2)
 
 import { prisma } from '@/lib/prisma';
+import { notify } from '@/lib/notifications/service';
+import { NotificationType } from '@/lib/notifications/types';
 
 // ── Stage definitions ─────────────────────────────────────────────────────────
 
@@ -250,19 +252,17 @@ export async function nudgeStuckCommissioners(): Promise<{ nudged: number; skipp
         const toNudge = candidates.map(u => u.id).filter(id => !nudgedSet.has(id));
         if (toNudge.length === 0) continue;
 
-        await prisma.notification.createMany({
-            data: toNudge.map(userId => ({
-                userId,
-                type:  'commissioner_nudge',
-                title: msg.title,
-                body:  msg.body,
-                data:  { stage },
-            })),
-        });
-
-        // Mark as nudged so subsequent stage iterations skip them
-        toNudge.forEach(id => nudgedSet.add(id));
-        nudged += toNudge.length;
+        for (const uid of toNudge) {
+            await notify({
+                userId: uid,
+                type:   NotificationType.COMMISSIONER_NUDGE,
+                title:  msg.title,
+                body:   msg.body,
+                data:   { stage },
+            });
+            nudgedSet.add(uid);
+            nudged++;
+        }
     }
 
     return { nudged, skipped };

@@ -90,7 +90,7 @@ export default function MemberRow({ member, duesId, buyInAmount }: Props) {
 
     return (
         <>
-            <li className="px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
+            <li className="px-4 sm:px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
                 <div className="min-w-0">
                     <p className="font-medium text-white text-sm">{member.displayName}</p>
                     {member.teamName && <p className="text-gray-500 text-xs mt-0.5">{member.teamName}</p>}
