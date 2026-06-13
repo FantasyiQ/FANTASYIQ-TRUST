@@ -101,8 +101,7 @@ export default async function PayDuesPage({
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
                     <h2 className="text-lg font-semibold">Which team are you?</h2>
                     <p className="text-sm text-gray-400">
-                        We couldn&apos;t automatically match your account to a member slot.
-                        Select your team below to continue to payment.
+                        Your commissioner added you by name. Select your slot once — we&apos;ll link your account automatically for every payment and notification going forward.
                     </p>
                     {unpaid.length === 0 ? (
                         <p className="text-sm text-gray-500">All members have already paid.</p>

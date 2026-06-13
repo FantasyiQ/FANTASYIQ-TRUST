@@ -7,6 +7,21 @@ import { prisma } from '@/lib/prisma';
 const CURRENT_YEAR = String(new Date().getFullYear());
 const LAST_YEAR    = String(new Date().getFullYear() - 1);
 
+type TeamSize = 8 | 10 | 12 | 14 | 16 | 32;
+const COMM_PRICES: Record<TeamSize, [number, number, number]> = {
+    8: [54.99, 64.99, 74.99], 10: [64.99, 74.99, 84.99], 12: [74.99, 84.99, 94.99],
+    14: [84.99, 94.99, 104.99], 16: [94.99, 104.99, 114.99], 32: [174.99, 184.99, 194.99],
+};
+const TIER_INDEX: Record<string, number> = { COMMISSIONER_PRO: 0, COMMISSIONER_ALL_PRO: 1, COMMISSIONER_ELITE: 2 };
+function commPrice(tier: string, leagueSize: number | null): number {
+    if (!leagueSize) return 0;
+    const prices = COMM_PRICES[leagueSize as TeamSize];
+    return prices ? prices[TIER_INDEX[tier] ?? 0] : 0;
+}
+function fmtCurrency(n: number) {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+}
+
 function startOf(daysAgo: number): Date {
     const d = new Date();
     d.setDate(d.getDate() - daysAgo);
@@ -75,6 +90,13 @@ export default async function AdminOverviewPage() {
         platformBreakdownThisYear,
         subsByStatus,
         topFeatures,
+        activeSubs,
+        newSubsThisMonth,
+        canceledThisMonth,
+        lfLeagueCount,
+        lfJoinReqRecent,
+        lfJoinReqAccepted,
+        lfJoinReqTotal,
     ] = await Promise.all([
         prisma.user.count(),
         prisma.user.count({ where: { createdAt: { gte: startOf(0) } } }),
@@ -106,6 +128,19 @@ export default async function AdminOverviewPage() {
             orderBy: { _count: { feature: 'desc' } },
             take:    5,
         }),
+        // MRR: active subs with tier + leagueSize
+        prisma.subscription.findMany({
+            where:  { status: { in: ['active', 'trialing'] } },
+            select: { tier: true, leagueSize: true },
+        }),
+        // Revenue flow
+        prisma.subscription.count({ where: { createdAt: { gte: startOf(30) }, status: { in: ['active', 'trialing'] } } }),
+        prisma.subscription.count({ where: { updatedAt: { gte: startOf(30) }, status: 'canceled' } }),
+        // LeagueFinder stats
+        prisma.lFLeague.count(),
+        prisma.lFJoinRequest.count({ where: { createdAt: { gte: startOf(30) } } }),
+        prisma.lFJoinRequest.count({ where: { status: 'ACCEPTED' } }),
+        prisma.lFJoinRequest.count(),
     ]);
 
     // Build daily new-user chart data (last 14 days)
@@ -130,6 +165,10 @@ export default async function AdminOverviewPage() {
         : null;
     const activeByStatus = Object.fromEntries(subsByStatus.map(s => [s.status, s._count._all]));
 
+    const arr = activeSubs.reduce((sum, s) => sum + commPrice(s.tier, s.leagueSize), 0);
+    const mrr = arr / 12;
+    const lfAcceptRate = lfJoinReqTotal > 0 ? Math.round((lfJoinReqAccepted / lfJoinReqTotal) * 100) : 0;
+
     return (
         <div className="space-y-8">
             <div>
@@ -143,6 +182,32 @@ export default async function AdminOverviewPage() {
                 <StatCard label="Active Subs"       value={activeSubCount} sub={`${commSubCount} commissioner`} />
                 <StatCard label={`${CURRENT_YEAR} Leagues`} value={leaguesThisYear.toLocaleString()} sub={yoyChange !== null ? `${yoyChange >= 0 ? '+' : ''}${yoyChange}% vs ${LAST_YEAR} · ${totalLeagues} all-time` : `${leaguesSyncedToday} synced today`} accent />
                 <StatCard label="New Today"         value={newUsersToday} sub={`${newUsersThisWeek} this week`} />
+            </div>
+
+            {/* ── Revenue snapshot ───────────────────────────────────────── */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatCard label="Est. MRR"     value={fmtCurrency(mrr)} sub="Annual ÷ 12" accent />
+                <StatCard label="Est. ARR"     value={fmtCurrency(arr)} sub="Active sub revenue" />
+                <StatCard label="New Subs 30d" value={newSubsThisMonth} sub={`${canceledThisMonth} canceled`} />
+                <StatCard label="LF Leagues"   value={lfLeagueCount}    sub={`${lfJoinReqRecent} applications (30d)`} />
+            </div>
+
+            {/* ── LeagueFinder funnel ────────────────────────────────────── */}
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-3">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">LeagueFinder Pipeline</p>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                    {[
+                        { label: 'Leagues Listed',     value: lfLeagueCount,       color: 'text-white'        },
+                        { label: 'Total Applications', value: lfJoinReqTotal,       color: 'text-white'        },
+                        { label: 'Accepted',           value: lfJoinReqAccepted,    color: 'text-emerald-400'  },
+                        { label: 'Accept Rate',        value: `${lfAcceptRate}%`,   color: 'text-[#D4AF37]'    },
+                    ].map(({ label, value, color }) => (
+                        <div key={label}>
+                            <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1">{label}</p>
+                            <p className={`text-2xl font-black tabular-nums ${color}`}>{value}</p>
+                        </div>
+                    ))}
+                </div>
             </div>
 
             {/* ── Growth chart ───────────────────────────────────────────── */}

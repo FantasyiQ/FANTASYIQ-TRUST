@@ -78,6 +78,8 @@ export const NotificationType = {
 
   // League Finder
   LF_JOIN_REQUEST:              'lf.join_request',           // player requested to join commissioner's league
+  LF_JOIN_ACCEPTED:             'lf.join_accepted',          // commissioner accepted player's join request
+  LF_JOIN_REJECTED:             'lf.join_rejected',          // commissioner rejected player's join request
   LF_PRS_HISTORY_ADDED:         'lf.prs_history_added',      // commissioner imported history for this player
 
   // Platform ops (admin-only)
