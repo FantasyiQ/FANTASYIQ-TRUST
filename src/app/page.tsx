@@ -384,17 +384,6 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="border-t border-gray-900 py-8 px-6 bg-black">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-gray-600 text-sm">
-          <span>© {new Date().getFullYear()} FantasyiQ Trust. All rights reserved.</span>
-          <div className="flex gap-6">
-            <a href="/pricing" className="hover:text-white transition">Pricing</a>
-            <a href="/support" className="hover:text-white transition">Support</a>
-            <a href="/privacy" className="hover:text-white transition">Privacy</a>
-            <a href="/terms" className="hover:text-white transition">Terms</a>
-          </div>
-        </div>
-      </footer>
     </main>
   );
 }
