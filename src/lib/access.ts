@@ -55,6 +55,25 @@ export async function requirePaidTier(userId: string): Promise<Response | null> 
 }
 
 /**
+ * Returns true if any league record sharing the same Sleeper leagueId is covered
+ * by a commissioner plan. Used to let members access features without their own sub.
+ */
+export async function isLeagueCommissionerCovered(leagueDbId: string): Promise<boolean> {
+    const league = await prisma.league.findUnique({
+        where:  { id: leagueDbId },
+        select: { leagueId: true, assignedPlanType: true },
+    });
+    if (!league) return false;
+    if (league.assignedPlanType === 'commissioner') return true;
+    if (!league.leagueId) return false;
+    const covered = await prisma.league.findFirst({
+        where:  { leagueId: league.leagueId, assignedPlanType: 'commissioner' },
+        select: { id: true },
+    });
+    return !!covered;
+}
+
+/**
  * Verify the user has paid access to a specific league.
  *
  * Rules:

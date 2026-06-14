@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
 import { getUserSubscriptionTier } from '@/lib/user/getUserSubscriptionTier';
+import { isLeagueCommissionerCovered } from '@/lib/access';
 import { getLeagueRankings } from '@/lib/league/getLeagueRankings';
 import LeagueRankingsView from '@/components/league/LeagueRankingsView';
 import BackToOverview from '../_components/BackToOverview';
@@ -9,8 +10,12 @@ import BackToOverview from '../_components/BackToOverview';
 export default async function RankingsPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
 
-    const tier = await getUserSubscriptionTier();
-    if (tier < 2) {
+    const [tier, commCovered] = await Promise.all([
+        getUserSubscriptionTier(),
+        isLeagueCommissionerCovered(id),
+    ]);
+
+    if (tier < 2 && !commCovered) {
         return (
             <div className="space-y-4">
                 <BackToOverview leagueId={id} />
