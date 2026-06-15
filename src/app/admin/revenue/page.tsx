@@ -180,18 +180,19 @@ export default async function AdminRevenuePage() {
     const playerSubs     = activeSubs.filter(s => s.type === 'player');
     const commSubs       = activeSubs.filter(s => s.type === 'commissioner');
 
-    // List-price ARR (what revenue looks like when ELITE100 expires in Year 2)
-    const commArr  = commSubs.reduce((sum, s) => sum + commPrice(s.tier, s.leagueSize), 0);
-    const playerArr = playerSubs.reduce((sum, s) => sum + playerPrice(s.tier), 0);
-    const arr      = commArr + playerArr;
-    const mrr      = arr / 12;
-
-    // Billed ARR — non-ELITE100 subs only
+    // ARR/MRR: ELITE100 = $0 billed = $0 revenue — only count actually-charged subs
     const paidCommArr   = paidActiveSubs.filter(s => s.type === 'commissioner').reduce((sum, s) => sum + commPrice(s.tier, s.leagueSize), 0);
     const paidPlayerArr = paidActiveSubs.filter(s => s.type === 'player').reduce((sum, s) => sum + playerPrice(s.tier), 0);
     const paidArr       = paidCommArr + paidPlayerArr;
+    const arr           = paidArr;       // alias for stat cards
+    const mrr           = paidArr / 12;
 
-    // Subscription Stripe fees: 2.9% + $0.30 per paid sub
+    // List-price totals (informational only — not revenue until ELITE100 expires)
+    const listCommArr  = commSubs.reduce((sum, s) => sum + commPrice(s.tier, s.leagueSize), 0);
+    const listPlayerArr = playerSubs.reduce((sum, s) => sum + playerPrice(s.tier), 0);
+    const listArr      = listCommArr + listPlayerArr;
+
+    // Subscription Stripe fees: 2.9% + $0.30 per paid charge
     const estSubStripeFees = paidArr * 0.029 + paidActiveSubs.length * 0.30;
     const netSubRevenue    = paidArr - estSubStripeFees;
 
@@ -245,10 +246,10 @@ export default async function AdminRevenuePage() {
 
             {/* ── Top stats ─────────────────────────────────────────────────── */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard label="Est. MRR"   value={fmt(mrr)}  sub="Annual ÷ 12" accent />
-                <StatCard label="Est. ARR"   value={fmt(arr)}  sub={`${fmt(commArr)} comm · ${fmt(playerArr)} player`} />
-                <StatCard label="Active Subs" value={String(activeSubs.length)} sub={`${commSubs.length} comm · ${playerSubs.length} player`} />
-                <StatCard label="New (30d)"  value={String(newSubsThisMonth)} sub={`${canceledThisMonth} canceled`} />
+                <StatCard label="Est. MRR"    value={fmt(mrr)}  sub="Billed annual ÷ 12" accent />
+                <StatCard label="Est. ARR"    value={fmt(arr)}  sub={`${fmt(paidCommArr)} comm · ${fmt(paidPlayerArr)} player · paid only`} />
+                <StatCard label="Active Subs" value={String(activeSubs.length)} sub={`${paidActiveSubs.length} paid · ${freeActiveSubs.length} ELITE100 ($0)`} />
+                <StatCard label="New (30d)"   value={String(newSubsThisMonth)} sub={`${canceledThisMonth} canceled`} />
             </div>
 
             {/* ── SUBSCRIPTION REVENUE FLOW ─────────────────────────────────── */}
@@ -317,30 +318,16 @@ export default async function AdminRevenuePage() {
                     </div>
                 </div>
 
-                {/* Year 2 potential (when ELITE100 expires) */}
+                {/* ELITE100 note — not revenue, just context */}
                 {freeActiveSubs.length > 0 && (
-                    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 flex items-center justify-between gap-6">
-                        <div>
-                            <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-1">
-                                Year 2 Potential <span className="text-gray-700 normal-case font-normal">(when ELITE100 expires)</span>
-                            </p>
-                            <p className="text-3xl font-black text-white tabular-nums">{fmt2(arr)}</p>
-                            <p className="text-xs text-gray-600 mt-1">{freeActiveSubs.length} ELITE100 sub{freeActiveSubs.length > 1 ? 's' : ''} become full-price</p>
-                        </div>
-                        <div className="text-right text-xs text-gray-600 space-y-1.5">
-                            <div className="flex justify-between gap-6">
-                                <span>Comm ARR</span>
-                                <span className="text-gray-400 font-semibold">{fmt2(commArr)}</span>
-                            </div>
-                            <div className="flex justify-between gap-6">
-                                <span>Player ARR</span>
-                                <span className="text-gray-400 font-semibold">{fmt2(playerArr)}</span>
-                            </div>
-                            <div className="flex justify-between gap-6">
-                                <span>MRR equiv</span>
-                                <span className="text-[#D4AF37] font-semibold">{fmt2(mrr)}</span>
-                            </div>
-                        </div>
+                    <div className="bg-gray-900 border border-gray-800 rounded-xl px-5 py-3 flex items-center justify-between text-xs text-gray-500">
+                        <span>
+                            <span className="text-gray-400 font-semibold">{freeActiveSubs.length} ELITE100 sub{freeActiveSubs.length > 1 ? 's' : ''}</span>
+                            {' '}active · $0 billed · $0 Stripe fees · not counted in revenue
+                        </span>
+                        <span className="text-gray-600">
+                            List-price value if paid: <span className="text-gray-500">{fmt2(listArr)}</span>
+                        </span>
                     </div>
                 )}
             </div>
