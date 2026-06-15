@@ -95,7 +95,7 @@ export default async function AdminRevenuePage() {
                 buyInAmount:   true,
                 teamCount:     true,
                 winners:       { select: { amount: true, paidOut: true } },
-                _count:        { select: { members: true } },
+                _count:        { select: { members: { where: { duesStatus: 'paid' } } } },
             },
             orderBy: { createdAt: 'desc' },
         }),
@@ -242,11 +242,11 @@ export default async function AdminRevenuePage() {
                 <p className="text-gray-500 text-sm mb-4">What&apos;s yours vs. what belongs to league winners.</p>
 
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-3">
-                    <StatCard label="Total Dues Collected" value={fmt(totalDuesCollected)} sub={`${totalPaidMembers} member transactions`} />
+                    <StatCard label="Total Dues Collected" value={fmt(totalDuesCollected)} sub={`${totalPaidMembers} paid transactions`} />
                     <StatCard label="Already Paid Out"     value={fmt(alreadyPaidOut)}     sub="Sent to winners" />
                     <StatCard label="Pending Payouts"      value={fmt(pendingPayouts)}      sub="Winners set, not paid" />
                     <StatCard label="Gross Escrow"         value={fmt(stillInEscrow)}       sub="Before fees" />
-                    <StatCard label="Est. Stripe Fees"     value={fmt(estStripeFees)}       sub={`2.9% + $0.30 × ${totalPaidMembers} txns`} />
+                    <StatCard label="Est. Stripe Fees"     value={fmt(estStripeFees)}       sub={`2.9% + $0.30 × ${totalPaidMembers} paid txns`} />
                     <StatCard label="Est. Payout Fees"     value={fmt(estPayoutFees)}       sub="1.5% of gross escrow" />
                 </div>
 
