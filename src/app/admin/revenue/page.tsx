@@ -167,16 +167,23 @@ export default async function AdminRevenuePage() {
 
     // ── Subscription math ────────────────────────────────────────────────────
 
+    // Only live-mode Stripe IDs — test-mode IDs won't appear in the live Stripe response
+    const liveStripeIds = new Set(stripeSubsPage.data.map(s => s.id));
+
     const elite100StripeIds = new Set(
         stripeSubsPage.data
             .filter(s => (s.discounts as { coupon?: { percent_off?: number; id?: string } }[])
                 ?.some(d => (d.coupon?.percent_off ?? 0) >= 100 || d.coupon?.id === 'ELITE100'))
             .map(s => s.id)
     );
-    const isElite100 = (id: string | null) => !id || elite100StripeIds.has(id);
 
-    const paidActiveSubs = activeSubs.filter(s => !isElite100(s.stripeSubscriptionId));
-    const freeActiveSubs = activeSubs.filter(s =>  isElite100(s.stripeSubscriptionId));
+    // A sub only counts if it has a live-mode Stripe ID; test/null IDs are excluded entirely
+    const isLive     = (id: string | null) => !!id && liveStripeIds.has(id);
+    const isElite100 = (id: string | null) => !!id && elite100StripeIds.has(id);
+
+    const liveActiveSubs = activeSubs.filter(s =>  isLive(s.stripeSubscriptionId));
+    const paidActiveSubs = liveActiveSubs.filter(s => !isElite100(s.stripeSubscriptionId));
+    const freeActiveSubs = liveActiveSubs.filter(s =>  isElite100(s.stripeSubscriptionId));
     const playerSubs     = activeSubs.filter(s => s.type === 'player');
     const commSubs       = activeSubs.filter(s => s.type === 'commissioner');
 
