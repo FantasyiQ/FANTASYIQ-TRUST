@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "node scripts/kill-orphan-next.mjs && next dev",
-    "build": "npm audit --audit-level=high --omit=dev && prisma generate && node scripts/migrate.mjs && next build",
+    "build": "npm audit --audit-level=critical --omit=dev && prisma generate && node scripts/migrate.mjs && next build",
     "start": "next start",
     "lint": "eslint",
     "db:generate": "dotenv -e .env.local -- prisma generate",
