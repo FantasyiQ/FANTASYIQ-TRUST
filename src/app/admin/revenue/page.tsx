@@ -117,10 +117,9 @@ export default async function AdminRevenuePage() {
     // Stripe processing: 2.9% + $0.30 per transaction (each paid member = 1 txn)
     const totalPaidMembers = leaguesWithDues.reduce((sum, l) => sum + l._count.members, 0);
     const estStripeFees    = totalDuesCollected * 0.029 + totalPaidMembers * 0.30;
-    // Stripe Connect payout fee: 1.5% on all amounts paid out to winners
-    const totalEverPaidOut = alreadyPaidOut + pendingPayouts;
-    const estPayoutFees    = totalEverPaidOut * 0.015;
-    const netEscrowAfterFees = stillInEscrow - estStripeFees - (pendingPayouts * 0.015);
+    // Stripe Connect payout fee: 1.5% of gross escrow (all dues collected will eventually be paid out)
+    const estPayoutFees      = stillInEscrow * 0.015;
+    const netEscrowAfterFees = stillInEscrow - estStripeFees - estPayoutFees;
 
     // Break down by tier
     const byTier = new Map<string, number>();
@@ -248,7 +247,7 @@ export default async function AdminRevenuePage() {
                     <StatCard label="Pending Payouts"      value={fmt(pendingPayouts)}      sub="Winners set, not paid" />
                     <StatCard label="Gross Escrow"         value={fmt(stillInEscrow)}       sub="Before fees" />
                     <StatCard label="Est. Stripe Fees"     value={fmt(estStripeFees)}       sub={`2.9% + $0.30 × ${totalPaidMembers} txns`} />
-                    <StatCard label="Est. Payout Fees"     value={fmt(estPayoutFees)}       sub="1.5% on winner payouts" />
+                    <StatCard label="Est. Payout Fees"     value={fmt(estPayoutFees)}       sub="1.5% of gross escrow" />
                 </div>
 
                 <div className="bg-gray-900 border border-[#D4AF37]/30 rounded-xl px-5 py-4 mb-6">
@@ -261,7 +260,7 @@ export default async function AdminRevenuePage() {
                         <div className="text-right text-xs text-gray-600 space-y-1">
                             <p>Gross: <span className="text-gray-400 font-medium">{fmt(stillInEscrow)}</span></p>
                             <p>Processing: <span className="text-red-400 font-medium">−{fmt(estStripeFees)}</span></p>
-                            <p>Payout fees: <span className="text-red-400 font-medium">−{fmt(pendingPayouts * 0.015)}</span></p>
+                            <p>Payout fees: <span className="text-red-400 font-medium">−{fmt(estPayoutFees)}</span></p>
                         </div>
                     </div>
                 </div>
@@ -322,7 +321,7 @@ export default async function AdminRevenuePage() {
             </div>
 
             <p className="text-[11px] text-gray-700">
-                * MRR estimate: commissioner plan prices are annual; MRR = ARR ÷ 12. Player plan revenue not included in estimate. Stripe fee estimate: 2.9% + $0.30/txn on dues collected; payout fee estimate: 1.5% on winner payouts (Stripe Connect instant). Verify exact amounts in Stripe Dashboard.
+                * MRR estimate: commissioner plan prices are annual; MRR = ARR ÷ 12. Player plan revenue not included in estimate. Stripe fee estimate: 2.9% + $0.30/txn on dues collected; payout fee estimate: 1.5% of gross escrow (full escrow eventually paid to winners). Verify exact amounts in Stripe Dashboard.
             </p>
         </div>
     );
