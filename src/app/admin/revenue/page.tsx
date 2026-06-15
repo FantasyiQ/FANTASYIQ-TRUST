@@ -161,7 +161,10 @@ export default async function AdminRevenuePage() {
         }),
         // on-behalf count (subset of selfPayCount — used for display breakdown only)
         prisma.duesMember.count({ where: { duesStatus: 'paid', paymentMethod: 'stripe_on_behalf' } }),
-        stripe.subscriptions.list({ status: 'all', limit: 100 }),
+        // Expand latest_invoice so we can check the actual billed amount
+        // Coupons are applied at invoice level, not subscription level — checking
+        // s.discounts is unreliable; amount_due === 0 is the ground truth
+        stripe.subscriptions.list({ status: 'all', limit: 100, expand: ['data.latest_invoice'] }),
     ]);
 
     // ── Subscription math ────────────────────────────────────────────────────
@@ -169,20 +172,24 @@ export default async function AdminRevenuePage() {
     // Only live-mode Stripe IDs — test-mode IDs won't appear in the live Stripe response
     const liveStripeIds = new Set(stripeSubsPage.data.map(s => s.id));
 
-    const elite100StripeIds = new Set(
+    // A sub is "free" if its latest invoice was $0 (ELITE100 or any 100% coupon)
+    const freeStripeIds = new Set(
         stripeSubsPage.data
-            .filter(s => (s.discounts as { coupon?: { percent_off?: number; id?: string } }[])
-                ?.some(d => (d.coupon?.percent_off ?? 0) >= 100 || d.coupon?.id === 'ELITE100'))
+            .filter(s => {
+                const inv = s.latest_invoice as { amount_due?: number } | string | null;
+                if (!inv || typeof inv === 'string') return false;
+                return (inv.amount_due ?? 1) === 0;
+            })
             .map(s => s.id)
     );
 
     // A sub only counts if it has a live-mode Stripe ID; test/null IDs are excluded entirely
-    const isLive     = (id: string | null) => !!id && liveStripeIds.has(id);
-    const isElite100 = (id: string | null) => !!id && elite100StripeIds.has(id);
+    const isLive = (id: string | null) => !!id && liveStripeIds.has(id);
+    const isFree = (id: string | null) => !!id && freeStripeIds.has(id);
 
     const liveActiveSubs = activeSubs.filter(s =>  isLive(s.stripeSubscriptionId));
-    const paidActiveSubs = liveActiveSubs.filter(s => !isElite100(s.stripeSubscriptionId));
-    const freeActiveSubs = liveActiveSubs.filter(s =>  isElite100(s.stripeSubscriptionId));
+    const paidActiveSubs = liveActiveSubs.filter(s => !isFree(s.stripeSubscriptionId));
+    const freeActiveSubs = liveActiveSubs.filter(s =>  isFree(s.stripeSubscriptionId));
     const playerSubs     = activeSubs.filter(s => s.type === 'player');
     const commSubs       = activeSubs.filter(s => s.type === 'commissioner');
 
