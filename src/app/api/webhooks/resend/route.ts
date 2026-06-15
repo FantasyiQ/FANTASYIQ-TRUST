@@ -9,11 +9,12 @@ export const dynamic = 'force-dynamic';
 // Map Resend event types to our status strings
 const EVENT_STATUS: Record<string, string> = {
     'email.sent':              'sent',
+    'email.scheduled':         'scheduled',
     'email.delivered':         'delivered',
     'email.delivery_delayed':  'delayed',
     'email.bounced':           'bounced',
     'email.complained':        'complained',
-    'email.unsubscribed':      'unsubscribed',
+    'email.failed':            'failed',
     'email.suppressed':        'suppressed',
     'email.opened':            'opened',
     'email.clicked':           'clicked',
