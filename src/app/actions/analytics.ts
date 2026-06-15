@@ -6,10 +6,12 @@ import { prisma } from '@/lib/prisma';
 export type FeatureName =
     | 'trade_evaluator'
     | 'draft_report'
+    | 'draft_assistant'
     | 'roster_values'
     | 'league_refresh'
     | 'power_rankings'
     | 'player_rankings'
+    | 'start_sit'
     | 'league_finder_search'
     | 'dues_setup'
     | 'announcement_posted'

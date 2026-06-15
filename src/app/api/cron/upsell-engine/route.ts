@@ -1,6 +1,7 @@
 // GET /api/cron/upsell-engine
 // Daily cron — identifies high-value upsell targets and sends targeted in-app prompts.
 import { runUpsellEngine } from '@/lib/upsell-engine';
+import { withCronLog } from '@/lib/cron-logger';
 import { captureError } from '@/lib/sentry';
 
 export const maxDuration = 300;
@@ -11,8 +12,10 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     try {
-    
-        const result = await runUpsellEngine();
+        const result = await withCronLog('upsell-engine', async () => {
+            const r = await runUpsellEngine();
+            return { processed: r.assessed, message: `${r.opportunities} opportunities · ${r.nudged} nudged` };
+        });
         return Response.json({ ok: true, ...result });
     } catch (err) {
         captureError(err, { cron: 'upsell-engine' });

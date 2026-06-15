@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { getNflState } from '@/lib/sleeper';
 import StartSitAdvisor from '../../start-sit/StartSitAdvisor';
 import HubTabBar       from '../HubTabBar';
+import { trackFeature } from '@/app/actions/analytics';
 
 export default async function HubStartSitPage({
     params,
@@ -16,6 +17,8 @@ export default async function HubStartSitPage({
 
     const session = await auth();
     if (!session?.user?.id) redirect('/sign-in');
+
+    void trackFeature('start_sit', { leagueId: id });
 
     const league = await prisma.league.findUnique({
         where:  { id },

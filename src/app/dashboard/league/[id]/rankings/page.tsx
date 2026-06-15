@@ -6,9 +6,12 @@ import { isLeagueCommissionerCovered } from '@/lib/access';
 import { getLeagueRankings } from '@/lib/league/getLeagueRankings';
 import LeagueRankingsView from '@/components/league/LeagueRankingsView';
 import BackToOverview from '../_components/BackToOverview';
+import { trackFeature } from '@/app/actions/analytics';
 
 export default async function RankingsPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
+
+    void trackFeature('player_rankings', { leagueId: id });
 
     const [tier, commCovered] = await Promise.all([
         getUserSubscriptionTier(),

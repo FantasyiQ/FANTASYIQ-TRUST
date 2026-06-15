@@ -8,9 +8,12 @@ import TradePartnersPanel from '../TradePartnersPanel';
 import { getUserSubscriptionTier } from '@/lib/user/getUserSubscriptionTier';
 import { isLeagueCommissionerCovered } from '@/lib/access';
 import BackToOverview from '../_components/BackToOverview';
+import { trackFeature } from '@/app/actions/analytics';
 
 export default async function TradePage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
+
+    void trackFeature('trade_evaluator', { leagueId: id });
 
     const [tier, commCovered] = await Promise.all([
         getUserSubscriptionTier(),

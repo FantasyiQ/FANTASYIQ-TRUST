@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { getLeagueDrafts, getLeagueRosters, getLeagueUsers } from '@/lib/sleeper';
 import DraftCenterTabBar from '../DraftCenterTabBar';
 import DraftAssistantPanel from './DraftAssistantPanel';
+import { trackFeature } from '@/app/actions/analytics';
 
 export default async function DraftAssistantPage({
     params,
@@ -17,6 +18,8 @@ export default async function DraftAssistantPage({
 
     const session = await auth();
     if (!session?.user?.id) redirect('/sign-in');
+
+    void trackFeature('draft_assistant', { leagueId: id });
 
     const [league, dbUser] = await Promise.all([
         prisma.league.findUnique({

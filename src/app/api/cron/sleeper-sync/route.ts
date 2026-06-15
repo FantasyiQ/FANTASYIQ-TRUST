@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { getSleeperLeagues, getLeagueRosters, getLeagueDrafts, getNflState, deriveScoringType, rosterFpts, resolveDraftType, type SleeperLeague } from '@/lib/sleeper';
 import { deriveChampWeek } from '@/lib/leaguePhase';
 import { shouldSkipLeague, withRetry, recordSyncFailure, recordSyncRecovered } from '@/lib/sync-recovery';
+import { withCronLog } from '@/lib/cron-logger';
 import { captureError } from '@/lib/sentry';
 
 export const maxDuration = 300;
@@ -112,32 +113,35 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     try {
-        const [users, nflState] = await Promise.all([
-            prisma.user.findMany({
-                where: { sleeperUserId: { not: null } },
-                select: {
-                    id: true, sleeperUserId: true,
-                    leagues: {
-                        select: { id: true, leagueId: true, syncStatus: true, syncErrorCount: true, syncLastErrorAt: true },
+        const result = await withCronLog('sleeper-sync', async () => {
+            const [users, nflState] = await Promise.all([
+                prisma.user.findMany({
+                    where: { sleeperUserId: { not: null } },
+                    select: {
+                        id: true, sleeperUserId: true,
+                        leagues: {
+                            select: { id: true, leagueId: true, syncStatus: true, syncErrorCount: true, syncLastErrorAt: true },
+                        },
                     },
-                },
-            }),
-            getNflState(),
-        ]);
+                }),
+                getNflState(),
+            ]);
 
-        let synced  = 0;
-        let skipped = 0;
+            let synced  = 0;
+            let skipped = 0;
 
-        for (let i = 0; i < users.length; i += USER_BATCH_SIZE) {
-            const batch   = users.slice(i, i + USER_BATCH_SIZE);
-            const results = await Promise.all(batch.map(user => syncUser(user, nflState.season)));
-            for (const r of results) {
-                synced  += r.synced;
-                skipped += r.skipped;
+            for (let i = 0; i < users.length; i += USER_BATCH_SIZE) {
+                const batch   = users.slice(i, i + USER_BATCH_SIZE);
+                const results = await Promise.all(batch.map(user => syncUser(user, nflState.season)));
+                for (const r of results) {
+                    synced  += r.synced;
+                    skipped += r.skipped;
+                }
             }
-        }
 
-        return Response.json({ ok: true, synced, skipped, users: users.length });
+            return { processed: synced, message: `${synced} leagues synced · ${skipped} skipped · ${users.length} users` };
+        });
+        return Response.json({ ok: true, ...result });
     } catch (err) {
         captureError(err, { cron: 'sleeper-sync' });
         const message = err instanceof Error ? err.message : 'Sync failed';

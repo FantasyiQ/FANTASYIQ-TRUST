@@ -1181,6 +1181,43 @@ model RookieRankingsPlayer {
     @@map("rookie_rankings_players")
 }
 
+// ── Observability ─────────────────────────────────────────────────────────────
+
+// One record per cron execution — written by withCronLog() wrapper.
+model CronLog {
+    id          String   @id @default(cuid())
+    cron        String   // matches the route segment name, e.g. "sleeper-sync"
+    status      String   // "success" | "error" | "partial"
+    durationMs  Int
+    processed   Int?     // items touched (leagues synced, emails sent, etc.)
+    errors      Int?
+    message     String?  // short summary or first error message
+    createdAt   DateTime @default(now())
+
+    @@index([cron])
+    @@index([status])
+    @@index([createdAt])
+    @@map("cron_logs")
+}
+
+// One record per outbound email — written by sendEmail(), updated by Resend webhook.
+model EmailLog {
+    id          String    @id @default(cuid())
+    to          String
+    subject     String
+    type        String    @default("general") // notification type or "transactional"
+    resendId    String?   @unique              // Resend message ID for webhook correlation
+    status      String    @default("sent")     // "sent" | "delivered" | "bounced" | "complained" | "opened" | "clicked"
+    sentAt      DateTime  @default(now())
+    updatedAt   DateTime  @updatedAt
+
+    @@index([to])
+    @@index([status])
+    @@index([sentAt])
+    @@index([resendId])
+    @@map("email_logs")
+}
+
 // One lineup per user per contest.
 model DFSLineup {
     id          String   @id @default(cuid())

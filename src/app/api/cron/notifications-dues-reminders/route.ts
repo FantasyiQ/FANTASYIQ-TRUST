@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { notify } from '@/lib/notifications/service';
 import { NotificationType } from '@/lib/notifications/types';
+import { withCronLog } from '@/lib/cron-logger';
 import { captureError } from '@/lib/sentry';
 
 export const maxDuration = 300;
@@ -11,6 +12,7 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     try {
+        const result = await withCronLog('notifications-dues-reminders', async () => {
         const now = new Date();
 
         // Find all LeagueDues with a future deadline and at least one unpaid member
@@ -135,7 +137,9 @@ export async function GET(request: Request): Promise<Response> {
             }
         }
 
-        return Response.json({ ok: true, duesWithDeadline: duesWithDeadlines.length, duesNoDeadline: duesNoDeadline.length, sent });
+        return { processed: sent, message: `${sent} reminders · ${duesWithDeadlines.length} deadline leagues · ${duesNoDeadline.length} no-deadline leagues` };
+        }); // end withCronLog
+        return Response.json({ ok: true, ...result });
     } catch (err) {
         captureError(err, { cron: 'notifications-dues-reminders' });
         const message = err instanceof Error ? err.message : 'Cron failed';
