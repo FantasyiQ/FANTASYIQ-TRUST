@@ -458,6 +458,37 @@ export default async function AdminRevenuePage() {
                     />
                 </div>
 
+                {/* Make pot whole */}
+                {totalDuesCollected > 0 && (
+                    <div className="max-w-2xl mt-5">
+                        <div className="border-2 border-[#D4AF37]/50 bg-[#D4AF37]/5 rounded-xl p-5 flex items-center justify-between gap-6">
+                            <div>
+                                <p className="text-[11px] text-[#D4AF37]/70 font-semibold uppercase tracking-widest mb-2">
+                                    Deposit to Make Pot Whole
+                                </p>
+                                <p className="text-4xl font-black text-[#D4AF37] tabular-nums">{fmt2(totalDuesExpenses)}</p>
+                                <p className="text-xs text-gray-500 mt-2">
+                                    Deposit this into Stripe so winners receive the full {fmt2(totalDuesCollected)} pot
+                                </p>
+                            </div>
+                            <div className="text-right text-xs space-y-2 shrink-0">
+                                <div className="text-gray-500">
+                                    <span>Processing fees</span>
+                                    <span className="text-red-400 font-bold ml-3">+{fmt2(estStripeFees)}</span>
+                                </div>
+                                <div className="text-gray-500">
+                                    <span>Payout fees (est.)</span>
+                                    <span className="text-red-400 font-bold ml-3">+{fmt2(totalPayoutFeeEst)}</span>
+                                </div>
+                                <div className="border-t border-[#D4AF37]/20 pt-2 text-[#D4AF37] font-bold">
+                                    <span>Total to deposit</span>
+                                    <span className="ml-3">{fmt2(totalDuesExpenses)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Fee summary cards */}
                 <div className="grid grid-cols-3 gap-3 max-w-2xl mt-6 mb-6">
                     <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
