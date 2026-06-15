@@ -26,6 +26,11 @@ function commPrice(tier: string, leagueSize: number | null): number {
     return prices ? prices[idx] : 0;
 }
 
+const PLAYER_PRICES: Record<string, number> = {
+    PLAYER_PRO: 9.99, PLAYER_ALL_PRO: 24.99, PLAYER_ELITE: 44.99,
+};
+function playerPrice(tier: string): number { return PLAYER_PRICES[tier] ?? 0; }
+
 function StatCard({ label, value, sub, accent }: {
     label: string; value: string; sub?: string; accent?: boolean;
 }) {
@@ -111,9 +116,18 @@ export default async function AdminRevenuePage() {
         }),
     ]);
 
-    // MRR: prices are annual, so MRR = annual / 12
-    const arr = activeSubs.reduce((sum, s) => sum + commPrice(s.tier, s.leagueSize), 0);
-    const mrr = arr / 12;
+    // ARR: commissioner plan + player plan revenue combined
+    const playerSubs = activeSubs.filter(s => s.type === 'player');
+    const commArr    = activeSubs.filter(s => s.type === 'commissioner')
+                                 .reduce((sum, s) => sum + commPrice(s.tier, s.leagueSize), 0);
+    const playerArr  = playerSubs.reduce((sum, s) => sum + playerPrice(s.tier), 0);
+    const arr        = commArr + playerArr;
+    const mrr        = arr / 12;
+
+    // Subscription Stripe fees (2.9% + $0.30/sub on actual billed amount)
+    // ELITE100 = $0 charge = $0 fee; non-ELITE100 subs billed at full price
+    // We use arr as the billed base — ELITE100 subs inflate this, so treat as ceiling
+    const estSubStripeFees = arr * 0.029 + activeSubs.length * 0.30;
 
     // Balance split
     const totalDuesCollected = duesAgg._sum.potTotal ?? 0;
@@ -162,10 +176,25 @@ export default async function AdminRevenuePage() {
             </div>
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard label="Est. MRR"    value={fmt(mrr)}  sub="Annual ÷ 12"     accent />
-                <StatCard label="Est. ARR"    value={fmt(arr)}  sub="Active subs total" />
-                <StatCard label="Active Subs" value={String(activeSubs.length)} sub={`${commSubs.length} commissioner`} />
-                <StatCard label="New (30d)"   value={String(newSubsThisMonth)} sub={`${canceledThisMonth} canceled`} />
+                <StatCard label="Est. MRR"      value={fmt(mrr)}       sub="Annual ÷ 12"                       accent />
+                <StatCard label="Est. ARR"       value={fmt(arr)}       sub={`${fmt(commArr)} comm · ${fmt(playerArr)} player`} />
+                <StatCard label="Active Subs"    value={String(activeSubs.length)} sub={`${commSubs.length} comm · ${playerSubs.length} player`} />
+                <StatCard label="New (30d)"      value={String(newSubsThisMonth)}  sub={`${canceledThisMonth} canceled`} />
+            </div>
+
+            {/* Sub Stripe fees */}
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <p className="text-[11px] text-gray-500 font-medium uppercase tracking-wider mb-1">Est. Subscription Stripe Fees</p>
+                        <p className="text-2xl font-black text-white tabular-nums">{fmt(estSubStripeFees)}</p>
+                        <p className="text-xs text-gray-600 mt-1">2.9% of ARR + $0.30 × {activeSubs.length} subs — ceiling estimate (ELITE100 subs = $0 actual fee)</p>
+                    </div>
+                    <div className="text-right text-xs text-gray-600 space-y-1">
+                        <p>Comm fees: <span className="text-gray-400">{fmt(commArr * 0.029 + commSubs.length * 0.30)}</span></p>
+                        <p>Player fees: <span className="text-gray-400">{fmt(playerArr * 0.029 + playerSubs.length * 0.30)}</span></p>
+                    </div>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -333,7 +362,7 @@ export default async function AdminRevenuePage() {
             </div>
 
             <p className="text-[11px] text-gray-700">
-                * MRR estimate: commissioner plan prices are annual; MRR = ARR ÷ 12. Player plan revenue not included in estimate. Stripe fee estimate: 2.9% + $0.30/txn on dues collected; payout fee estimate: 1.5% of gross escrow (full escrow eventually paid to winners). Verify exact amounts in Stripe Dashboard.
+                * ARR = commissioner plan + player plan revenue (Pro $9.99 · All-Pro $24.99 · Elite $44.99/yr). MRR = ARR ÷ 12. Subscription Stripe fee estimate uses full plan price — ELITE100 subs are billed $0 so actual fees are lower. Dues fee: 2.9% + $0.30/paid txn. Payout fee: 1.5% of gross escrow. Verify exact amounts in Stripe Dashboard.
             </p>
         </div>
     );
