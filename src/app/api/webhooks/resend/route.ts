@@ -1,12 +1,11 @@
 // POST /api/webhooks/resend
 // Receives delivery status events from Resend and updates EmailLog records.
 // Configure in Resend Dashboard → Webhooks → https://fantasyiqtrust.com/api/webhooks/resend
-// Events: email.sent, email.delivered, email.bounced, email.complained, email.opened, email.clicked
+import { Webhook } from 'svix';
 import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-// Map Resend event types to our status strings
 const EVENT_STATUS: Record<string, string> = {
     'email.sent':              'sent',
     'email.scheduled':         'scheduled',
@@ -18,19 +17,33 @@ const EVENT_STATUS: Record<string, string> = {
     'email.suppressed':        'suppressed',
     'email.opened':            'opened',
     'email.clicked':           'clicked',
-    // email.received is inbound-only — not applicable
 };
 
 export async function POST(request: Request): Promise<Response> {
-    // Optional: verify Resend webhook signature
-    // const svixId        = request.headers.get('svix-id');
-    // const svixTimestamp = request.headers.get('svix-timestamp');
-    // const svixSignature = request.headers.get('svix-signature');
-    // Resend uses Svix for signing — add verification here if RESEND_WEBHOOK_SECRET is set
+    const secret = process.env.RESEND_WEBHOOK_SECRET;
+
+    const svixId        = request.headers.get('svix-id')        ?? '';
+    const svixTimestamp = request.headers.get('svix-timestamp') ?? '';
+    const svixSignature = request.headers.get('svix-signature') ?? '';
+    const rawBody       = await request.text();
+
+    // Verify signature if secret is configured
+    if (secret) {
+        try {
+            const wh = new Webhook(secret);
+            wh.verify(rawBody, {
+                'svix-id':        svixId,
+                'svix-timestamp': svixTimestamp,
+                'svix-signature': svixSignature,
+            });
+        } catch {
+            return Response.json({ error: 'Invalid signature' }, { status: 401 });
+        }
+    }
 
     let body: unknown;
     try {
-        body = await request.json();
+        body = JSON.parse(rawBody);
     } catch {
         return Response.json({ error: 'Invalid JSON' }, { status: 400 });
     }
