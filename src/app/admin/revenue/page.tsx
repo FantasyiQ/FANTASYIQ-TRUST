@@ -113,6 +113,15 @@ export default async function AdminRevenuePage() {
     const pendingPayouts  = pendingRow?._sum.amount  ?? 0;
     const stillInEscrow   = totalDuesCollected - alreadyPaidOut;
 
+    // Fee estimates
+    // Stripe processing: 2.9% + $0.30 per transaction (each paid member = 1 txn)
+    const totalPaidMembers = leaguesWithDues.reduce((sum, l) => sum + l._count.members, 0);
+    const estStripeFees    = totalDuesCollected * 0.029 + totalPaidMembers * 0.30;
+    // Stripe Connect payout fee: 1.5% on all amounts paid out to winners
+    const totalEverPaidOut = alreadyPaidOut + pendingPayouts;
+    const estPayoutFees    = totalEverPaidOut * 0.015;
+    const netEscrowAfterFees = stillInEscrow - estStripeFees - (pendingPayouts * 0.015);
+
     // Break down by tier
     const byTier = new Map<string, number>();
     for (const s of activeSubs) {
@@ -233,16 +242,33 @@ export default async function AdminRevenuePage() {
                 <h2 className="text-lg font-bold text-white mb-1">Stripe Balance Breakdown</h2>
                 <p className="text-gray-500 text-sm mb-4">What&apos;s yours vs. what belongs to league winners.</p>
 
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                    <StatCard label="Total Dues Collected" value={fmt(totalDuesCollected)} sub="Members paid in" />
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-3">
+                    <StatCard label="Total Dues Collected" value={fmt(totalDuesCollected)} sub={`${totalPaidMembers} member transactions`} />
                     <StatCard label="Already Paid Out"     value={fmt(alreadyPaidOut)}     sub="Sent to winners" />
                     <StatCard label="Pending Payouts"      value={fmt(pendingPayouts)}      sub="Winners set, not paid" />
-                    <StatCard label="Still in Escrow"      value={fmt(stillInEscrow)}       sub="Don't transfer this" accent />
+                    <StatCard label="Gross Escrow"         value={fmt(stillInEscrow)}       sub="Before fees" />
+                    <StatCard label="Est. Stripe Fees"     value={fmt(estStripeFees)}       sub={`2.9% + $0.30 × ${totalPaidMembers} txns`} />
+                    <StatCard label="Est. Payout Fees"     value={fmt(estPayoutFees)}       sub="1.5% on winner payouts" />
+                </div>
+
+                <div className="bg-gray-900 border border-[#D4AF37]/30 rounded-xl px-5 py-4 mb-6">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Net Escrow After All Fees</p>
+                            <p className="text-2xl font-black text-[#D4AF37] tabular-nums">{fmt(netEscrowAfterFees)}</p>
+                            <p className="text-xs text-gray-600 mt-1">Gross escrow − Stripe processing − pending payout fees</p>
+                        </div>
+                        <div className="text-right text-xs text-gray-600 space-y-1">
+                            <p>Gross: <span className="text-gray-400 font-medium">{fmt(stillInEscrow)}</span></p>
+                            <p>Processing: <span className="text-red-400 font-medium">−{fmt(estStripeFees)}</span></p>
+                            <p>Payout fees: <span className="text-red-400 font-medium">−{fmt(pendingPayouts * 0.015)}</span></p>
+                        </div>
+                    </div>
                 </div>
 
                 <div className="bg-amber-950/30 border border-amber-800/40 rounded-xl px-5 py-4 mb-6 text-sm text-amber-300">
                     <span className="font-bold">Safe to transfer out of Stripe:</span>{' '}
-                    subscription revenue only. The <span className="font-bold">{fmt(stillInEscrow)}</span> still in escrow belongs to league winners — leave it in Stripe until payouts are complete.
+                    subscription revenue only. Leave <span className="font-bold">{fmt(stillInEscrow)}</span> in Stripe until all payouts clear — Stripe deducts fees automatically from the balance.
                 </div>
 
                 {/* Per-league escrow table */}
@@ -296,7 +322,7 @@ export default async function AdminRevenuePage() {
             </div>
 
             <p className="text-[11px] text-gray-700">
-                * MRR estimate: commissioner plan prices are annual; MRR = ARR ÷ 12. Player plan revenue not included in estimate. Verify exact amounts in Stripe Dashboard.
+                * MRR estimate: commissioner plan prices are annual; MRR = ARR ÷ 12. Player plan revenue not included in estimate. Stripe fee estimate: 2.9% + $0.30/txn on dues collected; payout fee estimate: 1.5% on winner payouts (Stripe Connect instant). Verify exact amounts in Stripe Dashboard.
             </p>
         </div>
     );
