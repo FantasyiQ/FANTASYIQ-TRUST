@@ -261,6 +261,49 @@ export default async function AdminRevenuePage() {
                 <StatCard label="New (30d)"   value={String(newSubsThisMonth)} sub={`${canceledThisMonth} canceled`} />
             </div>
 
+            {/* ── BOTTOM LINE ───────────────────────────────────────────────── */}
+            {(() => {
+                const netPosition = netSubRevenue - totalDuesExpenses;
+                const isPositive  = netPosition >= 0;
+                return (
+                    <div className={`border-2 rounded-2xl p-6 ${isPositive ? 'border-emerald-500/40 bg-emerald-950/20' : 'border-red-500/40 bg-red-950/20'}`}>
+                        <div className="flex items-center justify-between gap-6">
+                            <div>
+                                <p className={`text-[11px] font-bold uppercase tracking-widest mb-2 ${isPositive ? 'text-emerald-400/70' : 'text-red-400/70'}`}>
+                                    {isPositive ? 'You Keep' : 'You Need to Pay In'}
+                                </p>
+                                <p className={`text-5xl font-black tabular-nums ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                                    {isPositive ? '+' : '−'}{fmt2(Math.abs(netPosition))}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-2">
+                                    {isPositive
+                                        ? 'Subscription revenue covers all dues fees — this is yours'
+                                        : 'Deposit this into Stripe so winners get the full pot and dues fees are covered'}
+                                </p>
+                            </div>
+                            <div className="text-right text-xs space-y-2 shrink-0">
+                                <div className="flex justify-between gap-8">
+                                    <span className="text-gray-500">Sub revenue (after Stripe)</span>
+                                    <span className="text-emerald-400 font-bold">+{fmt2(netSubRevenue)}</span>
+                                </div>
+                                <div className="flex justify-between gap-8">
+                                    <span className="text-gray-500">Dues processing fees</span>
+                                    <span className="text-red-400 font-bold">−{fmt2(estStripeFees)}</span>
+                                </div>
+                                <div className="flex justify-between gap-8">
+                                    <span className="text-gray-500">Dues payout fees (est.)</span>
+                                    <span className="text-red-400 font-bold">−{fmt2(totalPayoutFeeEst)}</span>
+                                </div>
+                                <div className={`flex justify-between gap-8 border-t pt-2 font-bold ${isPositive ? 'border-emerald-800/40 text-emerald-400' : 'border-red-800/40 text-red-400'}`}>
+                                    <span>Net position</span>
+                                    <span>{isPositive ? '+' : '−'}{fmt2(Math.abs(netPosition))}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
             {/* ── SUBSCRIPTION REVENUE FLOW ─────────────────────────────────── */}
             <div>
                 <h2 className="text-lg font-bold text-white mb-1">Subscription Revenue Flow</h2>
