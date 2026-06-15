@@ -118,7 +118,6 @@ export default async function AdminRevenuePage() {
         winnersAgg,
         leaguesWithDues,
         stripeOnBehalfCount,
-        futureDuesStripeCount,
         stripeSubsPage,
     ] = await Promise.all([
         prisma.subscription.findMany({
@@ -156,12 +155,12 @@ export default async function AdminRevenuePage() {
                 buyInAmount: true,
                 teamCount:   true,
                 winners:     { select: { amount: true, paidOut: true } },
-                _count:      { select: { members: { where: { duesStatus: 'paid' } } } },
+                _count:      { select: { members: { where: { duesStatus: 'paid', paymentMethod: { not: 'manual' } } } } },
             },
             orderBy: { createdAt: 'desc' },
         }),
-        prisma.duesMember.count({ where: { paymentMethod: 'stripe_on_behalf' } }),
-        prisma.futureDuesObligation.count({ where: { paymentMethod: 'stripe_on_behalf' } }),
+        // on-behalf count (subset of selfPayCount — used for display breakdown only)
+        prisma.duesMember.count({ where: { duesStatus: 'paid', paymentMethod: 'stripe_on_behalf' } }),
         stripe.subscriptions.list({ status: 'all', limit: 100 }),
     ]);
 
@@ -212,8 +211,11 @@ export default async function AdminRevenuePage() {
     const pendingPayouts     = pendingRow?._sum.amount ?? 0;
     const stillInEscrow      = totalDuesCollected - alreadyPaidOut;
 
-    const selfPayCount      = leaguesWithDues.reduce((sum, l) => sum + l._count.members, 0);
-    const totalPaidMembers  = selfPayCount + stripeOnBehalfCount + futureDuesStripeCount;
+    // selfPayCount = all Stripe-paid members (direct + on-behalf, manual excluded)
+    // stripeOnBehalfCount is already a subset of selfPayCount — don't add separately
+    const selfPayCount     = leaguesWithDues.reduce((sum, l) => sum + l._count.members, 0);
+    const directPayCount   = selfPayCount - stripeOnBehalfCount;
+    const totalPaidMembers = selfPayCount;
 
     // Stripe processing: 2.9% of gross + $0.30 per transaction
     const estStripeFees     = totalDuesCollected * 0.029 + totalPaidMembers * 0.30;
@@ -426,7 +428,7 @@ export default async function AdminRevenuePage() {
                     <FlowBox
                         label="Gross Dues Collected"
                         amount={fmt2(totalDuesCollected)}
-                        sublabel={`${totalPaidMembers} Stripe transactions · ${selfPayCount} self-pay · ${stripeOnBehalfCount} on-behalf · ${futureDuesStripeCount} future`}
+                        sublabel={`${totalPaidMembers} Stripe transactions · ${directPayCount} self-pay · ${stripeOnBehalfCount} commissioner on-behalf`}
                         variant="start"
                     />
 
