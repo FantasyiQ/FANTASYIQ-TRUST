@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { prisma } from '@/lib/prisma';
+import { stripe } from '@/lib/stripe';
 
 // ── Pricing table (matches PricingClient.tsx COMM_PRICES) ────────────────────
 
@@ -61,10 +62,11 @@ export default async function AdminRevenuePage() {
         leaguesWithDues,
         stripeOnBehalfCount,
         futureDuesStripeCount,
+        stripeSubsPage,
     ] = await Promise.all([
         prisma.subscription.findMany({
             where:  { status: { in: ['active', 'trialing'] } },
-            select: { tier: true, type: true, leagueSize: true, status: true, createdAt: true },
+            select: { tier: true, type: true, leagueSize: true, status: true, createdAt: true, stripeSubscriptionId: true },
         }),
         prisma.subscription.count({
             where: { createdAt: { gte: startOf(30) }, status: { in: ['active', 'trialing'] } },
@@ -114,20 +116,36 @@ export default async function AdminRevenuePage() {
         prisma.futureDuesObligation.count({
             where: { paymentMethod: 'stripe_on_behalf' },
         }),
+        // Stripe sub data to identify ELITE100 (100% coupon = $0 billed = $0 Stripe fee)
+        stripe.subscriptions.list({ status: 'all', limit: 100 }),
     ]);
 
-    // ARR: commissioner plan + player plan revenue combined
-    const playerSubs = activeSubs.filter(s => s.type === 'player');
-    const commArr    = activeSubs.filter(s => s.type === 'commissioner')
-                                 .reduce((sum, s) => sum + commPrice(s.tier, s.leagueSize), 0);
-    const playerArr  = playerSubs.reduce((sum, s) => sum + playerPrice(s.tier), 0);
-    const arr        = commArr + playerArr;
-    const mrr        = arr / 12;
+    // Identify ELITE100 (100% off) Stripe subscriptions — these are billed $0 so no Stripe fee
+    const elite100StripeIds = new Set(
+        stripeSubsPage.data
+            .filter(s => (s.discounts as { coupon?: { percent_off?: number; id?: string } }[])
+                ?.some(d => (d.coupon?.percent_off ?? 0) >= 100 || d.coupon?.id === 'ELITE100'))
+            .map(s => s.id)
+    );
+    const isElite100 = (stripeSubId: string | null) =>
+        !stripeSubId || elite100StripeIds.has(stripeSubId);
 
-    // Subscription Stripe fees (2.9% + $0.30/sub on actual billed amount)
-    // ELITE100 = $0 charge = $0 fee; non-ELITE100 subs billed at full price
-    // We use arr as the billed base — ELITE100 subs inflate this, so treat as ceiling
-    const estSubStripeFees = arr * 0.029 + activeSubs.length * 0.30;
+    const paidActiveSubs = activeSubs.filter(s => !isElite100(s.stripeSubscriptionId));
+    const freeActiveSubs = activeSubs.filter(s =>  isElite100(s.stripeSubscriptionId));
+
+    // ARR: full list-price value (ELITE100 subs show what revenue will be when coupons expire)
+    const playerSubs = activeSubs.filter(s => s.type === 'player');
+    const commSubs   = activeSubs.filter(s => s.type === 'commissioner');
+    const commArr    = commSubs.reduce((sum, s) => sum + commPrice(s.tier, s.leagueSize), 0);
+    const playerArr  = playerSubs.reduce((sum, s) => sum + playerPrice(s.tier), 0);
+    const arr         = commArr + playerArr;
+    const mrr         = arr / 12;
+
+    // Subscription Stripe fees — only on subs actually billed (non-ELITE100)
+    const paidCommArr    = paidActiveSubs.filter(s => s.type === 'commissioner').reduce((sum, s) => sum + commPrice(s.tier, s.leagueSize), 0);
+    const paidPlayerArr  = paidActiveSubs.filter(s => s.type === 'player').reduce((sum, s) => sum + playerPrice(s.tier), 0);
+    const paidArr        = paidCommArr + paidPlayerArr;
+    const estSubStripeFees = paidArr * 0.029 + paidActiveSubs.length * 0.30;
 
     // Balance split
     const totalDuesCollected = duesAgg._sum.potTotal ?? 0;
@@ -154,8 +172,7 @@ export default async function AdminRevenuePage() {
     }
 
     // Break down commissioner subs by league size
-    const commSubs = activeSubs.filter(s => s.type === 'commissioner');
-    const bySize   = new Map<number, number>();
+    const bySize = new Map<number, number>();
     for (const s of commSubs) {
         if (s.leagueSize) bySize.set(s.leagueSize, (bySize.get(s.leagueSize) ?? 0) + 1);
     }
@@ -188,11 +205,15 @@ export default async function AdminRevenuePage() {
                     <div>
                         <p className="text-[11px] text-gray-500 font-medium uppercase tracking-wider mb-1">Est. Subscription Stripe Fees</p>
                         <p className="text-2xl font-black text-white tabular-nums">{fmt(estSubStripeFees)}</p>
-                        <p className="text-xs text-gray-600 mt-1">2.9% of ARR + $0.30 × {activeSubs.length} subs — ceiling estimate (ELITE100 subs = $0 actual fee)</p>
+                        <p className="text-xs text-gray-600 mt-1">
+                            2.9% of ${paidArr.toFixed(2)} billed + $0.30 × {paidActiveSubs.length} paid subs
+                            {freeActiveSubs.length > 0 && ` · ${freeActiveSubs.length} ELITE100 sub${freeActiveSubs.length > 1 ? 's' : ''} excluded ($0 billed)`}
+                        </p>
                     </div>
                     <div className="text-right text-xs text-gray-600 space-y-1">
-                        <p>Comm fees: <span className="text-gray-400">{fmt(commArr * 0.029 + commSubs.length * 0.30)}</span></p>
-                        <p>Player fees: <span className="text-gray-400">{fmt(playerArr * 0.029 + playerSubs.length * 0.30)}</span></p>
+                        <p>Paid subs: <span className="text-gray-400">{paidActiveSubs.length} of {activeSubs.length}</span></p>
+                        <p>ELITE100 (free): <span className="text-gray-400">{freeActiveSubs.length}</span></p>
+                        <p>Billed ARR: <span className="text-gray-400">{fmt(paidArr)}</span></p>
                     </div>
                 </div>
             </div>
@@ -362,7 +383,7 @@ export default async function AdminRevenuePage() {
             </div>
 
             <p className="text-[11px] text-gray-700">
-                * ARR = commissioner plan + player plan revenue (Pro $9.99 · All-Pro $24.99 · Elite $44.99/yr). MRR = ARR ÷ 12. Subscription Stripe fee estimate uses full plan price — ELITE100 subs are billed $0 so actual fees are lower. Dues fee: 2.9% + $0.30/paid txn. Payout fee: 1.5% of gross escrow. Verify exact amounts in Stripe Dashboard.
+                * ARR = list-price value across all active subs (shows Year 2 revenue when ELITE100 expires). Subscription Stripe fees based on actually-billed subs only — ELITE100 subs are $0 invoice = $0 Stripe fee. Dues fee: 2.9% + $0.30/paid txn. Payout fee: 1.5% of gross escrow. Verify exact amounts in Stripe Dashboard.
             </p>
         </div>
     );
