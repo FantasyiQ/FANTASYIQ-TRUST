@@ -10,11 +10,14 @@ export const dynamic = 'force-dynamic';
 const EVENT_STATUS: Record<string, string> = {
     'email.sent':              'sent',
     'email.delivered':         'delivered',
-    'email.delivery_delayed':  'sent',       // still in flight
+    'email.delivery_delayed':  'delayed',
     'email.bounced':           'bounced',
     'email.complained':        'complained',
+    'email.unsubscribed':      'unsubscribed',
+    'email.suppressed':        'suppressed',
     'email.opened':            'opened',
     'email.clicked':           'clicked',
+    // email.received is inbound-only — not applicable
 };
 
 export async function POST(request: Request): Promise<Response> {
