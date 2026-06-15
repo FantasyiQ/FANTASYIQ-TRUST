@@ -1,6 +1,6 @@
 import type { NotificationType, NotificationPayload } from './types';
 
-const appUrl = process.env.NEXTAUTH_URL ?? 'https://fantasyiq.app';
+const appUrl = process.env.NEXTAUTH_URL ?? 'https://www.fantasyiqtrust.com';
 
 interface TemplateContext {
   title: string;

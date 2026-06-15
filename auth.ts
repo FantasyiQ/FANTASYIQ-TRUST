@@ -4,6 +4,8 @@ import Google from 'next-auth/providers/google';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import bcrypt from 'bcryptjs';
 import { prisma } from './lib/prisma';
+import { sendEmail } from './src/lib/notifications/email';
+import { renderTemplate } from './src/lib/notifications/templates';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
     adapter: PrismaAdapter(prisma),
@@ -69,6 +71,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
         }),
     ],
+
+    events: {
+        async createUser({ user }) {
+            if (!user.email) return;
+            const name = user.name?.split(' ')[0] ?? 'Commissioner';
+            const html = renderTemplate('account.welcome', {
+                title: `Welcome to FantasyiQ Trust, ${name}!`,
+                body:  'Your account is ready.',
+            });
+            void sendEmail({
+                to:      user.email,
+                subject: `Welcome to FantasyiQ Trust, ${name}!`,
+                html,
+                type:    'welcome',
+            });
+        },
+    },
 
     callbacks: {
         authorized({ auth: session, request }) {
