@@ -10,6 +10,7 @@ import SupportAssistantLauncher from '@/components/support/SupportAssistantLaunc
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://fantasyiqtrust.com'),
   title: 'FantasyiQ Trust — Your League Dues. Protected.',
   description: 'The fantasy football platform that never touches your money. Zero fees. Zero skimming. Total trust.',
 };

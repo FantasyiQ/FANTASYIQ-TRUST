@@ -13,6 +13,7 @@ const NAV = [
     { href: '/admin/features',     label: 'Feature Usage',  icon: '🔥' },
     { href: '/admin/emails',       label: 'Email Delivery', icon: '📧' },
     { href: '/admin/crons',        label: 'Cron Logs',      icon: '⚙️'  },
+    { href: '/admin/webhooks',     label: 'Webhooks',       icon: '🔗' },
     { href: '/admin/churn',        label: 'Churn Risk',     icon: '⚠️'  },
     { href: '/admin/upsell',       label: 'Upsell',         icon: '📈' },
     { href: '/admin/health',       label: 'League Health',  icon: '🏥' },

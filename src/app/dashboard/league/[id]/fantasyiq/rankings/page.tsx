@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { getNflState } from '@/lib/sleeper';
 import RankingsHub from './RankingsHub';
 import type { RankingPlayer } from '@/lib/rankings/rankingsUtils';
+import { trackFeature } from '@/app/actions/analytics';
 
 const ALL_FANTASY_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE', 'K', 'DEF']);
 
@@ -19,6 +20,8 @@ export default async function RankingsPage({
 
     const session = await auth();
     if (!session?.user?.id) redirect('/sign-in');
+
+    void trackFeature('power_rankings', { leagueId: id });
 
     const league = await prisma.league.findUnique({
         where:  { id },

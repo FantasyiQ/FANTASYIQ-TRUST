@@ -7,7 +7,7 @@ export const metadata: Metadata = {
     openGraph: {
         title:       'Pricing — FantasyiQ Trust',
         description: 'Simple, transparent pricing for fantasy football commissioners and players. No hidden fees.',
-        url:         'https://fantasyiq.app/pricing',
+        url:         'https://fantasyiqtrust.com/pricing',
         siteName:    'FantasyiQ Trust',
         type:        'website',
     },

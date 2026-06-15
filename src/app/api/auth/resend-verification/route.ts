@@ -36,7 +36,7 @@ export async function POST(request: NextRequest): Promise<Response> {
         data: { userId: user.id, token, expiresAt },
     });
 
-    const appUrl    = process.env.NEXTAUTH_URL ?? 'https://fantasyiq.app';
+    const appUrl    = process.env.NEXTAUTH_URL ?? 'https://fantasyiqtrust.com';
     const verifyUrl = `${appUrl}/api/auth/verify-email?token=${token}`;
 
     const html = renderTemplate('account.email_verification', {

@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 
 export default function robots(): MetadataRoute.Robots {
-    const base = process.env.NEXTAUTH_URL ?? 'https://fantasyiq-trust.vercel.app';
+    const base = process.env.NEXTAUTH_URL ?? 'https://fantasyiqtrust.com';
     return {
         rules: [
             {

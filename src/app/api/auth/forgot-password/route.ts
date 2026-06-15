@@ -38,7 +38,7 @@ export async function POST(request: NextRequest): Promise<Response> {
             data: { userId: user.id, token, expiresAt },
         });
 
-        const appUrl = process.env.NEXTAUTH_URL ?? 'https://fantasyiq.app';
+        const appUrl = process.env.NEXTAUTH_URL ?? 'https://fantasyiqtrust.com';
         const resetUrl = `${appUrl}/reset-password?token=${token}`;
 
         const html = renderTemplate('account.password_reset', {

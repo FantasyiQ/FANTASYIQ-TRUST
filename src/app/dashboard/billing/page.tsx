@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { stripe } from '@/lib/stripe';
 import { reconcileStripeSubscriptions } from '@/lib/stripe-reconcile';
+import ManageBillingButton from './ManageBillingButton';
 import type Stripe from 'stripe';
 
 function formatTier(tier: string): string {
@@ -103,14 +104,17 @@ export default async function BillingHistoryPage() {
             <div className="max-w-3xl mx-auto space-y-8">
 
                 {/* Header */}
-                <div>
-                    <Link href="/dashboard" className="text-gray-500 hover:text-gray-300 text-sm transition">
-                        ← Back to My Leagues
-                    </Link>
-                    <h1 className="text-2xl font-bold mt-3">Billing History</h1>
-                    <p className="text-gray-400 text-sm mt-1">
-                        All receipts and invoices across your plans.
-                    </p>
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div>
+                        <Link href="/dashboard" className="text-gray-500 hover:text-gray-300 text-sm transition">
+                            ← Back to My Leagues
+                        </Link>
+                        <h1 className="text-2xl font-bold mt-3">Billing History</h1>
+                        <p className="text-gray-400 text-sm mt-1">
+                            All receipts and invoices across your plans.
+                        </p>
+                    </div>
+                    <ManageBillingButton />
                 </div>
 
                 {subscriptions.length === 0 ? (
