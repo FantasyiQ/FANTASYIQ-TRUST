@@ -54,6 +54,8 @@ export default async function AdminRevenuePage() {
         duesAgg,
         winnersAgg,
         leaguesWithDues,
+        stripeOnBehalfCount,
+        futureDuesStripeCount,
     ] = await Promise.all([
         prisma.subscription.findMany({
             where:  { status: { in: ['active', 'trialing'] } },
@@ -99,6 +101,14 @@ export default async function AdminRevenuePage() {
             },
             orderBy: { createdAt: 'desc' },
         }),
+        // Pay-on-behalf Stripe transactions (commissioner pays for a member)
+        prisma.duesMember.count({
+            where: { paymentMethod: 'stripe_on_behalf' },
+        }),
+        // Future dues paid via Stripe
+        prisma.futureDuesObligation.count({
+            where: { paymentMethod: 'stripe_on_behalf' },
+        }),
     ]);
 
     // MRR: prices are annual, so MRR = annual / 12
@@ -114,8 +124,10 @@ export default async function AdminRevenuePage() {
     const stillInEscrow   = totalDuesCollected - alreadyPaidOut;
 
     // Fee estimates
-    // Stripe processing: 2.9% + $0.30 per transaction (each paid member = 1 txn)
-    const totalPaidMembers = leaguesWithDues.reduce((sum, l) => sum + l._count.members, 0);
+    // Stripe processing: 2.9% + $0.30 per transaction
+    // Self-pay (stripe_direct) counted via filtered _count on each league
+    const selfPayCount     = leaguesWithDues.reduce((sum, l) => sum + l._count.members, 0);
+    const totalPaidMembers = selfPayCount + stripeOnBehalfCount + futureDuesStripeCount;
     const estStripeFees    = totalDuesCollected * 0.029 + totalPaidMembers * 0.30;
     // Stripe Connect payout fee: 1.5% of gross escrow (all dues collected will eventually be paid out)
     const estPayoutFees      = stillInEscrow * 0.015;
@@ -242,7 +254,7 @@ export default async function AdminRevenuePage() {
                 <p className="text-gray-500 text-sm mb-4">What&apos;s yours vs. what belongs to league winners.</p>
 
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-3">
-                    <StatCard label="Total Dues Collected" value={fmt(totalDuesCollected)} sub={`${totalPaidMembers} paid transactions`} />
+                    <StatCard label="Total Dues Collected" value={fmt(totalDuesCollected)} sub={`${totalPaidMembers} Stripe txns (${selfPayCount} self · ${stripeOnBehalfCount} on-behalf · ${futureDuesStripeCount} future)`} />
                     <StatCard label="Already Paid Out"     value={fmt(alreadyPaidOut)}     sub="Sent to winners" />
                     <StatCard label="Pending Payouts"      value={fmt(pendingPayouts)}      sub="Winners set, not paid" />
                     <StatCard label="Gross Escrow"         value={fmt(stillInEscrow)}       sub="Before fees" />
