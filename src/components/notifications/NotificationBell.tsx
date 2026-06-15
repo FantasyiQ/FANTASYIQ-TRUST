@@ -173,7 +173,11 @@ export default function NotificationBell({ userId }: { userId?: string }) {
 
       {/* Bell button */}
       <button
-        onClick={() => { router.push('/dashboard/notifications'); setOpen(false); }}
+        onClick={() => {
+          const willOpen = !open;
+          setOpen(willOpen);
+          if (willOpen) markAllReadOnOpen();
+        }}
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
         style={{
           position:        'relative',
