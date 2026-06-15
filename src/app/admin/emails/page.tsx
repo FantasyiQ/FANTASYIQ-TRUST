@@ -77,7 +77,7 @@ export default async function AdminEmailsPage() {
                 <div className="bg-amber-950/30 border border-amber-800/40 rounded-xl px-5 py-4 text-sm text-amber-300">
                     <span className="font-bold">Resend webhook not yet configured.</span>{' '}
                     Emails are being sent and logged, but delivery status won&apos;t update until you add the webhook in Resend Dashboard →{' '}
-                    <span className="font-mono text-amber-200">https://fantasyiqtrust.com/api/webhooks/resend</span>
+                    <span className="font-mono text-amber-200">https://www.fantasyiqtrust.com/api/webhooks/resend</span>
                 </div>
             )}
 
