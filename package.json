@@ -13,7 +13,7 @@
     "db:studio": "dotenv -e .env.local -- prisma studio",
     "dob:check": "npx tsx scripts/dobSyncValidator.ts",
     "deploy": "vercel --prod --yes",
-    "test": "tsx --test src/lib/auction/computeAuctionValues.test.ts src/lib/rankings/rankingsUtils.test.ts"
+    "test": "tsx --test src/lib/auction/computeAuctionValues.test.ts src/lib/rankings/rankingsUtils.test.ts src/lib/dues/payout-validation.test.ts src/lib/stripe/webhook-helpers.test.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",

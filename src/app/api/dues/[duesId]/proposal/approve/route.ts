@@ -6,6 +6,8 @@ import { stripe } from '@/lib/stripe';
 import { notify } from '@/lib/notifications/service';
 import { NotificationType } from '@/lib/notifications/types';
 import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
+import { validatePayoutTotal } from '@/lib/dues/payout-validation';
+import { hasEnoughBalance, dollarsToCents } from '@/lib/stripe/webhook-helpers';
 
 function appUrl() {
     const u = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL;
@@ -61,11 +63,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const payoutTotal   = assignedItems.reduce((sum, i) => sum + i.amount, 0);
     const potTotal      = dues.potTotal;
 
-    // Allow up to $0.02 rounding tolerance
-    if (Math.abs(payoutTotal - potTotal) > 0.02) {
-        return Response.json({
-            error: `Payout total ($${payoutTotal.toFixed(2)}) does not match the league pot ($${potTotal.toFixed(2)}). Adjust payout spots before approving.`,
-        }, { status: 400 });
+    // ── Invariant 1: payout plan must equal the pot total ─────────────────────
+    const totalCheck = validatePayoutTotal(payoutTotal, potTotal);
+    if (!totalCheck.valid) {
+        return Response.json({ error: totalCheck.error }, { status: totalCheck.status });
     }
 
     // ── Invariant 2: Stripe platform balance must cover total pending payouts ──
@@ -78,11 +79,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         }),
     ]);
 
-    const availableCents  = stripeBalance.available.find(b => b.currency === 'usd')?.amount ?? 0;
-    const availableDollars = availableCents / 100;
-    const totalPendingDollars = allPendingItems.reduce((sum, i) => sum + i.amount, 0) + payoutTotal;
+    const availableCents      = stripeBalance.available.find(b => b.currency === 'usd')?.amount ?? 0;
+    const pendingPayoutsCents = allPendingItems.reduce((sum, i) => sum + dollarsToCents(i.amount), 0);
 
-    if (availableDollars < totalPendingDollars) {
+    if (!hasEnoughBalance(availableCents, pendingPayoutsCents, dollarsToCents(payoutTotal))) {
+        const availableDollars    = availableCents / 100;
+        const totalPendingDollars = (pendingPayoutsCents / 100) + payoutTotal;
         return Response.json({
             error: `Stripe platform balance ($${availableDollars.toFixed(2)}) is insufficient to cover all pending payouts ($${totalPendingDollars.toFixed(2)}). Contact support.`,
         }, { status: 400 });

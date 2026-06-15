@@ -83,9 +83,29 @@ const STEPS = [
     },
 ];
 
+const SOFTWARE_APP_JSONLD = {
+    '@context':          'https://schema.org',
+    '@type':             'SoftwareApplication',
+    name:                'FantasyiQ Trust',
+    url:                 'https://www.fantasyiqtrust.com',
+    description:         'League-aware fantasy football dues tracking, payout management, and analytics platform. Zero fees. Sync ESPN, Sleeper, Yahoo, and NFL Fantasy.',
+    applicationCategory: 'SportsApplication',
+    operatingSystem:     'Web',
+    offers: {
+        '@type':    'Offer',
+        price:      '0',
+        priceCurrency: 'USD',
+        description: 'Free tier available. Commissioner and Player plans from $0/yr.',
+    },
+};
+
 export default function Home() {
   return (
     <main className="min-h-screen bg-black text-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(SOFTWARE_APP_JSONLD) }}
+      />
 
       {/* ── Hero ─────────────────────────────────────────────────────── */}
       <section className="pt-16 pb-20 px-6 bg-black">
