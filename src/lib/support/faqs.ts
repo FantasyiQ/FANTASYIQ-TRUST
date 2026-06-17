@@ -349,6 +349,20 @@ export const FAQ_ITEMS: FAQItem[] = [
 
     // ── League Finder ────────────────────────────────────────────────────────
     {
+        id:       'what-is-prs',
+        category: 'leaguefinder',
+        question: 'What is PRS?',
+        answer:   'PRS (Player Reliability Score) is a 0–100 score in League Finder that measures how trustworthy and reliable a fantasy player is. It is built from:\n• Verified seasons — confirmed full seasons played\n• League retention — whether you stayed or left leagues\n• Engagement — lineup activity, trade responses, waiver pickups\n• Commissioner trust — approvals, endorsements, flags, or bans from past commissioners\n\nPRS has five tiers: Unproven (0–20), Developing (21–40), Reliable (41–60), Trusted (61–80), and Elite (81–100). It updates daily as new events are recorded.',
+        tags:     ['prs', 'player reliability score', 'league finder', 'score', 'trust', 'tiers'],
+    },
+    {
+        id:       'improve-prs',
+        category: 'leaguefinder',
+        question: 'How do I improve my PRS?',
+        answer:   'PRS improves as you build a verified track record:\n• Complete full seasons in your leagues (each verified season adds points)\n• Stay in leagues year over year (retention events boost your score)\n• Set lineups consistently and respond to trades\n• Earn commissioner approvals or endorsements\n\nAvoiding drops, abandoning leagues, or commissioner flags is just as important — penalties reduce your score.',
+        tags:     ['prs', 'player reliability score', 'improve', 'increase', 'tips', 'league finder'],
+    },
+    {
         id:       'what-is-leaguefinder',
         category: 'leaguefinder',
         question: 'What is League Finder?',

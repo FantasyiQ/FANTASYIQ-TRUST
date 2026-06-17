@@ -14,7 +14,7 @@ type Message = {
 
 const GREETING: Message = {
     role:    'assistant',
-    content: 'Hi! Ask me anything about FantasyiQ Trust — DSS, draft reports, DTV, playoff settings, or commissioner tools.',
+    content: 'Hi! Ask me anything about FantasyiQ Trust — PRS, DSS, DTV, draft reports, dues, or commissioner tools.',
 };
 
 // ── Chat panel ────────────────────────────────────────────────────────────────
