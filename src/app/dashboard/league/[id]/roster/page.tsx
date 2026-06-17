@@ -87,6 +87,7 @@ interface RosterRow {
     name:         string;
     position:     string;
     team:         string | null;
+    age:          number | null;
     dtv:          number;
     injuryStatus: string | null;
     status:       SlotStatus;
@@ -261,6 +262,7 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
         const normd   = normalizeName(name);
         const dtv     = dtvByName.get(nameLow) ?? dtvByName.get(normd) ?? 0;
         const inj     = sl?.injuryStatus ?? null;
+        const age     = calculateAge(sl?.birthDate ?? null) ?? sl?.age ?? null;
 
         let status: SlotStatus;
         if (irSet.has(pid))           status = 'IR';
@@ -268,7 +270,7 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
         else if (starterSet.has(pid)) status = 'Starter';
         else                          status = 'Bench';
 
-        return { playerId: pid, name, position: pos, team, dtv, injuryStatus: inj, status };
+        return { playerId: pid, name, position: pos, team, age, dtv, injuryStatus: inj, status };
     }).sort((a, b) => {
         const pg = posGroup(a.position) - posGroup(b.position);
         if (pg !== 0) return pg;
@@ -337,6 +339,7 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
                             <tr className="border-b border-gray-800">
                                 <th scope="col" className="text-left px-5 py-3 text-gray-500 font-medium">Player</th>
                                 <th scope="col" className="text-left px-3 py-3 text-gray-500 font-medium hidden sm:table-cell">Team</th>
+                                <th scope="col" className="text-right px-3 py-3 text-gray-500 font-medium hidden sm:table-cell">Age</th>
                                 <th scope="col" className="text-right px-3 py-3 text-gray-500 font-medium">DTV</th>
                                 <th scope="col" className="text-right px-5 py-3 text-gray-500 font-medium">Slot</th>
                             </tr>
@@ -346,7 +349,7 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
                                 <>
                                     {/* Position section header */}
                                     <tr key={`hdr-${pos}`} className="border-t border-gray-800 bg-gray-800/30">
-                                        <td colSpan={4} className="px-5 py-1.5">
+                                        <td colSpan={5} className="px-5 py-1.5">
                                             <div className="flex items-center gap-2">
                                                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${POS_COLORS[pos] ?? 'bg-gray-800 text-gray-400 border-gray-700'}`}>
                                                     {pos}
@@ -370,6 +373,9 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
                                             <td className="px-3 py-3 text-gray-400 hidden sm:table-cell">
                                                 {row.team ?? <span className="text-gray-700">FA</span>}
                                             </td>
+                                            <td className="px-3 py-3 text-right text-gray-400 hidden sm:table-cell">
+                                                {row.age ?? <span className="text-gray-700">—</span>}
+                                            </td>
                                             <td className="px-3 py-3 text-right font-bold text-white">
                                                 {row.dtv > 0 ? row.dtv : <span className="text-gray-600">—</span>}
                                             </td>
@@ -384,7 +390,7 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
                             ))}
                             {rows.length === 0 && (
                                 <tr>
-                                    <td colSpan={4} className="px-5 py-10 text-center text-gray-600">No players on roster.</td>
+                                    <td colSpan={5} className="px-5 py-10 text-center text-gray-600">No players on roster.</td>
                                 </tr>
                             )}
                         </tbody>
