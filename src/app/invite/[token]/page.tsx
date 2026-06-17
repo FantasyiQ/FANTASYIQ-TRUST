@@ -105,6 +105,17 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
     });
     if (!invite) notFound();
 
+    // Fetch league documents to show on the landing page (no auth required)
+    const commLeague = await prisma.league.findFirst({
+        where:  { leagueId: invite.sleeperLeagueId },
+        select: { id: true },
+    });
+    const documents = commLeague ? await prisma.leagueDocument.findMany({
+        where:   { leagueId: commLeague.id },
+        select:  { id: true, label: true, url: true },
+        orderBy: { createdAt: 'asc' },
+    }) : [];
+
     const session = await auth();
 
     if (session?.user?.id) {
@@ -183,6 +194,29 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
                         <li>✓ League announcements from your commissioner</li>
                     </ul>
                 </div>
+
+                {documents.length > 0 && (
+                    <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden text-left">
+                        <div className="px-5 py-3 border-b border-gray-800">
+                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">League Documents</p>
+                        </div>
+                        <ul className="divide-y divide-gray-800/50">
+                            {documents.map(doc => (
+                                <li key={doc.id} className="px-5 py-3 flex items-center gap-3">
+                                    <span className="text-base shrink-0">📄</span>
+                                    <a
+                                        href={doc.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-[#D4AF37] hover:text-[#BF9D2F] text-sm font-medium transition truncate"
+                                    >
+                                        {doc.label}
+                                    </a>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
 
                 <div className="space-y-3">
                     <Link
