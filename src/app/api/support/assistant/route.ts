@@ -23,8 +23,9 @@ Key product facts:
 - League Documents: commissioner uploads bylaws/files (PDF, Word, Excel, images up to 10 MB); visible on league overview and member invite page
 - Invite flow: members see league docs before signing up, then land on dues/pay page after joining
 - Dues collection: FiQ tracks payment status only — money moves via Venmo/Cash App/Zelle between members, FiQ never touches dues money
-- Payouts to winners: FiQ facilitates these via Stripe Connect. Flow: commissioner generates proposal → assigns winners → approves → each winner gets a unique "Claim Your Winnings" link → winner completes Stripe onboarding (name, last 4 SSN, bank account, ~5 min) → FiQ transfers funds automatically
-- Payout speed: standard Stripe deposit = 2–5 business days. Commissioners can cover the 1.5% Stripe instant payout fee to pay winners within minutes. FantasyiQ Trust leagues offer instant payouts with the fee covered by the commissioner.
+- Payouts to winners: FiQ initiates via Stripe Connect (Stripe is what actually moves the money). Flow: commissioner generates proposal → assigns winners → approves → each winner gets a unique "Claim Your Winnings" link (sent to their FiQ account email — Google email if they used Google sign-in — AND as an in-app notification in the dashboard bell) → winner completes Stripe onboarding (name, last 4 SSN, bank account, ~5 min) → Stripe deposits to bank
+- Payout speed: INSTANT on all FiQ leagues — within minutes. FiQ absorbs the 1.5% Stripe instant payout fee as part of its commissioner plan cost. This is how FiQ keeps its zero-fees promise (no cut of dues or winnings). Individual commissioners do NOT pay the 1.5% fee — FiQ does.
+- Never say "your commissioner covers the fee" — FiQ covers it, always, on every league.
 - Commissioner plans are per-league; Player plans are for personal analytics across all leagues
 - Free account = League Finder access only; paid plan required for syncing, analytics, or commissioner tools
 - Copy Invite Link is in the league header (not a separate menu)
