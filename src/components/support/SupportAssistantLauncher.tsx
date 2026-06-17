@@ -2,16 +2,19 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { type FAQItem } from '@/lib/support/faqs';
 import { useSupportContext } from '@/lib/support/SupportContextStore';
-import { generateAssistantReply, getContextHint } from '@/lib/support/assistantEngine';
+import { getContextHint } from '@/lib/support/assistantEngine';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 type Message = {
     role:    'user' | 'assistant';
     content: string;
-    faq?:    FAQItem | null;
+};
+
+const GREETING: Message = {
+    role:    'assistant',
+    content: 'Hi! Ask me anything about FantasyiQ Trust — DSS, draft reports, DTV, playoff settings, or commissioner tools.',
 };
 
 // ── Chat panel ────────────────────────────────────────────────────────────────
@@ -20,36 +23,73 @@ function SupportAssistantPanel({ onClose }: { onClose: () => void }) {
     const context = useSupportContext();
     const hint    = getContextHint(context);
 
-    const [messages, setMessages] = useState<Message[]>([
-        {
-            role:    'assistant',
-            content: 'Hi! Ask me anything about FantasyiQ Trust — PRS, draft reports, DTV, playoff settings, or commissioner tools.',
-            faq:     null,
-        },
-    ]);
-    const [input,   setInput]   = useState('');
-    const [loading, setLoading] = useState(false);
+    const [messages, setMessages] = useState<Message[]>([GREETING]);
+    const [input,    setInput]    = useState('');
+    const [loading,  setLoading]  = useState(false);
     const bottomRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
-    function handleSend() {
+    async function handleSend() {
         const text = input.trim();
         if (!text || loading) return;
 
-        const userMsg: Message = { role: 'user', content: text, faq: null };
+        const userMsg: Message    = { role: 'user', content: text };
+        // History sent to API: all prior exchanges (skip greeting) + new user message
+        const history: Message[]  = [...messages.slice(1), userMsg];
+
         setMessages(prev => [...prev, userMsg]);
         setInput('');
         setLoading(true);
 
-        // Brief thinking delay, then context-aware response
-        setTimeout(() => {
-            const { content, faq } = generateAssistantReply(text, context);
-            setMessages(prev => [...prev, { role: 'assistant', content, faq }]);
+        // Placeholder message that we'll stream into
+        setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+
+        try {
+            const res = await fetch('/api/support/assistant', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ messages: history, context }),
+            });
+
+            if (!res.ok || !res.body) {
+                setMessages(prev => {
+                    const next = [...prev];
+                    next[next.length - 1] = { role: 'assistant', content: "I'm having trouble right now. Try browsing the Support Center or refresh the page." };
+                    return next;
+                });
+                return;
+            }
+
+            setLoading(false); // stop dots — text starts coming in
+
+            const reader  = res.body.getReader();
+            const decoder = new TextDecoder();
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value, { stream: true });
+                setMessages(prev => {
+                    const next = [...prev];
+                    next[next.length - 1] = {
+                        ...next[next.length - 1],
+                        content: next[next.length - 1].content + chunk,
+                    };
+                    return next;
+                });
+            }
+        } catch {
+            setMessages(prev => {
+                const next = [...prev];
+                next[next.length - 1] = { role: 'assistant', content: "Something went wrong. Try the Support Center at /support." };
+                return next;
+            });
+        } finally {
             setLoading(false);
-        }, 400);
+        }
     }
 
     function handleKey(e: React.KeyboardEvent) {
@@ -70,7 +110,7 @@ function SupportAssistantPanel({ onClose }: { onClose: () => void }) {
                         {hint ? (
                             <p className="text-[#D4AF37]/60 text-[10px] mt-0.5 truncate">{hint}</p>
                         ) : (
-                            <p className="text-gray-600 text-[10px] mt-0.5">Support · FAQ-powered</p>
+                            <p className="text-gray-600 text-[10px] mt-0.5">Powered by Claude</p>
                         )}
                     </div>
                 </div>
@@ -99,26 +139,17 @@ function SupportAssistantPanel({ onClose }: { onClose: () => void }) {
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
                 {messages.map((msg, i) => (
                     <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[85%] space-y-1.5 flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                            <div className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${
-                                msg.role === 'user'
-                                    ? 'bg-[#D4AF37] text-black font-medium rounded-br-sm'
-                                    : 'bg-gray-800 text-gray-200 rounded-bl-sm'
-                            }`}>
-                                {msg.content}
-                            </div>
-                            {/* FAQ link for assistant messages */}
-                            {msg.role === 'assistant' && msg.faq && (
-                                <Link
-                                    href={`/support#faq-${msg.faq.category}`}
-                                    className="text-[10px] text-[#D4AF37]/70 hover:text-[#D4AF37] transition ml-1"
-                                >
-                                    See full answer in Support Center →
-                                </Link>
-                            )}
+                        <div className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${
+                            msg.role === 'user'
+                                ? 'bg-[#D4AF37] text-black font-medium rounded-br-sm'
+                                : 'bg-gray-800 text-gray-200 rounded-bl-sm'
+                        }`}>
+                            {msg.content}
                         </div>
                     </div>
                 ))}
+
+                {/* Typing dots — only while waiting for first token */}
                 {loading && (
                     <div className="flex justify-start">
                         <div className="bg-gray-800 rounded-2xl rounded-bl-sm px-4 py-3 flex gap-1 items-center">
@@ -161,7 +192,7 @@ function SupportAssistantPanel({ onClose }: { onClose: () => void }) {
                     </button>
                 </div>
                 <p className="text-[10px] text-gray-700 mt-1.5 text-center">
-                    Powered by FAQ matching · <Link href="/support" className="hover:text-gray-500 transition">Browse full Support Center</Link>
+                    Powered by Claude · <Link href="/support" className="hover:text-gray-500 transition">Browse Support Center</Link>
                 </p>
             </div>
         </div>
@@ -173,7 +204,6 @@ function SupportAssistantPanel({ onClose }: { onClose: () => void }) {
 export default function SupportAssistantLauncher() {
     const [open, setOpen] = useState(false);
 
-    // Listen for the custom event fired from the Support Center teaser button
     useEffect(() => {
         const handler = () => setOpen(true);
         window.addEventListener('fiq:open-assistant', handler);
@@ -184,7 +214,6 @@ export default function SupportAssistantLauncher() {
         <>
             {open && <SupportAssistantPanel onClose={() => setOpen(false)} />}
 
-            {/* Floating launcher button */}
             <button
                 type="button"
                 onClick={() => setOpen(o => !o)}

@@ -16,6 +16,7 @@
     "test": "tsx --test src/lib/auction/computeAuctionValues.test.ts src/lib/rankings/rankingsUtils.test.ts src/lib/dues/payout-validation.test.ts src/lib/stripe/webhook-helpers.test.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.2",
     "@auth/prisma-adapter": "^2.11.1",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
