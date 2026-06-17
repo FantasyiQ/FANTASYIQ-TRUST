@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getLeague, getLeagueRosters, getLeagueUsers, getPlayers } from '@/lib/sleeper';
-import { calculateAge } from '@/lib/calculateAge';
+import { calculatePreciseAge } from '@/lib/calculateAge';
 import { calcDtv, DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
 import type { Player, LeagueSettings, LeagueType } from '@/lib/trade-engine';
 import { computePlayerBaseValue } from '@/lib/player-universe';
@@ -262,7 +262,7 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
         const normd   = normalizeName(name);
         const dtv     = dtvByName.get(nameLow) ?? dtvByName.get(normd) ?? 0;
         const inj     = sl?.injuryStatus ?? null;
-        const age     = calculateAge(sl?.birthDate ?? null) ?? sl?.age ?? null;
+        const age     = calculatePreciseAge(sl?.birthDate ?? null) ?? sl?.age ?? null;
 
         let status: SlotStatus;
         if (irSet.has(pid))           status = 'IR';
