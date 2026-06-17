@@ -22,7 +22,8 @@ Key product facts:
 - My Roster tab: players grouped by position (QB→RB→WR→TE→K→DEF) sorted by DTV, with Starters/Bench/Taxi/IR slot summary cards
 - League Documents: commissioner uploads bylaws/files (PDF, Word, Excel, images up to 10 MB); visible on league overview and member invite page
 - Invite flow: members see league docs before signing up, then land on dues/pay page after joining
-- Dues: FiQ tracks payment status only — money moves via Venmo/Cash App/Zelle, never through FiQ
+- Dues collection: FiQ tracks payment status only — money moves via Venmo/Cash App/Zelle between members, FiQ never touches dues money
+- Payouts to winners: FiQ DOES facilitate these via Stripe Connect. Flow: commissioner generates proposal → assigns winners → approves → each winner gets a unique "Claim Your Winnings" link → winner completes Stripe onboarding (name, last 4 SSN, bank account, ~5 min) → FiQ transfers funds automatically → Stripe deposits to bank in 2–5 business days
 - Commissioner plans are per-league; Player plans are for personal analytics across all leagues
 - Free account = League Finder access only; paid plan required for syncing, analytics, or commissioner tools
 - Copy Invite Link is in the league header (not a separate menu)
