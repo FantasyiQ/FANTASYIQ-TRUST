@@ -49,7 +49,7 @@ export const FAQ_ITEMS: FAQItem[] = [
         id:       'invite-members',
         category: 'account',
         question: 'How do I invite league members?',
-        answer:   'Open your league in the dashboard, go to Commissioner Hub → Invite Members. Copy the invite link and share it with your leaguemates. When they join, their DSS scores will appear on your Members card.',
+        answer:   'Open your league in the dashboard and click "Copy Invite Link" in the league header. Share the link with your leaguemates via group chat or Sleeper.\n\nMembers who open the link will see your league documents (if any) before signing up, then get redirected to the dues page after joining. Their DSS scores will appear on your Members card once they\'re connected.',
         tags:     ['invite', 'members', 'link', 'commissioner'],
     },
     {
@@ -181,8 +181,15 @@ export const FAQ_ITEMS: FAQItem[] = [
         id:       'announcements',
         category: 'commissioner-tools',
         question: 'How do I post an announcement to my league?',
-        answer:   'Go to Commissioner Hub → Announcements Manager. You can create a new post, pin important announcements to the top, and attach documents (PDFs, images). All league members who have joined FantasyiQ Trust will see announcements on their league dashboard.',
-        tags:     ['announcements', 'post', 'commissioner', 'pin', 'documents'],
+        answer:   'Go to Commissioner Hub → Announcements Manager. You can create a new post and pin important announcements to the top. All league members who have joined FantasyiQ Trust will see announcements on their league dashboard.',
+        tags:     ['announcements', 'post', 'commissioner', 'pin'],
+    },
+    {
+        id:       'league-documents',
+        category: 'commissioner-tools',
+        question: 'How do I share league documents (bylaws, rulebook)?',
+        answer:   'Go to Commissioner Hub → Announcements Manager → League Documents. Click "+ Add Document" to upload a file (PDF, Word, Excel, images — up to 10 MB) or paste a link to an external file.\n\nUploaded documents appear:\n• On your league overview page so members can always access them\n• On the member invite page so prospects can read the rules before signing up\n\nYou can label each document (e.g. "Hall Hogzz Bylaws 2025") and remove old ones at any time.',
+        tags:     ['documents', 'bylaws', 'rulebook', 'upload', 'files', 'rules', 'commissioner', 'pdf'],
     },
     {
         id:       'commissioner-settings',
@@ -195,8 +202,15 @@ export const FAQ_ITEMS: FAQItem[] = [
         id:       'invite-members-comm',
         category: 'commissioner-tools',
         question: 'How do I get my league members to join FiQ?',
-        answer:   'From Commissioner Hub → Invite Members, copy your unique invite link and share it in your league group chat or Sleeper. When members join using your link, they\'re automatically connected to your league. You can track who has joined from the Members dashboard.',
-        tags:     ['invite', 'members', 'join', 'link', 'commissioner'],
+        answer:   'From Commissioner Hub → Invite Members, copy your unique invite link and share it in your league group chat or Sleeper.\n\nWhen a member opens the link they\'ll see:\n• What FantasyiQ Trust offers their league\n• Any league documents you\'ve uploaded (bylaws, rulebook, etc.)\n• Sign-in and sign-up buttons\n\nAfter they join, they\'re automatically connected to your league and taken directly to the dues page to pay. You can track who has joined from the Members dashboard.',
+        tags:     ['invite', 'members', 'join', 'link', 'commissioner', 'dues'],
+    },
+    {
+        id:       'my-roster',
+        category: 'commissioner-tools',
+        question: 'Where can I see my roster and player values?',
+        answer:   'Open your league and click the "My Roster" tab (second tab in the league navigation). Your roster is organized by position (QB → RB → WR → TE → K → DEF) with players sorted by DTV within each group.\n\nAt the top you\'ll see slot summary cards:\n• Starters — how many starter spots are filled vs. allowed\n• Bench — bench players vs. bench slots\n• Taxi — taxi squad count vs. allowed (dynasty leagues)\n• IR — injured reserve count vs. slots\n• Total DTV — your combined dynasty roster value\n\nPlayer DTV values match your Team Rankings to the cent.',
+        tags:     ['roster', 'my roster', 'dtv', 'player values', 'starters', 'bench', 'taxi', 'ir', 'dynasty'],
     },
 
     // ── Dues & Payouts ───────────────────────────────────────────────────────

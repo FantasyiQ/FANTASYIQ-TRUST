@@ -145,7 +145,7 @@ export default function SupportCenter() {
                         type="text"
                         value={query}
                         onChange={e => setQuery(e.target.value)}
-                        placeholder="Search FAQs — try 'PRS', 'playoff', 'ESPN'…"
+                        placeholder="Search FAQs — try 'DSS', 'playoff', 'ESPN'…"
                         className="w-full bg-gray-900 border border-gray-700 rounded-2xl pl-11 pr-4 py-3.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#D4AF37]/50 focus:ring-1 focus:ring-[#D4AF37]/20 transition"
                     />
                     {query && (
@@ -183,7 +183,7 @@ export default function SupportCenter() {
                     <div className="flex-1">
                         <p className="font-semibold text-white text-sm">Still need help?</p>
                         <p className="text-gray-500 text-xs mt-1 mb-3">
-                            Our FiQ Support Assistant can answer questions about PRS, draft reports, DTV, playoff settings, and commissioner tools — right from any page.
+                            Our FiQ Support Assistant can answer questions about DSS, draft reports, DTV, playoff settings, and commissioner tools — right from any page.
                         </p>
                         <button
                             type="button"

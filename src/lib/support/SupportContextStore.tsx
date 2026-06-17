@@ -11,6 +11,7 @@ export type SupportPage =
     | 'calendar'
     | 'commissioner'
     | 'league-sync'
+    | 'roster'
     | 'support'
     | 'other';
 
@@ -47,6 +48,7 @@ function derivePage(pathname: string): SupportPage {
     if (pathname.includes('/support'))            return 'support';
     // Check for league-level pages (members card is on the league overview)
     if (pathname.match(/\/dashboard\/league\/[^/]+$/)) return 'members';
+    if (pathname.includes('/roster'))             return 'roster';
     if (pathname.includes('/dashboard/league/'))  return 'league-sync';
     return 'other';
 }

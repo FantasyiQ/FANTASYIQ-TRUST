@@ -15,6 +15,7 @@ const PAGE_BOOST: Record<SupportPage, string[]> = {
     'calendar':      ['calendar-playoffs'],
     'commissioner':  ['commissioner-tools'],
     'league-sync':   ['league-sync'],
+    'roster':        ['dtv', 'commissioner-tools'],
     'support':       [],
     'other':         [],
 };
@@ -48,6 +49,7 @@ const PAGE_BASE_HINTS: Partial<Record<SupportPage, string>> = {
     'calendar':     'Calendar Manager · Ask about playoff weeks or season phase.',
     'commissioner': 'Commissioner Hub · Ask about dues, announcements, or settings.',
     'league-sync':  'League · Ask about syncing, roster data, or credentials.',
+    'roster':       'My Roster · Ask about player values, slot counts, or DTV.',
     'support':      'Support Center · Ask any question.',
 };
 
@@ -243,6 +245,18 @@ export function generateAssistantReply(
         return {
             content: 'Set up dues in Commissioner Hub → Dues Manager. FantasyiQ Trust never touches your money — payments go directly between members.',
             faq:     FAQ_ITEMS.find(f => f.id === 'setup-dues') ?? null,
+        };
+    }
+    if (q.includes('document') || q.includes('bylaw') || q.includes('rulebook') || q.includes('upload')) {
+        return {
+            content: 'Go to Commissioner Hub → Announcements Manager → League Documents to upload files (PDF, Word, Excel, images — up to 10 MB) or add links. Documents are visible to members on the league overview page and to prospects on the invite landing page.',
+            faq:     FAQ_ITEMS.find(f => f.id === 'league-documents') ?? null,
+        };
+    }
+    if (q.includes('roster') || q.includes('my roster') || q.includes('slot') || q.includes('taxi') || (q.includes('bench') && !q.includes('mark'))) {
+        return {
+            content: 'The "My Roster" tab in your league shows your players grouped by position (QB → RB → WR → TE → K → DEF), sorted by DTV. Slot summary cards at the top show Starters, Bench, Taxi, and IR counts (current vs. allowed) plus your Total DTV.',
+            faq:     FAQ_ITEMS.find(f => f.id === 'my-roster') ?? null,
         };
     }
 
