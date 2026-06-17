@@ -1,3 +1,5 @@
+export const maxDuration = 60;
+
 import type { NextRequest } from 'next/server';
 import { put } from '@vercel/blob';
 import { auth } from '@/lib/auth';

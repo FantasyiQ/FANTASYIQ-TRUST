@@ -140,15 +140,23 @@ export default function DocumentsManager({ leagueId, leagueName, initialDocument
                                     const f = e.dataTransfer.files[0];
                                     if (f) handleFilePick(f);
                                 }}
-                                onClick={() => fileRef.current?.click()}
-                                className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition ${
-                                    dragOver
+                                onClick={() => { if (!busy) fileRef.current?.click(); }}
+                                className={`border-2 border-dashed rounded-xl p-6 text-center transition ${busy ? 'cursor-default border-[#D4AF37]/40 bg-[#D4AF37]/5' : 'cursor-pointer'} ${
+                                    !busy && dragOver
                                         ? 'border-[#D4AF37] bg-[#D4AF37]/5'
-                                        : file
+                                        : !busy && file
                                             ? 'border-green-700 bg-green-900/10'
-                                            : 'border-gray-700 hover:border-gray-600'
+                                            : !busy
+                                                ? 'border-gray-700 hover:border-gray-600'
+                                                : ''
                                 }`}>
-                                {file ? (
+                                {busy ? (
+                                    <div className="flex flex-col items-center justify-center gap-2 py-2">
+                                        <div className="w-6 h-6 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
+                                        <p className="text-gray-400 text-sm">Uploading <span className="text-white font-medium">{file?.name}</span>…</p>
+                                        <p className="text-gray-600 text-xs">Large files may take a few seconds</p>
+                                    </div>
+                                ) : file ? (
                                     <div className="flex items-center justify-center gap-2">
                                         <span className="text-xl">{fileIcon(file.name)}</span>
                                         <div className="text-left">

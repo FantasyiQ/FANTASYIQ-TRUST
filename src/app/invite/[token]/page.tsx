@@ -139,13 +139,13 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
             if (existing) {
                 // Ensure commissioner coverage is set even on the fast path.
                 await applyCommissionerCoverage(existing.id, invite.sleeperLeagueId);
-                redirect(`/dashboard/league/${existing.id}`);
+                redirect(`/dashboard/league/${existing.id}/dues/pay`);
             }
 
             // Auto-accept: fetch from Sleeper, create records, redirect — no UI shown
             try {
                 const leagueDbId = await acceptInvite(dbUser.id, dbUser.sleeperUserId, invite);
-                redirect(`/dashboard/league/${leagueDbId}`);
+                redirect(`/dashboard/league/${leagueDbId}/dues/pay`);
             } catch {
                 // Sleeper unreachable — fall back to sync page
                 redirect(
