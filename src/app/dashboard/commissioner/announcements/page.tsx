@@ -28,20 +28,9 @@ export default async function AnnouncementsPage({
                         orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
                         include: { author: { select: { name: true, image: true } } },
                     },
-                },
-            },
-            subscriptions: {
-                where:  { type: 'commissioner', status: { in: ['active', 'trialing'] } },
-                select: {
-                    leagueDues: {
-                        select: {
-                            id:         true,
-                            leagueName: true,
-                            documents: {
-                                select:  { id: true, label: true, url: true, createdAt: true },
-                                orderBy: { createdAt: 'asc' },
-                            },
-                        },
+                    documents: {
+                        select:  { id: true, label: true, url: true, createdAt: true },
+                        orderBy: { createdAt: 'asc' },
                     },
                 },
             },
@@ -57,18 +46,10 @@ export default async function AnnouncementsPage({
         const ex  = _seenAnn.get(key);
         if (!ex || l.season > ex.season) _seenAnn.set(key, l);
     }
-    const leagues = [..._seenAnn.values()].sort((a, b) => a.leagueName.localeCompare(b.leagueName));
-
-    // Build a map of leagueName → documents from dues tracker (still dues-linked)
-    const docsByLeagueName = new Map<string, { id: string; label: string; url: string; createdAt: Date }[]>();
-    const duesIdByLeagueName = new Map<string, string>();
-    for (const sub of user.subscriptions) {
-        if (sub.leagueDues) {
-            const name = sub.leagueDues.leagueName.toLowerCase();
-            docsByLeagueName.set(name, sub.leagueDues.documents);
-            duesIdByLeagueName.set(name, sub.leagueDues.id);
-        }
-    }
+    const allLeagues = [..._seenAnn.values()].sort((a, b) => a.leagueName.localeCompare(b.leagueName));
+    const leagues = contextLeagueId
+        ? allLeagues.filter(l => l.id === contextLeagueId)
+        : allLeagues;
 
     return (
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
@@ -96,42 +77,36 @@ export default async function AnnouncementsPage({
                         </Link>
                     </div>
                 ) : (
-                    leagues.map(league => {
-                        const docs    = docsByLeagueName.get(league.leagueName.toLowerCase()) ?? [];
-                        const duesId  = duesIdByLeagueName.get(league.leagueName.toLowerCase()) ?? null;
-                        return (
-                            <div key={league.id} className="space-y-8">
-                                {/* Announcements */}
-                                <div className="space-y-4">
-                                    <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
-                                        Announcements — {league.leagueName}
-                                    </h2>
-                                    <AnnouncementBoard
-                                        leagueId={league.id}
-                                        leagueName={league.leagueName}
-                                        initial={league.announcements}
-                                    />
-                                </div>
-
-                                {/* Documents — still dues-linked, shown only when dues tracker exists */}
-                                {duesId && docs.length >= 0 && (
-                                    <div className="space-y-4">
-                                        <div>
-                                            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">League Documents</h2>
-                                            <p className="text-gray-500 text-xs mt-1">
-                                                Rulebook, bylaws, or any shareable link (Google Drive, Dropbox, etc.)
-                                            </p>
-                                        </div>
-                                        <DocumentsManager
-                                            duesId={duesId}
-                                            leagueName={league.leagueName}
-                                            initialDocuments={docs}
-                                        />
-                                    </div>
-                                )}
+                    leagues.map(league => (
+                        <div key={league.id} className="space-y-8">
+                            {/* Announcements */}
+                            <div className="space-y-4">
+                                <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+                                    Announcements — {league.leagueName}
+                                </h2>
+                                <AnnouncementBoard
+                                    leagueId={league.id}
+                                    leagueName={league.leagueName}
+                                    initial={league.announcements}
+                                />
                             </div>
-                        );
-                    })
+
+                            {/* Documents */}
+                            <div className="space-y-4">
+                                <div>
+                                    <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">League Documents</h2>
+                                    <p className="text-gray-500 text-xs mt-1">
+                                        Rulebook, bylaws, or any shareable link (Google Drive, Dropbox, etc.)
+                                    </p>
+                                </div>
+                                <DocumentsManager
+                                    leagueId={league.id}
+                                    leagueName={league.leagueName}
+                                    initialDocuments={league.documents}
+                                />
+                            </div>
+                        </div>
+                    ))
                 )}
             </div>
         </main>

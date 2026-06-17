@@ -11,6 +11,7 @@ import {
 } from '@/lib/sleeper';
 import type { TeamRosterData } from '../RosterCards';
 import { type StandingRow, type AnnouncementData, type SleeperSettings } from '../LeagueDetailTabs';
+import type { DocumentData } from '../LeagueOverviewCards';
 import type { DuesManagerData } from '../DuesManager';
 import type { LeagueMemberData } from '../MembersCard';
 import LeagueOverviewCards from '../LeagueOverviewCards';
@@ -86,7 +87,7 @@ export default async function LeagueOverviewPage({
             starterSlots: rosterPositions.filter(p => !BENCH_SLOTS.has(p)),
         }));
 
-        const [leagueDuesRecord, leagueAnnouncements] = await Promise.all([
+        const [leagueDuesRecord, leagueAnnouncements, leagueDocs] = await Promise.all([
             prisma.leagueDues.findFirst({
                 where:   { leagueName: { equals: league.leagueName, mode: 'insensitive' } },
                 orderBy: { season: 'desc' },
@@ -103,6 +104,11 @@ export default async function LeagueOverviewPage({
                 orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
                 select:  { id: true, body: true, mediaUrl: true, pinned: true, createdAt: true, author: { select: { name: true } } },
             }),
+            prisma.leagueDocument.findMany({
+                where:   { leagueId: league.id },
+                select:  { id: true, label: true, url: true, createdAt: true },
+                orderBy: { createdAt: 'asc' },
+            }),
         ]);
 
         const duesData: DuesManagerData | null = leagueDuesRecord ? {
@@ -117,6 +123,9 @@ export default async function LeagueOverviewPage({
         const announcements: AnnouncementData[] = leagueAnnouncements.map(a => ({
             id: a.id, body: a.body, mediaUrl: a.mediaUrl ?? null, pinned: a.pinned,
             createdAt: a.createdAt.toISOString(), authorName: a.author.name ?? null,
+        }));
+        const documents: DocumentData[] = leagueDocs.map(d => ({
+            id: d.id, label: d.label, url: d.url, createdAt: d.createdAt.toISOString(),
         }));
 
         return (
@@ -136,6 +145,7 @@ export default async function LeagueOverviewPage({
                 sleeperSettings={{}}
                 duesData={duesData}
                 announcements={announcements}
+                documents={documents}
                 isCommissioner={league.userId === session.user.id}
                 currentUserId={session.user.id}
                 membersData={[]}
@@ -144,7 +154,7 @@ export default async function LeagueOverviewPage({
     }
 
     const safeLeagueP = getSafeSleeperLeague(league.leagueId);
-    const [allPlayers, dbUser, leagueDuesRecord, leagueAnnouncements] = await Promise.all([
+    const [allPlayers, dbUser, leagueDuesRecord, leagueAnnouncements, leagueDocs] = await Promise.all([
         getPlayers(),
         prisma.user.findUnique({
             where:  { id: session.user.id },
@@ -179,6 +189,11 @@ export default async function LeagueOverviewPage({
             where:   { leagueId: league.id },
             orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
             select:  { id: true, body: true, mediaUrl: true, pinned: true, createdAt: true, author: { select: { name: true } } },
+        }),
+        prisma.leagueDocument.findMany({
+            where:   { leagueId: league.id },
+            select:  { id: true, label: true, url: true, createdAt: true },
+            orderBy: { createdAt: 'asc' },
         }),
     ]);
 
@@ -290,6 +305,13 @@ export default async function LeagueOverviewPage({
         pinned:     a.pinned,
         createdAt:  a.createdAt.toISOString(),
         authorName: a.author.name ?? null,
+    }));
+
+    const documents: DocumentData[] = leagueDocs.map(d => ({
+        id:        d.id,
+        label:     d.label,
+        url:       d.url,
+        createdAt: d.createdAt.toISOString(),
     }));
 
     // ── Member credibility data ────────────────────────────────────────────────
@@ -426,6 +448,7 @@ export default async function LeagueOverviewPage({
             sleeperSettings={sleeperSettings}
             duesData={duesData}
             announcements={announcements}
+            documents={documents}
             isCommissioner={isCommissioner}
             currentUserId={session.user.id}
             membersData={membersData}

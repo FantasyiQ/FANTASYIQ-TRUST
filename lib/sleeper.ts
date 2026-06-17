@@ -22,6 +22,8 @@ export interface SleeperLeague {
         playoff_round_type?: number;     // 0 = 1-week rounds, 1 = 2-week rounds
         trade_deadline?: number;
         commissioner_id?: string;        // Sleeper user_id of the league commissioner
+        taxi_slots?: number;             // number of taxi squad spots (dynasty leagues)
+        reserve_slots?: number;          // number of IR slots
     };
     scoring_settings: {
         rec?:              number;   // PPR value (0 / 0.5 / 1)
@@ -54,6 +56,8 @@ export interface SleeperRoster {
     owner_id: string | null;
     players: string[] | null;
     starters: string[] | null;
+    reserve: string[] | null;  // IR slots
+    taxi: string[] | null;     // taxi squad (dynasty)
     // Dynasty: picks this roster currently owns (authoritative — includes cross-season trades)
     draft_picks?: SleeperTradedPick[];
     settings: {

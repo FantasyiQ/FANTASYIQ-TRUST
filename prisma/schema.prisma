@@ -235,6 +235,7 @@ model League {
     leaguePayouts    LeaguePayout[]
     leaguePayoutWinners LeaguePayoutWinner[]
     announcements    Announcement[]
+    documents        LeagueDocument[]
 
     @@unique([userId, platform, leagueId])
     @@index([userId])
@@ -509,13 +510,16 @@ model PollVote {
 
 model LeagueDocument {
     id           String   @id @default(cuid())
-    leagueDuesId String
+    leagueId     String?  // direct league link (preferred)
+    leagueDuesId String?  // legacy — dues-linked
     label        String   // e.g. "Rulebook 2025", "League Bylaws"
-    url          String   // Google Drive / Dropbox share link
+    url          String   // Google Drive / Dropbox share link or Vercel Blob URL
     createdAt    DateTime @default(now())
 
-    leagueDues   LeagueDues @relation(fields: [leagueDuesId], references: [id], onDelete: Cascade)
+    league     League?     @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+    leagueDues LeagueDues? @relation(fields: [leagueDuesId], references: [id], onDelete: Cascade)
 
+    @@index([leagueId])
     @@index([leagueDuesId])
 }
 

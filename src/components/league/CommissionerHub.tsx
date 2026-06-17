@@ -22,6 +22,12 @@ export default function CommissionerHub({ league, dues }: LeagueData) {
             cta:         'Manage Announcements →',
         },
         {
+            label:       'League Documents',
+            description: 'Upload your rulebook, bylaws, or any league docs. Members can view them on the league page.',
+            href:        `/dashboard/commissioner/documents?leagueId=${league.id}`,
+            cta:         'Manage Documents →',
+        },
+        {
             label:       'Calendar Manager',
             description: 'Set playoff schedule, draft date, trade deadline, and key season dates.',
             href:        `/dashboard/commissioner/calendar/${league.id}`,

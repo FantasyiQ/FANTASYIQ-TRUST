@@ -26,7 +26,13 @@ const FEATURES = [
         href:        '/dashboard/commissioner/announcements',
         icon:        '📣',
         title:       'Commissioner Announcements',
-        description: 'Store your rulebook, bylaws, and league documents. Draft and send announcements to keep your managers in the loop.',
+        description: 'Post pinned updates and keep your managers in the loop.',
+    },
+    {
+        href:        '/dashboard/commissioner/documents',
+        icon:        '📁',
+        title:       'League Documents',
+        description: 'Upload your rulebook, bylaws, or any league files. Members can view them on the league page.',
     },
 ] as const;
 

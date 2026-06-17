@@ -7,6 +7,13 @@ import type { TeamRosterData } from './RosterCards';
 import RosterCards from './RosterCards';
 import type { SlimPlayer } from '@/lib/sleeper';
 import type { StandingRow, AnnouncementData, SleeperSettings } from './LeagueDetailTabs';
+
+export interface DocumentData {
+    id:        string;
+    label:     string;
+    url:       string;
+    createdAt: string;
+}
 import type { DuesManagerData } from './DuesManager';
 import MembersCard, { type LeagueMemberData } from './MembersCard';
 
@@ -28,6 +35,7 @@ interface Props {
     sleeperSettings:        SleeperSettings;
     duesData:               DuesManagerData | null;
     announcements:          AnnouncementData[];
+    documents:              DocumentData[];
     isCommissioner:         boolean;
     currentUserId:          string;
     membersData:            LeagueMemberData[];
@@ -320,6 +328,56 @@ function AnnouncementsCard({
     );
 }
 
+// ── Card 3: League Documents (read-only) ─────────────────────────────────────
+
+function fileIcon(url: string): string {
+    const u = url.toLowerCase();
+    if (u.includes('.pdf'))                       return '📄';
+    if (u.includes('.doc'))                       return '📝';
+    if (u.includes('.xls') || u.includes('.csv')) return '📊';
+    if (/\.(png|jpg|jpeg|gif|webp)/.test(u))      return '🖼️';
+    return '🔗';
+}
+
+function DocumentsCard({ documents, leagueId, isCommissioner }: { documents: DocumentData[]; leagueId: string; isCommissioner: boolean }) {
+    if (documents.length === 0) return null;
+    return (
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between gap-4">
+                <h2 className="font-semibold text-lg">League Documents</h2>
+                {isCommissioner && (
+                    <a
+                        href={`/dashboard/commissioner/announcements?leagueId=${leagueId}`}
+                        className="text-xs text-[#D4AF37]/70 hover:text-[#D4AF37] font-medium transition"
+                    >
+                        Manage →
+                    </a>
+                )}
+            </div>
+            <ul className="divide-y divide-gray-800/50">
+                {documents.map(doc => (
+                    <li key={doc.id} className="px-6 py-3.5 flex items-center gap-3">
+                        <span className="text-lg shrink-0">{fileIcon(doc.url)}</span>
+                        <div className="min-w-0">
+                            <p className="text-white text-sm font-medium truncate">{doc.label}</p>
+                            <a
+                                href={doc.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[#D4AF37]/70 hover:text-[#D4AF37] text-xs truncate block transition"
+                            >
+                                {doc.url.includes('vercel-storage.com') || doc.url.includes('public.blob.vercel')
+                                    ? '↓ Download / View'
+                                    : doc.url}
+                            </a>
+                        </div>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function LeagueOverviewCards({
@@ -338,6 +396,7 @@ export default function LeagueOverviewCards({
     sleeperSettings,
     duesData,
     announcements,
+    documents,
     isCommissioner,
     currentUserId,
     membersData,
@@ -364,6 +423,12 @@ export default function LeagueOverviewCards({
                 isCommissioner={isCommissioner}
             />
 
+            {/* Documents */}
+            <DocumentsCard
+                documents={documents}
+                leagueId={leagueId}
+                isCommissioner={isCommissioner}
+            />
 
             {/* Card 4: Player Rankings */}
             <CollapsibleCard title="Player Rankings">

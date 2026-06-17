@@ -10,7 +10,7 @@ interface Doc {
 }
 
 interface Props {
-    duesId:           string;
+    leagueId:         string;
     leagueName:       string;
     initialDocuments: Doc[];
 }
@@ -30,7 +30,7 @@ function isBlobUrl(url: string): boolean {
     return url.includes('vercel-storage.com') || url.includes('public.blob.vercel');
 }
 
-export default function DocumentsManager({ duesId, leagueName, initialDocuments }: Props) {
+export default function DocumentsManager({ leagueId, leagueName, initialDocuments }: Props) {
     const [docs, setDocs]         = useState<Doc[]>(initialDocuments);
     const [mode, setMode]         = useState<'link' | 'upload'>('upload');
     const [showForm, setShowForm] = useState(false);
@@ -63,7 +63,7 @@ export default function DocumentsManager({ duesId, leagueName, initialDocuments 
         e.preventDefault();
         setError('');
         setBusy(true);
-        const res = await fetch(`/api/dues/${duesId}/documents`, {
+        const res = await fetch(`/api/leagues/${leagueId}/documents`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ label: label.trim(), url: url.trim() }),
@@ -83,7 +83,7 @@ export default function DocumentsManager({ duesId, leagueName, initialDocuments 
         const fd = new FormData();
         fd.append('file', file);
         fd.append('label', uploadLabel.trim() || file.name);
-        const res = await fetch(`/api/dues/${duesId}/documents/upload`, {
+        const res = await fetch(`/api/leagues/${leagueId}/documents/upload`, {
             method: 'POST',
             body: fd,
         });
@@ -95,7 +95,7 @@ export default function DocumentsManager({ duesId, leagueName, initialDocuments 
     }
 
     async function handleDelete(docId: string) {
-        const res = await fetch(`/api/dues/${duesId}/documents/${docId}`, { method: 'DELETE' });
+        const res = await fetch(`/api/leagues/${leagueId}/documents/${docId}`, { method: 'DELETE' });
         if (res.ok) setDocs(prev => prev.filter(d => d.id !== docId));
     }
 
