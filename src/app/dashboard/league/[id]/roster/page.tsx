@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getLeague, getLeagueRosters, getLeagueUsers, getPlayers } from '@/lib/sleeper';
-import { calculatePreciseAge } from '@/lib/calculateAge';
+import { calculateAge, calculatePreciseAge } from '@/lib/calculateAge';
 import { calcDtv, DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
 import type { Player, LeagueSettings, LeagueType } from '@/lib/trade-engine';
 import { computePlayerBaseValue } from '@/lib/player-universe';
