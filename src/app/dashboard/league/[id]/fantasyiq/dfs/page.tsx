@@ -7,7 +7,6 @@ import { prisma } from '@/lib/prisma';
 import { currentNflWeek, getDFSSlots } from '@/lib/dfs';
 import LineupBuilder  from '@/components/dfs/LineupBuilder';
 import DFSLeaderboard from '@/components/dfs/DFSLeaderboard';
-import HubTabBar      from '../HubTabBar';
 
 type DFSEntry = { slot: string; playerId: string };
 
@@ -92,9 +91,6 @@ export default async function DFSChallengePage({
 
                 </div>
             </div>
-
-            {/* Tab bar */}
-            <HubTabBar leagueId={id} activeTab="dfs" />
 
             {/* DFS content */}
             <div className="space-y-8">
