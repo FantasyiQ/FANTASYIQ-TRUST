@@ -80,7 +80,7 @@ export async function POST(request: NextRequest): Promise<Response> {
                 return prisma.league.upsert({
                     where:  { userId_platform_leagueId: { userId, platform: 'sleeper', leagueId: league.league_id } },
                     create: { userId, platform: 'sleeper', ...sharedFields(league) },
-                    update: sharedFields(league),
+                    update: { ...sharedFields(league), isHistorical: false },
                     select: { id: true, leagueId: true, leagueName: true, totalRosters: true, scoringType: true, assignedPlanId: true, assignedPlanType: true },
                 });
             }),
