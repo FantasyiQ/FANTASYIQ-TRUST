@@ -23,7 +23,6 @@ Key product facts:
 - My Roster tab: players grouped by position (QB→RB→WR→TE→K→DEF) sorted by DTV, with Starters/Bench/Taxi/IR slot summary cards
 - Optimized Lineups: start/sit recommendations calibrated to your league scoring. Available on Player Pro and above.
 - Matchup Projections: weekly score projections for your matchup and your opponent. Available on Player All-Pro and above.
-- Draft Strategy: pre-draft game plan tailored to your league's scoring format, roster slots, and positional scarcity. Available on Player All-Pro and above.
 - Roster Intelligence: AI-powered roster analysis and buy/sell/hold recommendations. Elite plans only.
 - Live Draft Assistant: real-time AI pick recommendations during your live draft. Elite plans only.
 - Mock Draft Simulator: simulate full snake or dynasty drafts with AI opponents before the real thing. Calibrated to your league's exact scoring format, roster slots, and league size. A great way to practice different strategies before draft day. Elite plans only.
@@ -41,7 +40,7 @@ Key product facts:
 
 Feature tier summary:
 - Player Pro: PRS, DSS, Platform Handles, Optimized Lineups
-- Player All-Pro: all Pro features + Matchup Projections, Draft Strategy
+- Player All-Pro: all Pro features + Matchup Projections
 - Player Elite: all All-Pro features + Roster Intelligence, Live Draft Assistant, Mock Draft Simulator
 - Commissioner Pro/All-Pro/Elite: commissioner hub, dues, payouts, analytics matching the equivalent Player tier
 
