@@ -24,17 +24,16 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     try {
         const nflState = await getNflState();
-        const [userLeagues, exclusions] = await Promise.all([
-            getSleeperLeagues(sleeperUserId, nflState.season),
-            prisma.syncExclusion.findMany({
-                where: { userId, platform: 'sleeper' },
-                select: { leagueId: true },
-            }),
-        ]);
+        const userLeagues = await getSleeperLeagues(sleeperUserId, nflState.season);
         const validIds = new Set(userLeagues.map((l) => l.league_id));
-        const excludedIds = new Set(exclusions.map((e) => e.leagueId));
-        const toSync = leagues.filter((l) => validIds.has(l.league_id) && !excludedIds.has(l.league_id));
+        const toSync = leagues.filter((l) => validIds.has(l.league_id));
         if (toSync.length === 0) return Response.json({ error: 'No valid leagues to sync' }, { status: 400 });
+
+        // Clear any prior exclusions for leagues the user is explicitly re-syncing.
+        // Exclusions only block the automatic cron re-sync — a manual user action overrides them.
+        await prisma.syncExclusion.deleteMany({
+            where: { userId, platform: 'sleeper', leagueId: { in: toSync.map(l => l.league_id) } },
+        });
 
         const sharedFields = (league: SleeperLeague) => {
             const playoffWeekStart = league.settings?.playoff_week_start ?? null;
