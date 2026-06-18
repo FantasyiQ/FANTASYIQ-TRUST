@@ -96,8 +96,8 @@ const FEATURE_TOOLTIPS: Record<string, string> = {
     'Commissioner Hub':              'Full commissioner toolset — manage dues, payouts, polls, announcements, and league documents.',
     'League Finder':                 'Discover and join new fantasy leagues, or list yours to attract competitive players from the FiQ community.',
     'Commish Reviews':               'Rate and review commissioners after each season. Helps the community identify great leagues — and flag ones to avoid.',
-    'Dynasty Skill Score (DSS)': 'DSS measures your long-term dynasty performance — roster strength, draft efficiency, trade impact, lineup optimization, and season-over-season improvement. It reflects dynasty skill, not just win totals.',
-    'Player Reliability Score (PRS)': 'Grades every player on your roster for week-to-week consistency and reliability — so you know which starts you can count on and which carry real risk.',
+    'Dynasty Skill Score (DSS)': 'A composite score measuring your long-term dynasty skill — roster strength, draft efficiency, trade impact, lineup optimization, and season-over-season improvement. It reflects true dynasty ability, not just win totals.',
+    'Player Reliability Score (PRS)': 'A 0–100 score measuring how trustworthy and reliable you are as a fantasy player — built from verified seasons, league retention, lineup engagement, and commissioner trust. Five tiers from Unproven to Elite. Updates daily.',
     'Platform Handles':              'Link your Sleeper, ESPN, Yahoo, and NFL Fantasy handles to your FiQ profile so commissioners and league-mates can find and verify you across platforms.',
     'Weekly DFS Challenge':          'Compete in weekly DFS contests against other FiQ members for bragging rights and leaderboard glory.',
     'Optimized Lineups':             'Every week FiQ scans your roster and surfaces the highest-projected valid lineup — with a one-click swap summary.',
@@ -117,14 +117,14 @@ function tip(name: string): string | undefined {
     return FEATURE_TOOLTIPS[name];
 }
 
-const DSS_TOOLTIP = 'DSS will measure your long-term dynasty skill — roster strength, draft efficiency, trade impact, lineup optimization, and season-over-season improvement. Launching soon.';
+const DSS_TOOLTIP = tip('Dynasty Skill Score (DSS)');
 
 const PLAYER_PRO_FEATURES: Feature[] = [
     { name: 'Sync Up to 2 Leagues',                   included: true,  tooltip: 'Connect up to 2 fantasy leagues from Sleeper, ESPN, Yahoo, or NFL Fantasy.' },
     { name: 'League Finder',                           included: true,  tooltip: tip('League Finder') },
     { name: 'Commish Reviews',                         included: true,  tooltip: tip('Commish Reviews') },
     { name: 'Player Reliability Score (PRS)',          included: false, tooltip: tip('Player Reliability Score (PRS)') },
-    { name: 'Dynasty Skill Score (DSS) — Coming Soon', included: true,  tooltip: DSS_TOOLTIP },
+    { name: 'Dynasty Skill Score (DSS)', included: true,  tooltip: DSS_TOOLTIP },
     { name: 'Platform Handles',                        included: true,  tooltip: tip('Platform Handles') },
     { name: 'Weekly DFS Challenge',                    included: true,  tooltip: tip('Weekly DFS Challenge') },
     { name: 'Optimized Lineups',                       included: false, tooltip: tip('Optimized Lineups') },
@@ -145,7 +145,7 @@ const PLAYER_ALL_PRO_FEATURES: Feature[] = [
     { name: 'League Finder',                           included: true,  tooltip: tip('League Finder') },
     { name: 'Commish Reviews',                         included: true,  tooltip: tip('Commish Reviews') },
     { name: 'Player Reliability Score (PRS)',          included: true,  tooltip: tip('Player Reliability Score (PRS)') },
-    { name: 'Dynasty Skill Score (DSS) — Coming Soon', included: true,  tooltip: DSS_TOOLTIP },
+    { name: 'Dynasty Skill Score (DSS)', included: true,  tooltip: DSS_TOOLTIP },
     { name: 'Platform Handles',                        included: true,  tooltip: tip('Platform Handles') },
     { name: 'Weekly DFS Challenge',                    included: true,  tooltip: tip('Weekly DFS Challenge') },
     { name: 'Optimized Lineups',                       included: true,  tooltip: tip('Optimized Lineups') },
@@ -166,7 +166,7 @@ const PLAYER_ELITE_FEATURES: Feature[] = [
     { name: 'League Finder',                           included: true, tooltip: tip('League Finder') },
     { name: 'Commish Reviews',                         included: true, tooltip: tip('Commish Reviews') },
     { name: 'Player Reliability Score (PRS)',          included: true, tooltip: tip('Player Reliability Score (PRS)') },
-    { name: 'Dynasty Skill Score (DSS) — Coming Soon', included: true, tooltip: DSS_TOOLTIP },
+    { name: 'Dynasty Skill Score (DSS)', included: true, tooltip: DSS_TOOLTIP },
     { name: 'Platform Handles',                        included: true, tooltip: tip('Platform Handles') },
     { name: 'Weekly DFS Challenge',                    included: true, tooltip: tip('Weekly DFS Challenge') },
     { name: 'Optimized Lineups',                       included: true, tooltip: tip('Optimized Lineups') },
@@ -192,7 +192,7 @@ const COMM_PRO_FEATURES: Feature[] = [
     { name: 'League Finder',                           included: true,  tooltip: tip('League Finder') },
     { name: 'Commish Reviews',                         included: true,  tooltip: tip('Commish Reviews') },
     { name: 'Player Reliability Score (PRS)',          included: false, tooltip: tip('Player Reliability Score (PRS)') },
-    { name: 'Dynasty Skill Score (DSS) — Coming Soon', included: true,  tooltip: DSS_TOOLTIP },
+    { name: 'Dynasty Skill Score (DSS)', included: true,  tooltip: DSS_TOOLTIP },
     { name: 'Platform Handles',                        included: true,  tooltip: tip('Platform Handles') },
     { name: 'Optimized Lineups',                       included: false, tooltip: tip('Optimized Lineups') },
     { name: 'Start/Sit Intelligence',                  included: false, tooltip: tip('Start/Sit Intelligence') },
@@ -216,7 +216,7 @@ const COMM_ALL_PRO_FEATURES: Feature[] = [
     { name: 'League Finder',                           included: true,  tooltip: tip('League Finder') },
     { name: 'Commish Reviews',                         included: true,  tooltip: tip('Commish Reviews') },
     { name: 'Player Reliability Score (PRS)',          included: true,  tooltip: tip('Player Reliability Score (PRS)') },
-    { name: 'Dynasty Skill Score (DSS) — Coming Soon', included: true,  tooltip: DSS_TOOLTIP },
+    { name: 'Dynasty Skill Score (DSS)', included: true,  tooltip: DSS_TOOLTIP },
     { name: 'Platform Handles',                        included: true,  tooltip: tip('Platform Handles') },
     { name: 'Optimized Lineups',                       included: true,  tooltip: tip('Optimized Lineups') },
     { name: 'Start/Sit Intelligence',                  included: true,  tooltip: tip('Start/Sit Intelligence') },
@@ -240,7 +240,7 @@ const COMM_ELITE_FEATURES: Feature[] = [
     { name: 'League Finder',                           included: true, tooltip: tip('League Finder') },
     { name: 'Commish Reviews',                         included: true, tooltip: tip('Commish Reviews') },
     { name: 'Player Reliability Score (PRS)',          included: true, tooltip: tip('Player Reliability Score (PRS)') },
-    { name: 'Dynasty Skill Score (DSS) — Coming Soon', included: true, tooltip: DSS_TOOLTIP },
+    { name: 'Dynasty Skill Score (DSS)', included: true, tooltip: DSS_TOOLTIP },
     { name: 'Platform Handles',                        included: true, tooltip: tip('Platform Handles') },
     { name: 'Optimized Lineups',                       included: true, tooltip: tip('Optimized Lineups') },
     { name: 'Start/Sit Intelligence',                  included: true, tooltip: tip('Start/Sit Intelligence') },
