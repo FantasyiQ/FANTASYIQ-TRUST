@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getLeagueRosters, getLeagueUsers } from '@/lib/sleeper';
+import { getLeagueRosters, getLeagueUsers, getLeague, getNflState } from '@/lib/sleeper';
 import { calcDtv, DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
 import type { Player, LeagueSettings, LeagueType, PprFormat } from '@/lib/trade-engine';
 import { computePlayerBaseValue } from '@/lib/player-universe';
@@ -372,9 +372,10 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
     }
 
     // ── Sleeper branch: fetch live rosters + members ──────────────────────────
-    const [rosters, members] = await Promise.all([
+    const [rosters, members, nflState] = await Promise.all([
         getLeagueRosters(league.leagueId),
         getLeagueUsers(league.leagueId),
+        getNflState(),
     ]);
 
     // ── Build display names from Sleeper users ────────────────────────────────
@@ -425,14 +426,25 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
     const maxPf = Math.max(...rosterRows.map(r => r.pf), 1);
     const maxPa = Math.max(...rosterRows.map(r => r.pa), 0);
 
-    // Pre-season: all rosters have no games and no points — show last season's snapshot instead
-    const isPreseason = rosterRows.every(r => r.wins === 0 && r.losses === 0 && r.pf === 0);
-    if (isPreseason) {
-        const lastSnapshot = await prisma.powerRankingSnapshot.findFirst({
+    // Pre-season: show last season's final power rankings instead of all-zero current data
+    if (nflState.season_type === 'pre') {
+        // Try current league's snapshots first, then follow previous_league_id to last season
+        let lastSnapshot = await prisma.powerRankingSnapshot.findFirst({
             where:   { leagueId: league.leagueId },
             orderBy: { week: 'desc' },
             select:  { data: true },
         });
+        if (!lastSnapshot) {
+            const sleeperLeague = await getLeague(league.leagueId);
+            const prevId = sleeperLeague.previous_league_id;
+            if (prevId) {
+                lastSnapshot = await prisma.powerRankingSnapshot.findFirst({
+                    where:   { leagueId: prevId },
+                    orderBy: { week: 'desc' },
+                    select:  { data: true },
+                });
+            }
+        }
         if (lastSnapshot?.data) {
             type SnapshotRow = { rank: number; rosterId: number; ownerName: string; wins: number; losses: number; pf: number; pa: number; powerScore: number };
             const snapshotRankings: PowerRankingRow[] = (lastSnapshot.data as SnapshotRow[]).map(r => ({
@@ -440,11 +452,11 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
                 rosterId:   r.rosterId,
                 teamName:   `Team ${r.rosterId}`,
                 ownerName:  r.ownerName,
-                wins:       r.wins   ?? 0,
-                losses:     r.losses ?? 0,
-                pf:         r.pf     ?? 0,
-                pa:         r.pa     ?? 0,
-                powerScore: r.powerScore ?? 50,
+                wins:       r.wins        ?? 0,
+                losses:     r.losses      ?? 0,
+                pf:         r.pf          ?? 0,
+                pa:         r.pa          ?? 0,
+                powerScore: r.powerScore  ?? 50,
             }));
             return { league: leagueResult, playerRankings, teamRankings, powerRankings: snapshotRankings, valueSyncedAt: latestSync?.updatedAt.toISOString() ?? null, lastSeasonRankings: true };
         }
