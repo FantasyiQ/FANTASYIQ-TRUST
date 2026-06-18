@@ -110,6 +110,7 @@ const FEATURE_TOOLTIPS: Record<string, string> = {
     'League Power Rankings':         'Weekly power rankings based on win/loss record, points for, and strength of schedule — a truer picture of team strength than standings alone.',
     'Dynamic Trade Evaluator':       'Real-time trade analysis that shows you exactly who wins and loses before you accept.',
     'Roster Intelligence':           'RosteriQ grades your team A–D each week, maps positional strengths and weaknesses against league averages, tracks bench depth, and recommends your best path forward.',
+    'Mock Draft Simulator':          'Simulate your upcoming draft against AI opponents — practice different strategies, test pick order scenarios, and walk into draft day with a plan.',
     'Live Draft Assistant':          'Real-time draft board that ranks available players by FiQ score so you always know who the best pick is.',
 };
 
@@ -136,6 +137,7 @@ const PLAYER_PRO_FEATURES: Feature[] = [
     { name: 'Dynamic Trade Evaluator',                 included: false, tooltip: tip('Dynamic Trade Evaluator') },
     { name: 'Draft Board',                             included: false, tooltip: tip('Draft Board') },
     { name: 'Draft Report',                            included: false, tooltip: tip('Draft Report') },
+    { name: 'Mock Draft Simulator',                    included: false, tooltip: tip('Mock Draft Simulator') },
     { name: 'Roster Intelligence',                     included: false, tooltip: tip('Roster Intelligence') },
     { name: 'Live Draft Assistant',                    included: false, tooltip: tip('Live Draft Assistant') },
 ];
@@ -157,6 +159,7 @@ const PLAYER_ALL_PRO_FEATURES: Feature[] = [
     { name: 'Dynamic Trade Evaluator',                 included: true,  tooltip: tip('Dynamic Trade Evaluator') },
     { name: 'Draft Board',                             included: true,  tooltip: tip('Draft Board') },
     { name: 'Draft Report',                            included: true,  tooltip: tip('Draft Report') },
+    { name: 'Mock Draft Simulator',                    included: false, tooltip: tip('Mock Draft Simulator') },
     { name: 'Roster Intelligence',                     included: false, tooltip: tip('Roster Intelligence') },
     { name: 'Live Draft Assistant',                    included: false, tooltip: tip('Live Draft Assistant') },
 ];
@@ -178,6 +181,7 @@ const PLAYER_ELITE_FEATURES: Feature[] = [
     { name: 'Dynamic Trade Evaluator',                 included: true, tooltip: tip('Dynamic Trade Evaluator') },
     { name: 'Draft Board',                             included: true, tooltip: tip('Draft Board') },
     { name: 'Draft Report',                            included: true, tooltip: tip('Draft Report') },
+    { name: 'Mock Draft Simulator',                    included: true, tooltip: tip('Mock Draft Simulator') },
     { name: 'Roster Intelligence',                     included: true, tooltip: tip('Roster Intelligence') },
     { name: 'Live Draft Assistant',                    included: true, tooltip: tip('Live Draft Assistant') },
 ];
@@ -203,6 +207,7 @@ const COMM_PRO_FEATURES: Feature[] = [
     { name: 'Dynamic Trade Evaluator',                 included: false, tooltip: tip('Dynamic Trade Evaluator') },
     { name: 'Draft Board',                             included: false, tooltip: tip('Draft Board') },
     { name: 'Draft Report',                            included: false, tooltip: tip('Draft Report') },
+    { name: 'Mock Draft Simulator',                    included: false, tooltip: tip('Mock Draft Simulator') },
     { name: 'Roster Intelligence',                     included: false, tooltip: tip('Roster Intelligence') },
     { name: 'Live Draft Assistant',                    included: false, tooltip: tip('Live Draft Assistant') },
 ];
@@ -227,6 +232,7 @@ const COMM_ALL_PRO_FEATURES: Feature[] = [
     { name: 'Dynamic Trade Evaluator',                 included: true,  tooltip: tip('Dynamic Trade Evaluator') },
     { name: 'Draft Board',                             included: true,  tooltip: tip('Draft Board') },
     { name: 'Draft Report',                            included: true,  tooltip: tip('Draft Report') },
+    { name: 'Mock Draft Simulator',                    included: false, tooltip: tip('Mock Draft Simulator') },
     { name: 'Roster Intelligence',                     included: false, tooltip: tip('Roster Intelligence') },
     { name: 'Live Draft Assistant',                    included: false, tooltip: tip('Live Draft Assistant') },
 ];
@@ -251,6 +257,7 @@ const COMM_ELITE_FEATURES: Feature[] = [
     { name: 'Dynamic Trade Evaluator',                 included: true, tooltip: tip('Dynamic Trade Evaluator') },
     { name: 'Draft Board',                             included: true, tooltip: tip('Draft Board') },
     { name: 'Draft Report',                            included: true, tooltip: tip('Draft Report') },
+    { name: 'Mock Draft Simulator',                    included: true, tooltip: tip('Mock Draft Simulator') },
     { name: 'Roster Intelligence',                     included: true, tooltip: tip('Roster Intelligence') },
     { name: 'Live Draft Assistant',                    included: true, tooltip: tip('Live Draft Assistant') },
 ];
