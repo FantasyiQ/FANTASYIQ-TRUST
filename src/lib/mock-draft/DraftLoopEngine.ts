@@ -56,8 +56,8 @@ export function runUntilUserPick(
 
         const teamNeeds = needs.get(pick.teamId) ?? team.needsProfile;
 
-        // Wider candidate window for redraft so K/DEF can enter the BPA consideration set
-        const maxCandidates = context.settings.isDynasty ? 10 : 15;
+        // Dynasty uses a BPA window (human-like variance); redraft has no limit
+        const maxCandidates = context.settings.isDynasty ? 10 : available.length;
 
         // QB streaming: in superflex rookie drafts, teams gradually load up on QBs
         // in rounds 3–5. Not every team streams at once — probability scales with

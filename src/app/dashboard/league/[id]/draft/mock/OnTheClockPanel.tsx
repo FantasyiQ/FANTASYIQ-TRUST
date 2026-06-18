@@ -128,14 +128,18 @@ export default function OnTheClockPanel({
     const userTeam  = context.teams.find(t => t.teamId === context.yourTeamId);
     const userNeeds = draftState.teamNeeds.get(context.yourTeamId) ?? userTeam?.needsProfile;
 
-    const bpaTop10 = useMemo(() => availablePlayers.slice(0, 10), [availablePlayers]);
+    const isRedraft = context.settings.draftMode === 'redraft';
+    const bpaList   = useMemo(
+        () => isRedraft ? availablePlayers : availablePlayers.slice(0, 10),
+        [availablePlayers, isRedraft],
+    );
 
     const bestFit = useMemo(() => {
-        if (!userNeeds) return bpaTop10;
+        if (!userNeeds) return bpaList;
         return rankBestFitForTeam(availablePlayers, userNeeds).map(r => r.player);
-    }, [availablePlayers, userNeeds]);
+    }, [availablePlayers, userNeeds, bpaList]);
 
-    const displayList = tab === 'bpa' ? bpaTop10 : bestFit;
+    const displayList = tab === 'bpa' ? bpaList : bestFit;
 
     const hasK   = availablePlayers.some(p => p.position === 'K');
     const hasDEF = availablePlayers.some(p => p.position === 'DEF');
@@ -227,7 +231,7 @@ export default function OnTheClockPanel({
                         )}
                     </div>
 
-                    {tab === 'bpa' && (
+                    {tab === 'bpa' && !isRedraft && (
                         <p className="text-gray-600 text-xs text-center pt-1">
                             Showing top 10 BPA · AI opponents can only reach within this window
                         </p>
