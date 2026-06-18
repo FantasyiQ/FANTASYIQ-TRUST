@@ -98,7 +98,7 @@ function PlayerCard({
     );
 }
 
-type Tab = 'bpa' | 'fit';
+type Tab = 'bpa' | 'fit' | 'picks';
 
 interface Props {
     currentPick:      MockDraftPick;
@@ -117,9 +117,14 @@ export default function OnTheClockPanel({
     onDraft,
     onAutoPick,
 }: Props) {
-    const [tab, setTab] = useState<Tab>('bpa');
+    const [tab, setTab]         = useState<Tab>('bpa');
     const [posFilter, setPosFilter] = useState<string>('ALL');
-    const historyBottomRef = useRef<HTMLDivElement>(null);
+    const [search, setSearch]   = useState('');
+    const historyBottomRef      = useRef<HTMLDivElement>(null);
+    const searchRef             = useRef<HTMLInputElement>(null);
+
+    // Clear search when switching tabs
+    useEffect(() => { setSearch(''); }, [tab]);
 
     useEffect(() => {
         historyBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -127,6 +132,7 @@ export default function OnTheClockPanel({
 
     const userTeam  = context.teams.find(t => t.teamId === context.yourTeamId);
     const userNeeds = draftState.teamNeeds.get(context.yourTeamId) ?? userTeam?.needsProfile;
+    const yourPicks = draftState.results.filter(r => r.teamId === context.yourTeamId);
 
     const isRedraft = context.settings.draftMode === 'redraft';
     const bpaList   = useMemo(
@@ -144,13 +150,17 @@ export default function OnTheClockPanel({
     const hasK   = availablePlayers.some(p => p.position === 'K');
     const hasDEF = availablePlayers.some(p => p.position === 'DEF');
     const posOptions = ['ALL', 'QB', 'RB', 'WR', 'TE', ...(hasK ? ['K'] : []), ...(hasDEF ? ['DEF'] : [])];
-    const filtered = posFilter === 'ALL'
-        ? displayList
-        : displayList.filter(p => p.position === posFilter);
 
-    const posLabels: Record<string, string> = {
-        QB: 'Quarterback', RB: 'Running Back', WR: 'Wide Receiver', TE: 'Tight End',
-    };
+    const q = search.trim().toLowerCase();
+    const filtered = displayList
+        .filter(p => posFilter === 'ALL' || p.position === posFilter)
+        .filter(p => !q || p.name.toLowerCase().includes(q) || (p.team ?? '').toLowerCase().includes(q));
+
+    const TABS: { key: Tab; label: string }[] = [
+        { key: 'bpa',   label: 'Draft Board (BPA)' },
+        { key: 'fit',   label: 'Best Fit' },
+        { key: 'picks', label: `Your Picks${yourPicks.length > 0 ? ` (${yourPicks.length})` : ''}` },
+    ];
 
     return (
         <div className="space-y-5">
@@ -178,63 +188,128 @@ export default function OnTheClockPanel({
                 <div className="lg:col-span-2 space-y-3">
                     {/* Tab bar */}
                     <div className="flex gap-0.5 border-b border-gray-800">
-                        {(['bpa', 'fit'] as Tab[]).map(t => (
+                        {TABS.map(t => (
                             <button
-                                key={t}
-                                onClick={() => setTab(t)}
+                                key={t.key}
+                                onClick={() => setTab(t.key)}
                                 className={[
                                     'px-4 pb-2.5 pt-1 text-sm transition whitespace-nowrap',
-                                    tab === t
+                                    tab === t.key
                                         ? 'font-semibold text-white border-b-2 border-[#D4AF37]'
                                         : 'text-gray-500 hover:text-gray-300',
                                 ].join(' ')}
                             >
-                                {t === 'bpa' ? 'Draft Board (BPA)' : 'Best Fit for Your Roster'}
+                                {t.label}
                             </button>
                         ))}
                     </div>
 
-                    {/* Position filter */}
-                    <div className="flex gap-1.5 flex-wrap">
-                        {posOptions.map(pos => (
-                            <button
-                                key={pos}
-                                onClick={() => setPosFilter(pos)}
-                                className={[
-                                    'px-3 py-1 rounded-lg text-xs font-semibold border transition',
-                                    posFilter === pos
-                                        ? 'bg-[#D4AF37] text-black border-[#D4AF37]'
-                                        : 'bg-gray-800 text-gray-500 border-gray-700 hover:border-gray-500',
-                                ].join(' ')}
-                            >
-                                {pos}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Player cards */}
-                    <div className="space-y-1.5">
-                        {filtered.length === 0 ? (
-                            <p className="text-gray-600 text-sm text-center py-6">
-                                No {posFilter !== 'ALL' ? (posLabels[posFilter] ?? posFilter) : 'players'} in top 10 BPA
-                            </p>
-                        ) : (
-                            filtered.map((p, i) => (
-                                <PlayerCard
-                                    key={p.playerId}
-                                    player={p}
-                                    rank={i + 1}
-                                    onDraft={onDraft}
-                                    highlight={tab === 'fit' && i === 0}
+                    {tab !== 'picks' && (
+                        <>
+                            {/* Search bar */}
+                            <div className="relative">
+                                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" />
+                                </svg>
+                                <input
+                                    ref={searchRef}
+                                    type="text"
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
+                                    placeholder="Search players..."
+                                    className="w-full bg-gray-800/60 border border-gray-700 rounded-xl pl-9 pr-8 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-gray-500"
                                 />
-                            ))
-                        )}
-                    </div>
+                                {search && (
+                                    <button
+                                        onClick={() => setSearch('')}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                                    >
+                                        ✕
+                                    </button>
+                                )}
+                            </div>
 
-                    {tab === 'bpa' && !isRedraft && (
-                        <p className="text-gray-600 text-xs text-center pt-1">
-                            Showing top 10 BPA · AI opponents can only reach within this window
-                        </p>
+                            {/* Position filter */}
+                            <div className="flex gap-1.5 flex-wrap">
+                                {posOptions.map(pos => (
+                                    <button
+                                        key={pos}
+                                        onClick={() => setPosFilter(pos)}
+                                        className={[
+                                            'px-3 py-1 rounded-lg text-xs font-semibold border transition',
+                                            posFilter === pos
+                                                ? 'bg-[#D4AF37] text-black border-[#D4AF37]'
+                                                : 'bg-gray-800 text-gray-500 border-gray-700 hover:border-gray-500',
+                                        ].join(' ')}
+                                    >
+                                        {pos}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Player cards */}
+                            <div className="space-y-1.5">
+                                {filtered.length === 0 ? (
+                                    <p className="text-gray-600 text-sm text-center py-6">
+                                        {q ? `No players matching "${search}"` : `No ${posFilter !== 'ALL' ? posFilter : 'players'} available`}
+                                    </p>
+                                ) : (
+                                    filtered.map((p, i) => (
+                                        <PlayerCard
+                                            key={p.playerId}
+                                            player={p}
+                                            rank={i + 1}
+                                            onDraft={onDraft}
+                                            highlight={tab === 'fit' && i === 0}
+                                        />
+                                    ))
+                                )}
+                            </div>
+
+                            {tab === 'bpa' && !isRedraft && (
+                                <p className="text-gray-600 text-xs text-center pt-1">
+                                    Showing top 10 BPA · AI opponents can only reach within this window
+                                </p>
+                            )}
+                        </>
+                    )}
+
+                    {tab === 'picks' && (
+                        <div className="space-y-2">
+                            {yourPicks.length === 0 ? (
+                                <p className="text-gray-600 text-sm text-center py-8">No picks yet</p>
+                            ) : (
+                                yourPicks.map(r => (
+                                    <div
+                                        key={`${r.pick.overall}-${r.player.playerId}`}
+                                        className="flex items-center gap-3 px-3 py-2.5 bg-[#D4AF37]/5 border border-[#D4AF37]/15 rounded-xl"
+                                    >
+                                        <div className="shrink-0 text-center w-10">
+                                            <p className="text-[#D4AF37] text-xs font-bold">{r.pick.round}.{String(r.pick.slot).padStart(2, '0')}</p>
+                                            <p className="text-gray-600 text-[10px]">#{r.pick.overall}</p>
+                                        </div>
+                                        {r.player.imageUrl ? (
+                                            /* eslint-disable-next-line @next/next/no-img-element */
+                                            <img
+                                                src={r.player.imageUrl}
+                                                alt={r.player.name}
+                                                className="w-8 h-8 rounded-full object-cover bg-gray-800 shrink-0"
+                                                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                            />
+                                        ) : (
+                                            <div className="w-8 h-8 rounded-full bg-gray-800 shrink-0" />
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-white text-sm font-semibold truncate">{r.player.name}</p>
+                                            <p className="text-gray-500 text-xs">{r.player.team ?? 'FA'}{r.player.age ? ` · Age ${r.player.age}` : ''}</p>
+                                        </div>
+                                        <span className={`shrink-0 text-[10px] font-bold px-1.5 py-px rounded border ${POS_COLORS[r.player.position] ?? 'bg-gray-800 text-gray-400 border-gray-700'}`}>
+                                            {r.player.position}
+                                        </span>
+                                    </div>
+                                ))
+                            )}
+                        </div>
                     )}
                 </div>
 
