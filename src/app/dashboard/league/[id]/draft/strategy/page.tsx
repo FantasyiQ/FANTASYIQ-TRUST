@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { getNflState } from '@/lib/sleeper';
 import DraftCenterTabBar from '../DraftCenterTabBar';
 import RookieDynastyRankings from './RookieDynastyRankings';
+import RedraftBigBoard from './RedraftBigBoard';
 import PhaseDebugStrip from '@/components/dev/PhaseDebugStrip';
 import TeamIntelligenceCard from '@/components/league/TeamIntelligenceCard';
 import { getLeaguePhaseResult } from '@/lib/leaguePhase';
@@ -150,6 +151,66 @@ export default async function DraftStrategyPage({
         });
 
     const showSettingsAlert = isDynasty && phaseResult.missingSettings;
+
+    // ── Redraft big board ─────────────────────────────────────────────────────
+    if (!isDynasty) {
+        const adpPlayers = await prisma.sleeperPlayer.findMany({
+            where: {
+                searchRank: { not: null },
+                position:   { in: ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'] },
+            },
+            orderBy: { searchRank: 'asc' },
+            select: {
+                playerId:     true,
+                fullName:     true,
+                position:     true,
+                team:         true,
+                age:          true,
+                searchRank:   true,
+                injuryStatus: true,
+            },
+            take: 300,
+        });
+
+        // Attach projections if in season
+        const pprField = league.platform === 'sleeper' ? 'pointsPpr' : null;
+        let projMap = new Map<string, number>();
+        if (pprField && currentWeek > 0) {
+            const projs = await prisma.playerProjection.findMany({
+                where:  { season, week: currentWeek, playerId: { in: adpPlayers.map(p => p.playerId) } },
+                select: { playerId: true, pointsPpr: true },
+            });
+            projMap = new Map(projs.map(p => [p.playerId, p.pointsPpr ?? 0]));
+        }
+
+        return (
+            <div className="space-y-6">
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <h1 className="text-2xl font-bold text-white">Draft War Room</h1>
+                        <p className="text-gray-500 text-sm mt-0.5">{league.leagueName}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                        <div className="text-[10px] font-bold tracking-widest text-[#D4AF37]">FantasyiQ</div>
+                    </div>
+                </div>
+                <DraftCenterTabBar leagueId={id} isDynasty={false} />
+                <RedraftBigBoard
+                    players={adpPlayers.map(p => ({
+                        playerId:     p.playerId,
+                        name:         p.fullName ?? '',
+                        position:     p.position ?? '',
+                        team:         p.team,
+                        age:          p.age,
+                        adp:          p.searchRank ?? 999,
+                        injuryStatus: p.injuryStatus,
+                        projection:   projMap.get(p.playerId) ?? null,
+                    }))}
+                    week={currentWeek}
+                />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">

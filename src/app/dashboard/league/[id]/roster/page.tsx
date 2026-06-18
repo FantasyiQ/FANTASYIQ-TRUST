@@ -132,6 +132,7 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
             leagueName:      true,
             season:          true,
             leagueType:      true,
+            platform:        true,
             scoringType:     true,
             scoringSettings: true,
             rosterPositions: true,
@@ -191,6 +192,19 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
     const irSet      = new Set(myRoster.reserve  ?? []);
     const taxiSet    = new Set(myRoster.taxi      ?? []);
     const allPids    = myRoster.players ?? [];
+
+    const isRedraft = league.leagueType !== 'Dynasty';
+    if (isRedraft && allPids.length === 0) {
+        return (
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-12 text-center space-y-3">
+                <div className="text-4xl mb-2">📋</div>
+                <h2 className="text-lg font-bold text-white">Your roster is empty</h2>
+                <p className="text-gray-400 text-sm max-w-sm mx-auto">
+                    Check back after your draft is complete — your roster will appear here once players have been selected.
+                </p>
+            </div>
+        );
+    }
 
     const [playerById, fcRows, sleeperPlayers] = await Promise.all([
         getPlayers(allPids),

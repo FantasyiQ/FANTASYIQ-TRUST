@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const ALL_TABS = [
-    { key: 'strategy',  label: 'Draft Board',  path: 'strategy',  dynastyOnly: true  },
+    { key: 'strategy',  label: 'Draft Board',  path: 'strategy',  dynastyOnly: false },
     { key: 'mock',      label: 'Mock Draft',   path: 'mock',      dynastyOnly: false },
     { key: 'assistant', label: 'Live Draft',   path: 'assistant', dynastyOnly: false },
     { key: 'report',    label: 'Draft Report', path: 'report',    dynastyOnly: false },

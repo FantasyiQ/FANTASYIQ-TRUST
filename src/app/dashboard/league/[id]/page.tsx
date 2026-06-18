@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { prisma } from '@/lib/prisma';
 
 export default async function LeagueRootPage({
     params,
@@ -15,5 +16,13 @@ export default async function LeagueRootPage({
         else qs.set(k, v);
     }
     const query = qs.toString();
-    redirect(`/dashboard/league/${id}/overview${query ? `?${query}` : ''}`);
+
+    const league = await prisma.league.findUnique({
+        where:  { id },
+        select: { leagueType: true },
+    });
+
+    const isDynasty = league?.leagueType === 'Dynasty';
+    const base = isDynasty ? 'overview' : 'fantasyiq';
+    redirect(`/dashboard/league/${id}/${base}${query ? `?${query}` : ''}`);
 }
