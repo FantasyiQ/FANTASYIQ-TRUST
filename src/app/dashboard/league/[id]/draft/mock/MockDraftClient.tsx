@@ -69,9 +69,8 @@ export default function MockDraftClient({
     totalRosters: number;
 }) {
     const [clientPhase, setClientPhase] = useState<ClientPhase>({ phase: 'idle' });
-    const [draftMode, setDraftMode]     = useState<'dynasty' | 'redraft'>(
-        leagueType === 'Dynasty' ? 'dynasty' : 'redraft',
-    );
+    const isDynasty = leagueType === 'Dynasty';
+    const draftMode: 'dynasty' | 'redraft' = isDynasty ? 'dynasty' : 'redraft';
     const [draftSlot, setDraftSlot] = useState(1);
 
     // ── Start / restart ───────────────────────────────────────────────────────
@@ -79,7 +78,10 @@ export default function MockDraftClient({
     const startDraft = useCallback(async () => {
         setClientPhase({ phase: 'loading' });
         try {
-            const res = await fetch(`/api/mock-draft/init?leagueId=${leagueId}&mode=${draftMode}&slot=${draftSlot}`);
+            // Dynasty: pass slot=0 so the init route uses the user's real draft position.
+            // Redraft: pass the user-selected slot.
+            const slotParam = isDynasty ? 0 : draftSlot;
+            const res = await fetch(`/api/mock-draft/init?leagueId=${leagueId}&mode=${draftMode}&slot=${slotParam}`);
             if (!res.ok) throw new Error(`Status ${res.status}`);
             const data: MockDraftInitResponse = await res.json();
 
@@ -94,7 +96,7 @@ export default function MockDraftClient({
         } catch (err) {
             setClientPhase({ phase: 'error', message: err instanceof Error ? err.message : 'Unknown error' });
         }
-    }, [leagueId, draftMode, draftSlot]);
+    }, [leagueId, draftMode, draftSlot, isDynasty]);
 
     // ── User selects a player ─────────────────────────────────────────────────
 
@@ -135,8 +137,7 @@ export default function MockDraftClient({
         return (
             <IdleScreen
                 leagueName={leagueName}
-                draftMode={draftMode}
-                onModeChange={setDraftMode}
+                leagueType={leagueType}
                 totalRosters={totalRosters}
                 draftSlot={draftSlot}
                 onSlotChange={setDraftSlot}
@@ -253,24 +254,24 @@ function DraftHeader({
 
 function IdleScreen({
     leagueName,
-    draftMode,
-    onModeChange,
+    leagueType,
     totalRosters,
     draftSlot,
     onSlotChange,
     onStart,
 }: {
     leagueName:   string;
-    draftMode:    'dynasty' | 'redraft';
-    onModeChange: (m: 'dynasty' | 'redraft') => void;
+    leagueType:   string;
     totalRosters: number;
     draftSlot:    number;
     onSlotChange: (s: number) => void;
     onStart:      () => void;
 }) {
-    const modeDetails = draftMode === 'redraft'
-        ? { label: 'Redraft Mock', rounds: '15 rounds · Linear draft · Full player pool (QB/RB/WR/TE/K/DEF)', desc: 'Season-long values — best player available each round, all positions included.' }
-        : { label: 'Dynasty Mock', rounds: '20 rounds or rookie-only · Dynasty values',                       desc: 'Long-term dynasty values — age curve, DTV, and startup or rookie draft calibration.' };
+    const isDynasty = leagueType === 'Dynasty';
+
+    const modeDetails = isDynasty
+        ? { label: 'Dynasty Mock Draft',  rounds: '20 rounds · Dynasty values · Snake draft',         desc: 'Long-term dynasty values — age curve, DTV, and startup draft calibration.' }
+        : { label: 'Redraft Mock Draft',  rounds: '15 rounds · Season-long values · Linear draft',    desc: 'Season-long values — best player available each round, all positions included.' };
 
     const n = totalRosters;
     const slotLabel = draftSlot === 1 ? 'Pick 1 every round (first overall)'
@@ -288,49 +289,29 @@ function IdleScreen({
             </div>
 
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 space-y-6">
-                {/* Mode selector */}
-                <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider text-center mb-3">Draft Type</p>
-                    <div className="flex gap-3 justify-center">
-                        {(['dynasty', 'redraft'] as const).map(m => (
-                            <button
-                                key={m}
-                                onClick={() => onModeChange(m)}
-                                className={[
-                                    'px-5 py-2.5 rounded-xl text-sm font-bold border transition',
-                                    draftMode === m
-                                        ? 'bg-[#D4AF37] text-black border-[#D4AF37]'
-                                        : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500 hover:text-white',
-                                ].join(' ')}
-                            >
-                                {m === 'dynasty' ? 'Dynasty' : 'Redraft'}
-                            </button>
-                        ))}
+                {/* Draft slot selector — redraft only; dynasty uses real position from league data */}
+                {!isDynasty && (
+                    <div>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider text-center mb-3">Your Draft Slot</p>
+                        <div className="flex gap-2 flex-wrap justify-center">
+                            {Array.from({ length: n }, (_, i) => i + 1).map(slot => (
+                                <button
+                                    key={slot}
+                                    onClick={() => onSlotChange(slot)}
+                                    className={[
+                                        'w-10 h-10 rounded-lg text-sm font-bold border transition',
+                                        draftSlot === slot
+                                            ? 'bg-[#D4AF37] text-black border-[#D4AF37]'
+                                            : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500 hover:text-white',
+                                    ].join(' ')}
+                                >
+                                    {slot}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="text-center text-xs text-gray-500 mt-2">{slotLabel}</p>
                     </div>
-                    <p className="text-center text-xs text-gray-500 mt-2">{modeDetails.desc}</p>
-                </div>
-
-                {/* Draft slot selector */}
-                <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider text-center mb-3">Your Draft Slot</p>
-                    <div className="flex gap-2 flex-wrap justify-center">
-                        {Array.from({ length: n }, (_, i) => i + 1).map(slot => (
-                            <button
-                                key={slot}
-                                onClick={() => onSlotChange(slot)}
-                                className={[
-                                    'w-10 h-10 rounded-lg text-sm font-bold border transition',
-                                    draftSlot === slot
-                                        ? 'bg-[#D4AF37] text-black border-[#D4AF37]'
-                                        : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500 hover:text-white',
-                                ].join(' ')}
-                            >
-                                {slot}
-                            </button>
-                        ))}
-                    </div>
-                    <p className="text-center text-xs text-gray-500 mt-2">{slotLabel}</p>
-                </div>
+                )}
 
                 {/* Info block */}
                 <div className="text-center space-y-3">
@@ -338,6 +319,9 @@ function IdleScreen({
                     <div>
                         <h2 className="text-lg font-bold text-white">{modeDetails.label}</h2>
                         <p className="text-gray-500 text-xs mt-1">{modeDetails.rounds}</p>
+                        {isDynasty && (
+                            <p className="text-gray-600 text-xs mt-1">Your draft slot is pulled from your league's actual draft order.</p>
+                        )}
                         <p className="text-gray-400 text-sm mt-2 max-w-md mx-auto leading-relaxed">
                             Simulate your upcoming draft against AI opponents calibrated to your league
                             — scoring format, roster settings, and positional needs included.
@@ -348,7 +332,7 @@ function IdleScreen({
                         <span>✓ BPA-ranked player pool</span>
                         <span>✓ Roster need awareness</span>
                         <span>✓ Human-like AI opponents</span>
-                        {draftMode === 'redraft' && <span>✓ K & DEF included</span>}
+                        {!isDynasty && <span>✓ K & DEF included</span>}
                     </div>
                     <button
                         onClick={onStart}
