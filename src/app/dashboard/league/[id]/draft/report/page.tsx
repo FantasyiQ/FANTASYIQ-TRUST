@@ -41,7 +41,7 @@ export default async function DraftReportPage({
                     <h1 className="text-2xl font-bold text-white">Draft War Room</h1>
                     <p className="text-gray-500 text-sm mt-0.5">{league.leagueName}</p>
                 </div>
-                <DraftCenterTabBar leagueId={id} />
+                <DraftCenterTabBar leagueId={id} isDynasty={league.leagueType === 'Dynasty'} />
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center">
                     <p className="text-gray-400 text-sm">Draft Report Card is available for Sleeper Dynasty leagues only.</p>
                 </div>
@@ -99,7 +99,7 @@ export default async function DraftReportPage({
                 </div>
             </div>
 
-            <DraftCenterTabBar leagueId={id} />
+            <DraftCenterTabBar leagueId={id} isDynasty={league.leagueType === 'Dynasty'} />
 
             <DraftReportPanel
                 leagueId={id}

@@ -7,6 +7,7 @@ export type LeagueRow = {
     season:          string;
     userId:          string;
     isCommissioner:  boolean;
+    isDynasty:       boolean;
 };
 
 /**
@@ -22,7 +23,7 @@ export async function getLeagueById(
     const [league, dbUser] = await Promise.all([
         prisma.league.findUnique({
             where:  { id },
-            select: { id: true, leagueId: true, leagueName: true, season: true, userId: true, sleeperUserId: true, platform: true },
+            select: { id: true, leagueId: true, leagueName: true, season: true, userId: true, sleeperUserId: true, platform: true, leagueType: true },
         }),
         prisma.user.findUnique({
             where:  { id: requestingUserId },
@@ -46,5 +47,6 @@ export async function getLeagueById(
         season:         league.season,
         userId:         league.userId,
         isCommissioner,
+        isDynasty:      league.leagueType === 'Dynasty',
     };
 }

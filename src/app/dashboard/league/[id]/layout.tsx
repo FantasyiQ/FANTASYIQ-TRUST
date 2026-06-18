@@ -56,7 +56,7 @@ export default async function LeagueLayout({
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
             <div className="flex flex-col gap-6 max-w-5xl mx-auto">
                 <LeagueHeader leagueId={id} />
-                <LeagueTabs leagueId={id} isCommissioner={league.isCommissioner} />
+                <LeagueTabs leagueId={id} isCommissioner={league.isCommissioner} isDynasty={league.isDynasty} />
                 <div className="mt-6">
                     {children}
                 </div>

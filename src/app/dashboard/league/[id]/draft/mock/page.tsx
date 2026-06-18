@@ -26,7 +26,7 @@ export default async function MockDraftPage({
 
     return (
         <div className="space-y-0">
-            <DraftCenterTabBar leagueId={id} />
+            <DraftCenterTabBar leagueId={id} isDynasty={league.leagueType === 'Dynasty'} />
             <div className="pt-6">
                 <MockDraftClient
                     leagueId={id}

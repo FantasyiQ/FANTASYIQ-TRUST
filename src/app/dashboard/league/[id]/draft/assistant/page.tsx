@@ -46,7 +46,7 @@ export default async function DraftAssistantPage({
                         <p className="text-gray-500 text-sm mt-0.5">{league.leagueName}</p>
                     </div>
                 </div>
-                <DraftCenterTabBar leagueId={id} />
+                <DraftCenterTabBar leagueId={id} isDynasty={league.leagueType === 'Dynasty'} />
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center">
                     <p className="text-gray-400 text-sm">Live Draft Assistant is available for Sleeper Dynasty leagues only.</p>
                 </div>
@@ -109,7 +109,7 @@ export default async function DraftAssistantPage({
                 </div>
             </div>
 
-            <DraftCenterTabBar leagueId={id} />
+            <DraftCenterTabBar leagueId={id} isDynasty={league.leagueType === 'Dynasty'} />
 
             <DraftAssistantPanel
                 leagueId={id}

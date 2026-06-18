@@ -163,7 +163,7 @@ export default async function DraftStrategyPage({
                 </div>
             </div>
 
-            <DraftCenterTabBar leagueId={id} />
+            <DraftCenterTabBar leagueId={id} isDynasty={league.leagueType === 'Dynasty'} />
 
             <PhaseDebugStrip phase={phaseResult} />
 
