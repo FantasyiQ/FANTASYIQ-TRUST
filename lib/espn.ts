@@ -110,12 +110,33 @@ export interface EspnNormalizedTeam {
     name: string;
     abbrev: string;
     ownerId: string | null;
+    ownerName: string | null;
     wins: number;
     losses: number;
     ties: number;
     pointsFor: number;
     pointsAgainst: number;
     roster: EspnNormalizedPlayer[];
+}
+
+// ─── Transaction types ─────────────────────────────────────────────────────────
+
+export type EspnTransactionType = 'TRADE_ACCEPT' | 'WAIVER' | 'FREEAGENT' | 'ADD' | 'DROP' | string;
+
+export interface EspnTransactionItem {
+    playerId:   number;
+    playerName: string;
+    type:       'ADD' | 'DROP' | string;
+    fromTeamId: number;
+    toTeamId:   number;
+}
+
+export interface EspnTransaction {
+    id:            string;
+    type:          EspnTransactionType;
+    date:          number; // epoch ms
+    teamId:        number;
+    items:         EspnTransactionItem[];
 }
 
 export interface EspnNormalizedMatchup {
@@ -292,11 +313,20 @@ const POSITION_MAP: Record<number, string> = {
 };
 
 export function normalizeEspnLeague(raw: EspnLeagueSettings, leagueId: string): EspnNormalizedLeague {
-    const teams = (raw.teams ?? []).map((t): EspnNormalizedTeam => ({
-        teamId:       t.id,
-        name:         `${t.location ?? ''} ${t.nickname ?? ''}`.trim(),
-        abbrev:       t.abbrev ?? '',
-        ownerId:      t.owners?.[0] ?? null,
+    // Build SWID → displayName map from members array
+    const memberMap = new Map<string, string>();
+    for (const m of (raw.members ?? [])) {
+        if (m.id && m.displayName) memberMap.set(m.id, m.displayName);
+    }
+
+    const teams = (raw.teams ?? []).map((t): EspnNormalizedTeam => {
+        const ownerId = t.owners?.[0] ?? null;
+        return {
+        teamId:    t.id,
+        name:      `${t.location ?? ''} ${t.nickname ?? ''}`.trim(),
+        abbrev:    t.abbrev ?? '',
+        ownerId,
+        ownerName: ownerId ? (memberMap.get(ownerId) ?? null) : null,
         wins:         t.record?.overall?.wins ?? 0,
         losses:       t.record?.overall?.losses ?? 0,
         ties:         t.record?.overall?.ties ?? 0,
@@ -312,7 +342,8 @@ export function normalizeEspnLeague(raw: EspnLeagueSettings, leagueId: string): 
             injuryStatus:    e.playerPoolEntry?.player?.injuryStatus ?? '',
             acquisitionType: e.playerPoolEntry?.acquisitionType ?? '',
         })),
-    }));
+        };
+    });
 
     const matchups = (raw.schedule ?? []).map((s): EspnNormalizedMatchup => ({
         week:        s.matchupPeriodId,
@@ -390,5 +421,55 @@ export function buildEspnStandings(teams: EspnTeam[]): Array<{
             fpts:        t.record?.overall?.pointsFor ?? 0,
             fptsAgainst: t.record?.overall?.pointsAgainst ?? 0,
             ownerId:     t.owners?.[0] ?? null,
+        }));
+}
+
+// ─── Transactions (trades, adds, drops, waivers) ───────────────────────────────
+
+interface EspnRawTransaction {
+    id:            string;
+    type:          string;
+    proposedDate?: number;
+    executionDate?: number;
+    teamId:        number;
+    status?:       string;
+    items?:        Array<{
+        playerId:        number;
+        type:            string;
+        fromTeamId:      number;
+        toTeamId:        number;
+        playerPoolEntry?: { playerPoolEntry?: { player?: { fullName?: string } }; player?: { fullName?: string } };
+    }>;
+}
+
+interface EspnTransactionsResponse {
+    transactions?: EspnRawTransaction[];
+}
+
+export async function getEspnTransactions(
+    leagueId: string, season: number, espnS2: string, swid: string,
+): Promise<EspnTransaction[]> {
+    const raw = await withRetry(() =>
+        espnFetch<EspnTransactionsResponse>(
+            `/seasons/${season}/segments/0/leagues/${leagueId}?view=mTransactions2`,
+            espnS2, swid,
+        ),
+    );
+    return (raw.transactions ?? [])
+        .filter(t => t.status !== 'PROPOSED' && t.status !== 'VETOED')
+        .map(t => ({
+            id:     t.id,
+            type:   t.type,
+            date:   t.executionDate ?? t.proposedDate ?? 0,
+            teamId: t.teamId,
+            items:  (t.items ?? []).map(item => ({
+                playerId:   item.playerId,
+                playerName: item.playerPoolEntry?.playerPoolEntry?.player?.fullName
+                         ?? item.playerPoolEntry?.player?.fullName
+                         ?? `Player ${item.playerId}`,
+                type:       item.type,
+                fromTeamId: item.fromTeamId,
+                toTeamId:   item.toTeamId,
+            })),
         }));
 }

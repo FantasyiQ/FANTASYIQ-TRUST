@@ -51,10 +51,11 @@ export async function GET(request: Request): Promise<Response> {
                                 scoringType: deriveEspnScoringType(rawData.settings),
                                 standings:   data.teams.map(t => ({
                                     teamId: t.teamId, name: t.name, abbrev: t.abbrev,
-                                    ownerId: t.ownerId, wins: t.wins, losses: t.losses,
+                                    ownerId: t.ownerId, ownerName: t.ownerName,
+                                    wins: t.wins, losses: t.losses,
                                     ties: t.ties, fpts: t.pointsFor, fptsAgainst: t.pointsAgainst,
                                     rosterSize: t.roster.length,
-                                    players: t.roster.map(p => ({ name: p.fullName, position: p.position })),
+                                    players: t.roster.map(p => ({ name: p.fullName, position: p.position, lineupSlot: p.lineupSlot })),
                                 })),
                                 currentMatchup: currentWeekMatchups.length > 0
                                     ? JSON.parse(JSON.stringify({ week: data.currentWeek, matchups: currentWeekMatchups }))

@@ -10,6 +10,170 @@ import type { Player, LeagueSettings, LeagueType } from '@/lib/trade-engine';
 import { computePlayerBaseValue } from '@/lib/player-universe';
 import type { UniversePlayer } from '@/lib/player-universe';
 
+// ── ESPN Roster Page ──────────────────────────────────────────────────────────
+
+interface EspnStandingTeam {
+    teamId:    number;
+    name:      string;
+    ownerId:   string | null;
+    ownerName: string | null;
+    players:   Array<{ name: string; position: string; lineupSlot?: string }>;
+}
+
+async function EspnRosterPage({
+    leagueId,
+    league,
+    userId,
+}: {
+    leagueId: string;
+    league: { leagueName: string | null; season: string | null; scoringType: string | null; rosterPositions: unknown; standings: unknown };
+    userId: string;
+}) {
+    const dbUser = await prisma.user.findUnique({
+        where:  { id: userId },
+        select: { swid: true },
+    });
+    const mySwid = dbUser?.swid ?? null;
+
+    const espnTeams = (league.standings as EspnStandingTeam[] | null) ?? [];
+    const myTeam    = mySwid ? espnTeams.find(t => t.ownerId === mySwid) : null;
+
+    if (!myTeam) {
+        return (
+            <div className="space-y-6">
+                <div>
+                    <h1 className="text-xl font-bold">My Roster</h1>
+                    <p className="text-gray-500 text-sm mt-0.5">{league.leagueName} · {league.season} Season</p>
+                </div>
+                <div className="bg-gray-900 border border-gray-800 rounded-2xl p-10 text-center space-y-3">
+                    <div className="text-4xl">🏈</div>
+                    <h2 className="text-lg font-bold">Roster Not Found</h2>
+                    <p className="text-gray-400 text-sm max-w-sm mx-auto">
+                        {mySwid
+                            ? 'Your ESPN account wasn\'t matched to a team in this league. Try refreshing ESPN credentials.'
+                            : 'Connect your ESPN credentials to view your roster.'}
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    const players = myTeam.players ?? [];
+
+    // Try to match player names to Sleeper DB for DTV values
+    const allNames = players.map(p => p.name.toLowerCase());
+    const fcRows = await prisma.fantasyCalcValue.findMany({
+        where:  { OR: [{ dynastyValue: { gt: 0 } }, { redraftValue: { gt: 0 } }] },
+        select: { playerName: true, nameLower: true, position: true, redraftValue: true, redraftValueSf: true },
+    });
+
+    function normName(n: string) {
+        return n.toLowerCase().replace(/\s+\b(jr\.?|sr\.?|ii|iii|iv|v)\s*$/i, '').replace(/\./g, '').replace(/\s+/g, ' ').trim();
+    }
+
+    const dtvByName = new Map<string, number>();
+    for (const r of fcRows) {
+        const val = Math.round((r.redraftValue ?? 0) / 99.99);
+        dtvByName.set(r.nameLower, val);
+        dtvByName.set(normName(r.nameLower), val);
+    }
+
+    const STARTER_SLOTS = new Set(['QB', 'RB', 'WR', 'TE', 'FLEX', 'K', 'DEF', 'BN']);
+    const POS_ORDER: Record<string, number> = { QB: 0, RB: 1, WR: 2, TE: 3, K: 4, DEF: 5 };
+    const POS_COLORS: Record<string, string> = {
+        QB: 'bg-red-900/40 text-red-300 border-red-800',
+        RB: 'bg-green-900/40 text-green-300 border-green-800',
+        WR: 'bg-blue-900/40 text-blue-300 border-blue-800',
+        TE: 'bg-yellow-900/40 text-yellow-300 border-yellow-800',
+        K:  'bg-purple-900/40 text-purple-300 border-purple-800',
+        DEF:'bg-gray-800 text-gray-300 border-gray-700',
+    };
+
+    const rows = [...players].sort((a, b) => {
+        const pg = (POS_ORDER[a.position] ?? 99) - (POS_ORDER[b.position] ?? 99);
+        return pg !== 0 ? pg : a.name.localeCompare(b.name);
+    });
+
+    const starters = rows.filter(p => p.lineupSlot && p.lineupSlot !== 'BN' && p.lineupSlot !== 'IR');
+    const bench    = rows.filter(p => !p.lineupSlot || p.lineupSlot === 'BN');
+    const ir       = rows.filter(p => p.lineupSlot === 'IR');
+
+    return (
+        <div className="space-y-6">
+            <div>
+                <h1 className="text-xl font-bold">{myTeam.name}</h1>
+                <p className="text-gray-500 text-sm mt-0.5">{league.leagueName} · {league.season} Season</p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+                {[
+                    { label: 'Starters', count: starters.length, color: 'text-[#D4AF37]' },
+                    { label: 'Bench',    count: bench.length,    color: 'text-gray-300'  },
+                    { label: 'IR',       count: ir.length,       color: 'text-red-400'   },
+                ].map(({ label, count, color }) => (
+                    <div key={label} className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
+                        <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">{label}</p>
+                        <p className={`text-2xl font-bold ${color}`}>{count}</p>
+                    </div>
+                ))}
+            </div>
+
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm min-w-[400px]">
+                        <thead>
+                            <tr className="border-b border-gray-800">
+                                <th className="text-left px-5 py-3 text-gray-500 font-medium">Player</th>
+                                <th className="text-left px-3 py-3 text-gray-500 font-medium">Slot</th>
+                                <th className="text-right px-5 py-3 text-gray-500 font-medium">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {rows.map((p, i) => {
+                                const nameLow = p.name.toLowerCase();
+                                const dtv     = dtvByName.get(nameLow) ?? dtvByName.get(normName(nameLow)) ?? 0;
+                                const isStarter = p.lineupSlot && p.lineupSlot !== 'BN' && p.lineupSlot !== 'IR';
+                                return (
+                                    <tr key={`${p.name}-${i}`} className="border-t border-gray-800/40 hover:bg-gray-800/20 transition">
+                                        <td className="px-5 py-3">
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${POS_COLORS[p.position] ?? 'bg-gray-800 text-gray-400 border-gray-700'}`}>
+                                                    {p.position}
+                                                </span>
+                                                <span className="text-white font-medium">{p.name}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-3">
+                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${
+                                                p.lineupSlot === 'IR'      ? 'bg-red-900/30 text-red-400 border-red-800/50' :
+                                                p.lineupSlot === 'BN' || !isStarter ? 'bg-gray-800 text-gray-400 border-gray-700' :
+                                                'bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/30'
+                                            }`}>
+                                                {p.lineupSlot ?? 'BN'}
+                                            </span>
+                                        </td>
+                                        <td className="px-5 py-3 text-right font-bold">
+                                            {dtv > 0 ? <span className="text-white">{dtv}</span> : <span className="text-gray-600">—</span>}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                            {rows.length === 0 && (
+                                <tr><td colSpan={3} className="px-5 py-10 text-center text-gray-600">No players on roster.</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+                <div className="px-5 py-3 border-t border-gray-800 text-xs text-gray-600">
+                    Data from last ESPN sync · Values from FantasyCalc
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 // ── Slot counting ─────────────────────────────────────────────────────────────
 
 const STARTER_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE', 'FLEX', 'REC_FLEX', 'SUPER_FLEX', 'IDP_FLEX', 'K', 'DL', 'LB', 'DB', 'DEF']);
@@ -137,19 +301,24 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
             scoringSettings: true,
             rosterPositions: true,
             totalRosters:    true,
+            standings:       true,
             userId:          true,
             sleeperUserId:   true,
         },
     });
     if (!league) redirect('/dashboard');
 
+    if (league.platform === 'espn') {
+        return <EspnRosterPage leagueId={id} league={league} userId={session.user.id} />;
+    }
+
     if (league.platform !== 'sleeper') {
         return (
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-12 text-center space-y-3">
                 <div className="text-4xl mb-2">📋</div>
-                <h2 className="text-lg font-bold text-white">Roster view coming soon for {league.platform === 'espn' ? 'ESPN' : 'this platform'}</h2>
+                <h2 className="text-lg font-bold text-white">Roster not available</h2>
                 <p className="text-gray-400 text-sm max-w-sm mx-auto">
-                    Live roster data is currently available for Sleeper leagues. ESPN roster support is on the way.
+                    Roster data is not available for this platform.
                 </p>
             </div>
         );

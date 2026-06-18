@@ -349,6 +349,7 @@ export default function EspnSyncPage() {
 
     const prefilledLeagueId = searchParams.get('leagueId') ?? '';
     const fromInvite        = searchParams.get('fromInvite') === '1';
+    const isRefresh         = searchParams.get('refresh') === '1';
     const inviteLeagueName  = searchParams.get('leagueName') ?? '';
 
     const [step, setStep]                 = useState<Step>('credentials');
@@ -479,6 +480,16 @@ export default function EspnSyncPage() {
                         </p>
                         <p className="text-gray-400 text-xs mt-1">
                             Connect your ESPN account below — the league ID is pre-filled for you.
+                        </p>
+                    </div>
+                )}
+
+                {isRefresh && (
+                    <div className="bg-yellow-900/20 border border-yellow-800/50 rounded-2xl px-5 py-4">
+                        <p className="text-yellow-300 font-semibold text-sm">⚠ ESPN credentials expired</p>
+                        <p className="text-yellow-500/80 text-xs mt-1">
+                            Re-connect your ESPN account using the extension below to resume syncing.
+                            {prefilledLeagueId && ' Your league ID is pre-filled.'}
                         </p>
                     </div>
                 )}

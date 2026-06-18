@@ -12,6 +12,7 @@ import {
     type SleeperTransaction,
     type SleeperDraftPickEntry,
 } from '@/lib/sleeper';
+import { getEspnTransactions } from '@/lib/espn';
 
 const WEEKS = Array.from({ length: 19 }, (_, i) => i); // 0–18
 
@@ -82,10 +83,56 @@ export async function GET(
 
     const league = await prisma.league.findFirst({
         where: { id: leagueId, userId: session.user.id },
-        select: { leagueId: true },
+        select: { leagueId: true, platform: true, season: true, standings: true },
     });
     if (!league) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
+    // ── ESPN trade history ────────────────────────────────────────────────────
+    if (league.platform === 'espn') {
+        const dbUser = await prisma.user.findUnique({
+            where:  { id: session.user.id },
+            select: { espnS2: true, swid: true },
+        });
+        if (!dbUser?.espnS2 || !dbUser.swid) {
+            return NextResponse.json({ trades: [], note: 'Connect ESPN credentials to view trade history.' });
+        }
+
+        type EspnTeamRow = { teamId: number; name: string; ownerName: string | null };
+        const espnTeams = (league.standings as EspnTeamRow[] | null) ?? [];
+        const teamById  = new Map(espnTeams.map(t => [t.teamId, t]));
+
+        let transactions = await getEspnTransactions(
+            league.leagueId, Number(league.season ?? new Date().getFullYear()), dbUser.espnS2, dbUser.swid,
+        );
+        transactions = transactions.filter(t => t.type === 'TRADE_ACCEPT');
+        transactions.sort((a, b) => b.date - a.date);
+
+        // Group ESPN trade items into sides by teamId
+        const trades = transactions.map(t => {
+            const teamIds = [...new Set([
+                t.teamId,
+                ...t.items.map(i => i.toTeamId).filter(id => id > 0),
+            ])];
+            const sides = teamIds.map(tid => {
+                const team     = teamById.get(tid);
+                const received = t.items
+                    .filter(i => i.toTeamId === tid)
+                    .map(i => ({ type: 'player' as const, playerId: String(i.playerId), name: i.playerName, position: null }));
+                return {
+                    rosterId:    tid,
+                    displayName: team?.name ?? `Team ${tid}`,
+                    avatar:      null as string | null,
+                    received,
+                };
+            }).filter(s => s.received.length > 0);
+
+            return { transactionId: t.id, date: t.date, sides };
+        }).filter(t => t.sides.length >= 2);
+
+        return NextResponse.json({ trades });
+    }
+
+    // ── Sleeper trade history ─────────────────────────────────────────────────
     const sleeperLeagueId = league.leagueId;
 
     const [leagueIds, rosters, users] = await Promise.all([

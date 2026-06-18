@@ -94,6 +94,7 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
                 leagueId: true,
                 draftStartTime: true, draftStatus: true, draftType: true,
                 playoffWeekStart: true, champWeek: true,
+                syncStatus: true, syncErrorCount: true,
             },
         }),
         session?.user?.id
@@ -268,6 +269,27 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
                     ) : null}
                 </div>
             </div>
+
+            {/* ESPN credentials warning */}
+            {league.platform === 'espn' && (league.syncStatus === 'failing' || league.syncStatus === 'failed' || (league.syncErrorCount ?? 0) >= 2) && (
+                <div className="border-t border-yellow-800/40 pt-3">
+                    <div className="flex items-center justify-between gap-3 bg-yellow-900/20 border border-yellow-800/50 rounded-xl px-4 py-3">
+                        <div className="flex items-center gap-2.5">
+                            <span className="text-yellow-400 text-base shrink-0">⚠</span>
+                            <div>
+                                <p className="text-yellow-300 text-sm font-semibold leading-tight">ESPN credentials may be expired</p>
+                                <p className="text-yellow-500/80 text-xs mt-0.5">League data hasn&apos;t synced recently — refresh your ESPN credentials to resume updates.</p>
+                            </div>
+                        </div>
+                        <Link
+                            href={`/dashboard/sync/espn?leagueId=${league.leagueId}&refresh=1`}
+                            className="shrink-0 text-xs font-semibold text-yellow-300 border border-yellow-700/60 hover:border-yellow-500 px-3 py-1.5 rounded-lg transition"
+                        >
+                            Update →
+                        </Link>
+                    </div>
+                </div>
+            )}
 
             {/* Commissioner quick-share tools — invite link + dues pay link */}
             {isCommissioner && (
