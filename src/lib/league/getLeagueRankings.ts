@@ -430,7 +430,7 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
     if (nflState.season_type === 'pre' || nflState.season_type === 'off') {
         // Try current league's snapshots first, then follow previous_league_id to last season
         let lastSnapshot = await prisma.powerRankingSnapshot.findFirst({
-            where:   { leagueId: league.leagueId },
+            where:   { leagueId: league.leagueId, week: { gt: 0 } },
             orderBy: { week: 'desc' },
             select:  { data: true },
         });
@@ -439,7 +439,7 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
             const prevId = sleeperLeague.previous_league_id;
             if (prevId) {
                 lastSnapshot = await prisma.powerRankingSnapshot.findFirst({
-                    where:   { leagueId: prevId },
+                    where:   { leagueId: prevId, week: { gt: 0 } },
                     orderBy: { week: 'desc' },
                     select:  { data: true },
                 });

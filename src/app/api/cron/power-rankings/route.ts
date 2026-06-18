@@ -71,8 +71,8 @@ export async function GET(request: Request): Promise<Response> {
 
     try {
         const nflState = await getNflState();
-        if (nflState.season_type === 'pre') {
-            return Response.json({ skipped: true, reason: 'preseason' });
+        if (nflState.season_type !== 'regular' && nflState.season_type !== 'post') {
+            return Response.json({ skipped: true, reason: nflState.season_type });
         }
         const week = nflState.week;
 
