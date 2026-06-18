@@ -56,7 +56,7 @@ export default async function LeagueOverviewPage({
 
     // ESPN leagues use stored DB data — skip all Sleeper API calls
     if (league.platform === 'espn') {
-        type EspnStandingRow = { teamId: number; name: string; abbrev: string; ownerId: string | null; wins: number; losses: number; ties: number; fpts: number; fptsAgainst: number; rosterSize: number };
+        type EspnStandingRow = { teamId: number; name: string; abbrev: string; ownerId: string | null; ownerName?: string | null; wins: number; losses: number; ties: number; fpts: number; fptsAgainst: number; rosterSize: number };
         const espnTeams = (league.standings as EspnStandingRow[] | null) ?? [];
         const rosterPositions = (league.rosterPositions as string[]) ?? [];
 
@@ -86,6 +86,33 @@ export default async function LeagueOverviewPage({
             bench:       [],
             starterSlots: rosterPositions.filter(p => !BENCH_SLOTS.has(p)),
         }));
+
+        // Match ESPN owners to FiQ accounts by SWID
+        const ownerSwids = espnTeams.map(t => t.ownerId).filter(Boolean) as string[];
+        const fiqBySwid  = ownerSwids.length > 0
+            ? new Map((await prisma.user.findMany({
+                where:  { swid: { in: ownerSwids } },
+                select: { id: true, swid: true, prsScore: true, trustScore: true },
+              })).map(u => [u.swid!, u]))
+            : new Map<string, { id: string; swid: string | null; prsScore: number | null; trustScore: number | null }>();
+
+        const membersData: LeagueMemberData[] = espnTeams.map(t => {
+            const fiq         = t.ownerId ? fiqBySwid.get(t.ownerId) : null;
+            const displayName = t.ownerName ?? (t.name || t.abbrev || `Team ${t.teamId}`);
+            return {
+                sleeperUserId:    String(t.teamId),
+                displayName,
+                username:         null,
+                sleeperAvatarId:  null,
+                isCommissioner:   false,
+                isCoCommissioner: false,
+                userId:           fiq?.id ?? null,
+                prsScore:         fiq?.prsScore ?? null,
+                trustScore:       fiq?.trustScore ?? null,
+                lfCommissioner:   null,
+                existingVouch:    null,
+            };
+        });
 
         const [leagueDuesRecord, leagueAnnouncements, leagueDocs] = await Promise.all([
             prisma.leagueDues.findFirst({
@@ -148,7 +175,7 @@ export default async function LeagueOverviewPage({
                 documents={documents}
                 isCommissioner={league.userId === session.user.id}
                 currentUserId={session.user.id}
-                membersData={[]}
+                membersData={membersData}
             />
         );
     }

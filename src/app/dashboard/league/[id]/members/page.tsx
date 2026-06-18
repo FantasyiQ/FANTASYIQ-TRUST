@@ -64,9 +64,10 @@ async function EspnMembersView({ teams, mySwid }: { teams: EspnTeamRow[]; mySwid
             </div>
             <div className="divide-y divide-gray-800/50">
                 {sorted.map((team, i) => {
-                    const fiq    = team.ownerId ? fiqBySWID.get(team.ownerId) : null;
-                    const isMe   = mySwid && team.ownerId === mySwid;
-                    const initials = (team.ownerName ?? team.name)[0]?.toUpperCase() ?? '?';
+                    const fiq        = team.ownerId ? fiqBySWID.get(team.ownerId) : null;
+                    const isMe       = mySwid && team.ownerId === mySwid;
+                    const displayName = team.name || team.abbrev || `Team ${team.teamId}`;
+                    const initials   = (team.ownerName ?? displayName)[0]?.toUpperCase() ?? '?';
                     return (
                         <div key={team.teamId} className={`flex items-center gap-4 px-5 py-3.5 ${isMe ? 'bg-[#D4AF37]/5' : 'hover:bg-gray-800/30'} transition`}>
                             <span className="text-gray-600 text-sm w-5 text-right shrink-0">{i + 1}</span>
@@ -75,7 +76,7 @@ async function EspnMembersView({ teams, mySwid }: { teams: EspnTeamRow[]; mySwid
                             </div>
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="font-medium text-sm text-white truncate">{team.name}</span>
+                                    <span className="font-medium text-sm text-white truncate">{displayName}</span>
                                     {isMe && (
                                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37]">You</span>
                                     )}

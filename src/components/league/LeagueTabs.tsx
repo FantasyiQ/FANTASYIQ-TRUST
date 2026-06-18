@@ -33,7 +33,6 @@ export default function LeagueTabs({ leagueId, isDynasty = true }: { leagueId: s
             {isDynasty && (
                 <Tab href={`/dashboard/league/${leagueId}/trade`}     label="Trade Evaluator"  />
             )}
-            <Tab href={`/dashboard/league/${leagueId}/members`}       label="Members"          />
             <Tab href={`/dashboard/league/${leagueId}/draft`}         label="Draft War Room"   />
             <Tab href={`/dashboard/league/${leagueId}/commissioner`}  label="Commissioner Hub" />
             <Tab href={`/dashboard/league/${leagueId}/dfs`}           label="Weekly DFS"       />
