@@ -5,6 +5,7 @@ import { notFound, redirect } from 'next/navigation';
 import { auth }   from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getNflState, getLeagueUsers } from '@/lib/sleeper';
+import { getEspnRosters, normalizeEspnLeague, type EspnNormalizedMatchup } from '@/lib/espn';
 import {
     assembleTeamProjection,
     buildOpponentDefRankMap,
@@ -44,15 +45,174 @@ export default async function HubProjectionsPage({
             id: true, userId: true, leagueId: true, leagueName: true,
             season: true, scoringType: true, totalRosters: true,
             rosterPositions: true, standings: true, platform: true,
+            currentMatchup: true,
         },
     });
 
     if (!league || league.userId !== session.user.id) notFound();
 
-    if (league.platform !== 'sleeper') {
+    if (league.platform !== 'sleeper' && league.platform !== 'espn') {
         redirect(`/dashboard/league/${id}/fantasyiq`);
     }
 
+    // ── ESPN projections branch ───────────────────────────────────────────────
+    if (league.platform === 'espn') {
+        const season = league.season ?? '2026';
+        const header = (
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-white">FantasyiQ Hub</h1>
+                    <p className="text-gray-500 text-sm mt-0.5">{league.leagueName}</p>
+                </div>
+                <div className="shrink-0 text-right">
+                    <div className="text-[10px] font-bold tracking-widest text-[#D4AF37]">FantasyiQ</div>
+                </div>
+            </div>
+        );
+
+        const storedMatchup = league.currentMatchup as { week: number; matchups: EspnNormalizedMatchup[] } | null;
+
+        if (!storedMatchup || storedMatchup.week === 0 || !storedMatchup.matchups?.length) {
+            return (
+                <div className="space-y-6">
+                    {header}
+                    <HubTabBar leagueId={id} activeTab="projections" hideProjections={false} />
+                    <MatchupProjections matchups={[]} week={0} season={season} scoringType={league.scoringType ?? null} offSeason />
+                </div>
+            );
+        }
+
+        const espnWeek = storedMatchup.week;
+
+        const dbUser = await prisma.user.findUnique({
+            where:  { id: session.user.id },
+            select: { espnS2: true, swid: true },
+        });
+
+        const noCredentials = !dbUser?.espnS2 || !dbUser?.swid;
+        if (!noCredentials) {
+            try {
+                const rawEspn = await getEspnRosters(
+                    league.leagueId,
+                    parseInt(season),
+                    dbUser!.espnS2!,
+                    dbUser!.swid!,
+                );
+                const espnData = normalizeEspnLeague(rawEspn, league.leagueId);
+
+                const BENCH = new Set(['BN', 'IR']);
+
+                const teamStarterNames = new Map<number, string[]>();
+                const teamAllNames     = new Map<number, string[]>();
+                const teamInfoMap      = new Map<number, { name: string }>();
+
+                for (const team of espnData.teams) {
+                    teamStarterNames.set(team.teamId, team.roster.filter(p => !BENCH.has(p.lineupSlot)).map(p => p.fullName));
+                    teamAllNames.set(team.teamId,     team.roster.map(p => p.fullName));
+                    teamInfoMap.set(team.teamId,      { name: team.name });
+                }
+
+                const allNameSet = new Set<string>();
+                for (const names of teamAllNames.values()) for (const n of names) allNameSet.add(n);
+                const allNames = [...allNameSet];
+
+                const sleeperRows = await prisma.sleeperPlayer.findMany({
+                    where:  { fullName: { in: allNames } },
+                    select: { playerId: true, fullName: true, position: true, team: true, injuryStatus: true },
+                });
+
+                const nameToSleeper = new Map(sleeperRows.map(p => [p.fullName ?? '', p]));
+                const nameLower     = new Map(sleeperRows.map(p => [(p.fullName ?? '').toLowerCase(), p]));
+
+                function resolveId(name: string): string | null {
+                    return (nameToSleeper.get(name) ?? nameLower.get(name.toLowerCase()))?.playerId ?? null;
+                }
+
+                const allMatchedIds = sleeperRows.map(p => p.playerId);
+
+                const pprField: 'pointsPpr' | 'pointsStd' | 'pointsHalfPpr' =
+                    league.scoringType === 'ppr'      ? 'pointsPpr'     :
+                    league.scoringType === 'half_ppr' ? 'pointsHalfPpr' : 'pointsStd';
+
+                const projs = await prisma.playerProjection.findMany({
+                    where:  { season, week: espnWeek, playerId: { in: allMatchedIds } },
+                    select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true },
+                });
+                const projByPlayer = new Map(projs.map(p => [p.playerId, p[pprField] ?? 0]));
+
+                const playerInfo = new Map<string, PlayerRecord>(
+                    sleeperRows.map(p => [p.playerId, {
+                        playerId: p.playerId, name: p.fullName,
+                        position: p.position, team: p.team, injuryStatus: p.injuryStatus,
+                    }])
+                );
+
+                type EspnStandingEntry = { teamId: number; fpts?: number };
+                const espnStandings = (league.standings as EspnStandingEntry[] | null) ?? [];
+                const standingsFpts = espnStandings.map(s => ({ rosterId: s.teamId, fpts: s.fpts ?? 0 }));
+                const defRankMap    = buildOpponentDefRankMap(standingsFpts);
+                const totalTeams    = league.totalRosters;
+
+                function makeSlot(teamId: number, livePts: number): RosterSlot {
+                    const toIds = (names: string[]) => names.map(n => resolveId(n)).filter(Boolean) as string[];
+                    return {
+                        rosterId: teamId,
+                        teamName: teamInfoMap.get(teamId)?.name ?? `Team ${teamId}`,
+                        username: undefined,
+                        avatar:   null,
+                        starters: toIds(teamStarterNames.get(teamId) ?? []),
+                        players:  toIds(teamAllNames.get(teamId) ?? []),
+                        livePts,
+                        playerPts: {},
+                    };
+                }
+
+                const espnMatchups: MatchupProjection[] = [];
+                storedMatchup.matchups.forEach((m, i) => {
+                    if (!m.awayTeamId) return;
+                    const defA = defRankMap.get(m.awayTeamId) ?? Math.ceil(totalTeams / 2);
+                    const defB = defRankMap.get(m.homeTeamId) ?? Math.ceil(totalTeams / 2);
+                    const teamA = assembleTeamProjection(makeSlot(m.homeTeamId, m.homeScore), projByPlayer, playerInfo, defA, totalTeams);
+                    const teamB = assembleTeamProjection(makeSlot(m.awayTeamId, m.awayScore), projByPlayer, playerInfo, defB, totalTeams);
+                    const margin = teamA.teamProjEnhanced - teamB.teamProjEnhanced;
+                    espnMatchups.push({
+                        matchupId: i + 1,
+                        week:      espnWeek,
+                        teamA,
+                        teamB,
+                        winProbA:  Math.round(winProbability(margin, teamA.teamVariance, teamB.teamVariance) * 1000) / 1000,
+                        margin:    Math.round(margin * 100) / 100,
+                    });
+                });
+
+                return (
+                    <div className="space-y-6">
+                        {header}
+                        <HubTabBar leagueId={id} activeTab="projections" hideProjections={false} />
+                        <MatchupProjections
+                            matchups={espnMatchups}
+                            week={espnWeek}
+                            season={season}
+                            scoringType={league.scoringType ?? null}
+                        />
+                    </div>
+                );
+            } catch { /* fall through to reconnect message */ }
+        }
+
+        return (
+            <div className="space-y-6">
+                {header}
+                <HubTabBar leagueId={id} activeTab="projections" hideProjections={false} />
+                <div className="rounded-2xl bg-gray-900 border border-gray-800 px-6 py-12 text-center space-y-2">
+                    <p className="text-gray-400 text-sm font-semibold">Could not load ESPN roster data.</p>
+                    <p className="text-gray-600 text-xs">Your ESPN credentials may have expired. Try reconnecting your ESPN account from the sync page.</p>
+                </div>
+            </div>
+        );
+    }
+
+    // ── Sleeper branch ────────────────────────────────────────────────────────
     const nflState = await getNflState();
     const { week, season, season_type } = nflState as typeof nflState & { season_type: string };
 

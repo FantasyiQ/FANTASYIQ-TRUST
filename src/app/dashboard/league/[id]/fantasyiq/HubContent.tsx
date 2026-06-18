@@ -74,7 +74,7 @@ export default function HubContent({
                 leagueId={leagueId}
                 activeTab={activeSection}
                 onSectionChange={onSectionChange}
-                hideProjections={platform !== 'sleeper'}
+                hideProjections={platform !== 'sleeper' && platform !== 'espn'}
             />
 
             {/* Tab content — all slots are pre-rendered server-side, hidden via CSS */}
