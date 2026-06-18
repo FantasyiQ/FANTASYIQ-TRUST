@@ -440,11 +440,11 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
                 rosterId:   r.rosterId,
                 teamName:   `Team ${r.rosterId}`,
                 ownerName:  r.ownerName,
-                wins:       r.wins,
-                losses:     r.losses,
-                pf:         r.pf,
-                pa:         r.pa,
-                powerScore: r.powerScore,
+                wins:       r.wins   ?? 0,
+                losses:     r.losses ?? 0,
+                pf:         r.pf     ?? 0,
+                pa:         r.pa     ?? 0,
+                powerScore: r.powerScore ?? 50,
             }));
             return { league: leagueResult, playerRankings, teamRankings, powerRankings: snapshotRankings, valueSyncedAt: latestSync?.updatedAt.toISOString() ?? null, lastSeasonRankings: true };
         }
