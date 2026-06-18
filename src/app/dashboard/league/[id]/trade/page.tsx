@@ -44,8 +44,8 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
                 sleeperLeagueId={content.sleeperLeagueId}
                 mySleeperUserId={content.mySleeperUserId}
             />
-            <TradeHistoryPanel leagueId={id} />
             <TradeEvaluator content={content} />
+            <TradeHistoryPanel leagueId={id} />
         </div>
     );
 }
