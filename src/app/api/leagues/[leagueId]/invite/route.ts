@@ -56,13 +56,24 @@ export async function POST(
 
     const platform = dbLeague?.platform ?? 'sleeper';
 
-    // Reuse existing invite for this league+season if one exists
-    let invite = await prisma.leagueInvite.findFirst({
+    // Reuse existing invite for this league+season if one exists,
+    // but always ensure platform is up-to-date (old rows defaulted to 'sleeper').
+    const existing = await prisma.leagueInvite.findFirst({
         where: { sleeperLeagueId: leagueId, season },
-        select: { token: true },
+        select: { id: true, token: true, platform: true },
     });
 
-    if (!invite) {
+    let invite: { token: string };
+
+    if (existing) {
+        if (existing.platform !== platform) {
+            await prisma.leagueInvite.update({
+                where: { id: existing.id },
+                data:  { platform },
+            });
+        }
+        invite = { token: existing.token };
+    } else {
         invite = await prisma.leagueInvite.create({
             data: {
                 sleeperLeagueId: leagueId,
