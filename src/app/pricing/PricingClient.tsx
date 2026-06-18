@@ -130,13 +130,13 @@ const PLAYER_PRO_FEATURES: Feature[] = [
     { name: 'Optimized Lineups',                       included: false, tooltip: tip('Optimized Lineups') },
     { name: 'Start/Sit Intelligence',                  included: false, tooltip: tip('Start/Sit Intelligence') },
     { name: 'Waiver Wire Intelligence',                included: false, tooltip: tip('Waiver Wire Intelligence') },
-    { name: 'Roster Intelligence',                     included: false, tooltip: tip('Roster Intelligence') },
     { name: 'Player Rankings',                         included: false, tooltip: tip('Player Rankings') },
     { name: 'Team DTV Rankings',                       included: false, tooltip: tip('Team DTV Rankings') },
     { name: 'League Power Rankings',                   included: false, tooltip: tip('League Power Rankings') },
     { name: 'Dynamic Trade Evaluator',                 included: false, tooltip: tip('Dynamic Trade Evaluator') },
     { name: 'Draft Board',                             included: false, tooltip: tip('Draft Board') },
     { name: 'Draft Report',                            included: false, tooltip: tip('Draft Report') },
+    { name: 'Roster Intelligence',                     included: false, tooltip: tip('Roster Intelligence') },
     { name: 'Live Draft Assistant',                    included: false, tooltip: tip('Live Draft Assistant') },
 ];
 
@@ -151,13 +151,13 @@ const PLAYER_ALL_PRO_FEATURES: Feature[] = [
     { name: 'Optimized Lineups',                       included: true,  tooltip: tip('Optimized Lineups') },
     { name: 'Start/Sit Intelligence',                  included: true,  tooltip: tip('Start/Sit Intelligence') },
     { name: 'Waiver Wire Intelligence',                included: true,  tooltip: tip('Waiver Wire Intelligence') },
-    { name: 'Roster Intelligence',                     included: false, tooltip: tip('Roster Intelligence') },
     { name: 'Player Rankings',                         included: true,  tooltip: tip('Player Rankings') },
     { name: 'Team DTV Rankings',                       included: true,  tooltip: tip('Team DTV Rankings') },
     { name: 'League Power Rankings',                   included: true,  tooltip: tip('League Power Rankings') },
     { name: 'Dynamic Trade Evaluator',                 included: true,  tooltip: tip('Dynamic Trade Evaluator') },
     { name: 'Draft Board',                             included: true,  tooltip: tip('Draft Board') },
     { name: 'Draft Report',                            included: true,  tooltip: tip('Draft Report') },
+    { name: 'Roster Intelligence',                     included: false, tooltip: tip('Roster Intelligence') },
     { name: 'Live Draft Assistant',                    included: false, tooltip: tip('Live Draft Assistant') },
 ];
 
@@ -172,13 +172,13 @@ const PLAYER_ELITE_FEATURES: Feature[] = [
     { name: 'Optimized Lineups',                       included: true, tooltip: tip('Optimized Lineups') },
     { name: 'Start/Sit Intelligence',                  included: true, tooltip: tip('Start/Sit Intelligence') },
     { name: 'Waiver Wire Intelligence',                included: true, tooltip: tip('Waiver Wire Intelligence') },
-    { name: 'Roster Intelligence',                     included: true, tooltip: tip('Roster Intelligence') },
     { name: 'Player Rankings',                         included: true, tooltip: tip('Player Rankings') },
     { name: 'Team DTV Rankings',                       included: true, tooltip: tip('Team DTV Rankings') },
     { name: 'League Power Rankings',                   included: true, tooltip: tip('League Power Rankings') },
     { name: 'Dynamic Trade Evaluator',                 included: true, tooltip: tip('Dynamic Trade Evaluator') },
     { name: 'Draft Board',                             included: true, tooltip: tip('Draft Board') },
     { name: 'Draft Report',                            included: true, tooltip: tip('Draft Report') },
+    { name: 'Roster Intelligence',                     included: true, tooltip: tip('Roster Intelligence') },
     { name: 'Live Draft Assistant',                    included: true, tooltip: tip('Live Draft Assistant') },
 ];
 
@@ -197,13 +197,13 @@ const COMM_PRO_FEATURES: Feature[] = [
     { name: 'Optimized Lineups',                       included: false, tooltip: tip('Optimized Lineups') },
     { name: 'Start/Sit Intelligence',                  included: false, tooltip: tip('Start/Sit Intelligence') },
     { name: 'Waiver Wire Intelligence',                included: false, tooltip: tip('Waiver Wire Intelligence') },
-    { name: 'Roster Intelligence',                     included: false, tooltip: tip('Roster Intelligence') },
     { name: 'Player Rankings',                         included: false, tooltip: tip('Player Rankings') },
     { name: 'Team DTV Rankings',                       included: false, tooltip: tip('Team DTV Rankings') },
     { name: 'League Power Rankings',                   included: false, tooltip: tip('League Power Rankings') },
     { name: 'Dynamic Trade Evaluator',                 included: false, tooltip: tip('Dynamic Trade Evaluator') },
     { name: 'Draft Board',                             included: false, tooltip: tip('Draft Board') },
     { name: 'Draft Report',                            included: false, tooltip: tip('Draft Report') },
+    { name: 'Roster Intelligence',                     included: false, tooltip: tip('Roster Intelligence') },
     { name: 'Live Draft Assistant',                    included: false, tooltip: tip('Live Draft Assistant') },
 ];
 
@@ -221,13 +221,13 @@ const COMM_ALL_PRO_FEATURES: Feature[] = [
     { name: 'Optimized Lineups',                       included: true,  tooltip: tip('Optimized Lineups') },
     { name: 'Start/Sit Intelligence',                  included: true,  tooltip: tip('Start/Sit Intelligence') },
     { name: 'Waiver Wire Intelligence',                included: true,  tooltip: tip('Waiver Wire Intelligence') },
-    { name: 'Roster Intelligence',                     included: false, tooltip: tip('Roster Intelligence') },
     { name: 'Player Rankings',                         included: true,  tooltip: tip('Player Rankings') },
     { name: 'Team DTV Rankings',                       included: true,  tooltip: tip('Team DTV Rankings') },
     { name: 'League Power Rankings',                   included: true,  tooltip: tip('League Power Rankings') },
     { name: 'Dynamic Trade Evaluator',                 included: true,  tooltip: tip('Dynamic Trade Evaluator') },
     { name: 'Draft Board',                             included: true,  tooltip: tip('Draft Board') },
     { name: 'Draft Report',                            included: true,  tooltip: tip('Draft Report') },
+    { name: 'Roster Intelligence',                     included: false, tooltip: tip('Roster Intelligence') },
     { name: 'Live Draft Assistant',                    included: false, tooltip: tip('Live Draft Assistant') },
 ];
 
@@ -245,13 +245,13 @@ const COMM_ELITE_FEATURES: Feature[] = [
     { name: 'Optimized Lineups',                       included: true, tooltip: tip('Optimized Lineups') },
     { name: 'Start/Sit Intelligence',                  included: true, tooltip: tip('Start/Sit Intelligence') },
     { name: 'Waiver Wire Intelligence',                included: true, tooltip: tip('Waiver Wire Intelligence') },
-    { name: 'Roster Intelligence',                     included: true, tooltip: tip('Roster Intelligence') },
     { name: 'Player Rankings',                         included: true, tooltip: tip('Player Rankings') },
     { name: 'Team DTV Rankings',                       included: true, tooltip: tip('Team DTV Rankings') },
     { name: 'League Power Rankings',                   included: true, tooltip: tip('League Power Rankings') },
     { name: 'Dynamic Trade Evaluator',                 included: true, tooltip: tip('Dynamic Trade Evaluator') },
     { name: 'Draft Board',                             included: true, tooltip: tip('Draft Board') },
     { name: 'Draft Report',                            included: true, tooltip: tip('Draft Report') },
+    { name: 'Roster Intelligence',                     included: true, tooltip: tip('Roster Intelligence') },
     { name: 'Live Draft Assistant',                    included: true, tooltip: tip('Live Draft Assistant') },
 ];
 
