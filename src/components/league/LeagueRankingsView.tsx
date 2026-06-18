@@ -191,12 +191,12 @@ function PowerRankingsTable({ rankings, preseason, lastSeasonRankings }: { ranki
         <div className="overflow-x-auto">
             {lastSeasonRankings && (
                 <div className="px-6 py-2 border-b border-gray-800 text-xs text-gray-500">
-                    Pre-season — showing last season&apos;s final power rankings
+                    Pre-season — showing last season&apos;s final power rankings &middot; Scores are based on win/loss record, points for, and strength of schedule
                 </div>
             )}
             {preseason && !lastSeasonRankings && (
                 <div className="px-6 py-2 border-b border-gray-800 text-xs text-gray-600">
-                    Pre-season — power scores based on points scored only.
+                    Pre-season — scores are based on win/loss record, points for, and strength of schedule
                 </div>
             )}
             <table className="w-full text-sm">
