@@ -2,13 +2,12 @@
 
 import { useRouter } from 'next/navigation';
 
-export type HubTabKey = 'lineups' | 'start-sit' | 'waiver' | 'trade' | 'roster';
+export type HubTabKey = 'lineups' | 'start-sit' | 'waiver' | 'roster';
 
 const TABS: { key: HubTabKey; label: string }[] = [
     { key: 'lineups',   label: 'Optimized Lineups'       },
     { key: 'start-sit', label: 'Start/Sit Intelligence'  },
     { key: 'waiver',    label: 'Waiver Wire Intelligence' },
-    { key: 'trade',     label: 'Trade Insights'          },
     { key: 'roster',    label: 'Roster Intelligence'     },
 ];
 

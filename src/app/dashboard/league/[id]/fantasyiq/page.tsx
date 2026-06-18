@@ -27,7 +27,6 @@ import {
 } from '@/lib/projection-engine';
 import OptimizedLineups       from './OptimizedLineups';
 import WaiverWireTargets      from './WaiverWireTargets';
-import TradeInsights          from './TradeInsights';
 import RosterIntelligencePanel from './RosterIntelligence';
 import HubContent             from './HubContent';
 
@@ -272,7 +271,6 @@ export default async function FantasyiQHubPage({ params }: { params: Promise<{ i
                 totalRosters={league.totalRosters}
                 lineups={<OptimizedLineups optimizations={optimizations} offSeason={offSeason} />}
                 waiver={<WaiverWireTargets  analyses={waiverAnalyses}     offSeason={offSeason} />}
-                trade={<TradeInsights       insights={tradeInsights}       offSeason={offSeason} />}
                 roster={<RosterIntelligencePanel intelligence={rosterIntelligence} offSeason={offSeason} />}
             />
         </>

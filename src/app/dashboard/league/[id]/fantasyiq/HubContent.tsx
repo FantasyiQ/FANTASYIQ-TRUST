@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import HubTabBar, { type HubTabKey } from './HubTabBar';
 
-type SectionTab = 'lineups' | 'waiver' | 'trade' | 'roster';
+type SectionTab = 'lineups' | 'waiver' | 'roster';
 
 interface HubContentProps {
     leagueId:     string;
@@ -14,7 +14,6 @@ interface HubContentProps {
     // Pre-rendered server slots — shown/hidden by client tab state
     lineups:      React.ReactNode;
     waiver:       React.ReactNode;
-    trade:        React.ReactNode;
     roster:       React.ReactNode;
 }
 
@@ -32,13 +31,12 @@ export default function HubContent({
     totalRosters,
     lineups,
     waiver,
-    trade,
     roster,
 }: HubContentProps) {
     const [activeSection, setActiveSection] = useState<SectionTab>('lineups');
 
     function onSectionChange(tab: HubTabKey) {
-        if (tab === 'lineups' || tab === 'waiver' || tab === 'trade' || tab === 'roster') {
+        if (tab === 'lineups' || tab === 'waiver' || tab === 'roster') {
             setActiveSection(tab);
         }
     }
@@ -79,7 +77,6 @@ export default function HubContent({
             {/* Tab content — all slots are pre-rendered server-side, hidden via CSS */}
             <div className={activeSection === 'lineups' ? '' : 'hidden'}>{lineups}</div>
             <div className={activeSection === 'waiver'  ? '' : 'hidden'}>{waiver}</div>
-            <div className={activeSection === 'trade'   ? '' : 'hidden'}>{trade}</div>
             <div className={activeSection === 'roster'  ? '' : 'hidden'}>{roster}</div>
         </div>
     );
