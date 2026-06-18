@@ -55,10 +55,11 @@ export type LeagueRankingsData = {
         leagueType:  LeagueType;
         scoringType: string | null;
     };
-    playerRankings: PlayerRankingRow[];
-    teamRankings:   TeamRankingRow[];
-    powerRankings:  PowerRankingRow[];
-    valueSyncedAt:    string | null;
+    playerRankings:     PlayerRankingRow[];
+    teamRankings:       TeamRankingRow[];
+    powerRankings:      PowerRankingRow[];
+    valueSyncedAt:      string | null;
+    lastSeasonRankings: boolean;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -367,7 +368,7 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
             .sort((a, b) => b.powerScore - a.powerScore || b.pf - a.pf)
             .map((r, i) => ({ ...r, rank: i + 1 }));
 
-        return { league: leagueResult, playerRankings, teamRankings, powerRankings, valueSyncedAt: latestSync?.updatedAt.toISOString() ?? null };
+        return { league: leagueResult, playerRankings, teamRankings, powerRankings, valueSyncedAt: latestSync?.updatedAt.toISOString() ?? null, lastSeasonRankings: false };
     }
 
     // ── Sleeper branch: fetch live rosters + members ──────────────────────────
@@ -424,6 +425,31 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
     const maxPf = Math.max(...rosterRows.map(r => r.pf), 1);
     const maxPa = Math.max(...rosterRows.map(r => r.pa), 0);
 
+    // Pre-season: all rosters have no games and no points — show last season's snapshot instead
+    const isPreseason = rosterRows.every(r => r.wins === 0 && r.losses === 0 && r.pf === 0);
+    if (isPreseason) {
+        const lastSnapshot = await prisma.powerRankingSnapshot.findFirst({
+            where:   { leagueId: league.leagueId },
+            orderBy: { week: 'desc' },
+            select:  { data: true },
+        });
+        if (lastSnapshot?.data) {
+            type SnapshotRow = { rank: number; rosterId: number; ownerName: string; wins: number; losses: number; pf: number; pa: number; powerScore: number };
+            const snapshotRankings: PowerRankingRow[] = (lastSnapshot.data as SnapshotRow[]).map(r => ({
+                rank:       r.rank,
+                rosterId:   r.rosterId,
+                teamName:   `Team ${r.rosterId}`,
+                ownerName:  r.ownerName,
+                wins:       r.wins,
+                losses:     r.losses,
+                pf:         r.pf,
+                pa:         r.pa,
+                powerScore: r.powerScore,
+            }));
+            return { league: leagueResult, playerRankings, teamRankings, powerRankings: snapshotRankings, valueSyncedAt: latestSync?.updatedAt.toISOString() ?? null, lastSeasonRankings: true };
+        }
+    }
+
     const powerRankings: PowerRankingRow[] = rosterRows
         .map(r => ({
             ...r,
@@ -433,5 +459,5 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
         .sort((a, b) => b.powerScore - a.powerScore || b.pf - a.pf)
         .map((r, i) => ({ ...r, rank: i + 1 }));
 
-    return { league: leagueResult, playerRankings, teamRankings, powerRankings, valueSyncedAt: latestSync?.updatedAt.toISOString() ?? null };
+    return { league: leagueResult, playerRankings, teamRankings, powerRankings, valueSyncedAt: latestSync?.updatedAt.toISOString() ?? null, lastSeasonRankings: false };
 }

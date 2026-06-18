@@ -186,10 +186,15 @@ function TeamRankingsTable({ rankings }: { rankings: TeamRankingRow[] }) {
     );
 }
 
-function PowerRankingsTable({ rankings, preseason }: { rankings: PowerRankingRow[]; preseason: boolean }) {
+function PowerRankingsTable({ rankings, preseason, lastSeasonRankings }: { rankings: PowerRankingRow[]; preseason: boolean; lastSeasonRankings: boolean }) {
     return (
         <div className="overflow-x-auto">
-            {preseason && (
+            {lastSeasonRankings && (
+                <div className="px-6 py-2 border-b border-gray-800 text-xs text-gray-500">
+                    Pre-season — showing last season&apos;s final power rankings
+                </div>
+            )}
+            {preseason && !lastSeasonRankings && (
                 <div className="px-6 py-2 border-b border-gray-800 text-xs text-gray-600">
                     Pre-season — power scores based on points scored only.
                 </div>
@@ -233,6 +238,7 @@ export function LeagueRankingsView({
     teamRankings,
     powerRankings,
     valueSyncedAt,
+    lastSeasonRankings,
     preseason,
     search,
     position,
@@ -291,7 +297,7 @@ export function LeagueRankingsView({
                 <TeamRankingsTable rankings={teamRankings} />
             )}
             {tab === 'power' && (
-                <PowerRankingsTable rankings={powerRankings} preseason={preseason} />
+                <PowerRankingsTable rankings={powerRankings} preseason={preseason} lastSeasonRankings={lastSeasonRankings} />
             )}
         </div>
     );
