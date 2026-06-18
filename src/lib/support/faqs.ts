@@ -287,6 +287,13 @@ export const FAQ_ITEMS: FAQItem[] = [
         tags:     ['mock draft', 'simulator', 'draft', 'ai', 'simulate', 'practice', 'elite', 'snake', 'dynasty'],
     },
     {
+        id:       'draft-strategy',
+        category: 'draft-reports',
+        question: 'What is Draft Strategy?',
+        answer:   'Draft Strategy is a pre-draft game plan tool that analyzes your roster, league scoring format, roster slots, and positional scarcity to recommend which positions to prioritize and when to target them. It adapts to your league\'s specific settings automatically. Available on Player All-Pro and Elite plans.',
+        tags:     ['draft strategy', 'strategy', 'draft', 'pre-draft', 'planning', 'all-pro', 'elite'],
+    },
+    {
         id:       'matchup-projections',
         category: 'draft-reports',
         question: 'What are Matchup Projections?',
