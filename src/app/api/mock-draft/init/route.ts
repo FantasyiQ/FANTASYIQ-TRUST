@@ -102,6 +102,7 @@ export async function GET(req: NextRequest): Promise<Response> {
             leagueType: true, rosterPositions: true, scoringType: true,
             totalRosters: true, sleeperUserId: true, season: true,
             assignedPlanId: true, assignedPlanType: true,
+            platform: true, standings: true,
         },
     });
 
@@ -133,13 +134,33 @@ export async function GET(req: NextRequest): Promise<Response> {
     const forceEmptyRosters = modeParam === 'redraft';
 
     // ── Parallel Sleeper fetches ───────────────────────────────────────────────
-    const [rosters, members, drafts, dbUser, tradedPicksRaw] = await Promise.all([
+    let [rosters, members, drafts, dbUser, tradedPicksRaw] = await Promise.all([
         getLeagueRosters(league.leagueId).catch(() => []),
         getLeagueUsers(league.leagueId).catch(() => []),
         getLeagueDrafts(league.leagueId).catch(() => []),
         prisma.user.findUnique({ where: { id: session.user.id }, select: { sleeperUserId: true } }),
         getTradedPicks(league.leagueId).catch(() => [] as SleeperTradedPick[]),
     ]);
+
+    // For ESPN / Yahoo / NFL leagues, Sleeper calls return [].
+    // Fall back to team data stored in league.standings during ESPN sync.
+    if (rosters.length === 0 && league.platform !== 'sleeper') {
+        type StandingRow = { teamId?: string | number; name?: string; abbrev?: string; ownerId?: string };
+        const rows = Array.isArray(league.standings) ? (league.standings as StandingRow[]) : [];
+        if (rows.length > 0) {
+            rosters = rows.map((t, i) => ({
+                roster_id: parseInt(String(t.teamId ?? i + 1), 10) || (i + 1),
+                owner_id:  String(t.ownerId ?? t.teamId ?? i + 1),
+                players:   [] as string[],
+            })) as typeof rosters;
+            members = rows.map(t => ({
+                user_id:      String(t.ownerId ?? t.teamId ?? ''),
+                display_name: t.name ?? t.abbrev ?? 'Team',
+                metadata:     { team_name: t.name ?? '' },
+                avatar:       null,
+            })) as typeof members;
+        }
+    }
 
     // ── Identify user's roster ────────────────────────────────────────────────
     const mySleeperUserId = dbUser?.sleeperUserId ?? league.sleeperUserId ?? null;
