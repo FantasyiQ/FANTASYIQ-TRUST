@@ -274,7 +274,7 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
                 <div className="border-t border-gray-800 pt-3">
                     <CommissionerQuickActions
                         leagueDbId={leagueId}
-                        sleeperLeagueId={league.platform !== 'espn' ? (league.leagueId ?? null) : null}
+                        sleeperLeagueId={league.leagueId ?? null}
                         leagueName={league.leagueName ?? ''}
                         season={league.season ?? ''}
                         hasDues={!!dues}
