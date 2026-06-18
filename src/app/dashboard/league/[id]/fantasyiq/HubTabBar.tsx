@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 
-export type HubTabKey = 'lineups' | 'start-sit' | 'waiver' | 'trade' | 'roster' | 'dfs';
+export type HubTabKey = 'lineups' | 'start-sit' | 'waiver' | 'trade' | 'roster';
 
 const TABS: { key: HubTabKey; label: string }[] = [
     { key: 'lineups',   label: 'Optimized Lineups'       },
@@ -10,12 +10,11 @@ const TABS: { key: HubTabKey; label: string }[] = [
     { key: 'waiver',    label: 'Waiver Wire Intelligence' },
     { key: 'trade',     label: 'Trade Insights'          },
     { key: 'roster',    label: 'Roster Intelligence'     },
-    { key: 'dfs',       label: 'Weekly DFS Challenge'    },
 ];
 
 // Section tabs live on the main /fantasyiq page (no route change — state only).
 // Route tabs navigate to a nested sub-route.
-const ROUTE_TABS = new Set<HubTabKey>(['start-sit', 'dfs']);
+const ROUTE_TABS = new Set<HubTabKey>(['start-sit']);
 
 interface HubTabBarProps {
     leagueId:         string;
@@ -29,7 +28,6 @@ export default function HubTabBar({ leagueId, activeTab, onSectionChange }: HubT
 
     function routeHref(key: HubTabKey) {
         if (key === 'start-sit') return `${base}/start-sit`;
-        if (key === 'dfs')       return `${base}/dfs`;
         return base;
     }
 

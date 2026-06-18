@@ -27,10 +27,11 @@ export default function LeagueTabs({ leagueId }: { leagueId: string; isCommissio
             <Tab href={`/dashboard/league/${leagueId}/overview`}      label="Overview"         />
             <Tab href={`/dashboard/league/${leagueId}/roster`}        label="My Roster"        />
             <Tab href={`/dashboard/league/${leagueId}/fantasyiq`}     label="FantasyiQ Hub"    />
-            <Tab href={`/dashboard/league/${leagueId}/draft`}         label="Draft War Room"   />
             <Tab href={`/dashboard/league/${leagueId}/rankings`}      label="Rankings"         />
             <Tab href={`/dashboard/league/${leagueId}/trade`}         label="Trade Evaluator"  />
+            <Tab href={`/dashboard/league/${leagueId}/draft`}         label="Draft War Room"   />
             <Tab href={`/dashboard/league/${leagueId}/commissioner`}  label="Commissioner Hub" />
+            <Tab href={`/dashboard/league/${leagueId}/dfs`}           label="Weekly DFS"       />
         </nav>
     );
 }
