@@ -20,13 +20,13 @@ async function applyCommissionerCoverage(memberLeagueDbId: string, sleeperLeague
     });
 }
 
-// Auto-accept an invite for a logged-in user:
+// Auto-accept a Sleeper invite for a logged-in user:
 // 1. Fetch the Sleeper league (public API — no user credentials needed)
 // 2. Upsert the League record in our DB
 // 3. Propagate commissioner coverage to the member's League row
 // 4. Add a ConnectedLeague entry
 // 5. Return the DB league ID for redirect
-async function acceptInvite(
+async function acceptSleeperInvite(
     userId:        string,
     sleeperUserId: string | null,
     invite: { sleeperLeagueId: string },
@@ -101,9 +101,11 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
 
     const invite = await prisma.leagueInvite.findUnique({
         where:  { token },
-        select: { leagueName: true, season: true, sleeperLeagueId: true },
+        select: { leagueName: true, season: true, sleeperLeagueId: true, platform: true },
     });
     if (!invite) notFound();
+
+    const isEspn = invite.platform === 'espn';
 
     // Fetch league documents to show on the landing page (no auth required)
     const commLeague = await prisma.league.findFirst({
@@ -125,7 +127,15 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
         });
 
         if (dbUser) {
-            // Fast path: league already in DB for this user
+            if (isEspn) {
+                // ESPN leagues can't be auto-accepted — each member needs their own ESPN credentials.
+                // Send them to the ESPN sync page with the league ID pre-filled.
+                redirect(
+                    `/dashboard/sync/espn?leagueId=${invite.sleeperLeagueId}&fromInvite=1&leagueName=${encodeURIComponent(invite.leagueName)}`,
+                );
+            }
+
+            // Fast path: Sleeper league already in DB for this user
             const existing = await prisma.league.findFirst({
                 where:  { userId: dbUser.id, leagueId: invite.sleeperLeagueId },
                 select: { id: true },
@@ -155,7 +165,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
 
             // Auto-accept: fetch from Sleeper, create records, redirect — no UI shown
             try {
-                const leagueDbId = await acceptInvite(dbUser.id, dbUser.sleeperUserId, invite);
+                const leagueDbId = await acceptSleeperInvite(dbUser.id, dbUser.sleeperUserId, invite);
                 redirect(`/dashboard/league/${leagueDbId}/dues/pay`);
             } catch {
                 // Sleeper unreachable — fall back to sync page
@@ -187,13 +197,33 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
                         <strong className="text-white">{invite.leagueName}</strong> on{' '}
                         <span className="text-[#D4AF37] font-semibold">FantasyiQ Trust</span>.
                     </p>
-                    <ul className="space-y-1.5 text-gray-500 text-xs">
-                        <li>✓ See who&apos;s paid dues and who hasn&apos;t</li>
-                        <li>✓ View payout structure and standings</li>
-                        <li>✓ Trade evaluator with dynasty player values</li>
-                        <li>✓ League announcements from your commissioner</li>
-                    </ul>
+                    {isEspn ? (
+                        <ul className="space-y-1.5 text-gray-500 text-xs">
+                            <li>✓ See who&apos;s paid dues and who hasn&apos;t</li>
+                            <li>✓ View payout structure and standings</li>
+                            <li>✓ Trade evaluator with dynasty player values</li>
+                            <li>✓ League announcements from your commissioner</li>
+                            <li className="text-gray-600">You&apos;ll connect your ESPN account after signing in</li>
+                        </ul>
+                    ) : (
+                        <ul className="space-y-1.5 text-gray-500 text-xs">
+                            <li>✓ See who&apos;s paid dues and who hasn&apos;t</li>
+                            <li>✓ View payout structure and standings</li>
+                            <li>✓ Trade evaluator with dynasty player values</li>
+                            <li>✓ League announcements from your commissioner</li>
+                        </ul>
+                    )}
                 </div>
+
+                {isEspn && (
+                    <div className="bg-blue-950/40 border border-blue-800/50 rounded-2xl p-4 text-left space-y-1">
+                        <p className="text-blue-300 text-xs font-semibold">ESPN league — one extra step</p>
+                        <p className="text-blue-400 text-xs">
+                            After signing in, you&apos;ll connect your ESPN credentials using the free FiQ ESPN Connector extension.
+                            It takes about 30 seconds.
+                        </p>
+                    </div>
+                )}
 
                 {documents.length > 0 && (
                     <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden text-left">
@@ -234,8 +264,10 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
                 </div>
 
                 <p className="text-gray-700 text-xs">
-                    Sign in and you&apos;ll be taken directly into{' '}
-                    <strong className="text-gray-600">{invite.leagueName}</strong>.
+                    {isEspn
+                        ? 'Sign in and you\'ll be guided through connecting your ESPN account.'
+                        : `Sign in and you'll be taken directly into ${invite.leagueName}.`
+                    }
                 </p>
             </div>
         </main>

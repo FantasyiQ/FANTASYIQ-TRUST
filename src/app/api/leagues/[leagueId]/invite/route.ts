@@ -27,7 +27,7 @@ export async function POST(
     // Prefer DB ownership check (works for all platforms — Sleeper, ESPN, etc.)
     const dbLeague = await prisma.league.findFirst({
         where: { leagueId, userId: user.id },
-        select: { id: true },
+        select: { id: true, platform: true },
     });
 
     if (!dbLeague) {
@@ -54,6 +54,8 @@ export async function POST(
         return Response.json({ error: 'leagueName and season required.' }, { status: 400 });
     }
 
+    const platform = dbLeague?.platform ?? 'sleeper';
+
     // Reuse existing invite for this league+season if one exists
     let invite = await prisma.leagueInvite.findFirst({
         where: { sleeperLeagueId: leagueId, season },
@@ -66,6 +68,7 @@ export async function POST(
                 sleeperLeagueId: leagueId,
                 leagueName,
                 season,
+                platform,
                 createdById: user.id,
             },
             select: { token: true },

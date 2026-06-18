@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 // ── Extension types (mirrors the extension's types.ts) ────────────────────────
 
@@ -344,10 +344,15 @@ function ExtensionConnector({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function EspnSyncPage() {
-    const router = useRouter();
+    const router       = useRouter();
+    const searchParams = useSearchParams();
+
+    const prefilledLeagueId = searchParams.get('leagueId') ?? '';
+    const fromInvite        = searchParams.get('fromInvite') === '1';
+    const inviteLeagueName  = searchParams.get('leagueName') ?? '';
 
     const [step, setStep]                 = useState<Step>('credentials');
-    const [leagueId, setLeagueId]         = useState('');
+    const [leagueId, setLeagueId]         = useState(prefilledLeagueId);
     const [espnS2, setEspnS2]             = useState('');
     const [swid, setSwid]                 = useState('');
     const [credStatus, setCredStatus]     = useState<CredentialStatus>('idle');
@@ -466,6 +471,17 @@ export default function EspnSyncPage() {
                     <h1 className="text-2xl font-bold mt-3">Sync ESPN League</h1>
                     <p className="text-gray-400 text-sm mt-1">Connect your ESPN Fantasy Football league to FantasyiQ Trust.</p>
                 </div>
+
+                {fromInvite && inviteLeagueName && (
+                    <div className="bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-2xl px-5 py-4">
+                        <p className="text-[#D4AF37] font-semibold text-sm">
+                            You were invited to <strong>{inviteLeagueName}</strong>
+                        </p>
+                        <p className="text-gray-400 text-xs mt-1">
+                            Connect your ESPN account below — the league ID is pre-filled for you.
+                        </p>
+                    </div>
+                )}
 
                 {/* Step indicator */}
                 <div className="flex items-center gap-2 text-sm">

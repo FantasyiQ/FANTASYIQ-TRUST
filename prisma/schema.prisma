@@ -576,6 +576,7 @@ model LeagueInvite {
     sleeperLeagueId String
     leagueName      String
     season          String
+    platform        String   @default("sleeper")
     createdById     String
     createdAt       DateTime @default(now())
 
