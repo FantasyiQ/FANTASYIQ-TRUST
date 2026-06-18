@@ -269,6 +269,7 @@ export default async function FantasyiQHubPage({ params }: { params: Promise<{ i
                 season={season}
                 scoringType={league.scoringType ?? 'std'}
                 totalRosters={league.totalRosters}
+                platform={league.platform ?? undefined}
                 lineups={<OptimizedLineups optimizations={optimizations} offSeason={offSeason} />}
                 waiver={<WaiverWireTargets  analyses={waiverAnalyses}     offSeason={offSeason} />}
                 roster={<RosterIntelligencePanel intelligence={rosterIntelligence} offSeason={offSeason} />}

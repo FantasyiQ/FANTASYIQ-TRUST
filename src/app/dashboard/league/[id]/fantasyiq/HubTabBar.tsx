@@ -17,14 +17,16 @@ const TABS: { key: HubTabKey; label: string }[] = [
 const ROUTE_TABS = new Set<HubTabKey>(['start-sit', 'projections']);
 
 interface HubTabBarProps {
-    leagueId:         string;
-    activeTab:        HubTabKey;
-    onSectionChange?: (tab: HubTabKey) => void;
+    leagueId:          string;
+    activeTab:         HubTabKey;
+    onSectionChange?:  (tab: HubTabKey) => void;
+    hideProjections?:  boolean;
 }
 
-export default function HubTabBar({ leagueId, activeTab, onSectionChange }: HubTabBarProps) {
+export default function HubTabBar({ leagueId, activeTab, onSectionChange, hideProjections = false }: HubTabBarProps) {
     const router = useRouter();
     const base   = `/dashboard/league/${leagueId}/fantasyiq`;
+    const tabs   = hideProjections ? TABS.filter(t => t.key !== 'projections') : TABS;
 
     function routeHref(key: HubTabKey) {
         if (key === 'start-sit')   return `${base}/start-sit`;
@@ -47,7 +49,7 @@ export default function HubTabBar({ leagueId, activeTab, onSectionChange }: HubT
             className="flex gap-0.5 border-b border-gray-800 overflow-x-auto"
             style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}
         >
-            {TABS.map(tab => {
+            {tabs.map(tab => {
                 const isActive = tab.key === activeTab;
                 return (
                     <button

@@ -50,24 +50,7 @@ export default async function HubProjectionsPage({
     if (!league || league.userId !== session.user.id) notFound();
 
     if (league.platform !== 'sleeper') {
-        return (
-            <div className="space-y-6">
-                <div className="flex items-start justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl font-bold text-white">FantasyiQ Hub</h1>
-                        <p className="text-gray-500 text-sm mt-0.5">{league.leagueName}</p>
-                    </div>
-                    <div className="shrink-0 text-right">
-                        <div className="text-[10px] font-bold tracking-widest text-[#D4AF37]">FantasyiQ</div>
-                    </div>
-                </div>
-                <HubTabBar leagueId={id} activeTab="projections" />
-                <div className="rounded-2xl bg-gray-900 border border-gray-800 px-6 py-12 text-center">
-                    <p className="text-gray-400 text-sm font-semibold">Projections are only available for Sleeper leagues.</p>
-                    <p className="text-gray-600 text-xs mt-1">ESPN league projection support coming soon.</p>
-                </div>
-            </div>
-        );
+        redirect(`/dashboard/league/${id}/fantasyiq`);
     }
 
     const nflState = await getNflState();
@@ -89,7 +72,7 @@ export default async function HubProjectionsPage({
         return (
             <div className="space-y-6">
                 {header}
-                <HubTabBar leagueId={id} activeTab="projections" />
+                <HubTabBar leagueId={id} activeTab="projections" hideProjections={false} />
                 <MatchupProjections matchups={[]} week={0} season={season} scoringType={league.scoringType ?? null} offSeason />
             </div>
         );
@@ -213,7 +196,7 @@ export default async function HubProjectionsPage({
     return (
         <div className="space-y-6">
             {header}
-            <HubTabBar leagueId={id} activeTab="projections" />
+            <HubTabBar leagueId={id} activeTab="projections" hideProjections={false} />
             <MatchupProjections
                 matchups={matchups}
                 week={week}

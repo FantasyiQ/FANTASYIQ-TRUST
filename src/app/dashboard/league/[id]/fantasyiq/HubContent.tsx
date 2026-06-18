@@ -11,6 +11,7 @@ interface HubContentProps {
     season:       string;
     scoringType:  string;
     totalRosters: number;
+    platform?:    string;
     // Pre-rendered server slots — shown/hidden by client tab state
     lineups:      React.ReactNode;
     waiver:       React.ReactNode;
@@ -29,6 +30,7 @@ export default function HubContent({
     season,
     scoringType,
     totalRosters,
+    platform,
     lineups,
     waiver,
     roster,
@@ -72,6 +74,7 @@ export default function HubContent({
                 leagueId={leagueId}
                 activeTab={activeSection}
                 onSectionChange={onSectionChange}
+                hideProjections={platform !== 'sleeper'}
             />
 
             {/* Tab content — all slots are pre-rendered server-side, hidden via CSS */}
