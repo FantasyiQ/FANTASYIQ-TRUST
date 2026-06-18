@@ -427,7 +427,7 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
     const maxPa = Math.max(...rosterRows.map(r => r.pa), 0);
 
     // Pre-season: show last season's final power rankings instead of all-zero current data
-    if (nflState.season_type === 'pre') {
+    if (nflState.season_type === 'pre' || nflState.season_type === 'off') {
         // Try current league's snapshots first, then follow previous_league_id to last season
         let lastSnapshot = await prisma.powerRankingSnapshot.findFirst({
             where:   { leagueId: league.leagueId },
