@@ -428,22 +428,21 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
 
     // Pre-season: show last season's final power rankings instead of all-zero current data
     if (nflState.season_type === 'pre' || nflState.season_type === 'off') {
-        // Try current league's snapshots first, then follow previous_league_id to last season
+        const sleeperLeague = await getLeague(league.leagueId);
+        const prevId = sleeperLeague.previous_league_id ?? null;
+
+        // 1. Try DB snapshots (current league first, then previous league)
         let lastSnapshot = await prisma.powerRankingSnapshot.findFirst({
             where:   { leagueId: league.leagueId, week: { gt: 0 } },
             orderBy: { week: 'desc' },
             select:  { data: true },
         });
-        if (!lastSnapshot) {
-            const sleeperLeague = await getLeague(league.leagueId);
-            const prevId = sleeperLeague.previous_league_id;
-            if (prevId) {
-                lastSnapshot = await prisma.powerRankingSnapshot.findFirst({
-                    where:   { leagueId: prevId, week: { gt: 0 } },
-                    orderBy: { week: 'desc' },
-                    select:  { data: true },
-                });
-            }
+        if (!lastSnapshot && prevId) {
+            lastSnapshot = await prisma.powerRankingSnapshot.findFirst({
+                where:   { leagueId: prevId, week: { gt: 0 } },
+                orderBy: { week: 'desc' },
+                select:  { data: true },
+            });
         }
         if (lastSnapshot?.data) {
             type SnapshotRow = { rank: number; rosterId: number; ownerName: string; wins: number; losses: number; pf: number; pa: number; powerScore: number };
@@ -452,13 +451,37 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
                 rosterId:   r.rosterId,
                 teamName:   `Team ${r.rosterId}`,
                 ownerName:  r.ownerName,
-                wins:       r.wins        ?? 0,
-                losses:     r.losses      ?? 0,
-                pf:         r.pf          ?? 0,
-                pa:         r.pa          ?? 0,
-                powerScore: r.powerScore  ?? 50,
+                wins:       r.wins       ?? 0,
+                losses:     r.losses     ?? 0,
+                pf:         r.pf         ?? 0,
+                pa:         r.pa         ?? 0,
+                powerScore: r.powerScore ?? 50,
             }));
             return { league: leagueResult, playerRankings, teamRankings, powerRankings: snapshotRankings, valueSyncedAt: latestSync?.updatedAt.toISOString() ?? null, lastSeasonRankings: true };
+        }
+
+        // 2. No snapshot — fetch previous league's rosters directly from Sleeper API
+        if (prevId) {
+            const [prevRosters, prevMembers] = await Promise.all([
+                getLeagueRosters(prevId),
+                getLeagueUsers(prevId),
+            ]);
+            const prevOwnerName = new Map(prevMembers.map(m => [m.user_id, m.display_name ?? `Team ${m.user_id}`]));
+            const prevRows = prevRosters.map(r => ({
+                rosterId:  r.roster_id,
+                ownerName: r.owner_id ? (prevOwnerName.get(r.owner_id) ?? `Team ${r.roster_id}`) : `Team ${r.roster_id}`,
+                wins:   r.settings?.wins   ?? 0,
+                losses: r.settings?.losses ?? 0,
+                pf: (r.settings?.fpts         ?? 0) + (r.settings?.fpts_decimal         ?? 0) / 100,
+                pa: (r.settings?.fpts_against ?? 0) + (r.settings?.fpts_against_decimal ?? 0) / 100,
+            }));
+            const prevMaxPf = Math.max(...prevRows.map(r => r.pf), 1);
+            const prevMaxPa = Math.max(...prevRows.map(r => r.pa), 0);
+            const prevRankings: PowerRankingRow[] = prevRows
+                .map(r => ({ ...r, teamName: `Team ${r.rosterId}`, powerScore: computePowerScore(r.wins, r.losses, r.pf, r.pa, prevMaxPf, prevMaxPa) }))
+                .sort((a, b) => b.powerScore - a.powerScore || b.pf - a.pf)
+                .map((r, i) => ({ ...r, rank: i + 1 }));
+            return { league: leagueResult, playerRankings, teamRankings, powerRankings: prevRankings, valueSyncedAt: latestSync?.updatedAt.toISOString() ?? null, lastSeasonRankings: true };
         }
     }
 
