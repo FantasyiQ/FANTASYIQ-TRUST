@@ -31,7 +31,7 @@ export default async function MockDraftPage({
                 <MockDraftClient
                     leagueId={id}
                     leagueName={league.leagueName ?? 'My League'}
-                    leagueType={league.leagueType ?? 'Dynasty'}
+                    leagueType={league.leagueType ?? 'Redraft'}
                 />
             </div>
         </div>
