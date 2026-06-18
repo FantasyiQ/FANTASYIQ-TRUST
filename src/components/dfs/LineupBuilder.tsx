@@ -18,13 +18,13 @@ interface LineupEntry {
 }
 
 interface LineupBuilderProps {
-    contestId:   string;
-    slots:       string[];           // ordered DFS slot list e.g. ["QB","RB","RB","WR","WR","TE","FLEX","K","DEF"]
-    season:      string;
-    week:        number;
-    scoringType: string | null;
-    // Pre-fill from existing lineup (JSON array)
+    contestId:    string;
+    slots:        string[];
+    season:       string;
+    week:         number;
+    scoringType:  string | null;
     initialEntries?: { slot: string; playerId: string }[];
+    gameSchedule?: Record<string, number>; // team → epoch ms of kickoff
     onSaved?: () => void;
 }
 
@@ -49,7 +49,7 @@ function projPoints(player: SleeperPlayer, scoringType: string | null): number {
 }
 
 export default function LineupBuilder({
-    contestId, slots, season, week, scoringType, initialEntries, onSaved,
+    contestId, slots, season, week, scoringType, initialEntries, gameSchedule, onSaved,
 }: LineupBuilderProps) {
     // Build initial state
     const buildInitial = useCallback((): LineupEntry[] => {
@@ -71,7 +71,26 @@ export default function LineupBuilder({
     const [saving,       setSaving]       = useState(false);
     const [saveError,    setSaveError]    = useState('');
     const [saved,        setSaved]        = useState(false);
+    const [nowMs,        setNowMs]        = useState(() => Date.now());
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Tick every minute so per-player lock state stays current
+    useEffect(() => {
+        const id = setInterval(() => setNowMs(Date.now()), 60_000);
+        return () => clearInterval(id);
+    }, []);
+
+    function isSlotLocked(entry: LineupEntry): boolean {
+        if (!gameSchedule || !entry.player?.team) return false;
+        const kickoff = gameSchedule[entry.player.team];
+        return kickoff != null && nowMs >= kickoff;
+    }
+
+    function isPlayerGameStarted(player: SleeperPlayer): boolean {
+        if (!gameSchedule || !player.team) return false;
+        const kickoff = gameSchedule[player.team];
+        return kickoff != null && nowMs >= kickoff;
+    }
 
     // Re-init when initialEntries loads after first render (server data race)
     useEffect(() => {
@@ -181,19 +200,23 @@ export default function LineupBuilder({
             <div className="space-y-1.5">
                 {entries.map((entry, i) => {
                     const isActive = activeSlot === i;
-                    const pts = entry.player ? projPoints(entry.player, scoringType) : null;
+                    const locked   = isSlotLocked(entry);
+                    const pts      = entry.player ? projPoints(entry.player, scoringType) : null;
 
                     return (
                         <div key={i}>
                             <div
-                                className={`flex items-center gap-3 rounded-xl border px-4 py-3 transition cursor-pointer ${
-                                    isActive
-                                        ? 'border-[#D4AF37] bg-[#D4AF37]/5'
-                                        : entry.player
-                                            ? 'border-gray-700 bg-gray-900 hover:border-gray-600'
-                                            : 'border-dashed border-gray-700 bg-gray-900/50 hover:border-gray-500'
+                                className={`flex items-center gap-3 rounded-xl border px-4 py-3 transition ${
+                                    locked
+                                        ? 'border-gray-700 bg-gray-900 cursor-not-allowed'
+                                        : isActive
+                                            ? 'border-[#D4AF37] bg-[#D4AF37]/5 cursor-pointer'
+                                            : entry.player
+                                                ? 'border-gray-700 bg-gray-900 hover:border-gray-600 cursor-pointer'
+                                                : 'border-dashed border-gray-700 bg-gray-900/50 hover:border-gray-500 cursor-pointer'
                                 }`}
                                 onClick={() => {
+                                    if (locked) return;
                                     if (isActive) { setActiveSlot(null); setQuery(''); setResults([]); }
                                     else { setActiveSlot(i); setQuery(''); setResults([]); }
                                 }}
@@ -229,15 +252,17 @@ export default function LineupBuilder({
                                     </span>
                                 )}
 
-                                {/* Clear button */}
-                                {entry.player && (
+                                {/* Lock icon for started games, clear button otherwise */}
+                                {locked ? (
+                                    <span className="text-amber-400 text-xs shrink-0 ml-2" title="Game started — slot locked">🔒</span>
+                                ) : entry.player ? (
                                     <button
                                         className="text-gray-600 hover:text-gray-400 text-sm shrink-0 ml-2"
                                         onClick={e => { e.stopPropagation(); clearSlot(i); }}
                                     >
                                         ×
                                     </button>
-                                )}
+                                ) : null}
                             </div>
 
                             {/* Inline search dropdown */}
@@ -260,15 +285,17 @@ export default function LineupBuilder({
                                             <div className="px-4 py-3 text-xs text-gray-500">No players found</div>
                                         )}
                                         {results.map(player => {
-                                            const alreadyUsed = selectedIds.has(player.playerId);
-                                            const ppts        = projPoints(player, scoringType);
+                                            const alreadyUsed  = selectedIds.has(player.playerId);
+                                            const gameStarted  = isPlayerGameStarted(player);
+                                            const unavailable  = alreadyUsed || gameStarted;
+                                            const ppts         = projPoints(player, scoringType);
                                             return (
                                                 <button
                                                     key={player.playerId}
-                                                    disabled={alreadyUsed}
-                                                    onClick={() => !alreadyUsed && selectPlayer(player)}
+                                                    disabled={unavailable}
+                                                    onClick={() => !unavailable && selectPlayer(player)}
                                                     className={`w-full flex items-center justify-between px-4 py-2.5 text-left border-t border-gray-800 transition ${
-                                                        alreadyUsed
+                                                        unavailable
                                                             ? 'opacity-40 cursor-not-allowed'
                                                             : 'hover:bg-gray-800 cursor-pointer'
                                                     }`}
@@ -276,7 +303,8 @@ export default function LineupBuilder({
                                                     <div>
                                                         <div className="text-sm font-semibold text-white">
                                                             {player.fullName}
-                                                            {alreadyUsed && <span className="ml-1 text-[9px] text-gray-500">already in lineup</span>}
+                                                            {alreadyUsed  && <span className="ml-1 text-[9px] text-gray-500">already in lineup</span>}
+                                                            {gameStarted  && <span className="ml-1 text-[9px] text-amber-400">🔒 game started</span>}
                                                         </div>
                                                         <div className="text-[10px] text-gray-500">
                                                             {player.position} · {player.team ?? '—'}

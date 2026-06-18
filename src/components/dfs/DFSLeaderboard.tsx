@@ -19,9 +19,10 @@ interface DFSLeaderboardProps {
     lineups:    LeaderboardRow[];
     myUserId?:  string;
     status:     string;
+    isLocked?:  boolean;
 }
 
-export default function DFSLeaderboard({ lineups, myUserId, status }: DFSLeaderboardProps) {
+export default function DFSLeaderboard({ lineups, myUserId, status, isLocked = false }: DFSLeaderboardProps) {
     const [expanded, setExpanded] = useState<string | null>(null);
 
     if (lineups.length === 0) {
@@ -49,7 +50,7 @@ export default function DFSLeaderboard({ lineups, myUserId, status }: DFSLeaderb
                     >
                         <button
                             className="w-full flex items-center gap-3 px-4 py-3 text-left"
-                            onClick={() => setExpanded(isOpen ? null : row.id)}
+                            onClick={() => (isLocked || isMe) && setExpanded(isOpen ? null : row.id)}
                         >
                             {/* Rank */}
                             <span className={`text-lg font-black tabular-nums w-8 shrink-0 ${
@@ -68,23 +69,23 @@ export default function DFSLeaderboard({ lineups, myUserId, status }: DFSLeaderb
 
                             {/* Score */}
                             <span className="text-sm font-bold text-white tabular-nums shrink-0">
-                                {status === 'OPEN' ? (
+                                {!isLocked ? (
                                     <span className="text-gray-500 text-xs">Locked 🔒</span>
                                 ) : (
                                     `${row.totalPoints.toFixed(1)} pts`
                                 )}
                             </span>
 
-                            {/* Expand chevron */}
-                            {(status !== 'OPEN' || isMe) && (
+                            {/* Expand chevron — only shown when lineup is visible */}
+                            {(isLocked || isMe) && (
                                 <span className={`text-gray-500 text-xs transition-transform ${isOpen ? 'rotate-180' : ''}`}>
                                     ▼
                                 </span>
                             )}
                         </button>
 
-                        {/* Expanded lineup */}
-                        {isOpen && entries.length > 0 && (
+                        {/* Expanded lineup — hidden for others until locked */}
+                        {isOpen && (isLocked || isMe) && entries.length > 0 && (
                             <div className="px-4 pb-3 border-t border-gray-800 pt-2 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1">
                                 {entries.map((e, i) => (
                                     <div key={i} className="flex items-center gap-2 text-xs">

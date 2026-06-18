@@ -108,6 +108,50 @@ export async function getNflState(): Promise<SleeperNflState> {
     return sleeperFetch<SleeperNflState>('/state/nfl', 0);
 }
 
+/**
+ * Returns the earliest kickoff timestamp (ms) for each NFL team in a given week.
+ * Falls back to Sunday 1pm ET if the schedule can't be fetched.
+ * Shape: { [teamAbbrev: string]: epochMs }
+ */
+export async function getNflSchedule(season: string, week: number): Promise<Record<string, number>> {
+    try {
+        const url  = `https://api.sleeper.app/v1/schedule/nfl/regular/${season}/${week}`;
+        const resp = await fetch(url, { cache: 'no-store' });
+        if (!resp.ok) throw new Error(`Sleeper schedule ${resp.status}`);
+        const games = await resp.json() as Array<{ date?: number; home_team?: string; away_team?: string }>;
+        const out: Record<string, number> = {};
+        for (const g of games) {
+            if (!g.date) continue;
+            if (g.home_team) out[g.home_team] = Math.min(out[g.home_team] ?? Infinity, g.date);
+            if (g.away_team) out[g.away_team] = Math.min(out[g.away_team] ?? Infinity, g.date);
+        }
+        return out;
+    } catch {
+        return {};
+    }
+}
+
+/**
+ * Returns the first kickoff of the week as a Date.
+ * Uses Sleeper schedule API; falls back to Sunday 1pm ET.
+ */
+export async function getWeekLockTime(season: string, week: number): Promise<Date> {
+    const schedule = await getNflSchedule(season, week);
+    const times    = Object.values(schedule);
+    if (times.length > 0) {
+        return new Date(Math.min(...times));
+    }
+    // Fallback: compute Sunday 1pm ET for this week
+    const yr     = parseInt(season);
+    const sep1   = new Date(yr, 8, 1);
+    const firstThu = new Date(sep1);
+    firstThu.setDate(sep1.getDate() + ((4 - sep1.getDay() + 7) % 7));
+    const sunday = new Date(firstThu);
+    sunday.setDate(firstThu.getDate() + (week - 1) * 7 + 3);
+    sunday.setUTCHours(18, 0, 0, 0); // 1pm ET = 18:00 UTC
+    return sunday;
+}
+
 export async function getLeague(leagueId: string): Promise<SleeperLeague> {
     return sleeperFetch<SleeperLeague>(`/league/${leagueId}`);
 }

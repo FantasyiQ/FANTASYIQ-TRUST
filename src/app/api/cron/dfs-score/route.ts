@@ -29,7 +29,8 @@ export async function GET(request: NextRequest): Promise<Response> {
     try {
     
         const { week: currentWeek, season: currentSeason } = currentNflWeek();
-    
+        const now = new Date();
+
         // Load all non-FINAL contests
         const contests = await prisma.dFSContest.findMany({
             where:   { status: { not: 'FINAL' } },
@@ -38,15 +39,15 @@ export async function GET(request: NextRequest): Promise<Response> {
                 sourceLeague: { select: { scoringType: true } },
             },
         });
-    
+
         let totalScored = 0;
         let finalised   = 0;
-    
+
         for (const contest of contests) {
             const isPastWeek =
                 contest.season < currentSeason ||
                 (contest.season === currentSeason && contest.week < currentWeek);
-    
+
             // Score every lineup
             for (const lineup of contest.lineups) {
                 const entries = lineup.entriesJson as DFSEntry[];
@@ -57,16 +58,23 @@ export async function GET(request: NextRequest): Promise<Response> {
                 });
                 totalScored++;
             }
-    
-            // Past weeks → FINAL; current week → LOCKED (lineups in progress)
+
             if (isPastWeek) {
+                // Past week → FINAL
                 await prisma.dFSContest.update({
                     where: { id: contest.id },
                     data:  { status: 'FINAL' },
                 });
                 finalised++;
-            } else if (contest.status === 'OPEN' && contest.week === currentWeek && contest.season === currentSeason) {
-                // Keep OPEN; scores are live estimates only
+            } else if (contest.week === currentWeek && contest.season === currentSeason) {
+                // Transition OPEN → LOCKED once lockAt passes (first kickoff of week)
+                if (contest.status === 'OPEN' && contest.lockAt && now >= contest.lockAt) {
+                    await prisma.dFSContest.update({
+                        where: { id: contest.id },
+                        data:  { status: 'LOCKED' },
+                    });
+                }
+                // LOCKED stays LOCKED until the week rolls over (→ FINAL above)
             }
         }
     

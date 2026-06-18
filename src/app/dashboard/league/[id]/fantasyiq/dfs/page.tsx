@@ -5,6 +5,7 @@ import { redirect, notFound } from 'next/navigation';
 import { auth }   from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { currentNflWeek, getDFSSlots } from '@/lib/dfs';
+import { getWeekLockTime, getNflSchedule } from '@/lib/sleeper';
 import LineupBuilder  from '@/components/dfs/LineupBuilder';
 import DFSLeaderboard from '@/components/dfs/DFSLeaderboard';
 
@@ -34,7 +35,8 @@ export default async function DFSChallengePage({
     const { week, season } = currentNflWeek();
     const contestSeason    = parseInt(league.season, 10) || season;
 
-    const contest = await prisma.dFSContest.upsert({
+    // Find or create contest; backfill lockAt if missing
+    let contest = await prisma.dFSContest.findUnique({
         where: {
             platform_externalLeagueId_season_week: {
                 platform:         league.platform,
@@ -43,16 +45,31 @@ export default async function DFSChallengePage({
                 week,
             },
         },
-        create: {
-            platform:         league.platform,
-            externalLeagueId: league.leagueId,
-            sourceLeagueId:   league.id,
-            season:           contestSeason,
-            week,
-            status:           'OPEN',
-        },
-        update: {},
     });
+
+    if (!contest) {
+        const lockAt = await getWeekLockTime(String(contestSeason), week);
+        contest = await prisma.dFSContest.create({
+            data: {
+                platform:         league.platform,
+                externalLeagueId: league.leagueId,
+                sourceLeagueId:   league.id,
+                season:           contestSeason,
+                week,
+                status:           'OPEN',
+                lockAt,
+            },
+        });
+    } else if (!contest.lockAt) {
+        const lockAt = await getWeekLockTime(String(contestSeason), week);
+        contest = await prisma.dFSContest.update({ where: { id: contest.id }, data: { lockAt } });
+    }
+
+    const now      = new Date();
+    const isLocked = contest.status !== 'OPEN' || (!!contest.lockAt && now >= contest.lockAt);
+
+    // Per-player game schedule: team → epoch ms of kickoff
+    const gameSchedule = await getNflSchedule(String(contestSeason), week);
 
     const userLineup = await prisma.dFSLineup.findUnique({
         where:  { contestId_userId: { contestId: contest.id, userId } },
@@ -114,21 +131,23 @@ export default async function DFSChallengePage({
 
                 <div className="rounded-xl border border-gray-800 bg-gray-900/50 px-4 py-3 text-xs text-gray-500 leading-relaxed">
                     Free, no prizes. One lineup per week per member. Uses your league&apos;s scoring settings and roster template.
-                    Lineup locks at first game kickoff — scores update live.
+                    {contest.status !== 'FINAL' && (
+                        <span className="ml-1">Each player locks individually when their game kicks off — swap freely until then.</span>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <section className="space-y-3">
                         <h3 className="text-sm font-bold text-white uppercase tracking-wider">
                             {userLineup ? 'Your Lineup' : 'Build Your Lineup'}
-                            {userLineup && contest.status === 'OPEN' && (
+                            {userLineup && contest.status !== 'FINAL' && (
                                 <span className="ml-2 text-[10px] text-gray-500 font-normal normal-case">
-                                    (edit until kickoff)
+                                    (swap players until their game starts)
                                 </span>
                             )}
                         </h3>
 
-                        {contest.status === 'OPEN' ? (
+                        {contest.status !== 'FINAL' ? (
                             <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
                                 <LineupBuilder
                                     contestId={contest.id}
@@ -137,6 +156,7 @@ export default async function DFSChallengePage({
                                     week={contest.week}
                                     scoringType={league.scoringType}
                                     initialEntries={userLineup?.entriesJson as DFSEntry[] | undefined}
+                                    gameSchedule={gameSchedule}
                                 />
                             </div>
                         ) : (
@@ -176,6 +196,7 @@ export default async function DFSChallengePage({
                             lineups={leaderboard}
                             myUserId={userId}
                             status={contest.status}
+                            isLocked={isLocked}
                         />
                     </section>
                 </div>

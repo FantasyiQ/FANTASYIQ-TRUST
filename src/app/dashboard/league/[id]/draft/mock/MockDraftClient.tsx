@@ -270,13 +270,13 @@ function IdleScreen({
     const isDynasty = leagueType === 'Dynasty';
 
     const modeDetails = isDynasty
-        ? { label: 'Dynasty Mock Draft',  rounds: '20 rounds · Dynasty values · Snake draft',         desc: 'Long-term dynasty values — age curve, DTV, and startup draft calibration.' }
+        ? { label: 'Dynasty Mock Draft',  rounds: '20 rounds · Dynasty values · Linear draft',        desc: 'Long-term dynasty values — age curve, DTV, and startup draft calibration.' }
         : { label: 'Redraft Mock Draft',  rounds: '15 rounds · Season-long values · Linear draft',    desc: 'Season-long values — best player available each round, all positions included.' };
 
     const n = totalRosters;
     const slotLabel = draftSlot === 1 ? 'Pick 1 every round (first overall)'
         : draftSlot === n ? `Pick ${n} every round (last overall)`
-        : `Picks ${draftSlot} & ${n * 2 - draftSlot + 1} each round`;
+        : `Pick ${draftSlot} every round`;
 
     return (
         <div className="space-y-6">
@@ -319,9 +319,7 @@ function IdleScreen({
                     <div>
                         <h2 className="text-lg font-bold text-white">{modeDetails.label}</h2>
                         <p className="text-gray-500 text-xs mt-1">{modeDetails.rounds}</p>
-                        {isDynasty && (
-                            <p className="text-gray-600 text-xs mt-1">Your draft slot is pulled from your league's actual draft order.</p>
-                        )}
+
                         <p className="text-gray-400 text-sm mt-2 max-w-md mx-auto leading-relaxed">
                             Simulate your upcoming draft against AI opponents calibrated to your league
                             — scoring format, roster settings, and positional needs included.

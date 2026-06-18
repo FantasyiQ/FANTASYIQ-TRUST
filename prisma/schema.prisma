@@ -1143,6 +1143,7 @@ model DFSContest {
     week             Int
     season           Int
     status           DFSContestStatus @default(OPEN)
+    lockAt           DateTime?        // first kickoff of the week — submissions blocked, lineups revealed
     createdAt        DateTime         @default(now())
     updatedAt        DateTime         @updatedAt
 
