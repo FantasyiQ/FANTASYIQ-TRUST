@@ -93,6 +93,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     const { searchParams } = new URL(req.url);
     const leagueId  = searchParams.get('leagueId');
     const modeParam = searchParams.get('mode') as 'dynasty' | 'redraft' | null;
+    const slotParam = parseInt(searchParams.get('slot') ?? '0', 10) || 0;
     if (!leagueId) return Response.json({ error: 'Missing leagueId' }, { status: 400 });
 
     const league = await prisma.league.findUnique({
@@ -219,6 +220,18 @@ export async function GET(req: NextRequest): Promise<Response> {
         for (let i = slotToTeamId.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [slotToTeamId[i], slotToTeamId[j]] = [slotToTeamId[j], slotToTeamId[i]];
+        }
+    }
+
+    // If the user requested a specific slot, swap their team into that position.
+    const desiredSlot = slotParam >= 1 && slotParam <= totalTeams ? slotParam : null;
+    if (desiredSlot) {
+        const currentIdx  = slotToTeamId.indexOf(yourTeamId);
+        const targetIdx   = desiredSlot - 1;
+        if (currentIdx !== -1 && currentIdx !== targetIdx) {
+            const displaced = slotToTeamId[targetIdx];
+            slotToTeamId[targetIdx]  = yourTeamId;
+            slotToTeamId[currentIdx] = displaced;
         }
     }
 

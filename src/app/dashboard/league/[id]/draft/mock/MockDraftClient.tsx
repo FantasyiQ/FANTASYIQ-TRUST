@@ -59,22 +59,25 @@ export default function MockDraftClient({
     leagueId,
     leagueName,
     leagueType,
+    totalRosters,
 }: {
-    leagueId:    string;
-    leagueName:  string;
-    leagueType:  string;
+    leagueId:     string;
+    leagueName:   string;
+    leagueType:   string;
+    totalRosters: number;
 }) {
     const [clientPhase, setClientPhase] = useState<ClientPhase>({ phase: 'idle' });
     const [draftMode, setDraftMode]     = useState<'dynasty' | 'redraft'>(
         leagueType === 'Dynasty' ? 'dynasty' : 'redraft',
     );
+    const [draftSlot, setDraftSlot] = useState(1);
 
     // ── Start / restart ───────────────────────────────────────────────────────
 
     const startDraft = useCallback(async () => {
         setClientPhase({ phase: 'loading' });
         try {
-            const res = await fetch(`/api/mock-draft/init?leagueId=${leagueId}&mode=${draftMode}`);
+            const res = await fetch(`/api/mock-draft/init?leagueId=${leagueId}&mode=${draftMode}&slot=${draftSlot}`);
             if (!res.ok) throw new Error(`Status ${res.status}`);
             const data: MockDraftInitResponse = await res.json();
 
@@ -89,7 +92,7 @@ export default function MockDraftClient({
         } catch (err) {
             setClientPhase({ phase: 'error', message: err instanceof Error ? err.message : 'Unknown error' });
         }
-    }, [leagueId, draftMode]);
+    }, [leagueId, draftMode, draftSlot]);
 
     // ── User selects a player ─────────────────────────────────────────────────
 
@@ -132,6 +135,9 @@ export default function MockDraftClient({
                 leagueName={leagueName}
                 draftMode={draftMode}
                 onModeChange={setDraftMode}
+                totalRosters={totalRosters}
+                draftSlot={draftSlot}
+                onSlotChange={setDraftSlot}
                 onStart={startDraft}
             />
         );
@@ -243,16 +249,27 @@ function IdleScreen({
     leagueName,
     draftMode,
     onModeChange,
+    totalRosters,
+    draftSlot,
+    onSlotChange,
     onStart,
 }: {
     leagueName:   string;
     draftMode:    'dynasty' | 'redraft';
     onModeChange: (m: 'dynasty' | 'redraft') => void;
+    totalRosters: number;
+    draftSlot:    number;
+    onSlotChange: (s: number) => void;
     onStart:      () => void;
 }) {
     const modeDetails = draftMode === 'redraft'
         ? { label: 'Redraft Mock', rounds: '15 rounds · Snake draft · Full player pool (QB/RB/WR/TE/K/DEF)', desc: 'Season-long values — best player available each round, all positions included.' }
         : { label: 'Dynasty Mock', rounds: '20 rounds or rookie-only · Dynasty values',                       desc: 'Long-term dynasty values — age curve, DTV, and startup or rookie draft calibration.' };
+
+    const n = totalRosters;
+    const slotLabel = draftSlot === 1 ? 'Pick 1 every round (first overall)'
+        : draftSlot === n ? `Pick ${n} every round (last overall)`
+        : `Picks ${draftSlot} & ${n * 2 - draftSlot + 1} each round`;
 
     return (
         <div className="space-y-6">
@@ -285,6 +302,28 @@ function IdleScreen({
                         ))}
                     </div>
                     <p className="text-center text-xs text-gray-500 mt-2">{modeDetails.desc}</p>
+                </div>
+
+                {/* Draft slot selector */}
+                <div>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider text-center mb-3">Your Draft Slot</p>
+                    <div className="flex gap-2 flex-wrap justify-center">
+                        {Array.from({ length: n }, (_, i) => i + 1).map(slot => (
+                            <button
+                                key={slot}
+                                onClick={() => onSlotChange(slot)}
+                                className={[
+                                    'w-10 h-10 rounded-lg text-sm font-bold border transition',
+                                    draftSlot === slot
+                                        ? 'bg-[#D4AF37] text-black border-[#D4AF37]'
+                                        : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500 hover:text-white',
+                                ].join(' ')}
+                            >
+                                {slot}
+                            </button>
+                        ))}
+                    </div>
+                    <p className="text-center text-xs text-gray-500 mt-2">{slotLabel}</p>
                 </div>
 
                 {/* Info block */}
