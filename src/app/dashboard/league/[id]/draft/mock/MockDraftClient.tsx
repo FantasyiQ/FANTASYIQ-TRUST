@@ -269,7 +269,7 @@ function IdleScreen({
     onStart:      () => void;
 }) {
     const modeDetails = draftMode === 'redraft'
-        ? { label: 'Redraft Mock', rounds: '15 rounds · Snake draft · Full player pool (QB/RB/WR/TE/K/DEF)', desc: 'Season-long values — best player available each round, all positions included.' }
+        ? { label: 'Redraft Mock', rounds: '15 rounds · Linear draft · Full player pool (QB/RB/WR/TE/K/DEF)', desc: 'Season-long values — best player available each round, all positions included.' }
         : { label: 'Dynasty Mock', rounds: '20 rounds or rookie-only · Dynasty values',                       desc: 'Long-term dynasty values — age curve, DTV, and startup or rookie draft calibration.' };
 
     const n = totalRosters;
