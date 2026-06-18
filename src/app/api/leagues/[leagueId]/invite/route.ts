@@ -24,20 +24,28 @@ export async function POST(
     });
     if (!user) return Response.json({ error: 'User not found.' }, { status: 404 });
 
-    // Verify the requesting user is the commissioner (is_owner) of this Sleeper league.
-    if (!user.sleeperUserId) {
-        return Response.json({ error: 'Forbidden' }, { status: 403 });
-    }
-    try {
-        const members = await getLeagueUsers(leagueId);
-        const isCommissioner = members.some(
-            m => m.is_owner && String(m.user_id).trim() === String(user.sleeperUserId).trim()
-        );
-        if (!isCommissioner) {
+    // Prefer DB ownership check (works for all platforms — Sleeper, ESPN, etc.)
+    const dbLeague = await prisma.league.findFirst({
+        where: { leagueId, userId: user.id },
+        select: { id: true },
+    });
+
+    if (!dbLeague) {
+        // Fall back to Sleeper is_owner check for Sleeper leagues not in DB
+        if (!user.sleeperUserId) {
             return Response.json({ error: 'Forbidden' }, { status: 403 });
         }
-    } catch {
-        return Response.json({ error: 'Could not verify commissioner status' }, { status: 502 });
+        try {
+            const members = await getLeagueUsers(leagueId);
+            const isCommissioner = members.some(
+                m => m.is_owner && String(m.user_id).trim() === String(user.sleeperUserId).trim()
+            );
+            if (!isCommissioner) {
+                return Response.json({ error: 'Forbidden' }, { status: 403 });
+            }
+        } catch {
+            return Response.json({ error: 'Could not verify commissioner status' }, { status: 502 });
+        }
     }
 
     const body = await request.json() as { leagueName?: string; season?: string };

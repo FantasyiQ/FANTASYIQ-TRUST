@@ -82,9 +82,10 @@ export async function POST(request: NextRequest): Promise<Response> {
         },
     });
 
-    if (extraSeasons.length > 0) {
-        await prisma.leagueDues.createMany({
-            data: extraSeasons.map(season => ({
+    const extraIds: string[] = [];
+    for (const season of extraSeasons) {
+        const extra = await prisma.leagueDues.create({
+            data: {
                 commissionerId: user.id,
                 leagueName,
                 season,
@@ -92,9 +93,10 @@ export async function POST(request: NextRequest): Promise<Response> {
                 teamCount,
                 potTotal: 0,
                 status: 'setup',
-            })),
+            },
         });
+        extraIds.push(extra.id);
     }
 
-    return Response.json({ id: primary.id });
+    return Response.json({ id: primary.id, ids: [primary.id, ...extraIds] });
 }

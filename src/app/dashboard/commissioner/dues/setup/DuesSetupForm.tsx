@@ -36,8 +36,23 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
     );
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    // Payment model preference — stored as informational; both paths remain available
     const [paymentModel, setPaymentModel] = useState<'stripe' | 'manual'>('stripe');
+
+    // Payout spots
+    interface PayoutSpot { label: string; amount: string; }
+    const [spots, setSpots] = useState<PayoutSpot[]>([{ label: '1st Place', amount: '' }]);
+
+    function addSpot() {
+        const labels = ['2nd Place', '3rd Place', '4th Place', '5th Place'];
+        const label = labels[spots.length - 1] ?? '';
+        setSpots(prev => [...prev, { label, amount: '' }]);
+    }
+    function removeSpot(i: number) {
+        setSpots(prev => prev.filter((_, idx) => idx !== i));
+    }
+    function updateSpot(i: number, field: 'label' | 'amount', value: string) {
+        setSpots(prev => prev.map((s, idx) => idx === i ? { ...s, [field]: value } : s));
+    }
 
     // Season checkboxes — default to the auto-matched season, else current year
     const baseYear = parseInt(autoMatch?.season ?? new Date().getFullYear().toString());
@@ -67,6 +82,20 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
         if (!buyIn || parseFloat(buyIn) <= 0) { setError('Buy-in must be greater than $0.'); return; }
         if (!selectedSeasons.length) { setError('Select at least one season.'); return; }
 
+        // Validate payout spots if any amounts filled in
+        const filledSpots = spots.filter(s => s.amount && parseFloat(s.amount) > 0);
+        if (filledSpots.length > 0) {
+            const pot = parseFloat(buyIn) * parseInt(teamCount);
+            const allocated = filledSpots.reduce((sum, s) => sum + parseFloat(s.amount), 0);
+            if (Math.abs(pot - allocated) > 0.01) {
+                setError(`Payout spots must equal the full pot ($${pot.toFixed(2)}). Currently $${allocated.toFixed(2)} allocated.`);
+                return;
+            }
+            for (const s of filledSpots) {
+                if (!s.label.trim()) { setError('All payout spots need a label.'); return; }
+            }
+        }
+
         setLoading(true);
         try {
             const res = await fetch('/api/dues/create', {
@@ -80,9 +109,25 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
                     teamCount: parseInt(teamCount),
                 }),
             });
-            const data = await res.json() as { id?: string; error?: string };
+            const data = await res.json() as { id?: string; ids?: string[]; error?: string };
             if (!res.ok) { setError(data.error ?? 'Failed to create tracker.'); return; }
-            router.push(`/dashboard/commissioner/dues/${data.id}`);
+
+            // Save payout spots to each created tracker if configured
+            if (filledSpots.length > 0) {
+                const ids = data.ids ?? (data.id ? [data.id] : []);
+                await Promise.all(ids.map(id =>
+                    fetch(`/api/dues/${id}/payouts`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            spots: filledSpots.map((s, i) => ({ label: s.label.trim(), amount: parseFloat(s.amount), sortOrder: i })),
+                        }),
+                    })
+                ));
+            }
+
+            const firstId = data.id ?? data.ids?.[0];
+            router.push(`/dashboard/commissioner/dues/${firstId}`);
         } catch {
             setError('Something went wrong. Please try again.');
         } finally {
@@ -258,6 +303,67 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
                     )}
                 </div>
             )}
+
+            {/* Payout spots */}
+            <div className="space-y-3">
+                <div>
+                    <label className="block text-sm font-medium text-gray-300">Payout Spots</label>
+                    <p className="text-gray-500 text-xs mt-0.5">
+                        Optional — configure now or after creation.
+                        {buyIn && parseFloat(buyIn) > 0 && ` Full pot: $${(parseFloat(buyIn) * parseInt(teamCount)).toFixed(2)}`}
+                    </p>
+                </div>
+
+                <div className="space-y-2">
+                    {spots.map((spot, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                            <span className="text-gray-600 text-xs w-4 text-right shrink-0">{i + 1}.</span>
+                            <input
+                                type="text"
+                                value={spot.label}
+                                onChange={e => updateSpot(i, 'label', e.target.value)}
+                                placeholder={i === 0 ? '1st Place' : i === 1 ? '2nd Place' : 'Label'}
+                                className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#D4AF37]/60"
+                            />
+                            <div className="relative w-32 shrink-0">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={spot.amount}
+                                    onChange={e => updateSpot(i, 'amount', e.target.value)}
+                                    placeholder="0.00"
+                                    className="w-full bg-gray-800 border border-gray-700 rounded-xl pl-7 pr-3 py-2 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#D4AF37]/60"
+                                />
+                            </div>
+                            {spots.length > 1 && (
+                                <button type="button" onClick={() => removeSpot(i)} className="text-gray-700 hover:text-red-400 text-sm transition shrink-0">✕</button>
+                            )}
+                        </div>
+                    ))}
+                </div>
+
+                {(() => {
+                    const pot = buyIn && parseFloat(buyIn) > 0 ? parseFloat(buyIn) * parseInt(teamCount) : 0;
+                    const allocated = spots.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
+                    const remaining = pot - allocated;
+                    const anyFilled = spots.some(s => parseFloat(s.amount) > 0);
+                    return (
+                        <div className="flex items-center justify-between">
+                            <button type="button" onClick={addSpot} className="text-sm text-[#D4AF37] hover:underline">
+                                + Add Spot
+                            </button>
+                            {pot > 0 && anyFilled && (
+                                <span className={`text-xs font-semibold ${Math.abs(remaining) < 0.01 ? 'text-green-400' : 'text-yellow-400'}`}>
+                                    ${allocated.toFixed(2)} / ${pot.toFixed(2)}
+                                    {Math.abs(remaining) > 0.01 && ` · $${Math.abs(remaining).toFixed(2)} ${remaining > 0 ? 'left' : 'over'}`}
+                                </span>
+                            )}
+                        </div>
+                    );
+                })()}
+            </div>
 
             <button
                 type="submit"
