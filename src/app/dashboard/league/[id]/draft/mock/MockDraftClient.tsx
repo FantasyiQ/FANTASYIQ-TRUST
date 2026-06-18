@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import type {
     MockDraftInitResponse,
     MockDraftStepResult,
@@ -41,10 +41,12 @@ type ClientPhase = PhaseIdle | PhaseLoading | PhaseError | PhaseOnClock | PhaseC
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const POS_COLORS: Record<string, string> = {
-    QB: 'bg-red-900/40 text-red-300 border-red-800',
-    RB: 'bg-green-900/40 text-green-300 border-green-800',
-    WR: 'bg-blue-900/40 text-blue-300 border-blue-800',
-    TE: 'bg-yellow-900/40 text-yellow-300 border-yellow-800',
+    QB:  'bg-red-900/40 text-red-300 border-red-800',
+    RB:  'bg-green-900/40 text-green-300 border-green-800',
+    WR:  'bg-blue-900/40 text-blue-300 border-blue-800',
+    TE:  'bg-yellow-900/40 text-yellow-300 border-yellow-800',
+    K:   'bg-purple-900/40 text-purple-300 border-purple-800',
+    DEF: 'bg-gray-700/60 text-gray-300 border-gray-600',
 };
 
 function draftTypeLabel(settings: MockDraftInitResponse['context']['settings']): string {
@@ -185,6 +187,10 @@ export default function MockDraftClient({
                     context={initData.context}
                     onDraft={handleDraft}
                     onAutoPick={handleAutoPick}
+                />
+                <TeamRostersPanel
+                    results={stepResult.draftState.results}
+                    context={initData.context}
                 />
             </div>
         );
@@ -351,6 +357,66 @@ function IdleScreen({
                         Start Mock Draft
                     </button>
                 </div>
+            </div>
+        </div>
+    );
+}
+
+function TeamRostersPanel({
+    results,
+    context,
+}: {
+    results:  MockDraftResult[];
+    context:  MockLeagueContext;
+}) {
+    const byTeam = useMemo(() => {
+        const map = new Map<string, MockDraftResult[]>();
+        for (const r of results) {
+            if (!map.has(r.teamId)) map.set(r.teamId, []);
+            map.get(r.teamId)!.push(r);
+        }
+        return map;
+    }, [results]);
+
+    if (results.length === 0) return null;
+
+    return (
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-4">
+            <h2 className="text-sm font-bold text-white">Team Rosters</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {context.teams.map(team => {
+                    const isUser = team.teamId === context.yourTeamId;
+                    const picks  = byTeam.get(team.teamId) ?? [];
+                    return (
+                        <div
+                            key={team.teamId}
+                            className={[
+                                'rounded-xl border p-3',
+                                isUser
+                                    ? 'bg-[#D4AF37]/5 border-[#D4AF37]/30'
+                                    : 'bg-gray-800/30 border-gray-700/50',
+                            ].join(' ')}
+                        >
+                            <p className={`text-xs font-bold truncate mb-1.5 ${isUser ? 'text-[#D4AF37]' : 'text-gray-300'}`}>
+                                {team.ownerName}{isUser ? ' (You)' : ''}
+                            </p>
+                            {picks.length === 0 ? (
+                                <p className="text-gray-700 text-[10px]">No picks</p>
+                            ) : (
+                                <div className="space-y-0.5">
+                                    {picks.map(r => (
+                                        <div key={r.pick.overall} className="flex items-center gap-1 text-[10px]">
+                                            <span className={`shrink-0 px-1 py-px rounded border text-[8px] font-bold ${POS_COLORS[r.player.position] ?? 'bg-gray-800 text-gray-400 border-gray-700'}`}>
+                                                {r.player.position}
+                                            </span>
+                                            <span className="text-gray-300 truncate">{r.player.name}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );

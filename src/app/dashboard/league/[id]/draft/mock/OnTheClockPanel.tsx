@@ -120,11 +120,20 @@ export default function OnTheClockPanel({
     const [tab, setTab]         = useState<Tab>('bpa');
     const [posFilter, setPosFilter] = useState<string>('ALL');
     const [search, setSearch]   = useState('');
-    const historyBottomRef      = useRef<HTMLDivElement>(null);
-    const searchRef             = useRef<HTMLInputElement>(null);
+    const panelRef         = useRef<HTMLDivElement>(null);
+    const listRef          = useRef<HTMLDivElement>(null);
+    const historyBottomRef = useRef<HTMLDivElement>(null);
+    const searchRef        = useRef<HTMLInputElement>(null);
 
     // Clear search when switching tabs
     useEffect(() => { setSearch(''); }, [tab]);
+
+    // Each time it's the user's turn: scroll panel into view + reset player list to top
+    useEffect(() => {
+        panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (listRef.current) listRef.current.scrollTop = 0;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentPick.overall]);
 
     useEffect(() => {
         historyBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -163,7 +172,7 @@ export default function OnTheClockPanel({
     ];
 
     return (
-        <div className="space-y-5">
+        <div ref={panelRef} className="space-y-5">
             {/* Header */}
             <div className="bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-2xl px-5 py-4 flex items-center justify-between gap-4 flex-wrap">
                 <div>
@@ -248,7 +257,7 @@ export default function OnTheClockPanel({
                             </div>
 
                             {/* Player cards */}
-                            <div className="space-y-1.5">
+                            <div ref={listRef} className="space-y-1.5 max-h-[560px] overflow-y-auto pr-1">
                                 {filtered.length === 0 ? (
                                     <p className="text-gray-600 text-sm text-center py-6">
                                         {q ? `No players matching "${search}"` : `No ${posFilter !== 'ALL' ? posFilter : 'players'} available`}
