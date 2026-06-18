@@ -280,6 +280,34 @@ export const FAQ_ITEMS: FAQItem[] = [
 
     // ── Draft Reports ────────────────────────────────────────────────────────
     {
+        id:       'mock-draft-simulator',
+        category: 'draft-reports',
+        question: 'Does FiQ have a Mock Draft Simulator?',
+        answer:   'Yes — FiQ has a Mock Draft Simulator that lets you run full simulated drafts with AI opponents before the real thing. It is calibrated to your league\'s exact scoring format, roster slots, and league size, so every pick plays out like your actual draft. It\'s a great way to test different strategies before draft day. Available on Elite plans (Player Elite and Commissioner Elite).',
+        tags:     ['mock draft', 'simulator', 'draft', 'ai', 'simulate', 'practice', 'elite', 'snake', 'dynasty'],
+    },
+    {
+        id:       'draft-strategy',
+        category: 'draft-reports',
+        question: 'What is Draft Strategy?',
+        answer:   'Draft Strategy is a pre-draft game plan tool that analyzes your roster, league scoring format, roster slots, and positional scarcity to recommend which positions to prioritize and when to target them. It adapts to your league\'s specific settings automatically. Available on Player All-Pro and Elite plans.',
+        tags:     ['draft strategy', 'strategy', 'draft', 'pre-draft', 'planning', 'all-pro', 'elite'],
+    },
+    {
+        id:       'matchup-projections',
+        category: 'draft-reports',
+        question: 'What are Matchup Projections?',
+        answer:   'Matchup Projections show weekly score projections for your team and your opponent, calibrated to your league\'s scoring settings. They help you understand your win probability heading into each week and identify which players to start. Available on Player All-Pro and Elite plans.',
+        tags:     ['matchup projections', 'projections', 'weekly', 'score', 'opponent', 'start sit', 'all-pro', 'elite'],
+    },
+    {
+        id:       'power-rankings',
+        category: 'commissioner-tools',
+        question: 'How are Power Rankings calculated?',
+        answer:   'FiQ Power Rankings use a 3-factor formula: Points For (50%) + Win% (30%) + Strength of Schedule (20%). During the pre-season, FiQ shows last season\'s final power rankings so the table is never empty. Once the regular season begins, the live formula takes over automatically.',
+        tags:     ['power rankings', 'formula', 'points for', 'win percentage', 'strength of schedule', 'sos', 'pre-season'],
+    },
+    {
         id:       'draft-not-showing',
         category: 'draft-reports',
         question: 'Why is my draft not showing in the Report Card?',
