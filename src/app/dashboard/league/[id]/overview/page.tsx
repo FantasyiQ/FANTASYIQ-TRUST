@@ -104,7 +104,7 @@ export default async function LeagueOverviewPage({
                 displayName,
                 username:         null,
                 sleeperAvatarId:  null,
-                isCommissioner:   false,
+                isCommissioner:   fiq?.id === session.user.id,
                 isCoCommissioner: false,
                 userId:           fiq?.id ?? null,
                 prsScore:         fiq?.prsScore ?? null,
