@@ -421,6 +421,13 @@ function PlanCard({ name, price, period, badge, badgeGold, ring, features, price
                 </div>
             )}
 
+            <div className="flex items-start gap-2 bg-[#D4AF37]/10 border border-[#D4AF37]/20 rounded-xl px-3.5 py-2.5 mb-4">
+                <svg className="w-3.5 h-3.5 text-[#D4AF37] shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
+                </svg>
+                <p className="text-xs text-[#D4AF37]/80 leading-relaxed">Every tool adapts to your league&apos;s scoring format, roster settings, and league size — automatically personalized for each league you connect.</p>
+            </div>
+
             <ul className="space-y-0.5 flex-1">
                 {features.map((f, i) => <FeatureRow key={i} f={f} />)}
             </ul>
@@ -522,7 +529,14 @@ function CommPlanCard({ name, price, period, badge, badgeGold, ring, features, p
                 <span className="text-gray-400 text-sm ml-1.5">{period}</span>
             </div>
 
-            <ul className="space-y-0.5 flex-1 mt-4">
+            <div className="flex items-start gap-2 bg-[#D4AF37]/10 border border-[#D4AF37]/20 rounded-xl px-3.5 py-2.5 mt-4 mb-2">
+                <svg className="w-3.5 h-3.5 text-[#D4AF37] shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
+                </svg>
+                <p className="text-xs text-[#D4AF37]/80 leading-relaxed">Every tool adapts to your league&apos;s scoring format, roster settings, and league size — automatically personalized for each league you connect.</p>
+            </div>
+
+            <ul className="space-y-0.5 flex-1 mt-2">
                 {features.map((f, i) => <FeatureRow key={i} f={f} />)}
             </ul>
 
