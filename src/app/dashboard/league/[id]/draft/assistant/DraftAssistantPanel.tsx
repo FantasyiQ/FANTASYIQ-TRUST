@@ -126,7 +126,7 @@ export default function DraftAssistantPanel({
         return (
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center space-y-2">
                 <p className="text-white font-semibold">No Active Drafts</p>
-                <p className="text-gray-500 text-sm">No startup or rookie drafts are currently in progress for this league.</p>
+                <p className="text-gray-500 text-sm">Works with both startup and rookie drafts. Once your draft goes live in Sleeper, it will appear here automatically.</p>
             </div>
         );
     }
