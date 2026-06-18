@@ -204,9 +204,9 @@ function PowerRankingsTable({ rankings, preseason, lastSeasonRankings }: { ranki
                     <tr className="text-gray-500 text-left border-b border-gray-800">
                         <th className="px-4 py-3 font-medium w-10">#</th>
                         <th className="px-3 py-3 font-medium">Owner</th>
-                        {!preseason && <th className="px-3 py-3 font-medium text-right">W-L</th>}
-                        {!preseason && <th className="px-3 py-3 font-medium text-right">PF</th>}
-                        {!preseason && <th className="px-3 py-3 font-medium text-right">PA</th>}
+                        <th className="px-3 py-3 font-medium text-right">W-L</th>
+                        <th className="px-3 py-3 font-medium text-right">PF</th>
+                        <th className="px-3 py-3 font-medium text-right">PA</th>
                         <th className="px-4 py-3 font-medium text-right">Power Score</th>
                     </tr>
                 </thead>
@@ -218,9 +218,9 @@ function PowerRankingsTable({ rankings, preseason, lastSeasonRankings }: { ranki
                                 <div className="text-white font-medium">{r.ownerName}</div>
                                 <div className="text-gray-600 text-xs">{r.teamName}</div>
                             </td>
-                            {!preseason && <td className="px-3 py-2.5 text-right text-gray-300">{r.wins}–{r.losses}</td>}
-                            {!preseason && <td className="px-3 py-2.5 text-right text-gray-400">{r.pf.toFixed(1)}</td>}
-                            {!preseason && <td className="px-3 py-2.5 text-right text-gray-500">{r.pa.toFixed(1)}</td>}
+                            <td className="px-3 py-2.5 text-right text-gray-300">{r.wins}–{r.losses}</td>
+                            <td className="px-3 py-2.5 text-right text-gray-400">{r.pf.toFixed(1)}</td>
+                            <td className="px-3 py-2.5 text-right text-gray-500">{r.pa.toFixed(1)}</td>
                             <td className="px-4 py-2.5 text-right font-bold text-white">{r.powerScore}</td>
                         </tr>
                     ))}
