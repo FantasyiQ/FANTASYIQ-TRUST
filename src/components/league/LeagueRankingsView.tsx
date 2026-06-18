@@ -191,7 +191,7 @@ function PowerRankingsTable({ rankings, preseason }: { rankings: PowerRankingRow
         <div className="overflow-x-auto">
             {preseason && (
                 <div className="px-6 py-2 border-b border-gray-800 text-xs text-gray-600">
-                    Pre-season — power scores based on roster DTV only.
+                    Pre-season — power scores based on points scored only.
                 </div>
             )}
             <table className="w-full text-sm">
@@ -201,7 +201,7 @@ function PowerRankingsTable({ rankings, preseason }: { rankings: PowerRankingRow
                         <th className="px-3 py-3 font-medium">Owner</th>
                         {!preseason && <th className="px-3 py-3 font-medium text-right">W-L</th>}
                         {!preseason && <th className="px-3 py-3 font-medium text-right">PF</th>}
-                        <th className="px-3 py-3 font-medium text-right">Roster DTV</th>
+                        {!preseason && <th className="px-3 py-3 font-medium text-right">PA</th>}
                         <th className="px-4 py-3 font-medium text-right">Power Score</th>
                     </tr>
                 </thead>
@@ -215,7 +215,7 @@ function PowerRankingsTable({ rankings, preseason }: { rankings: PowerRankingRow
                             </td>
                             {!preseason && <td className="px-3 py-2.5 text-right text-gray-300">{r.wins}–{r.losses}</td>}
                             {!preseason && <td className="px-3 py-2.5 text-right text-gray-400">{r.pf.toFixed(1)}</td>}
-                            <td className="px-3 py-2.5 text-right text-gray-300">{r.rosterDtv}</td>
+                            {!preseason && <td className="px-3 py-2.5 text-right text-gray-500">{r.pa.toFixed(1)}</td>}
                             <td className="px-4 py-2.5 text-right font-bold text-white">{r.powerScore}</td>
                         </tr>
                     ))}

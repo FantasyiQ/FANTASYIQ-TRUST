@@ -44,7 +44,7 @@ export type PowerRankingRow = {
     wins:       number;
     losses:     number;
     pf:         number;
-    rosterDtv:  number;
+    pa:         number;
     powerScore: number;
 };
 
@@ -114,17 +114,17 @@ function rosterTier(rank: number, total: number): 'Elite' | 'Contender' | 'Compe
 }
 
 function computePowerScore(
-    wins: number, losses: number, pf: number, rosterDtv: number,
-    maxPf: number, maxDtv: number,
+    wins: number, losses: number, pf: number, pa: number,
+    maxPf: number, maxPa: number,
 ): number {
-    const allZeroRecord = wins === 0 && losses === 0;
-    if (allZeroRecord) {
-        return maxDtv > 0 ? Math.round((rosterDtv / maxDtv) * 100) : 0;
-    }
+    if (wins === 0 && losses === 0 && pf === 0) return 50;
+    const pfNorm  = maxPf > 0 ? pf / maxPf : 0;
     const winPct  = (wins + losses) > 0 ? wins / (wins + losses) : 0;
-    const pfNorm  = maxPf  > 0 ? pf / maxPf   : 0;
-    const dtvNorm = maxDtv > 0 ? rosterDtv / maxDtv : 0;
-    return Math.round(winPct * 40 + pfNorm * 30 + dtvNorm * 30);
+    if (maxPa === 0) {
+        return Math.round(pfNorm * 62.5 + winPct * 37.5);
+    }
+    const sosNorm = pa / maxPa;
+    return Math.round(pfNorm * 50 + winPct * 30 + sosNorm * 20);
 }
 
 // ── Main function ─────────────────────────────────────────────────────────────
@@ -361,10 +361,10 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
                 wins:       team.wins,
                 losses:     team.losses,
                 pf:         team.fpts,
-                rosterDtv:  rosterDtvById.get(team.teamId) ?? 0,
-                powerScore: computePowerScore(team.wins, team.losses, team.fpts, rosterDtvById.get(team.teamId) ?? 0, maxPf, maxDtv),
+                pa:         0,
+                powerScore: computePowerScore(team.wins, team.losses, team.fpts, 0, maxPf, 0),
             }))
-            .sort((a, b) => b.powerScore - a.powerScore || b.rosterDtv - a.rosterDtv)
+            .sort((a, b) => b.powerScore - a.powerScore || b.pf - a.pf)
             .map((r, i) => ({ ...r, rank: i + 1 }));
 
         return { league: leagueResult, playerRankings, teamRankings, powerRankings, valueSyncedAt: latestSync?.updatedAt.toISOString() ?? null };
@@ -412,26 +412,25 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
     }));
 
     // ── Power rankings ────────────────────────────────────────────────────────
-    const rosterDtvById = new Map(rosterDtvList.map(e => [e.roster.roster_id, e.totalDtv]));
     const rosterRows = rosters.map(r => ({
         rosterId:  r.roster_id,
         ownerName: r.owner_id ? (ownerDisplayName.get(r.owner_id) ?? `Team ${r.roster_id}`) : `Team ${r.roster_id}`,
-        wins:      r.settings?.wins    ?? 0,
-        losses:    r.settings?.losses  ?? 0,
-        pf:        (r.settings?.fpts   ?? 0) + (r.settings?.fpts_decimal ?? 0) / 100,
-        rosterDtv: rosterDtvById.get(r.roster_id) ?? 0,
+        wins:   r.settings?.wins   ?? 0,
+        losses: r.settings?.losses ?? 0,
+        pf: (r.settings?.fpts         ?? 0) + (r.settings?.fpts_decimal         ?? 0) / 100,
+        pa: (r.settings?.fpts_against ?? 0) + (r.settings?.fpts_against_decimal ?? 0) / 100,
     }));
 
-    const maxPf  = Math.max(...rosterRows.map(r => r.pf), 1);
-    const maxDtv = Math.max(...rosterRows.map(r => r.rosterDtv), 1);
+    const maxPf = Math.max(...rosterRows.map(r => r.pf), 1);
+    const maxPa = Math.max(...rosterRows.map(r => r.pa), 0);
 
     const powerRankings: PowerRankingRow[] = rosterRows
         .map(r => ({
             ...r,
             teamName:   `Team ${r.rosterId}`,
-            powerScore: computePowerScore(r.wins, r.losses, r.pf, r.rosterDtv, maxPf, maxDtv),
+            powerScore: computePowerScore(r.wins, r.losses, r.pf, r.pa, maxPf, maxPa),
         }))
-        .sort((a, b) => b.powerScore - a.powerScore || b.rosterDtv - a.rosterDtv)
+        .sort((a, b) => b.powerScore - a.powerScore || b.pf - a.pf)
         .map((r, i) => ({ ...r, rank: i + 1 }));
 
     return { league: leagueResult, playerRankings, teamRankings, powerRankings, valueSyncedAt: latestSync?.updatedAt.toISOString() ?? null };

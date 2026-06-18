@@ -1,77 +1,27 @@
 import { prisma } from '@/lib/prisma';
 import { getLeagueRosters, getLeagueUsers, getNflState } from '@/lib/sleeper';
-import { calcDtv, DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
-import type { Player, LeagueSettings, LeagueType, PprFormat } from '@/lib/trade-engine';
-import { computePlayerBaseValue } from '@/lib/player-universe';
-import type { UniversePlayer } from '@/lib/player-universe';
-import { calculateAge } from '@/lib/calculateAge';
 import { captureError } from '@/lib/sentry';
 
 export const maxDuration = 300;
 
-const LEAGUE_BATCH_SIZE = 15; // leagues processed in parallel per batch
+const LEAGUE_BATCH_SIZE = 15;
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-const VALUE_CAP = 9999;
-const SKILL_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE']);
-
-function normalise(raw: number): number {
-    return Math.min(100, Math.max(1, Math.round((raw / VALUE_CAP) * 100)));
-}
-
-function normalizeName(name: string): string {
-    return name
-        .toLowerCase()
-        .replace(/\s+\b(jr\.?|sr\.?|ii|iii|iv|v)\s*$/i, '')
-        .replace(/\./g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
-
-function buildLeagueSettings(
-    rosterPositions: string[],
-    scoringSettings: Record<string, number> | null,
-): LeagueSettings {
-    const ss = scoringSettings ?? {};
-    let qbSlots = 0, rbSlots = 0, wrSlots = 0, teSlots = 0, flexSlots = 0, sfSlots = 0;
-    for (const pos of rosterPositions) {
-        if (pos === 'QB')                              qbSlots++;
-        else if (pos === 'RB')                         rbSlots++;
-        else if (pos === 'WR')                         wrSlots++;
-        else if (pos === 'TE')                         teSlots++;
-        else if (pos === 'FLEX' || pos === 'REC_FLEX') flexSlots++;
-        else if (pos === 'SUPER_FLEX')                 sfSlots++;
-    }
-    return {
-        passTd:     ss.pass_td      ?? DEFAULT_LEAGUE_SETTINGS.passTd,
-        bonusRecTe: ss.bonus_rec_te ?? DEFAULT_LEAGUE_SETTINGS.bonusRecTe,
-        qbSlots:    qbSlots  || DEFAULT_LEAGUE_SETTINGS.qbSlots,
-        rbSlots:    rbSlots  || DEFAULT_LEAGUE_SETTINGS.rbSlots,
-        wrSlots:    wrSlots  || DEFAULT_LEAGUE_SETTINGS.wrSlots,
-        teSlots:    teSlots  || DEFAULT_LEAGUE_SETTINGS.teSlots,
-        flexSlots,
-        sfSlots,
-    };
-}
-
+// PF 50% · Win% 30% · SOS (points against, normalized) 20%
+// Pre-season (no games played, no points): return neutral 50.
+// When maxPa is 0 (no PA data), redistribute SOS weight proportionally to PF and Win%.
 function computePowerScore(
-    wins: number, losses: number, pf: number, rosterDtv: number,
-    maxPf: number, maxDtv: number,
+    wins: number, losses: number, pf: number, pa: number,
+    maxPf: number, maxPa: number,
 ): number {
-    if (wins === 0 && losses === 0) {
-        return maxDtv > 0 ? Math.round((rosterDtv / maxDtv) * 100) : 0;
-    }
+    if (wins === 0 && losses === 0 && pf === 0) return 50;
+    const pfNorm  = maxPf > 0 ? pf / maxPf : 0;
     const winPct  = (wins + losses) > 0 ? wins / (wins + losses) : 0;
-    const pfNorm  = maxPf  > 0 ? pf / maxPf   : 0;
-    const dtvNorm = maxDtv > 0 ? rosterDtv / maxDtv : 0;
-    return Math.round(winPct * 40 + pfNorm * 30 + dtvNorm * 30);
+    if (maxPa === 0) {
+        return Math.round(pfNorm * 62.5 + winPct * 37.5);
+    }
+    const sosNorm = pa / maxPa;
+    return Math.round(pfNorm * 50 + winPct * 30 + sosNorm * 20);
 }
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-type SleeperInfo = { playerId: string; team: string | null; injuryStatus: string | null; birthDate: string | null; age: number | null };
-type DtvEntry    = { playerName: string; position: string; u: UniversePlayer };
 
 type UniqueLeague = {
     leagueId:        string;
@@ -82,72 +32,37 @@ type UniqueLeague = {
     totalRosters:    number;
 };
 
-type Ctx = {
-    week:          number;
-    dtvByPlayerId: Map<string, DtvEntry>;
-};
-
-// ── Per-league processor ──────────────────────────────────────────────────────
-
-async function processLeague(league: UniqueLeague, ctx: Ctx): Promise<void> {
+async function processLeague(league: UniqueLeague, week: number): Promise<void> {
     const [rosters, members] = await Promise.all([
         getLeagueRosters(league.leagueId),
         getLeagueUsers(league.leagueId),
     ]);
 
-    const leagueType      = (league.leagueType as LeagueType) ?? 'Redraft';
-    const scoringSettings = (league.scoringSettings as Record<string, number> | null) ?? {};
-    const leagueSettings  = buildLeagueSettings(league.rosterPositions as string[], scoringSettings);
-    const ppr: PprFormat  = league.scoringType === 'ppr' ? 1 : league.scoringType === 'half_ppr' ? 0.5 : 0;
-    const superflex       = leagueSettings.sfSlots > 0;
-    const leagueSize      = league.totalRosters;
-
     const ownerName = new Map(members.map(m => [m.user_id, m.display_name ?? `Team ${m.user_id}`]));
 
-    const rosterRows = rosters.map(r => {
-        const playerIds = r.players ?? [];
-        const rosterDtv = playerIds.reduce((sum, pid) => {
-            const entry = ctx.dtvByPlayerId.get(pid);
-            if (!entry) return sum;
-            const baseValue = computePlayerBaseValue(entry.u, entry.position, {
-                leagueType, superflex, ppr, leagueSize,
-                passTd: leagueSettings.passTd, bonusRecTe: leagueSettings.bonusRecTe,
-            });
-            const p: Player = {
-                rank: 0, name: entry.u.name, position: entry.position,
-                team: entry.u.team ?? 'FA', age: entry.u.age ?? 0,
-                baseValue, injuryStatus: entry.u.injuryStatus,
-            };
-            const dtv = calcDtv(p, ppr, leagueType, undefined, leagueSettings);
-            return sum + dtv.finalDtv;
-        }, 0);
+    const rosterRows = rosters.map(r => ({
+        rosterId:  r.roster_id,
+        ownerName: r.owner_id ? (ownerName.get(r.owner_id) ?? `Team ${r.roster_id}`) : `Team ${r.roster_id}`,
+        wins:   r.settings?.wins   ?? 0,
+        losses: r.settings?.losses ?? 0,
+        pf: Math.round(((r.settings?.fpts          ?? 0) + (r.settings?.fpts_decimal          ?? 0) / 100) * 10) / 10,
+        pa: Math.round(((r.settings?.fpts_against  ?? 0) + (r.settings?.fpts_against_decimal  ?? 0) / 100) * 10) / 10,
+    }));
 
-        return {
-            rosterId:  r.roster_id,
-            ownerName: r.owner_id ? (ownerName.get(r.owner_id) ?? `Team ${r.roster_id}`) : `Team ${r.roster_id}`,
-            wins:      r.settings?.wins    ?? 0,
-            losses:    r.settings?.losses  ?? 0,
-            pf:        Math.round(((r.settings?.fpts ?? 0) + (r.settings?.fpts_decimal ?? 0) / 100) * 10) / 10,
-            rosterDtv: Math.round(rosterDtv * 10) / 10,
-        };
-    });
-
-    const maxPf  = Math.max(...rosterRows.map(r => r.pf),  1);
-    const maxDtv = Math.max(...rosterRows.map(r => r.rosterDtv), 1);
+    const maxPf = Math.max(...rosterRows.map(r => r.pf), 1);
+    const maxPa = Math.max(...rosterRows.map(r => r.pa), 0);
 
     const data = rosterRows
-        .map(r => ({ ...r, powerScore: computePowerScore(r.wins, r.losses, r.pf, r.rosterDtv, maxPf, maxDtv) }))
-        .sort((a, b) => b.powerScore - a.powerScore || b.rosterDtv - a.rosterDtv)
+        .map(r => ({ ...r, powerScore: computePowerScore(r.wins, r.losses, r.pf, r.pa, maxPf, maxPa) }))
+        .sort((a, b) => b.powerScore - a.powerScore || b.pf - a.pf)
         .map((r, i) => ({ rank: i + 1, ...r }));
 
     await prisma.powerRankingSnapshot.upsert({
-        where:  { leagueId_week: { leagueId: league.leagueId, week: ctx.week } },
+        where:  { leagueId_week: { leagueId: league.leagueId, week } },
         update: { data },
-        create: { leagueId: league.leagueId, week: ctx.week, data },
+        create: { leagueId: league.leagueId, week, data },
     });
 }
-
-// ── Route ─────────────────────────────────────────────────────────────────────
 
 export async function GET(request: Request): Promise<Response> {
     if (request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -171,66 +86,10 @@ export async function GET(request: Request): Promise<Response> {
             return Response.json({ ok: true, message: 'No in-season leagues', week });
         }
 
-        // Load dynasty values + Sleeper player data once for all leagues
-        const [fcRows, sleeperPlayers] = await Promise.all([
-            prisma.fantasyCalcValue.findMany({
-                where: {
-                    position: { in: ['QB', 'RB', 'WR', 'TE'] },
-                    OR: [{ dynastyValue: { gt: 0 } }, { redraftValue: { gt: 0 } }],
-                },
-                select: {
-                    playerName: true, nameLower: true, position: true,
-                    dynastyValue: true, dynastyValueSf: true,
-                    redraftValue: true, redraftValueSf: true,
-                },
-            }),
-            prisma.sleeperPlayer.findMany({
-                where:  { active: true, position: { in: ['QB', 'RB', 'WR', 'TE'] } },
-                select: { playerId: true, fullName: true, team: true, injuryStatus: true, birthDate: true, age: true },
-            }),
-        ]);
-
-        const sleeperExact      = new Map<string, SleeperInfo>();
-        const sleeperNormalized = new Map<string, SleeperInfo>();
-        for (const p of sleeperPlayers) {
-            const val  = { playerId: p.playerId, team: p.team, injuryStatus: p.injuryStatus, birthDate: p.birthDate, age: p.age };
-            const exact = p.fullName.toLowerCase();
-            const normd = normalizeName(p.fullName);
-            if (!sleeperExact.has(exact))      sleeperExact.set(exact, val);
-            if (!sleeperNormalized.has(normd)) sleeperNormalized.set(normd, val);
-        }
-
-        const dtvByPlayerId = new Map<string, DtvEntry>();
-        for (const r of fcRows) {
-            if (!SKILL_POSITIONS.has(r.position)) continue;
-            const exact = r.nameLower;
-            const normd = normalizeName(r.nameLower);
-            const sl    = sleeperExact.get(exact) ?? sleeperNormalized.get(normd) ?? null;
-            if (!sl) continue;
-            const rawTeam = sl.team ?? null;
-            const team    = (rawTeam && rawTeam !== 'FA') ? rawTeam : null;
-            const age     = calculateAge(sl.birthDate) ?? sl.age ?? null;
-            const u: UniversePlayer = {
-                name: r.playerName, position: r.position, team, age,
-                dynasty:        normalise(r.dynastyValue),
-                dynastySf:      normalise(r.dynastyValueSf),
-                redraft:        normalise(r.redraftValue),
-                redraftSf:      normalise(r.redraftValueSf),
-                trend:          null,
-                injuryStatus:   sl.injuryStatus ?? null,
-                birthDate:      sl.birthDate ?? null,
-                playerImageUrl: null,
-            };
-            dtvByPlayerId.set(sl.playerId, { playerName: r.playerName, position: r.position, u });
-        }
-
-        const ctx: Ctx = { week, dtvByPlayerId };
-        let saved  = 0;
-        let errors = 0;
-
+        let saved = 0, errors = 0;
         for (let i = 0; i < uniqueLeagues.length; i += LEAGUE_BATCH_SIZE) {
             const batch   = uniqueLeagues.slice(i, i + LEAGUE_BATCH_SIZE);
-            const results = await Promise.allSettled(batch.map(league => processLeague(league, ctx)));
+            const results = await Promise.allSettled(batch.map(league => processLeague(league, week)));
             for (const result of results) {
                 if (result.status === 'fulfilled') saved++;
                 else errors++;
