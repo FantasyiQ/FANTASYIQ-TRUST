@@ -19,7 +19,7 @@ export default async function MockDraftPage({
 
     const league = await prisma.league.findUnique({
         where:  { id },
-        select: { id: true, userId: true, leagueName: true, leagueType: true, totalRosters: true },
+        select: { id: true, userId: true, leagueName: true, leagueType: true, totalRosters: true, rosterPositions: true },
     });
 
     if (!league || league.userId !== session.user.id) redirect('/dashboard');
@@ -33,6 +33,7 @@ export default async function MockDraftPage({
                     leagueName={league.leagueName ?? 'My League'}
                     leagueType={league.leagueType ?? 'Redraft'}
                     totalRosters={league.totalRosters ?? 12}
+                    rosterSpots={(league.rosterPositions as string[] | null)?.length ?? 0}
                 />
             </div>
         </div>

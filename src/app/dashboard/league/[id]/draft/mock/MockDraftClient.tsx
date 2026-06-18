@@ -62,11 +62,13 @@ export default function MockDraftClient({
     leagueName,
     leagueType,
     totalRosters,
+    rosterSpots,
 }: {
     leagueId:     string;
     leagueName:   string;
     leagueType:   string;
     totalRosters: number;
+    rosterSpots:  number;
 }) {
     const [clientPhase, setClientPhase] = useState<ClientPhase>({ phase: 'idle' });
     const isDynasty = leagueType === 'Dynasty';
@@ -139,6 +141,7 @@ export default function MockDraftClient({
                 leagueName={leagueName}
                 leagueType={leagueType}
                 totalRosters={totalRosters}
+                rosterSpots={rosterSpots}
                 draftSlot={draftSlot}
                 onSlotChange={setDraftSlot}
                 onStart={startDraft}
@@ -256,6 +259,7 @@ function IdleScreen({
     leagueName,
     leagueType,
     totalRosters,
+    rosterSpots,
     draftSlot,
     onSlotChange,
     onStart,
@@ -263,15 +267,17 @@ function IdleScreen({
     leagueName:   string;
     leagueType:   string;
     totalRosters: number;
+    rosterSpots:  number;
     draftSlot:    number;
     onSlotChange: (s: number) => void;
     onStart:      () => void;
 }) {
     const isDynasty = leagueType === 'Dynasty';
+    const rounds    = rosterSpots || 15;
 
     const modeDetails = isDynasty
-        ? { label: 'Dynasty Mock Draft',  rounds: '20 rounds · Dynasty values · Linear draft',        desc: 'Long-term dynasty values — age curve, DTV, and startup draft calibration.' }
-        : { label: 'Redraft Mock Draft',  rounds: '15 rounds · Season-long values · Linear draft',    desc: 'Season-long values — best player available each round, all positions included.' };
+        ? { label: 'Dynasty Mock Draft',  rounds: 'Dynasty values · Linear draft',                          desc: 'Long-term dynasty values — age curve, DTV, and startup draft calibration.' }
+        : { label: 'Redraft Mock Draft',  rounds: `${rounds} rounds · Season-long values · Linear draft`,   desc: 'Season-long values — best player available each round, all positions included.' };
 
     const n = totalRosters;
     const slotLabel = draftSlot === 1 ? 'Pick 1 every round (first overall)'
