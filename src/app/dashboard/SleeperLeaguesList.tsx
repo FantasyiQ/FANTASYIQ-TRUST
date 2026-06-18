@@ -154,8 +154,16 @@ export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier
                             </div>
                         </Link>
                         <form action={unsyncLeague.bind(null, league.leagueId, league.platform)}>
-                            <button type="submit" title="Unsync"
-                                className="text-gray-600 hover:text-red-400 transition text-sm px-2 py-1 rounded">
+                            <button
+                                type="submit"
+                                title="Remove league"
+                                onClick={e => {
+                                    if (!confirm(`Remove "${league.leagueName}" from your dashboard?\n\nYou can re-sync it at any time.`)) {
+                                        e.preventDefault();
+                                    }
+                                }}
+                                className="text-gray-600 hover:text-red-400 transition text-sm px-2 py-1 rounded"
+                            >
                                 ✕
                             </button>
                         </form>
