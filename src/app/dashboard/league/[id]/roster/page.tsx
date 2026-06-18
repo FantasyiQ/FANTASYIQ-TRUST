@@ -143,6 +143,18 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
     });
     if (!league) redirect('/dashboard');
 
+    if (league.platform !== 'sleeper') {
+        return (
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-12 text-center space-y-3">
+                <div className="text-4xl mb-2">📋</div>
+                <h2 className="text-lg font-bold text-white">Roster view coming soon for {league.platform === 'espn' ? 'ESPN' : 'this platform'}</h2>
+                <p className="text-gray-400 text-sm max-w-sm mx-auto">
+                    Live roster data is currently available for Sleeper leagues. ESPN roster support is on the way.
+                </p>
+            </div>
+        );
+    }
+
     const dbUser = await prisma.user.findUnique({
         where:  { id: session.user.id },
         select: { sleeperUserId: true },
