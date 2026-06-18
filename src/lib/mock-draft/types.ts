@@ -21,6 +21,8 @@ export interface NeedsProfile {
     WR:   number;
     TE:   number;
     FLEX: number;
+    K?:   number;   // redraft only
+    DEF?: number;   // redraft only
 }
 
 export interface PersonalityProfile {
@@ -46,7 +48,8 @@ export interface MockDraftSettings {
     tePremium:     boolean;
     isDynasty:     boolean;
     isRookieDraft: boolean;
-    starterSlots:  Record<string, number>;   // QB:1, RB:2, WR:2, TE:1, FLEX:n
+    starterSlots:  Record<string, number>;   // QB:1, RB:2, WR:2, TE:1, FLEX:n, K:1, DEF:1
+    draftMode:     'dynasty' | 'redraft' | 'rookie';
 }
 
 export interface MockDraftPick {

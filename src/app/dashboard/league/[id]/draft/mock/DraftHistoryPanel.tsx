@@ -8,6 +8,8 @@ const POS_COLORS: Record<string, string> = {
     RB:  'bg-green-900/40 text-green-300 border-green-800',
     WR:  'bg-blue-900/40 text-blue-300 border-blue-800',
     TE:  'bg-yellow-900/40 text-yellow-300 border-yellow-800',
+    K:   'bg-purple-900/40 text-purple-300 border-purple-800',
+    DEF: 'bg-gray-700/60 text-gray-300 border-gray-600',
 };
 
 interface Props {

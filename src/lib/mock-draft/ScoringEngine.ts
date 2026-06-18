@@ -22,13 +22,14 @@ export interface ScoreBreakdown {
 export function scorePlayerForTeam(
     player:            MockPlayer,
     needs:             NeedsProfile,
-    bpaIndex:          number,      // 0-based overall BPA rank (guard: > 9 → -Infinity)
-    positionalRank:    number,      // 0-based rank within position among top 10 (0 = best)
-    positionalTotal:   number,      // how many of this position are in top 10
+    bpaIndex:          number,      // 0-based overall BPA rank (guard: >= maxCandidates → -Infinity)
+    positionalRank:    number,      // 0-based rank within position among candidates (0 = best)
+    positionalTotal:   number,      // how many of this position are in the candidate window
     posChaosMultiplier: number,     // per-position random [0–1], same for all players at this pos
     personality:       PersonalityProfile,
+    maxCandidates:     number = 10,
 ): { score: number; breakdown: ScoreBreakdown } {
-    if (bpaIndex > 9) {
+    if (bpaIndex >= maxCandidates) {
         return { score: -Infinity, breakdown: { base: 0, need: 0, chaos: 0, total: -Infinity } };
     }
 
@@ -75,40 +76,37 @@ export function rankBestFitForTeam(
         .sort((a, b) => b.score - a.score);
 }
 
-// Ranks the top 10 BPA candidates for a team. One chaos roll per position per
-// call — so across a single pick, all WRs share the same positional chaos weight,
-// all RBs share theirs, etc. Within a position the original BPA order is preserved.
+// Ranks the top N BPA candidates for a team (default 10, pass 15 for redraft).
+// One chaos roll per position per call — so across a single pick, all WRs share
+// the same positional chaos weight, all RBs share theirs, etc.
 export function rankCandidatesForTeam(
-    available:   MockPlayer[],
-    needs:       NeedsProfile,
-    personality: PersonalityProfile,
+    available:     MockPlayer[],
+    needs:         NeedsProfile,
+    personality:   PersonalityProfile,
+    maxCandidates: number = 10,
 ): { player: MockPlayer; score: number; breakdown: ScoreBreakdown }[] {
-    const top10 = available.slice(0, 10);
+    const pool = available.slice(0, maxCandidates);
 
-    // Count how many of each position appear in top 10, and track each player's
-    // rank within their position (top10 is already BPA-sorted, so order is stable).
     const posCounts  = new Map<string, number>();
     const posRankOf  = new Map<string, number>();  // playerId → 0-based positional rank
-    for (const p of top10) {
+    for (const p of pool) {
         const rank = posCounts.get(p.position) ?? 0;
         posRankOf.set(p.playerId, rank);
         posCounts.set(p.position, rank + 1);
     }
 
-    // One random [0–1] roll per position — the dice for which position this
-    // team "wants" this pick. Shared across all players at the same position.
     const posChaos = new Map<string, number>();
     for (const pos of posCounts.keys()) {
         posChaos.set(pos, Math.random());
     }
 
-    return top10
+    return pool
         .map((player, i) => {
             const posRank       = posRankOf.get(player.playerId) ?? 0;
             const posTotal      = posCounts.get(player.position)  ?? 1;
             const posChaosMult  = posChaos.get(player.position)   ?? 0;
             const { score, breakdown } = scorePlayerForTeam(
-                player, needs, i, posRank, posTotal, posChaosMult, personality,
+                player, needs, i, posRank, posTotal, posChaosMult, personality, maxCandidates,
             );
             return { player, score, breakdown };
         })

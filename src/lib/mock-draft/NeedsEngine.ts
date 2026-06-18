@@ -48,6 +48,9 @@ export function computeNeedsProfile(
         return Math.max(0, Math.min(1, (target - have) / target));
     };
 
+    const kSlots   = slots['K']   ?? 0;
+    const defSlots = slots['DEF'] ?? 0;
+
     return {
         QB:   urgency('QB', slots['QB'] ?? 1),
         RB:   urgency('RB', slots['RB'] ?? 2),
@@ -59,16 +62,21 @@ export function computeNeedsProfile(
                 urgency('WR', (slots['WR'] ?? 2) + flexSlots * 0.5),
               )
             : 0,
+        // Cap K/DEF urgency low so they naturally fall to late rounds
+        K:   kSlots   > 0 ? Math.min(0.35, urgency('K',   kSlots))   : undefined,
+        DEF: defSlots > 0 ? Math.min(0.45, urgency('DEF', defSlots)) : undefined,
     };
 }
 
 export function getNeedForPosition(needs: NeedsProfile, position: string): number {
     switch (position) {
-        case 'QB': return needs.QB;
-        case 'RB': return Math.max(needs.RB, needs.FLEX * 0.75);
-        case 'WR': return Math.max(needs.WR, needs.FLEX * 0.75);
-        case 'TE': return Math.max(needs.TE, needs.FLEX * 0.40);
-        default:   return 0;
+        case 'QB':  return needs.QB;
+        case 'RB':  return Math.max(needs.RB, needs.FLEX * 0.75);
+        case 'WR':  return Math.max(needs.WR, needs.FLEX * 0.75);
+        case 'TE':  return Math.max(needs.TE, needs.FLEX * 0.40);
+        case 'K':   return needs.K   ?? 0;
+        case 'DEF': return needs.DEF ?? 0;
+        default:    return 0;
     }
 }
 
@@ -86,10 +94,12 @@ export function updateNeedsAfterPick(
     const isFlexFill = FLEX_ELIGIBLE.has(pos) && needs.FLEX > 0;
 
     return {
-        QB:   pos === 'QB' ? reduce(needs.QB, slots['QB'] ?? 1) : needs.QB,
-        RB:   pos === 'RB' ? reduce(needs.RB, slots['RB'] ?? 2) : needs.RB,
-        WR:   pos === 'WR' ? reduce(needs.WR, slots['WR'] ?? 2) : needs.WR,
-        TE:   pos === 'TE' ? reduce(needs.TE, slots['TE'] ?? 1) : needs.TE,
-        FLEX: isFlexFill   ? reduce(needs.FLEX, slots['FLEX'] ?? 1) : needs.FLEX,
+        QB:   pos === 'QB'  ? reduce(needs.QB,        slots['QB']  ?? 1) : needs.QB,
+        RB:   pos === 'RB'  ? reduce(needs.RB,        slots['RB']  ?? 2) : needs.RB,
+        WR:   pos === 'WR'  ? reduce(needs.WR,        slots['WR']  ?? 2) : needs.WR,
+        TE:   pos === 'TE'  ? reduce(needs.TE,        slots['TE']  ?? 1) : needs.TE,
+        FLEX: isFlexFill    ? reduce(needs.FLEX,       slots['FLEX'] ?? 1) : needs.FLEX,
+        K:    needs.K   !== undefined ? (pos === 'K'   ? reduce(needs.K,   slots['K']   ?? 1) : needs.K)   : undefined,
+        DEF:  needs.DEF !== undefined ? (pos === 'DEF' ? reduce(needs.DEF, slots['DEF'] ?? 1) : needs.DEF) : undefined,
     };
 }

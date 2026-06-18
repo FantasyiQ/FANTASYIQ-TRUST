@@ -58,18 +58,23 @@ function draftTypeLabel(settings: MockDraftInitResponse['context']['settings']):
 export default function MockDraftClient({
     leagueId,
     leagueName,
+    leagueType,
 }: {
     leagueId:    string;
     leagueName:  string;
+    leagueType:  string;
 }) {
     const [clientPhase, setClientPhase] = useState<ClientPhase>({ phase: 'idle' });
+    const [draftMode, setDraftMode]     = useState<'dynasty' | 'redraft'>(
+        leagueType === 'Dynasty' ? 'dynasty' : 'redraft',
+    );
 
     // ── Start / restart ───────────────────────────────────────────────────────
 
     const startDraft = useCallback(async () => {
         setClientPhase({ phase: 'loading' });
         try {
-            const res = await fetch(`/api/mock-draft/init?leagueId=${leagueId}`);
+            const res = await fetch(`/api/mock-draft/init?leagueId=${leagueId}&mode=${draftMode}`);
             if (!res.ok) throw new Error(`Status ${res.status}`);
             const data: MockDraftInitResponse = await res.json();
 
@@ -84,7 +89,7 @@ export default function MockDraftClient({
         } catch (err) {
             setClientPhase({ phase: 'error', message: err instanceof Error ? err.message : 'Unknown error' });
         }
-    }, [leagueId]);
+    }, [leagueId, draftMode]);
 
     // ── User selects a player ─────────────────────────────────────────────────
 
@@ -122,7 +127,14 @@ export default function MockDraftClient({
     // ── Renders ───────────────────────────────────────────────────────────────
 
     if (clientPhase.phase === 'idle') {
-        return <IdleScreen leagueName={leagueName} onStart={startDraft} />;
+        return (
+            <IdleScreen
+                leagueName={leagueName}
+                draftMode={draftMode}
+                onModeChange={setDraftMode}
+                onStart={startDraft}
+            />
+        );
     }
 
     if (clientPhase.phase === 'loading') {
@@ -229,11 +241,19 @@ function DraftHeader({
 
 function IdleScreen({
     leagueName,
+    draftMode,
+    onModeChange,
     onStart,
 }: {
-    leagueName: string;
-    onStart:    () => void;
+    leagueName:   string;
+    draftMode:    'dynasty' | 'redraft';
+    onModeChange: (m: 'dynasty' | 'redraft') => void;
+    onStart:      () => void;
 }) {
+    const modeDetails = draftMode === 'redraft'
+        ? { label: 'Redraft Mock', rounds: '15 rounds · Snake draft · Full player pool (QB/RB/WR/TE/K/DEF)', desc: 'Season-long values — best player available each round, all positions included.' }
+        : { label: 'Dynasty Mock', rounds: '20 rounds or rookie-only · Dynasty values',                       desc: 'Long-term dynasty values — age curve, DTV, and startup or rookie draft calibration.' };
+
     return (
         <div className="space-y-6">
             <div className="flex items-start justify-between gap-4">
@@ -244,28 +264,54 @@ function IdleScreen({
                 <div className="text-[10px] font-bold tracking-widest text-[#D4AF37]">FantasyiQ</div>
             </div>
 
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center space-y-5">
-                <div className="text-5xl">🎯</div>
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 space-y-6">
+                {/* Mode selector */}
                 <div>
-                    <h2 className="text-lg font-bold text-white">Practice Your Draft</h2>
-                    <p className="text-gray-400 text-sm mt-2 max-w-md mx-auto leading-relaxed">
-                        Simulate your upcoming draft against AI opponents calibrated to your league
-                        — scoring format, roster settings, and positional needs included.
-                        No results are saved; run as many times as you want.
-                    </p>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider text-center mb-3">Draft Type</p>
+                    <div className="flex gap-3 justify-center">
+                        {(['dynasty', 'redraft'] as const).map(m => (
+                            <button
+                                key={m}
+                                onClick={() => onModeChange(m)}
+                                className={[
+                                    'px-5 py-2.5 rounded-xl text-sm font-bold border transition',
+                                    draftMode === m
+                                        ? 'bg-[#D4AF37] text-black border-[#D4AF37]'
+                                        : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500 hover:text-white',
+                                ].join(' ')}
+                            >
+                                {m === 'dynasty' ? 'Dynasty' : 'Redraft'}
+                            </button>
+                        ))}
+                    </div>
+                    <p className="text-center text-xs text-gray-500 mt-2">{modeDetails.desc}</p>
                 </div>
-                <div className="flex flex-wrap justify-center gap-4 text-xs text-gray-500">
-                    <span>✓ BPA-ranked player pool</span>
-                    <span>✓ Roster need awareness</span>
-                    <span>✓ 10-player reach window</span>
-                    <span>✓ Human-like randomness</span>
+
+                {/* Info block */}
+                <div className="text-center space-y-3">
+                    <div className="text-5xl">🎯</div>
+                    <div>
+                        <h2 className="text-lg font-bold text-white">{modeDetails.label}</h2>
+                        <p className="text-gray-500 text-xs mt-1">{modeDetails.rounds}</p>
+                        <p className="text-gray-400 text-sm mt-2 max-w-md mx-auto leading-relaxed">
+                            Simulate your upcoming draft against AI opponents calibrated to your league
+                            — scoring format, roster settings, and positional needs included.
+                            No results are saved; run as many times as you want.
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap justify-center gap-4 text-xs text-gray-500">
+                        <span>✓ BPA-ranked player pool</span>
+                        <span>✓ Roster need awareness</span>
+                        <span>✓ Human-like AI opponents</span>
+                        {draftMode === 'redraft' && <span>✓ K & DEF included</span>}
+                    </div>
+                    <button
+                        onClick={onStart}
+                        className="px-8 py-3 bg-[#D4AF37] text-black font-bold rounded-xl hover:bg-[#c9a227] transition text-sm"
+                    >
+                        Start Mock Draft
+                    </button>
                 </div>
-                <button
-                    onClick={onStart}
-                    className="px-8 py-3 bg-[#D4AF37] text-black font-bold rounded-xl hover:bg-[#c9a227] transition text-sm"
-                >
-                    Start Mock Draft
-                </button>
             </div>
         </div>
     );

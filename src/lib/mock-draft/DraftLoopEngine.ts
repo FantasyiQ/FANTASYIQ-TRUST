@@ -56,6 +56,9 @@ export function runUntilUserPick(
 
         const teamNeeds = needs.get(pick.teamId) ?? team.needsProfile;
 
+        // Wider candidate window for redraft so K/DEF can enter the BPA consideration set
+        const maxCandidates = context.settings.isDynasty ? 10 : 15;
+
         // QB streaming: in superflex rookie drafts, teams gradually load up on QBs
         // in rounds 3–5. Not every team streams at once — probability scales with
         // round urgency and personality. This creates organic QB runs rather than
@@ -85,12 +88,12 @@ export function runUntilUserPick(
                 player   = bestQB;
                 breakdown = { base: bestQB.baseScore / 100, need: 1, chaos: 0, total: bestQB.baseScore / 100 };
             } else {
-                const ranked = rankCandidatesForTeam(available, teamNeeds, team.personality);
+                const ranked = rankCandidatesForTeam(available, teamNeeds, team.personality, maxCandidates);
                 if (ranked.length === 0) break;
                 ({ player, breakdown } = ranked[0]);
             }
         } else {
-            const ranked = rankCandidatesForTeam(available, teamNeeds, team.personality);
+            const ranked = rankCandidatesForTeam(available, teamNeeds, team.personality, maxCandidates);
             if (ranked.length === 0) break;
             ({ player, breakdown } = ranked[0]);
         }

@@ -91,7 +91,8 @@ export async function GET(req: NextRequest): Promise<Response> {
     if (!session?.user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { searchParams } = new URL(req.url);
-    const leagueId = searchParams.get('leagueId');
+    const leagueId  = searchParams.get('leagueId');
+    const modeParam = searchParams.get('mode') as 'dynasty' | 'redraft' | null;
     if (!leagueId) return Response.json({ error: 'Missing leagueId' }, { status: 400 });
 
     const league = await prisma.league.findUnique({
@@ -113,7 +114,7 @@ export async function GET(req: NextRequest): Promise<Response> {
 
     // ── League settings ────────────────────────────────────────────────────────
     const rosterPositions = (league.rosterPositions ?? []) as string[];
-    const isDynasty       = league.leagueType === 'Dynasty';
+    const isDynasty       = modeParam === 'dynasty' ? true : modeParam === 'redraft' ? false : league.leagueType === 'Dynasty';
     const superflex       = rosterPositions.includes('SUPER_FLEX');
     const tePremium       = rosterPositions.includes('TE_FLEX');
     const rawSlots        = countStartersPerTeam(rosterPositions);
@@ -123,7 +124,13 @@ export async function GET(req: NextRequest): Promise<Response> {
         WR:   rawSlots.WR   ?? 2,
         TE:   rawSlots.TE   ?? 1,
         FLEX: (rawSlots['FLEX'] ?? 0) + (rawSlots['SUPER_FLEX'] ?? 0),
+        K:    rawSlots['K']   ?? (rosterPositions.includes('K')   ? 1 : 0),
+        DEF:  rawSlots['DEF'] ?? (rosterPositions.includes('DEF') ? 1 : 0),
     };
+
+    // For redraft mode applied to a dynasty league: treat all rosters as empty
+    // so needs start at 0 (redraft = no carryover players).
+    const forceEmptyRosters = modeParam === 'redraft';
 
     // ── Parallel Sleeper fetches ───────────────────────────────────────────────
     const [rosters, members, drafts, dbUser, tradedPicksRaw] = await Promise.all([
@@ -140,8 +147,9 @@ export async function GET(req: NextRequest): Promise<Response> {
     const yourTeamId      = String(userRoster?.roster_id ?? 1);
 
     // ── Determine draft type & parameters ─────────────────────────────────────
-    const hasExistingRosters = rosters.some(r => (r.players ?? []).length > 5);
+    const hasExistingRosters = !forceEmptyRosters && rosters.some(r => (r.players ?? []).length > 5);
     const isRookieDraft      = isDynasty && hasExistingRosters;
+    const isRedraftMode      = !isDynasty && !isRookieDraft;
 
     const upcomingDraft = drafts.find(d => d.status === 'pre_draft' || d.status === 'drafting')
         ?? drafts.at(-1)
@@ -162,6 +170,7 @@ export async function GET(req: NextRequest): Promise<Response> {
         isDynasty,
         isRookieDraft,
         starterSlots,
+        draftMode: isRookieDraft ? 'rookie' : isDynasty ? 'dynasty' : 'redraft',
     };
 
     // ── Build slot → teamId mapping ────────────────────────────────────────────
@@ -291,8 +300,12 @@ export async function GET(req: NextRequest): Promise<Response> {
             // Re-sort by adjusted baseScore so the board reflects dynasty-adjusted BPA
             .sort((a, b) => b.baseScore - a.baseScore);
     } else {
-        // Startup dynasty or redraft: FantasyCalc values
-        const needed = totalTeams * totalRounds + 60;
+        // Startup dynasty or redraft: FantasyCalc values.
+        // For redraft, use a smaller QB/RB/WR/TE pool (≈10 rounds worth) so that
+        // K/DEF — added separately — naturally appear in the BPA window by round 11+.
+        const needed = isRedraftMode
+            ? Math.ceil(totalTeams * totalRounds * 0.72) + 30
+            : totalTeams * totalRounds + 60;
 
         const fcValues = await prisma.fantasyCalcValue.findMany({
             where: {
@@ -344,6 +357,49 @@ export async function GET(req: NextRequest): Promise<Response> {
         });
     }
 
+    // ── Redraft: append K and DEF to the player pool ──────────────────────────
+    if (isRedraftMode && (starterSlots['K'] > 0 || starterSlots['DEF'] > 0)) {
+        const kdPositions = [
+            ...(starterSlots['K']   > 0 ? ['K']   : []),
+            ...(starterSlots['DEF'] > 0 ? ['DEF'] : []),
+        ];
+        const kdRaw = await prisma.sleeperPlayer.findMany({
+            where:  { position: { in: kdPositions }, active: true },
+            select: { playerId: true, fullName: true, team: true, age: true, position: true, injuryStatus: true },
+        });
+        // Shuffle for variety, then score descending so the "best" ones go slightly earlier
+        const shuffled = [...kdRaw].sort(() => Math.random() - 0.5);
+        const kList    = shuffled.filter(p => p.position === 'K');
+        const defList  = shuffled.filter(p => p.position === 'DEF');
+        const kdMock: MockPlayer[] = [
+            ...kList.map((p, i) => ({
+                playerId:     p.playerId,
+                name:         p.fullName,
+                position:     'K' as MockPlayer['position'],
+                team:         p.team ?? null,
+                age:          p.age ?? null,
+                tier:         5,
+                baseScore:    Math.max(8, 16 - Math.floor(i * 8 / Math.max(kList.length, 1))),
+                isRookie:     false,
+                injuryStatus: p.injuryStatus ?? null,
+                imageUrl:     `https://sleepercdn.com/content/nfl/players/${p.playerId}.jpg`,
+            })),
+            ...defList.map((p, i) => ({
+                playerId:     p.playerId,
+                name:         p.fullName,
+                position:     'DEF' as MockPlayer['position'],
+                team:         p.team ?? null,
+                age:          p.age ?? null,
+                tier:         5,
+                baseScore:    Math.max(10, 20 - Math.floor(i * 10 / Math.max(defList.length, 1))),
+                isRookie:     false,
+                injuryStatus: p.injuryStatus ?? null,
+                imageUrl:     `https://sleepercdn.com/content/nfl/players/${p.playerId}.jpg`,
+            })),
+        ];
+        boardPlayers = [...boardPlayers, ...kdMock].sort((a, b) => b.baseScore - a.baseScore);
+    }
+
     // ── Build existing roster position + name lookup ──────────────────────────
     const existingPlayerIds = [...new Set(rosters.flatMap(r => r.players ?? []).filter(Boolean))];
     const existingSleeperPlayers = existingPlayerIds.length > 0
@@ -393,10 +449,13 @@ export async function GET(req: NextRequest): Promise<Response> {
         const isUser    = teamId === yourTeamId;
 
         const rosterByPosition: Record<string, number> = {};
-        for (const pid of (r.players ?? [])) {
-            const sp = existingPlayerById.get(pid);
-            if (sp?.position && ['QB', 'RB', 'WR', 'TE'].includes(sp.position)) {
-                rosterByPosition[sp.position] = (rosterByPosition[sp.position] ?? 0) + 1;
+        // Redraft: all teams start empty — no carryover from existing dynasty rosters
+        if (!forceEmptyRosters) {
+            for (const pid of (r.players ?? [])) {
+                const sp = existingPlayerById.get(pid);
+                if (sp?.position && ['QB', 'RB', 'WR', 'TE'].includes(sp.position)) {
+                    rosterByPosition[sp.position] = (rosterByPosition[sp.position] ?? 0) + 1;
+                }
             }
         }
 

@@ -28,7 +28,11 @@ export default async function MockDraftPage({
         <div className="space-y-0">
             <DraftCenterTabBar leagueId={id} />
             <div className="pt-6">
-                <MockDraftClient leagueId={id} leagueName={league.leagueName ?? 'My League'} />
+                <MockDraftClient
+                    leagueId={id}
+                    leagueName={league.leagueName ?? 'My League'}
+                    leagueType={league.leagueType ?? 'Dynasty'}
+                />
             </div>
         </div>
     );

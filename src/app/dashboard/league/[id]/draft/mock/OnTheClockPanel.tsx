@@ -5,10 +5,12 @@ import type { MockPlayer, NeedsProfile, MockDraftPick, MockLeagueContext, MockDr
 import { rankBestFitForTeam } from '@/lib/mock-draft/ScoringEngine';
 
 const POS_COLORS: Record<string, string> = {
-    QB: 'bg-red-900/40 text-red-300 border-red-800',
-    RB: 'bg-green-900/40 text-green-300 border-green-800',
-    WR: 'bg-blue-900/40 text-blue-300 border-blue-800',
-    TE: 'bg-yellow-900/40 text-yellow-300 border-yellow-800',
+    QB:  'bg-red-900/40 text-red-300 border-red-800',
+    RB:  'bg-green-900/40 text-green-300 border-green-800',
+    WR:  'bg-blue-900/40 text-blue-300 border-blue-800',
+    TE:  'bg-yellow-900/40 text-yellow-300 border-yellow-800',
+    K:   'bg-purple-900/40 text-purple-300 border-purple-800',
+    DEF: 'bg-gray-700/60 text-gray-300 border-gray-600',
 };
 
 const TIER_LABELS: Record<number, string> = {
@@ -135,7 +137,9 @@ export default function OnTheClockPanel({
 
     const displayList = tab === 'bpa' ? bpaTop10 : bestFit;
 
-    const posOptions = ['ALL', 'QB', 'RB', 'WR', 'TE'];
+    const hasK   = availablePlayers.some(p => p.position === 'K');
+    const hasDEF = availablePlayers.some(p => p.position === 'DEF');
+    const posOptions = ['ALL', 'QB', 'RB', 'WR', 'TE', ...(hasK ? ['K'] : []), ...(hasDEF ? ['DEF'] : [])];
     const filtered = posFilter === 'ALL'
         ? displayList
         : displayList.filter(p => p.position === posFilter);
@@ -242,6 +246,8 @@ export default function OnTheClockPanel({
                                 <NeedsBar label="WR" value={userNeeds.WR} />
                                 <NeedsBar label="TE" value={userNeeds.TE} />
                                 {userNeeds.FLEX > 0 && <NeedsBar label="FLX" value={userNeeds.FLEX} />}
+                                {userNeeds.K   !== undefined && <NeedsBar label="K"   value={userNeeds.K} />}
+                                {userNeeds.DEF !== undefined && <NeedsBar label="DEF" value={userNeeds.DEF} />}
                             </div>
                         </div>
                     )}
