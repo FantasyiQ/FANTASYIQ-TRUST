@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { getTradeEvaluatorContent } from '@/lib/trade/getTradeEvaluatorContent';
 import TradeEvaluator from '@/components/league/TradeEvaluator';
 import TradePartnersPanel from '../TradePartnersPanel';
-import TradeHistoryPanel  from '../TradeHistoryPanel';
 import { getUserSubscriptionTier } from '@/lib/user/getUserSubscriptionTier';
 import { isLeagueCommissionerCovered } from '@/lib/access';
 import BackToOverview from '../_components/BackToOverview';
@@ -44,8 +43,7 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
                 sleeperLeagueId={content.sleeperLeagueId}
                 mySleeperUserId={content.mySleeperUserId}
             />
-            <TradeEvaluator content={content} />
-            <TradeHistoryPanel leagueId={id} />
+            <TradeEvaluator content={content} leagueId={id} />
         </div>
     );
 }

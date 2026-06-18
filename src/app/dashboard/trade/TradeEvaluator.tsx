@@ -10,7 +10,8 @@ import { evaluateUnifiedTrade } from '@/lib/rankings/unifiedTradeEvaluator';
 import type { DefenseValues } from '@/lib/rankings/unifiedTradeEvaluator';
 import type { LeaguePhaseResult } from '@/lib/leaguePhase';
 import { phaseLabel } from '@/lib/leaguePhase';
-import PhaseDebugStrip from '@/components/dev/PhaseDebugStrip';
+import PhaseDebugStrip   from '@/components/dev/PhaseDebugStrip';
+import TradeHistoryPanel from '@/app/dashboard/league/[id]/TradeHistoryPanel';
 
 const LEAGUE_SIZES = [8, 10, 12, 14, 16, 32] as const;
 type LeagueSize = typeof LEAGUE_SIZES[number];
@@ -473,6 +474,7 @@ export interface TradeTeam {
 }
 
 interface TradeEvaluatorProps {
+    leagueId?:              string;
     initialPpr?:            PprFormat;
     initialLeagueSize?:     LeagueSize;
     initialLeagueType?:     LeagueType;
@@ -496,6 +498,7 @@ interface TradeEvaluatorProps {
 }
 
 export default function TradeEvaluator({
+    leagueId,
     initialPpr            = 0.5,
     initialLeagueSize     = 12,
     initialLeagueType     = 'Redraft',
@@ -1097,6 +1100,9 @@ export default function TradeEvaluator({
                     )}
                 </div>
             )}
+
+            {/* Trade History */}
+            {leagueId && <TradeHistoryPanel leagueId={leagueId} />}
 
             {/* Reference chart */}
             <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">

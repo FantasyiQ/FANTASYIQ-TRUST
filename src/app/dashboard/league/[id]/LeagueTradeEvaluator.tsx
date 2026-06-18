@@ -88,6 +88,7 @@ interface ScoringSettings {
 }
 
 interface Props {
+    leagueId:             string;
     leagueName:           string;
     scoringType:          string | null;
     totalRosters:         number;
@@ -108,7 +109,7 @@ interface Props {
 }
 
 export default function LeagueTradeEvaluator({
-    leagueName, scoringType, totalRosters, draftRounds = 5, draftOrderProjected = false,
+    leagueId, leagueName, scoringType, totalRosters, draftRounds = 5, draftOrderProjected = false,
     leagueType, rosterPositions = [], scoringSettings = {}, myTeamData, otherTeamsData = [],
     defenseValues, phaseResult,
 }: Props) {
@@ -196,6 +197,7 @@ export default function LeagueTradeEvaluator({
 
     return (
         <TradeEvaluator
+                leagueId={leagueId}
                 initialPpr={ppr}
                 initialLeagueSize={leagueSize}
                 initialLeagueType={leagueType}
