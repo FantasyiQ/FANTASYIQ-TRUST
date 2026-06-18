@@ -115,7 +115,7 @@ function DuesNavCard({ leagueId, duesData, isCommissioner, leagueName }: {
                         Set Up a Dues Tracker →
                     </Link>
                 )}
-                {isCommissioner && duesData && (
+                {isCommissioner && (
                     <Link
                         href={`/dashboard/league/${leagueId}/commissioner/invite`}
                         className="inline-block mt-2 text-sm font-semibold text-[#D4AF37] hover:underline"
