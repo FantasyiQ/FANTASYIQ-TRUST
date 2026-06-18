@@ -113,22 +113,22 @@ function CommissionerProfile({ member }: { member: LeagueMemberData }) {
                 {member.username && (
                     <p className="text-gray-600 text-xs mt-0.5">@{member.username}</p>
                 )}
-                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                    {member.prsScore !== null && (
-                        <PRSBadge score={member.prsScore} />
-                    )}
-                    {member.lfCommissioner && member.lfCommissioner.reviewsCount > 0 && (
-                        <span className="flex items-center gap-1.5">
-                            <StarRow rating={member.lfCommissioner.avgRating} />
-                            <span className="text-gray-600 text-[10px]">
-                                {member.lfCommissioner.reviewsCount} review{member.lfCommissioner.reviewsCount !== 1 ? 's' : ''}
-                            </span>
+                {member.lfCommissioner && member.lfCommissioner.reviewsCount > 0 && (
+                    <span className="flex items-center gap-1.5 mt-2">
+                        <StarRow rating={member.lfCommissioner.avgRating} />
+                        <span className="text-gray-600 text-[10px]">
+                            {member.lfCommissioner.reviewsCount} review{member.lfCommissioner.reviewsCount !== 1 ? 's' : ''}
                         </span>
-                    )}
-                    {!member.userId && (
-                        <span className="text-gray-700 text-[10px] italic">Not on FantasyiQ</span>
-                    )}
-                </div>
+                    </span>
+                )}
+            </div>
+            <div className="shrink-0">
+                {member.prsScore !== null
+                    ? <PRSBadge score={member.prsScore} />
+                    : !member.userId
+                        ? <span className="text-gray-700 text-[10px] italic">Not on FantasyiQ</span>
+                        : null
+                }
             </div>
         </div>
     );
