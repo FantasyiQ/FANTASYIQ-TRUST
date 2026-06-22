@@ -33,7 +33,7 @@ wb = openpyxl.load_workbook(XLSX, data_only=True)
 ws = wb["Sheet1"]
 rows = list(ws.iter_rows(values_only=True))
 hdr = rows[0]; idx = {h: i for i, h in enumerate(hdr)}
-pi, hi, wi, fi = idx["Player"], idx["Height"], idx["Weight"], idx[40]
+pi, hi, wi, fi, si = idx["Player"], idx["Height"], idx["Weight"], idx[40], idx["School"]
 
 def blank(v):
     return v in (None, "")
@@ -55,17 +55,19 @@ for r in rows[1:]:
         "height": None if blank(r[hi]) else str(r[hi]).strip(),
         "weight": None if blank(r[wi]) else int(r[wi]),
         "forty":  parse_forty(r[fi]),
+        "school": None if blank(r[si]) else str(r[si]).strip(),
     }
 print(f"Spreadsheet: {len(sheet)} player rows read.")
 
 # ── 2. Rewrite the seed, syncing height/weight/fortyTime on each line ─────────
 lines = open(SEED).read().splitlines(keepends=True)
 name_re   = re.compile(r"playerName:\s*(?:'([^']*)'|\"([^\"]*)\")")
+school_re = re.compile(r"school:\s*'[^']*'")
 height_re = re.compile(r",\s*height:\s*\"(?:[^\"\\]|\\.)*\"")
 weight_re = re.compile(r",\s*weight:\s*\d+")
 forty_re  = re.compile(r",\s*fortyTime:\s*[0-9.]+")
 
-set_h = set_w = set_f = clr_f = 0
+set_h = set_w = set_f = clr_f = set_s = 0
 not_in_sheet = []
 out = []
 for line in lines:
@@ -90,6 +92,9 @@ for line in lines:
     body = weight_re.sub("", body)
 
     s = sheet[key]
+    # school: sheet wins (in-place token, keeps column order)
+    if s["school"] and school_re.search(body):
+        body = school_re.sub(f"school: '{s['school']}'", body); set_s += 1
     tokens = []
     # height: sheet wins, else keep existing
     if s["height"] is not None:
@@ -114,7 +119,7 @@ for line in lines:
 open(SEED, "w").write("".join(out))
 
 # ── 3. Report ────────────────────────────────────────────────────────────────
-print(f"Synced -> heights: {set_h}, weights: {set_w}, 40s set: {set_f}, 40s cleared/absent: {clr_f}")
+print(f"Synced -> schools: {set_s}, heights: {set_h}, weights: {set_w}, 40s set: {set_f}, 40s cleared/absent: {clr_f}")
 if not_in_sheet:
     print(f"\n⚠️  {len(not_in_sheet)} seed players not found in sheet (left untouched):")
     for n in sorted(not_in_sheet):
