@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { getPusherClient, userChannel } from '@/lib/pusher';
 
@@ -43,7 +44,23 @@ export default function NotificationBell({ userId }: { userId?: string }) {
   const [unreadCount, setUnreadCount]     = useState(0);
   const [open, setOpen]                   = useState(false);
   const [loading, setLoading]             = useState(false);
+  const [mounted, setMounted]             = useState(false);
+  const [position, setPosition]           = useState<{ top: number; right: number }>({ top: 0, right: 0 });
   const containerRef                      = useRef<HTMLDivElement>(null);
+  const buttonRef                         = useRef<HTMLButtonElement>(null);
+  const dropdownRef                       = useRef<HTMLDivElement>(null);
+
+  // Portal target only exists after mount (SSR-safe).
+  useEffect(() => { setMounted(true); }, []);
+
+  // Position the (portaled) dropdown beneath the bell button. The dropdown is
+  // rendered to document.body so it can't be clipped by the navbar's overflow
+  // scroll container — but that means we must anchor it manually.
+  const updatePosition = useCallback(() => {
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setPosition({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+  }, []);
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -81,16 +98,30 @@ export default function NotificationBell({ userId }: { userId?: string }) {
     return () => { pusher.unsubscribe(userChannel(userId)); };
   }, [userId]);
 
-  // Close on outside click
+  // Close on outside click. The dropdown is portaled to document.body, so it is
+  // NOT inside containerRef — check it separately or clicks inside it would close.
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      if (containerRef.current?.contains(target)) return;
+      if (dropdownRef.current?.contains(target)) return;
+      setOpen(false);
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Keep the portaled dropdown anchored to the bell on resize/scroll while open.
+  useEffect(() => {
+    if (!open) return;
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [open, updatePosition]);
 
   async function markAllReadOnOpen() {
     if (unreadCount === 0) return;
@@ -173,8 +204,10 @@ export default function NotificationBell({ userId }: { userId?: string }) {
 
       {/* Bell button */}
       <button
+        ref={buttonRef}
         onClick={() => {
           const willOpen = !open;
+          if (willOpen) updatePosition();
           setOpen(willOpen);
           if (willOpen) markAllReadOnOpen();
         }}
@@ -229,20 +262,22 @@ export default function NotificationBell({ userId }: { userId?: string }) {
         )}
       </button>
 
-      {/* Dropdown */}
-      {open && (
-        <div style={{
-          position:        'absolute',
-          top:             'calc(100% + 8px)',
-          right:           '0',
+      {/* Dropdown — portaled to <body> so the navbar's overflow scroll container
+          can't clip it. Anchored to the bell via fixed positioning. */}
+      {mounted && open && createPortal(
+        <div ref={dropdownRef} style={{
+          position:        'fixed',
+          top:             `${position.top}px`,
+          right:           `${position.right}px`,
           width:           '340px',
+          maxWidth:        'calc(100vw - 16px)',
           maxHeight:       '480px',
           overflowY:       'auto',
           background:      '#111827',
           border:          '1px solid #1f2937',
           borderRadius:    '12px',
           boxShadow:       '0 20px 40px rgba(0,0,0,0.6)',
-          zIndex:          50,
+          zIndex:          100,
         }}>
           {/* Header */}
           <div style={{
@@ -377,7 +412,8 @@ export default function NotificationBell({ userId }: { userId?: string }) {
               View all notifications
             </a>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

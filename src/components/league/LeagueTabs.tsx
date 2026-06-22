@@ -29,7 +29,7 @@ export default function LeagueTabs({ leagueId, isDynasty = true }: { leagueId: s
             )}
             <Tab href={`/dashboard/league/${leagueId}/roster`}        label="My Roster"        />
             <Tab href={`/dashboard/league/${leagueId}/fantasyiq`}     label="FantasyiQ Hub"    />
-            <Tab href={`/dashboard/league/${leagueId}/rankings`}      label="Player Rankings"  />
+            <Tab href={`/dashboard/league/${leagueId}/rankings`}      label="Rankings"         />
             {isDynasty && (
                 <Tab href={`/dashboard/league/${leagueId}/trade`}     label="Trade Evaluator"  />
             )}
