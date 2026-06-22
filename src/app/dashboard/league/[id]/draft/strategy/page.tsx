@@ -92,7 +92,9 @@ export default async function DraftStrategyPage({
     const hasKicker = rosterPos.has('K');
     const IDP_PLAYER_POSITIONS = new Set(['DE','DT','NT','DL','EDGE','OLB','ILB','MLB','LB','CB','FS','SS','NB','S','DB','SAF']);
 
-    const displaySeason = '2026';
+    // Active rookie-rankings class. Bump for a new draft year by setting the
+    // ROOKIE_RANKINGS_SEASON env var (Vercel) — no code change needed.
+    const displaySeason = process.env.ROOKIE_RANKINGS_SEASON ?? '2026';
 
     const rawPlayers = await prisma.rookieRankingsPlayer.findMany({
         where:   { season: displaySeason },
