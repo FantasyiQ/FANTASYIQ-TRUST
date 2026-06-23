@@ -1,5 +1,6 @@
 import { type NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { normalizePlayerName as normalizeName } from '@/lib/playerName';
 import { calculateAge } from '@/lib/calculateAge';
 import { calcDtv, DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
 import type { Player, LeagueSettings, LeagueType } from '@/lib/trade-engine';
@@ -13,15 +14,6 @@ function normalise(raw: number): number {
     return Math.min(100, Math.max(1, Math.round((raw / VALUE_CAP) * 100)));
 }
 
-function normalizeName(name: string): string {
-    return name
-        .toLowerCase()
-        .replace(/['‘’]/g, '')
-        .replace(/\s+\b(jr\.?|sr\.?|ii|iii|iv|v)\s*$/i, '')
-        .replace(/\./g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
 
 function buildLeagueSettings(
     rosterPositions: string[],

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { captureError } from '@/lib/sentry';
+import { normalizePlayerName as normalizeName } from '@/lib/playerName';
 
 export const maxDuration = 300;
 
@@ -42,15 +43,6 @@ async function fetchKtcPage(url: string): Promise<KtcPlayer[]> {
     return parsePlayersArray(await res.text());
 }
 
-function normalizeName(name: string): string {
-    return name
-        .toLowerCase()
-        .replace(/['‘’]/g, '')
-        .replace(/\s+\b(jr\.?|sr\.?|ii|iii|iv|v)\s*$/i, '')
-        .replace(/\./g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
 
 export async function GET(request: Request): Promise<Response> {
     if (request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {

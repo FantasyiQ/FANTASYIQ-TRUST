@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { checkPublicLimit, getClientIp } from '@/lib/ratelimit';
+import { normalizePlayerName as normalizeName } from '@/lib/playerName';
 
 // Normalise raw value (0–9999) to our 0–100 DTV scale.
 const VALUE_CAP = 9999;
@@ -9,22 +10,6 @@ function normalise(raw: number): number {
     return Math.min(100, Math.max(1, Math.round((raw / VALUE_CAP) * 100)));
 }
 
-// Normalise a player name for cross-source matching.
-// Strips name suffixes (Jr, Sr, II, III, IV, V) and periods so that
-// "Kenneth Walker III" and "Kenneth Walker" map to the same key.
-function normalizeName(name: string): string {
-    return name
-        .toLowerCase()
-        // Strip apostrophes (e.g. "Tre' Harris" → "tre harris")
-        .replace(/['‘’]/g, '')
-        // Strip trailing generational suffixes (whole-word match at end of string)
-        .replace(/\s+\b(jr\.?|sr\.?|ii|iii|iv|v)\s*$/i, '')
-        // Strip periods (e.g. "D.J." → "DJ", "T.J." → "TJ")
-        .replace(/\./g, '')
-        // Collapse extra whitespace
-        .replace(/\s+/g, ' ')
-        .trim();
-}
 
 // Returns a map of lowercase player name → { dynasty, redraft, team, age, trend, injuryStatus }
 // Used by TradeEvaluator to overlay live dynasty values onto hardcoded baseValues.

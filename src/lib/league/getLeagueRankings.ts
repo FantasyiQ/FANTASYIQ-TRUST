@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { normalizePlayerName as normalizeName } from '@/lib/playerName';
 import { getLeagueRosters, getLeagueUsers, getLeague, getNflState } from '@/lib/sleeper';
 import { calcDtv, DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
 import type { Player, LeagueSettings, LeagueType, PprFormat } from '@/lib/trade-engine';
@@ -71,15 +72,6 @@ function normalise(raw: number): number {
     return Math.min(100, Math.max(1, Math.round((raw / VALUE_CAP) * 100)));
 }
 
-function normalizeName(name: string): string {
-    return name
-        .toLowerCase()
-        .replace(/['‘’]/g, '')
-        .replace(/\s+\b(jr\.?|sr\.?|ii|iii|iv|v)\s*$/i, '')
-        .replace(/\./g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
 
 function buildLeagueSettings(
     rosterPositions: string[],

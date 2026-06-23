@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import type { UniversePlayer, UniverseResponse } from '@/lib/player-universe';
 import { calculateAge } from '@/lib/calculateAge';
 import { checkPublicLimit, getClientIp } from '@/lib/ratelimit';
+import { normalizePlayerName as normalizeName } from '@/lib/playerName';
 
 const VALUE_CAP = 9999;
 const SKILL_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE']);
@@ -11,15 +12,6 @@ function normalise(raw: number): number {
     return Math.min(100, Math.max(1, Math.round((raw / VALUE_CAP) * 100)));
 }
 
-function normalizeName(name: string): string {
-    return name
-        .toLowerCase()
-        .replace(/['‘’]/g, '')
-        .replace(/\s+\b(jr\.?|sr\.?|ii|iii|iv|v)\s*$/i, '')
-        .replace(/\./g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
 
 // Returns the full dynamic player universe: all ranked skill-position players
 // merged with live Sleeper team/injury/age data, sorted by dynasty value desc.

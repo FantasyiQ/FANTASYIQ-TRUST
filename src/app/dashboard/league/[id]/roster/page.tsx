@@ -9,6 +9,7 @@ import { calcDtv, DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
 import type { Player, LeagueSettings, LeagueType } from '@/lib/trade-engine';
 import { computePlayerBaseValue } from '@/lib/player-universe';
 import type { UniversePlayer } from '@/lib/player-universe';
+import { normalizePlayerName as normalizeName } from '@/lib/playerName';
 
 // ── ESPN Roster Page ──────────────────────────────────────────────────────────
 
@@ -198,14 +199,6 @@ function normalise(raw: number): number {
     return Math.min(100, Math.max(1, Math.round((raw / VALUE_CAP) * 100)));
 }
 
-function normalizeName(name: string): string {
-    return name.toLowerCase()
-        .replace(/['‘’]/g, '')
-        .replace(/\s+\b(jr\.?|sr\.?|ii|iii|iv|v)\s*$/i, '')
-        .replace(/\./g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
 
 function buildLeagueSettings(rosterPositions: string[], scoringSettings: Record<string, number> | null): LeagueSettings {
     const ss = scoringSettings ?? {};
