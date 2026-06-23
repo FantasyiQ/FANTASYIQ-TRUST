@@ -119,6 +119,14 @@ export async function GET(req: NextRequest): Promise<Response> {
     const isDynasty       = modeParam === 'dynasty' ? true : modeParam === 'redraft' ? false : league.leagueType === 'Dynasty';
     const superflex       = rosterPositions.includes('SUPER_FLEX');
     const tePremium       = rosterPositions.includes('TE_FLEX');
+
+    // IDP support: detect whether this league starts defensive players, and how
+    // many IDP starter slots it has (drives whether IDP enter the rookie pool).
+    const IDP_SLOTS = new Set(['DL','DE','DT','NT','LB','OLB','ILB','MLB','DB','CB','S','FS','SS','NB','IDP','IDPFLEX','IDP_FLEX']);
+    const IDP_PLAYER_POSITIONS = ['DE','DT','NT','DL','EDGE','OLB','ILB','MLB','LB','CB','FS','SS','NB','S','DB','SAF'];
+    const hasIDP          = rosterPositions.some(p => IDP_SLOTS.has(p));
+    const idpStarterSlots = rosterPositions.filter(p => IDP_SLOTS.has(p)).length;
+
     const rawSlots        = countStartersPerTeam(rosterPositions);
     const starterSlots    = {
         QB:   rawSlots.QB   ?? 1,
@@ -128,6 +136,7 @@ export async function GET(req: NextRequest): Promise<Response> {
         FLEX: (rawSlots['FLEX'] ?? 0) + (rawSlots['SUPER_FLEX'] ?? 0),
         K:    rawSlots['K']   ?? (rosterPositions.includes('K')   ? 1 : 0),
         DEF:  rawSlots['DEF'] ?? (rosterPositions.includes('DEF') ? 1 : 0),
+        IDP:  idpStarterSlots,
     };
 
     // For redraft mode applied to a dynasty league: treat all rosters as empty
@@ -296,8 +305,11 @@ export async function GET(req: NextRequest): Promise<Response> {
         };
 
         const season = league.season ?? '2026';
+        const rookiePositions = hasIDP
+            ? ['QB', 'RB', 'WR', 'TE', ...IDP_PLAYER_POSITIONS]
+            : ['QB', 'RB', 'WR', 'TE'];
         const rookies = await prisma.rookieRankingsPlayer.findMany({
-            where:   { season, position: { in: ['QB', 'RB', 'WR', 'TE'] } },
+            where:   { season, position: { in: rookiePositions } },
             orderBy: { fiqScore: 'desc' },
             select:  { playerName: true, position: true, fiqScore: true, fiqTier: true },
         });
@@ -313,7 +325,11 @@ export async function GET(req: NextRequest): Promise<Response> {
         boardPlayers = rookies
             .map((r, i) => {
                 const sp        = spByName.get(r.playerName.toLowerCase());
-                const mult      = DYNASTY_POS_MULT[r.position] ?? 1.0;
+                // IDP dampener: in dynasty rookie drafts IDP go behind comparably
+                // graded offense, so scale their board score down (tunable).
+                const mult      = IDP_PLAYER_POSITIONS.includes(r.position)
+                    ? 0.88
+                    : (DYNASTY_POS_MULT[r.position] ?? 1.0);
                 const baseScore = Math.min(100, Math.max(1, Math.round(r.fiqScore * mult)));
                 const tierMatch = r.fiqTier?.match(/(\d+)/);
                 const tier      = tierMatch ? parseInt(tierMatch[1], 10)
@@ -321,7 +337,7 @@ export async function GET(req: NextRequest): Promise<Response> {
                 return {
                     playerId:     sp?.playerId ?? `rookie-${i}`,
                     name:         r.playerName,
-                    position:     r.position as MockPlayer['position'],
+                    position:     (IDP_PLAYER_POSITIONS.includes(r.position) ? 'IDP' : r.position) as MockPlayer['position'],
                     team:         sp?.team ?? null,
                     age:          sp?.age ?? null,
                     tier:         Math.min(5, Math.max(1, tier)),
@@ -506,7 +522,11 @@ export async function GET(req: NextRequest): Promise<Response> {
                     qualityCount[sp.position] = (qualityCount[sp.position] ?? 0) + 1;
                 }
             }
-            needsProfile = computeRookieDraftNeeds(qualityCount);
+            // IDP has no FC values, so use a capped, slot-scaled need (more IDP
+            // starter slots → higher need), so IDP rookies draft in realistic
+            // mid/late rounds without ever outranking premium offense.
+            const idpNeed = hasIDP ? Math.min(0.6, 0.18 * idpStarterSlots) : undefined;
+            needsProfile = computeRookieDraftNeeds(qualityCount, idpNeed);
         } else {
             needsProfile = computeNeedsProfile(rosterByPosition, settings);
         }

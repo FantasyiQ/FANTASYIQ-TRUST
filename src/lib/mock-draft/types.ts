@@ -23,6 +23,7 @@ export interface NeedsProfile {
     FLEX: number;
     K?:   number;   // redraft only
     DEF?: number;   // redraft only
+    IDP?: number;   // IDP leagues only (all defensive players bucketed)
 }
 
 export interface PersonalityProfile {

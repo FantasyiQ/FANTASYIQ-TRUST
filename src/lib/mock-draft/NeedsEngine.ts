@@ -19,6 +19,7 @@ const ROOKIE_DEPTH_TARGETS: Record<string, number> = {
 
 export function computeRookieDraftNeeds(
     qualityCountByPosition: Record<string, number>,
+    idpNeed?: number,   // IDP leagues only — a capped, slot-scaled need (no FC values exist for IDP)
 ): NeedsProfile {
     const need = (pos: string): number => {
         const target = ROOKIE_DEPTH_TARGETS[pos] ?? 3;
@@ -32,6 +33,7 @@ export function computeRookieDraftNeeds(
         WR:   need('WR'),
         TE:   Math.min(need('TE'), 0.75), // cap: prevents TE panic-drafting top-2, but allows mid-round urgency
         FLEX: Math.max(need('RB'), need('WR')) * 0.6,
+        IDP:  idpNeed,
     };
 }
 
@@ -76,6 +78,7 @@ export function getNeedForPosition(needs: NeedsProfile, position: string): numbe
         case 'TE':  return Math.max(needs.TE, needs.FLEX * 0.40);
         case 'K':   return needs.K   ?? 0;
         case 'DEF': return needs.DEF ?? 0;
+        case 'IDP': return needs.IDP ?? 0;
         default:    return 0;
     }
 }
@@ -101,5 +104,6 @@ export function updateNeedsAfterPick(
         FLEX: isFlexFill    ? reduce(needs.FLEX,       slots['FLEX'] ?? 1) : needs.FLEX,
         K:    needs.K   !== undefined ? (pos === 'K'   ? reduce(needs.K,   slots['K']   ?? 1) : needs.K)   : undefined,
         DEF:  needs.DEF !== undefined ? (pos === 'DEF' ? reduce(needs.DEF, slots['DEF'] ?? 1) : needs.DEF) : undefined,
+        IDP:  needs.IDP !== undefined ? (pos === 'IDP' ? reduce(needs.IDP, slots['IDP'] ?? 1) : needs.IDP) : undefined,
     };
 }
