@@ -176,7 +176,36 @@ export async function GET(request: Request): Promise<Response> {
             upserted += batch.length;
         }
     
-        return Response.json({ ok: true, source: 'FantasyCalc', upserted });
+        // Self-heal: collapse punctuation-variant duplicates (e.g. a stale
+        // "tre' harris" alongside the canonical "tre harris") that linger when
+        // KTC changes a name's punctuation. Keeps the current canonical row
+        // (or, failing that, the highest-value one). Uses a punctuation-only key
+        // so it NEVER collapses suffix-different players ("Michael Carter" vs
+        // "Michael Carter II").
+        const punctKey = (s: string) => s.toLowerCase().replace(/['‘’.]/g, '').replace(/\s+/g, ' ').trim();
+        const canonical = new Set(entries.map(e => e.playerName.toLowerCase()));
+        const allRows = await prisma.fantasyCalcValue.findMany({
+            select: { nameLower: true, dynastyValue: true, redraftValue: true },
+        });
+        const byKey = new Map<string, typeof allRows>();
+        for (const r of allRows) {
+            const k = punctKey(r.nameLower);
+            (byKey.get(k) ?? byKey.set(k, []).get(k)!).push(r);
+        }
+        const staleNames: string[] = [];
+        for (const group of byKey.values()) {
+            if (group.length < 2) continue;
+            group.sort((a, b) =>
+                (canonical.has(b.nameLower) ? 1 : 0) - (canonical.has(a.nameLower) ? 1 : 0)
+                || b.dynastyValue - a.dynastyValue
+                || b.redraftValue - a.redraftValue);
+            for (const r of group.slice(1)) staleNames.push(r.nameLower);
+        }
+        if (staleNames.length) {
+            await prisma.fantasyCalcValue.deleteMany({ where: { nameLower: { in: staleNames } } }).catch(() => null);
+        }
+
+        return Response.json({ ok: true, source: 'FantasyCalc', upserted, deduped: staleNames.length });
     } catch (err) {
         captureError(err, { cron: 'fantasycalc-sync' });
         return Response.json({ error: 'Cron failed' }, { status: 500 });
