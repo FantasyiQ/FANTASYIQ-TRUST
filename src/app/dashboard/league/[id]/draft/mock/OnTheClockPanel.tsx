@@ -40,6 +40,14 @@ function NeedsBar({ label, value }: { label: string; value: number }) {
     );
 }
 
+// Matches the live-draft assistant's FiQ score coloring for consistency.
+function fiqColor(score: number) {
+    if (score >= 85) return 'text-[#D4AF37]';
+    if (score >= 75) return 'text-green-400';
+    if (score >= 65) return 'text-blue-400';
+    return 'text-gray-400';
+}
+
 function PlayerCard({
     player,
     rank,
@@ -90,6 +98,9 @@ function PlayerCard({
             <div className="flex flex-col items-end gap-0.5 shrink-0">
                 <span className={`text-[10px] font-bold px-1.5 py-px rounded border ${POS_COLORS[player.position] ?? 'bg-gray-800 text-gray-400 border-gray-700'}`}>
                     {player.position}
+                </span>
+                <span className={`text-[11px] font-bold ${fiqColor(player.baseScore)}`}>
+                    FiQ {player.baseScore}
                 </span>
                 <span className={`text-[10px] font-semibold ${TIER_COLORS[player.tier] ?? 'text-gray-500'}`}>
                     {TIER_LABELS[player.tier] ?? `T${player.tier}`}
