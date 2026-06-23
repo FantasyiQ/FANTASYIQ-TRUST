@@ -304,6 +304,13 @@ export async function GET(req: NextRequest): Promise<Response> {
             TE: 1.01,
         };
 
+        // IDP fantasy value depends heavily on how many IDP a league starts.
+        // With only 1 IDP starter, demand is minimal — elite defenders fall far
+        // down the board (essentially undrafted by the CPU), while deep IDP
+        // leagues value them in early rounds. Scale the dampener with slot count:
+        // ~0.62 at 1 slot → caps at 0.90 for deep IDP leagues. (tunable)
+        const idpMult = Math.min(0.90, 0.55 + 0.07 * idpStarterSlots);
+
         const season = league.season ?? '2026';
         const rookiePositions = hasIDP
             ? ['QB', 'RB', 'WR', 'TE', ...IDP_PLAYER_POSITIONS]
@@ -325,10 +332,8 @@ export async function GET(req: NextRequest): Promise<Response> {
         boardPlayers = rookies
             .map((r, i) => {
                 const sp        = spByName.get(r.playerName.toLowerCase());
-                // IDP dampener: in dynasty rookie drafts IDP go behind comparably
-                // graded offense, so scale their board score down (tunable).
                 const mult      = IDP_PLAYER_POSITIONS.includes(r.position)
-                    ? 0.88
+                    ? idpMult
                     : (DYNASTY_POS_MULT[r.position] ?? 1.0);
                 const baseScore = Math.min(100, Math.max(1, Math.round(r.fiqScore * mult)));
                 const tierMatch = r.fiqTier?.match(/(\d+)/);
