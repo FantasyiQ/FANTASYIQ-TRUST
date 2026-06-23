@@ -318,7 +318,7 @@ export async function GET(req: NextRequest): Promise<Response> {
         const rookies = await prisma.rookieRankingsPlayer.findMany({
             where:   { season, position: { in: rookiePositions } },
             orderBy: { fiqScore: 'desc' },
-            select:  { playerName: true, position: true, fiqScore: true, fiqTier: true },
+            select:  { playerName: true, position: true, fiqScore: true, fiqTier: true, height: true, weight: true, fortyTime: true },
         });
 
         const sleeperPlayers = rookies.length > 0
@@ -350,6 +350,9 @@ export async function GET(req: NextRequest): Promise<Response> {
                     isRookie:     true,
                     injuryStatus: sp?.injuryStatus ?? null,
                     imageUrl:     sp ? `https://sleepercdn.com/content/nfl/players/${sp.playerId}.jpg` : null,
+                    height:       r.height,
+                    weight:       r.weight,
+                    fortyTime:    r.fortyTime,
                 };
             })
             // Re-sort by adjusted baseScore so the board reflects dynasty-adjusted BPA

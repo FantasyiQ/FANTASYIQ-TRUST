@@ -78,7 +78,13 @@ function PlayerCard({
                     {player.name}
                 </p>
                 <p className="text-gray-500 text-xs truncate">
-                    {player.team ?? 'FA'}{player.age ? ` · Age ${player.age}` : ''}
+                    {[
+                        player.team ?? 'FA',
+                        player.age ? `Age ${player.age}` : null,
+                        player.height || null,
+                        player.weight ? `${player.weight} lb` : null,
+                        player.fortyTime ? `${player.fortyTime.toFixed(2)}` : null,
+                    ].filter(Boolean).join(' · ')}
                 </p>
             </div>
             <div className="flex flex-col items-end gap-0.5 shrink-0">

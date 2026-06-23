@@ -13,6 +13,9 @@ export interface MockPlayer {
     isRookie:     boolean;
     injuryStatus: string | null;
     imageUrl:     string | null;
+    height?:      string | null;   // rookies only (from rookie rankings)
+    weight?:      number | null;
+    fortyTime?:   number | null;
 }
 
 export interface NeedsProfile {
