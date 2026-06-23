@@ -2,6 +2,8 @@
 // Provides: per-position age curves, team scheme data, contract tiers, draft capital
 // Used by trade-engine.ts to enhance DTV calculations
 
+import { normalizePlayerName } from '@/lib/playerName';
+
 export type ContractTier = 'rookie' | 'rookie5th' | 'extension' | 'veteran' | 'expiring' | 'franchise' | 'ufa';
 
 // How each contract status impacts dynasty value
@@ -389,6 +391,15 @@ export interface PlayerIntel {
     insights:       string[]; // max 3 badge labels
 }
 
+// Normalized-key lookups so suffix/apostrophe/period differences still match
+// (e.g. "Marvin Harrison Jr" vs "Marvin Harrison", "Ja'Lynn Polk" vs "JaLynn Polk").
+const CONTRACTS_BY_NORM = new Map(
+    Object.entries(PLAYER_CONTRACTS).map(([k, v]) => [normalizePlayerName(k), v] as const),
+);
+const DRAFT_CAPITAL_BY_NORM = new Map(
+    Object.entries(PLAYER_DRAFT_CAPITAL).map(([k, v]) => [normalizePlayerName(k), v] as const),
+);
+
 export function getPlayerIntel(
     name:       string,
     position:   string,
@@ -396,12 +407,12 @@ export function getPlayerIntel(
     age:        number,
     leagueType: 'Redraft' | 'Dynasty',
 ): PlayerIntel {
-    const contractTier   = PLAYER_CONTRACTS[name] ?? null;
+    const contractTier   = PLAYER_CONTRACTS[name] ?? CONTRACTS_BY_NORM.get(normalizePlayerName(name)) ?? null;
     const contractFactor = contractTier
         ? CONTRACT_MULTIPLIERS[contractTier]
         : (age <= 25 ? 1.02 : 0.98); // reasonable default
 
-    const draftCapital   = PLAYER_DRAFT_CAPITAL[name] ?? 50;
+    const draftCapital   = PLAYER_DRAFT_CAPITAL[name] ?? DRAFT_CAPITAL_BY_NORM.get(normalizePlayerName(name)) ?? 50;
     const draftCapFactor = 0.92 + (draftCapital / 100) * 0.16; // 0.92–1.08
 
     const schemeFit = schemeFitScore(position, team);

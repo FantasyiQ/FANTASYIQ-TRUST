@@ -45,6 +45,7 @@ async function fetchKtcPage(url: string): Promise<KtcPlayer[]> {
 function normalizeName(name: string): string {
     return name
         .toLowerCase()
+        .replace(/['‘’]/g, '')
         .replace(/\s+\b(jr\.?|sr\.?|ii|iii|iv|v)\s*$/i, '')
         .replace(/\./g, '')
         .replace(/\s+/g, ' ')

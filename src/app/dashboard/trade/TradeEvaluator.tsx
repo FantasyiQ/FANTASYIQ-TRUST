@@ -5,6 +5,7 @@ import { getDraftPicks, evaluateTrade, calcDtv, DEFAULT_LEAGUE_SETTINGS, isIdpPo
 import type { Player, PprFormat, LeagueType, DtvResult, LeagueSettings } from '@/lib/trade-engine';
 import type { UniversePlayer, UniverseResponse, UniverseMeta, DeltaEntry, DeltaResponse } from '@/lib/player-universe';
 import { computePlayerBaseValue, playerVolatility } from '@/lib/player-universe';
+import { normalizePlayerName } from '@/lib/playerName';
 import { calculateAge } from '@/lib/calculateAge';
 import { evaluateUnifiedTrade } from '@/lib/rankings/unifiedTradeEvaluator';
 import type { DefenseValues } from '@/lib/rankings/unifiedTradeEvaluator';
@@ -548,9 +549,16 @@ export default function TradeEvaluator({
         }).catch(() => {});
     }, []);
 
-    // Universe keyed by lowercase name for fast lookup (roster player overlay)
+    // Universe keyed by lowercase name for fast lookup (roster player overlay).
+    // Also keep a normalized-name map so Sleeper names that differ by suffix
+    // ("Marvin Harrison" vs "Marvin Harrison Jr") or apostrophe ("Tre Harris"
+    // vs "Tre' Harris") still match the KTC universe name.
     const universeMap = useMemo(
         () => new Map(universe.map(u => [u.name.toLowerCase(), u])),
+        [universe],
+    );
+    const universeNormMap = useMemo(
+        () => new Map(universe.map(u => [normalizePlayerName(u.name), u])),
         [universe],
     );
 
@@ -565,7 +573,7 @@ export default function TradeEvaluator({
             const defScore = p.id ? defenseValues[p.id] : undefined;
             return defScore !== undefined ? { ...p, baseValue: defScore } : p;
         }
-        const u = universeMap.get(p.name.toLowerCase());
+        const u = universeMap.get(p.name.toLowerCase()) ?? universeNormMap.get(normalizePlayerName(p.name));
         if (!u) return p;
         const resolvedImageUrl = u.playerImageUrl ?? p.playerImageUrl ?? null;
         return {
@@ -578,7 +586,7 @@ export default function TradeEvaluator({
             playerImageUrl:  resolvedImageUrl,
             image:           resolvedImageUrl,
         };
-    }, [universeMap, leagueType, superflex, ppr, leagueSize, leagueSettings, defenseValues]);
+    }, [universeMap, universeNormMap, leagueType, superflex, ppr, leagueSize, leagueSettings, defenseValues]);
 
     const allExcluded = [...sideA.map(p => p.name), ...sideB.map(p => p.name), ...sideC.map(p => p.name)];
 

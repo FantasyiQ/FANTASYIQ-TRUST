@@ -63,6 +63,7 @@ function normalise(raw: number): number {
 function normalizeName(name: string): string {
     return name
         .toLowerCase()
+        .replace(/['‘’]/g, '')
         .replace(/\s+\b(jr\.?|sr\.?|ii|iii|iv|v)\s*$/i, '')
         .replace(/\./g, '')
         .replace(/\s+/g, ' ')

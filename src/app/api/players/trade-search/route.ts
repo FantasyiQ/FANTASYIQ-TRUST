@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { calculateAge } from '@/lib/calculateAge';
 import type { Player } from '@/lib/trade-engine';
 import { checkSearchLimit, getClientIp } from '@/lib/ratelimit';
+import { normalizePlayerName } from '@/lib/playerName';
 
 const VALUE_CAP = 9999;
 function normaliseFc(raw: number): number {
@@ -51,11 +52,14 @@ export async function GET(request: NextRequest): Promise<Response> {
     ]);
 
     const fcByName = new Map(fcRows.map(r => [r.nameLower, r]));
+    // Normalized fallback so suffix/apostrophe differences still match
+    // (e.g. Sleeper "Marvin Harrison" ↔ KTC "Marvin Harrison Jr.").
+    const fcByNorm = new Map(fcRows.map(r => [normalizePlayerName(r.nameLower), r]));
 
     // 2. Merge: dynasty value wins; fall back to position-based depth default
     const merged: Player[] = dbMatches.map((p, i) => {
         const nameLower = p.fullName.toLowerCase();
-        const fcRow  = fcByName.get(nameLower);
+        const fcRow  = fcByName.get(nameLower) ?? fcByNorm.get(normalizePlayerName(p.fullName));
         const fcValue = fcRow !== undefined
             ? normaliseFc(Math.max(fcRow.dynastyValue, fcRow.redraftValue))
             : undefined;

@@ -15,6 +15,8 @@ function normalise(raw: number): number {
 function normalizeName(name: string): string {
     return name
         .toLowerCase()
+        // Strip apostrophes (e.g. "Tre' Harris" → "tre harris")
+        .replace(/['‘’]/g, '')
         // Strip trailing generational suffixes (whole-word match at end of string)
         .replace(/\s+\b(jr\.?|sr\.?|ii|iii|iv|v)\s*$/i, '')
         // Strip periods (e.g. "D.J." → "DJ", "T.J." → "TJ")
