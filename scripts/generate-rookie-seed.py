@@ -21,7 +21,7 @@ EliteScore, MarketScore, Pick (overall pick #), FiQScore, Height, Weight, 40.
 draftCap is computed from Pick as round(100.2 - 0.2*Pick, 1); fiqTier is
 computed in the seed's main() from the blended FiQ score.
 """
-import argparse, json, math, os, re
+import argparse, json, math, os, re, subprocess, sys
 import openpyxl
 
 def norm_blank(v):
@@ -51,12 +51,27 @@ def main():
     ap.add_argument("--xlsx")
     ap.add_argument("--out")
     ap.add_argument("--json")
+    ap.add_argument("--no-lint", action="store_true",
+                    help="skip the sheet lint pre-check (not recommended)")
     args = ap.parse_args()
 
     season = args.season
     xlsx = args.xlsx or os.path.expanduser(
         f"~/Library/CloudStorage/OneDrive-FantasyiQTrust/{season} NFL DRAFT.xlsx")
     out = args.out or os.path.join(os.path.dirname(__file__), f"seed-rookie-rankings-{season}.ts")
+
+    # Lint the sheet first — refuse to generate from a sheet with blocking errors.
+    if not args.no_lint:
+        lint = os.path.join(os.path.dirname(__file__), "lint-rookie-sheet.py")
+        res = subprocess.run([sys.executable, lint, "--xlsx", xlsx],
+                             capture_output=True, text=True)
+        summary = next((l for l in res.stdout.splitlines() if l.startswith("Summary:")), "")
+        if res.returncode > 0:
+            print(res.stdout)
+            print(f"\n⛔ Lint found {res.returncode} blocking error(s) — fix the sheet, "
+                  f"or re-run with --no-lint to override.")
+            sys.exit(1)
+        print(f"Lint passed — {summary or 'clean'}")
 
     wb = openpyxl.load_workbook(xlsx, data_only=True)
     ws = wb["Sheet1"]
