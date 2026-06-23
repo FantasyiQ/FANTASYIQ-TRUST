@@ -11,6 +11,7 @@ const POS_COLORS: Record<string, string> = {
     TE:  'bg-yellow-900/40 text-yellow-300 border-yellow-800',
     K:   'bg-purple-900/40 text-purple-300 border-purple-800',
     DEF: 'bg-gray-700/60 text-gray-300 border-gray-600',
+    IDP: 'bg-orange-900/40 text-orange-300 border-orange-800',
 };
 
 const TIER_LABELS: Record<number, string> = {
@@ -158,10 +159,15 @@ export default function OnTheClockPanel({
 
     const hasK   = availablePlayers.some(p => p.position === 'K');
     const hasDEF = availablePlayers.some(p => p.position === 'DEF');
-    const posOptions = ['ALL', 'QB', 'RB', 'WR', 'TE', ...(hasK ? ['K'] : []), ...(hasDEF ? ['DEF'] : [])];
+    const hasIDP = availablePlayers.some(p => p.position === 'IDP');
+    const posOptions = ['ALL', 'QB', 'RB', 'WR', 'TE', ...(hasIDP ? ['IDP'] : []), ...(hasK ? ['K'] : []), ...(hasDEF ? ['DEF'] : [])];
 
     const q = search.trim().toLowerCase();
-    const filtered = displayList
+    // When the user filters by position or searches, look at the FULL available
+    // pool — not the top-10 BPA slice — so lower-ranked positions (IDP, K/DEF)
+    // and any searched player are actually findable.
+    const filterSource = (posFilter !== 'ALL' || q) ? availablePlayers : displayList;
+    const filtered = filterSource
         .filter(p => posFilter === 'ALL' || p.position === posFilter)
         .filter(p => !q || p.name.toLowerCase().includes(q) || (p.team ?? '').toLowerCase().includes(q));
 
