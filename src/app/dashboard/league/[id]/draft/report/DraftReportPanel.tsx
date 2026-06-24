@@ -455,8 +455,8 @@ export default function DraftReportPanel({
                                 </div>
                                 <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
                                     <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Roster Score</p>
-                                    <p className="text-white font-bold text-lg leading-none">{f.overallScore}</p>
-                                    <p className="text-gray-600 text-[10px] mt-0.5">out of 100</p>
+                                    <p className="text-white font-bold text-lg leading-none">{f.overallScore ?? '—'}</p>
+                                    <p className="text-gray-600 text-[10px] mt-0.5">{f.overallScore !== null ? 'out of 100' : 'not available'}</p>
                                 </div>
                                 <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
                                     <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Draft Impact</p>

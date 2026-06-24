@@ -88,7 +88,7 @@ export interface PositionCoreScore {
 export interface FranchiseState {
     trajectoryWindow:    string;
     horizonYears:        number;
-    overallScore:        number;
+    overallScore:        number | null;   // null = trajectory data unavailable
     coreStrength:        PositionCoreScore[];
     positionStability:   { stable: string[]; fragile: string[]; critical: string[] };
     ageCurve:            { young: number; prime: number; aging: number };
@@ -477,19 +477,11 @@ function generateDynastyOutlook(
     coreStrength: PositionCoreScore[],
     ageCurve: { young: number; prime: number; aging: number },
     avgScore: number,
-    overallScore: number,   // league-relative: computed against actual leaguemates
+    overallScore: number | null,   // league-relative vs leaguemates; null = unavailable
 ): string {
     const strongPositions = coreStrength.filter(cs => cs.grade === 'A' || cs.grade === 'B').map(cs => cs.position);
     const weakPositions   = coreStrength.filter(cs => cs.grade === 'D' || cs.grade === 'F').map(cs => cs.position);
     const elite = tierDist.T1 + tierDist.T2;
-
-    // ── Primary anchor: league-relative standing ──────────────────────────────
-    const leagueStanding =
-        overallScore >= 70 ? 'one of the top franchises in this league' :
-        overallScore >= 55 ? 'a competitive franchise in this league' :
-        overallScore >= 40 ? 'a middle-of-the-pack franchise right now' :
-        overallScore >= 25 ? 'a franchise with a clear runway ahead of you' :
-        'a franchise in rebuild mode';
 
     // ── Draft contribution ────────────────────────────────────────────────────
     const draftContrib =
@@ -503,9 +495,8 @@ function generateDynastyOutlook(
         ? ` Your ${strongPositions.join(' and ')} corps stand out as genuine strengths.`
         : '';
 
-    // ── Gaps — only flag when the team has room to grow (not for elite teams) ─
-    // Don't tell a top-3 team their roster is broken.
-    const gapNote = weakPositions.length > 0 && overallScore < 60
+    // ── Gaps — flag when there's room to grow (skip for elite teams) ──────────
+    const gapNote = weakPositions.length > 0 && (overallScore === null || overallScore < 60)
         ? ` Targeting ${weakPositions.join(' and ')} depth could be the next lever.`
         : '';
 
@@ -516,6 +507,17 @@ function generateDynastyOutlook(
         traj === 'REBUILD'   ? 'Stay patient and keep stacking. The upside is real.' :
         'Stay sharp — one move could shift the balance of power in this league.';
 
+    // No league-relative standing when trajectory data is unavailable — lead
+    // with the draft itself rather than fabricating a "middle of the pack".
+    if (overallScore === null) {
+        return `This draft ${draftContrib}.${posStrength}${gapNote} ${momentum}`;
+    }
+    const leagueStanding =
+        overallScore >= 70 ? 'one of the top franchises in this league' :
+        overallScore >= 55 ? 'a competitive franchise in this league' :
+        overallScore >= 40 ? 'a middle-of-the-pack franchise right now' :
+        overallScore >= 25 ? 'a franchise with a clear runway ahead of you' :
+        'a franchise in rebuild mode';
     return `You're ${leagueStanding}. This draft ${draftContrib}.${posStrength}${gapNote} ${momentum}`;
 }
 
@@ -789,7 +791,7 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
         coreStrength,
         ageCurve,
         avgScore,
-        trajectoryData?.overallScore ?? 50,
+        trajectoryData?.overallScore ?? null,
     );
 
     // v3.4: "What You Accomplished" bullets
@@ -814,7 +816,7 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
     const franchise: FranchiseState = {
         trajectoryWindow:    franchiseTraj,
         horizonYears:        trajectoryData?.horizonYears ?? draftProfile.horizonYears,
-        overallScore:        trajectoryData?.overallScore ?? 50,
+        overallScore:        trajectoryData?.overallScore ?? null,
         coreStrength,
         positionStability,
         ageCurve,

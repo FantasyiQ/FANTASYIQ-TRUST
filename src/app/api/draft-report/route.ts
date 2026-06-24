@@ -5,6 +5,7 @@ import { type NextRequest } from 'next/server';
 import { auth }   from '@/lib/auth';
 import { requireLeaguePaidAccess } from '@/lib/access';
 import { prisma } from '@/lib/prisma';
+import { captureError } from '@/lib/sentry';
 import {
     getSleeperDraft,
     getActiveDraftPicks,
@@ -218,7 +219,11 @@ export async function GET(req: NextRequest): Promise<Response> {
             const horizonYears = tw === 'WIN_NOW' ? 1 : tw === 'ASCENDING' ? 2 : 3;
             trajectoryData = { window: tw, horizonYears, overallScore: myTraj.overallScore };
         }
-    } catch { /* non-critical */ }
+    } catch (err) {
+        // Non-fatal: report still renders, but the Roster Score shows "—" rather
+        // than a misleading 50. Log so we can see when/why trajectory fails.
+        captureError(err, { route: 'draft-report', step: 'trajectory', leagueId });
+    }
 
     const trajectoryWindow: TrajectoryWindow = (trajectoryData?.window ?? 'PLATEAU') as TrajectoryWindow;
     const horizonYears = (trajectoryData?.horizonYears ?? 3) as 1 | 2 | 3;
