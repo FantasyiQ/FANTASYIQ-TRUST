@@ -14,6 +14,7 @@ import {
 import { normalizePosition, getTier, computeTeamMode } from '@/lib/draft/context';
 import type { DraftProfile, TrajectoryWindow, RosterProfile } from '@/lib/draft/context';
 import { computeReportCard, type PoolPlayer, type RichRosterPlayer } from '@/lib/draft/reportCard';
+import { assessTeamNeeds, deriveSlots, positionValue } from '@/lib/needs/assessTeamNeeds';
 import { getLeagueContext } from '@/lib/trajectory/contextLoader';
 import { computeTeamTrajectoryForLeague } from '@/lib/trajectory/teamTrajectory';
 import type { LeaguePhaseResult } from '@/lib/leaguePhase';
@@ -265,6 +266,46 @@ export async function GET(req: NextRequest): Promise<Response> {
         return Response.json({ noPicks: true, totalPicks: sortedAllPicks.length });
     }
 
+    // ── Unified Team Needs verdicts (league-relative; same model as Trade
+    //    Partners & Mock) — drives core-strength grades + stability ──────────────
+    const allRosteredIds = [...new Set(rosters.flatMap(r => (r.players ?? []).filter(id => id && id !== '0')))];
+    const allRosterSP = allRosteredIds.length > 0
+        ? await prisma.sleeperPlayer.findMany({ where: { playerId: { in: allRosteredIds } }, select: { playerId: true, position: true, fullName: true } })
+        : [];
+    const allNeedNames = allRosterSP.map(p => p.fullName).filter((n): n is string => Boolean(n));
+    const allNeedFc = allNeedNames.length > 0
+        ? await prisma.fantasyCalcValue.findMany({ where: { playerName: { in: allNeedNames } }, select: { playerName: true, dynastyValue: true, dynastyValueSf: true } })
+        : [];
+    const allDtvByName = new Map(allNeedFc.map(v => [v.playerName, superflex ? v.dynastyValueSf : v.dynastyValue]));
+    const spByIdNeeds  = new Map(allRosterSP.map(p => [p.playerId, p]));
+    const needSlots = deriveSlots(rosterPositions);
+    const OFF = ['QB', 'RB', 'WR', 'TE'];
+    const teamOffenseByPos = (r: typeof rosters[number]): Record<string, number[]> => {
+        const m: Record<string, number[]> = {};
+        for (const pid of (r.players ?? [])) {
+            const sp = spByIdNeeds.get(pid); if (!sp?.position) continue;
+            const pos = normalizePosition(sp.position);
+            if (!OFF.includes(pos)) continue;
+            (m[pos] ??= []).push(sp.fullName ? (allDtvByName.get(sp.fullName) ?? 0) : 0);
+        }
+        return m;
+    };
+    const needLeagueAvg: Record<string, number> = {};
+    for (const pos of OFF) {
+        const starters = needSlots.starters[pos] ?? 0;
+        const sum = rosters.reduce((s, r) => s + positionValue(teamOffenseByPos(r)[pos] ?? [], starters), 0);
+        needLeagueAvg[pos] = sum / (rosters.length || 1);
+    }
+    const userOffenseByPos: Record<string, number[]> = {};
+    for (const p of rosterRich) {
+        const pos = normalizePosition(p.position);
+        if (!OFF.includes(pos)) continue;
+        (userOffenseByPos[pos] ??= []).push(p.rawValue ?? 0);
+    }
+    const needVerdicts = assessTeamNeeds({ playersByPos: userOffenseByPos, slots: needSlots, leagueAvgByPos: needLeagueAvg })
+        .filter(v => OFF.includes(v.position))
+        .map(v => ({ position: v.position, label: v.label }));
+
     // ── Build report card ──────────────────────────────────────────────────────
     const myPickInputs = myPicksRaw.map(p => ({
         pickOverall:     p.pick_no,
@@ -288,6 +329,7 @@ export async function GET(req: NextRequest): Promise<Response> {
         totalTeams,
         totalRounds,
         trajectoryData,
+        needVerdicts,
     });
 
     return Response.json({ reportCard });

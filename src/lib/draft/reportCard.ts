@@ -9,6 +9,12 @@ import { computeDTVSnapshot, computePickDTVNote, type DTVSnapshot } from './team
 import { computePickCommentary }                         from './pickCommentary';
 import { computeDraftIdentityLabel, type DraftIdentityLabel, DRAFT_IDENTITY_DESC } from './draftIdentityLabel';
 import { computeDraftStoryline }                         from './draftStoryline';
+import type { NeedsLabel } from '@/lib/needs/assessTeamNeeds';
+
+// Unified Team Needs vocabulary → Draft Report presentation (A–F is cosmetic).
+function labelToGrade(l: NeedsLabel): 'A' | 'B' | 'C' | 'D' | 'F' {
+    return l === 'Strength' ? 'A' : l === 'Top-heavy' ? 'B' : l === 'Solid' ? 'C' : l === 'Shallow' ? 'D' : 'F';
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -375,22 +381,37 @@ const AGE_YOUNG: Record<string, number> = { QB: 25, RB: 23, WR: 24, TE: 24 };
 const AGE_AGING: Record<string, number> = { QB: 32, RB: 28, WR: 30, TE: 30 };
 const AGE_TARGET: Record<string, number> = { QB: 2, RB: 4, WR: 6, TE: 2 };
 
-function computeCoreStrength(players: RichRosterPlayer[]): PositionCoreScore[] {
+function computeCoreStrength(
+    players: RichRosterPlayer[],
+    labelByPos?: Map<string, NeedsLabel>,
+): PositionCoreScore[] {
     const positions = ['QB', 'RB', 'WR', 'TE'];
     return positions.map(pos => {
         const group = players.filter(p => normalizePosition(p.position) === pos);
-        if (group.length === 0) return { position: pos, grade: 'F' as const, avgFiq: 0, count: 0, label: `${pos} Core` };
-        const avg = Math.round(group.reduce((s, p) => s + p.fiqScore, 0) / group.length);
-        return { position: pos, grade: posGrade(avg), avgFiq: avg, count: group.length, label: `${pos} Core` };
+        const count = group.length;
+        const avg   = count ? Math.round(group.reduce((s, p) => s + p.fiqScore, 0) / count) : 0;
+        const vlabel = labelByPos?.get(pos);
+        // Unified verdict drives the grade + label; FiQ avg kept for display.
+        const grade = vlabel ? labelToGrade(vlabel) : (count ? posGrade(avg) : 'F');
+        const label = vlabel ? `${pos} · ${vlabel}` : `${pos} Core`;
+        return { position: pos, grade, avgFiq: avg, count, label };
     });
 }
 
 function computePositionStability(
     players: RichRosterPlayer[],
     coreStrength: PositionCoreScore[],
+    labelByPos?: Map<string, NeedsLabel>,
 ): { stable: string[]; fragile: string[]; critical: string[] } {
     const stable: string[] = [], fragile: string[] = [], critical: string[] = [];
     for (const cs of coreStrength) {
+        const vlabel = labelByPos?.get(cs.position);
+        if (vlabel) {
+            if (vlabel === 'Strength' || vlabel === 'Solid') stable.push(cs.position);
+            else if (vlabel === 'Need') critical.push(cs.position);
+            else fragile.push(cs.position);   // Top-heavy, Shallow
+            continue;
+        }
         const target = AGE_TARGET[cs.position] ?? 2;
         const filled = cs.count >= target;
         if (cs.grade === 'A' || (cs.grade === 'B' && filled)) stable.push(cs.position);
@@ -531,6 +552,9 @@ export interface ReportCardInput {
         horizonYears: number;
         overallScore: number;
     } | null;
+    // Unified Team Needs verdicts (offense), league-relative — drives core
+    // strength grades + stability so the report matches Trade Partners / Mock.
+    needVerdicts?:   { position: string; label: NeedsLabel }[];
 }
 
 export function computeReportCard(input: ReportCardInput): DraftReportCard {
@@ -730,8 +754,9 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
         : null;
 
     // Franchise state
-    const coreStrength      = computeCoreStrength(rosterRich);
-    const positionStability = computePositionStability(rosterRich, coreStrength);
+    const labelByPos        = new Map((input.needVerdicts ?? []).map(v => [v.position, v.label] as const));
+    const coreStrength      = computeCoreStrength(rosterRich, labelByPos);
+    const positionStability = computePositionStability(rosterRich, coreStrength, labelByPos);
     const ageCurve          = computeAgeCurve(rosterRich);
 
     // v3.3 trajectory: if engine returns PLATEAU (or no data), override with
