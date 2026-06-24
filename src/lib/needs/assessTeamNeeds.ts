@@ -107,9 +107,10 @@ export function positionValue(values: number[], starters: number): number {
 }
 
 // depthTarget = effective starters + 50% depth buffer (min +1)
-function depthTargetFor(starters: number): number {
+export function depthTarget(starters: number): number {
     return starters + Math.max(1, Math.round(starters * 0.5));
 }
+const depthTargetFor = depthTarget;
 
 function classifyDepth(count: number, dedicated: number, starters: number): DepthClass {
     if (count < Math.round(dedicated)) return 'empty';     // can't fill locked starters

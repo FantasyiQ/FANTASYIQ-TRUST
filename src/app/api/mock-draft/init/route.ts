@@ -24,7 +24,8 @@ import type {
     NeedsProfile,
     PersonalityProfile,
 } from '@/lib/mock-draft/types';
-import { computeNeedsProfile, computeRookieDraftNeeds } from '@/lib/mock-draft/NeedsEngine';
+import { buildNeedsProfile } from '@/lib/mock-draft/NeedsEngine';
+import { assessTeamNeeds, deriveSlots, positionValue } from '@/lib/needs/assessTeamNeeds';
 import { countStartersPerTeam }   from '@/lib/draft/draftStrategyUtils';
 
 export const maxDuration = 30;
@@ -499,6 +500,37 @@ export async function GET(req: NextRequest): Promise<Response> {
         }
     }
 
+    // ── Unified Team Needs setup (same model as Trade Partners) ───────────────
+    const needSlots = deriveSlots(rosterPositions);
+    const idpSet = new Set(IDP_PLAYER_POSITIONS);
+    const playersByPosFor = (r: typeof rosters[number]): Record<string, number[]> => {
+        const m: Record<string, number[]> = {};
+        if (forceEmptyRosters) return m;   // redraft: rosters start empty
+        for (const pid of (r.players ?? [])) {
+            const sp = existingPlayerById.get(pid);
+            if (!sp?.position) continue;
+            const pos = idpSet.has(sp.position) ? 'IDP' : sp.position;
+            const dtv = ['QB','RB','WR','TE'].includes(pos) && sp.fullName
+                ? (fcValueByName.get(sp.fullName.toLowerCase()) ?? 0)
+                : 0;   // IDP/K/DEF have no DTV — depth-only (count still matters)
+            (m[pos] ??= []).push(dtv);
+        }
+        return m;
+    };
+    // League-average positional value (offense), same metric the module uses
+    const needLeagueAvg: Record<string, number> = {};
+    for (const pos of ['QB','RB','WR','TE']) {
+        const starters = needSlots.starters[pos] ?? 0;
+        const sum = rosters.reduce((s, r) => s + positionValue(playersByPosFor(r)[pos] ?? [], starters), 0);
+        needLeagueAvg[pos] = sum / (rosters.length || 1);
+    }
+    const idpUrgencyCap = hasIDP ? Math.min(0.6, 0.18 * idpStarterSlots) : undefined;
+    const needUrgencyCaps: Record<string, number> = {
+        K: 0.35, DEF: 0.45,
+        ...(idpUrgencyCap !== undefined ? { IDP: idpUrgencyCap } : {}),
+    };
+    const needDepthOnly = new Set(['DEF', 'IDP']);  // no DTV value source
+
     // ── Build teams ────────────────────────────────────────────────────────────
     const teams: MockTeam[] = rosters.map(r => {
         const teamId    = String(r.roster_id);
@@ -517,27 +549,14 @@ export async function GET(req: NextRequest): Promise<Response> {
             }
         }
 
-        let needsProfile;
-        if (isRookieDraft) {
-            // Count quality assets (meaningful dynasty value) per position
-            const qualityCount: Record<string, number> = {};
-            for (const pid of (r.players ?? [])) {
-                const sp = existingPlayerById.get(pid);
-                if (!sp?.position || !['QB', 'RB', 'WR', 'TE'].includes(sp.position)) continue;
-                const val = sp.fullName ? (fcValueByName.get(sp.fullName.toLowerCase()) ?? 0) : 0;
-                const threshold = QUALITY_THRESHOLD[sp.position] ?? 3000;
-                if (val > threshold) {
-                    qualityCount[sp.position] = (qualityCount[sp.position] ?? 0) + 1;
-                }
-            }
-            // IDP has no FC values, so use a capped, slot-scaled need (more IDP
-            // starter slots → higher need), so IDP rookies draft in realistic
-            // mid/late rounds without ever outranking premium offense.
-            const idpNeed = hasIDP ? Math.min(0.6, 0.18 * idpStarterSlots) : undefined;
-            needsProfile = computeRookieDraftNeeds(qualityCount, idpNeed);
-        } else {
-            needsProfile = computeNeedsProfile(rosterByPosition, settings);
-        }
+        const verdicts = assessTeamNeeds({
+            playersByPos:   playersByPosFor(r),
+            slots:          needSlots,
+            leagueAvgByPos: needLeagueAvg,
+            depthOnly:      needDepthOnly,
+            urgencyCaps:    needUrgencyCaps,
+        });
+        const needsProfile = buildNeedsProfile(verdicts, needSlots.starters);
 
         return {
             teamId,

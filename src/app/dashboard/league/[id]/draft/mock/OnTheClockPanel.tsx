@@ -3,6 +3,10 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import type { MockPlayer, NeedsProfile, MockDraftPick, MockLeagueContext, MockDraftState } from '@/lib/mock-draft/types';
 import { rankBestFitForTeam } from '@/lib/mock-draft/ScoringEngine';
+import { getNeedForPosition } from '@/lib/mock-draft/NeedsEngine';
+import type { NeedsLabel } from '@/lib/needs/assessTeamNeeds';
+
+const NEEDS_ORDER = ['QB', 'RB', 'WR', 'TE', 'IDP', 'K', 'DEF'];
 
 const POS_COLORS: Record<string, string> = {
     QB:  'bg-red-900/40 text-red-300 border-red-800',
@@ -26,16 +30,19 @@ const TIER_COLORS: Record<number, string> = {
     5: 'text-gray-600',
 };
 
-function NeedsBar({ label, value }: { label: string; value: number }) {
+function NeedsBar({ pos, label, value }: { pos: string; label?: NeedsLabel; value: number }) {
     const pct = Math.round(value * 100);
-    const color = pct >= 80 ? 'bg-red-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-green-600';
+    const color = pct >= 70 ? 'bg-red-500' : pct >= 40 ? 'bg-amber-500' : 'bg-green-600';
+    const labelColor = label === 'Need' ? 'text-red-400'
+        : label === 'Top-heavy' || label === 'Shallow' ? 'text-amber-400'
+        : 'text-green-400';
     return (
         <div className="flex items-center gap-2 text-xs">
-            <span className="text-gray-400 w-8 shrink-0">{label}</span>
+            <span className="text-gray-300 w-8 shrink-0 font-semibold">{pos}</span>
+            <span className={`w-[68px] shrink-0 text-[10px] font-medium ${labelColor}`}>{label ?? ''}</span>
             <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
                 <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
             </div>
-            <span className="text-gray-500 w-7 text-right shrink-0">{pct}%</span>
         </div>
     );
 }
@@ -352,13 +359,14 @@ export default function OnTheClockPanel({
                         <div className="bg-gray-900 border border-gray-800 rounded-2xl px-4 py-4 space-y-3">
                             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Your Roster Needs</p>
                             <div className="space-y-2">
-                                <NeedsBar label="QB" value={userNeeds.QB} />
-                                <NeedsBar label="RB" value={userNeeds.RB} />
-                                <NeedsBar label="WR" value={userNeeds.WR} />
-                                <NeedsBar label="TE" value={userNeeds.TE} />
-                                {userNeeds.FLEX > 0 && <NeedsBar label="FLX" value={userNeeds.FLEX} />}
-                                {userNeeds.K   !== undefined && <NeedsBar label="K"   value={userNeeds.K} />}
-                                {userNeeds.DEF !== undefined && <NeedsBar label="DEF" value={userNeeds.DEF} />}
+                                {NEEDS_ORDER.filter(pos => pos in userNeeds.base).map(pos => (
+                                    <NeedsBar
+                                        key={pos}
+                                        pos={pos}
+                                        label={userNeeds.label[pos]}
+                                        value={getNeedForPosition(userNeeds, pos)}
+                                    />
+                                ))}
                             </div>
                         </div>
                     )}

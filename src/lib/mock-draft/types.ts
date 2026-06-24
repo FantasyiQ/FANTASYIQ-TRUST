@@ -1,5 +1,7 @@
 // FantasyiQ Trust — Mock Draft Engine v2 — Core Types
 
+import type { NeedsLabel } from '@/lib/needs/assessTeamNeeds';
+
 export type MockPosition = 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DEF' | 'IDP';
 
 export interface MockPlayer {
@@ -18,15 +20,20 @@ export interface MockPlayer {
     fortyTime?:   number | null;
 }
 
+/**
+ * Driven by the unified Team Needs model (src/lib/needs). Per position:
+ *   base       — verdict urgency (post-caps), static for the draft
+ *   picks      — players drafted this session at the position (for decay)
+ *   decayDenom — depthTarget(pos); effective = max(0, base - picks/decayDenom)
+ *   label/reason — the canonical vocabulary, for UI display
+ * Use getNeedForPosition() to read effective urgency (never read base directly).
+ */
 export interface NeedsProfile {
-    QB:   number;   // 0–1 urgency (0 = full, 1 = empty)
-    RB:   number;
-    WR:   number;
-    TE:   number;
-    FLEX: number;
-    K?:   number;   // redraft only
-    DEF?: number;   // redraft only
-    IDP?: number;   // IDP leagues only (all defensive players bucketed)
+    base:       Record<string, number>;
+    picks:      Record<string, number>;
+    decayDenom: Record<string, number>;
+    label:      Record<string, NeedsLabel>;
+    reason:     Record<string, string>;
 }
 
 export interface PersonalityProfile {

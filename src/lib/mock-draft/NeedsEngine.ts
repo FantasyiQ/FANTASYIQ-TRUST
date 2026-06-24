@@ -1,109 +1,57 @@
 import type { MockPlayer, NeedsProfile, MockDraftSettings } from './types';
+import { depthTarget, type PositionVerdict } from '@/lib/needs/assessTeamNeeds';
 
-const FLEX_ELIGIBLE = new Set(['RB', 'WR', 'TE']);
+/**
+ * Mock-draft needs are now driven by the unified Team Needs model
+ * (src/lib/needs/assessTeamNeeds). This file is the thin adapter that turns
+ * verdicts into a NeedsProfile the scoring loop consumes, plus the per-pick
+ * decay that keeps the CPU from tunnelling on one position.
+ *
+ * FLEX is folded into starter targets inside deriveSlots — there is NO
+ * post-urgency FLEX blending here.
+ */
 
-// ── Rookie-draft needs ────────────────────────────────────────────────────────
-// Dynasty teams already have full rosters, so counting raw players always returns
-// 0% urgency. Instead we count "quality assets" — players with meaningful dynasty
-// value — and compare against a target depth per position.
-//
-// qualityCountByPosition: how many dynasty assets above the value threshold each
-// team has at each position. Passed in from the API route after loading FC values.
-
-const ROOKIE_DEPTH_TARGETS: Record<string, number> = {
-    QB: 2,   // starter + 1 quality backup
-    RB: 5,   // 2 starters + 3 depth pieces
-    WR: 6,   // 2–3 starters + 3 depth pieces
-    TE: 1,   // one quality starter is enough in dynasty
-};
-
-export function computeRookieDraftNeeds(
-    qualityCountByPosition: Record<string, number>,
-    idpNeed?: number,   // IDP leagues only — a capped, slot-scaled need (no FC values exist for IDP)
+// Build a NeedsProfile from unified verdicts. decayDenom = depthTarget(pos),
+// so each pick at a position lowers its urgency by 1/depthTarget.
+export function buildNeedsProfile(
+    verdicts: PositionVerdict[],
+    startersByPos: Record<string, number>,
 ): NeedsProfile {
-    const need = (pos: string): number => {
-        const target = ROOKIE_DEPTH_TARGETS[pos] ?? 3;
-        const have   = qualityCountByPosition[pos] ?? 0;
-        return Math.max(0, Math.min(1, (target - have) / target));
-    };
+    const base:       Record<string, number> = {};
+    const picks:      Record<string, number> = {};
+    const decayDenom: Record<string, number> = {};
+    const label:      Record<string, PositionVerdict['label']>  = {};
+    const reason:     Record<string, string> = {};
 
-    return {
-        QB:   need('QB'),
-        RB:   need('RB'),
-        WR:   need('WR'),
-        TE:   Math.min(need('TE'), 0.75), // cap: prevents TE panic-drafting top-2, but allows mid-round urgency
-        FLEX: Math.max(need('RB'), need('WR')) * 0.6,
-        IDP:  idpNeed,
-    };
-}
-
-export function computeNeedsProfile(
-    rosterByPosition: Record<string, number>,
-    settings: MockDraftSettings,
-): NeedsProfile {
-    const slots = settings.starterSlots;
-    const flexSlots = slots['FLEX'] ?? 0;
-
-    const urgency = (pos: string, target: number): number => {
-        if (target <= 0) return 0;
-        const have = rosterByPosition[pos] ?? 0;
-        return Math.max(0, Math.min(1, (target - have) / target));
-    };
-
-    const kSlots   = slots['K']   ?? 0;
-    const defSlots = slots['DEF'] ?? 0;
-
-    return {
-        QB:   urgency('QB', slots['QB'] ?? 1),
-        RB:   urgency('RB', slots['RB'] ?? 2),
-        WR:   urgency('WR', slots['WR'] ?? 2),
-        TE:   urgency('TE', slots['TE'] ?? 1),
-        FLEX: flexSlots > 0
-            ? Math.max(
-                urgency('RB', (slots['RB'] ?? 2) + flexSlots * 0.5),
-                urgency('WR', (slots['WR'] ?? 2) + flexSlots * 0.5),
-              )
-            : 0,
-        // Cap K/DEF urgency low so they naturally fall to late rounds
-        K:   kSlots   > 0 ? Math.min(0.35, urgency('K',   kSlots))   : undefined,
-        DEF: defSlots > 0 ? Math.min(0.45, urgency('DEF', defSlots)) : undefined,
-    };
-}
-
-export function getNeedForPosition(needs: NeedsProfile, position: string): number {
-    switch (position) {
-        case 'QB':  return needs.QB;
-        case 'RB':  return Math.max(needs.RB, needs.FLEX * 0.75);
-        case 'WR':  return Math.max(needs.WR, needs.FLEX * 0.75);
-        case 'TE':  return Math.max(needs.TE, needs.FLEX * 0.40);
-        case 'K':   return needs.K   ?? 0;
-        case 'DEF': return needs.DEF ?? 0;
-        case 'IDP': return needs.IDP ?? 0;
-        default:    return 0;
+    for (const v of verdicts) {
+        base[v.position]       = v.urgency;
+        picks[v.position]      = 0;
+        decayDenom[v.position] = Math.max(1, depthTarget(startersByPos[v.position] ?? 1));
+        label[v.position]      = v.label;
+        reason[v.position]     = v.reason;
     }
+    return { base, picks, decayDenom, label, reason };
 }
 
+// Effective urgency = base verdict urgency, decayed by picks already spent at
+// the position this draft (floored at 0). Single source for scoring + UI.
+export function getNeedForPosition(needs: NeedsProfile, position: string): number {
+    const base  = needs.base[position] ?? 0;
+    const denom = Math.max(1, needs.decayDenom[position] ?? 1);
+    const picks = needs.picks[position] ?? 0;
+    return Math.max(0, base - picks / denom);
+}
+
+// After a pick, increment that position's session pick count (immutable).
+// IDP board players are already bucketed to 'IDP', so position maps directly.
 export function updateNeedsAfterPick(
     needs: NeedsProfile,
     player: MockPlayer,
-    settings: MockDraftSettings,
+    _settings: MockDraftSettings,
 ): NeedsProfile {
-    const slots = settings.starterSlots;
     const pos = player.position;
-
-    const reduce = (current: number, target: number): number =>
-        Math.max(0, current - 1 / Math.max(target, 1));
-
-    const isFlexFill = FLEX_ELIGIBLE.has(pos) && needs.FLEX > 0;
-
     return {
-        QB:   pos === 'QB'  ? reduce(needs.QB,        slots['QB']  ?? 1) : needs.QB,
-        RB:   pos === 'RB'  ? reduce(needs.RB,        slots['RB']  ?? 2) : needs.RB,
-        WR:   pos === 'WR'  ? reduce(needs.WR,        slots['WR']  ?? 2) : needs.WR,
-        TE:   pos === 'TE'  ? reduce(needs.TE,        slots['TE']  ?? 1) : needs.TE,
-        FLEX: isFlexFill    ? reduce(needs.FLEX,       slots['FLEX'] ?? 1) : needs.FLEX,
-        K:    needs.K   !== undefined ? (pos === 'K'   ? reduce(needs.K,   slots['K']   ?? 1) : needs.K)   : undefined,
-        DEF:  needs.DEF !== undefined ? (pos === 'DEF' ? reduce(needs.DEF, slots['DEF'] ?? 1) : needs.DEF) : undefined,
-        IDP:  needs.IDP !== undefined ? (pos === 'IDP' ? reduce(needs.IDP, slots['IDP'] ?? 1) : needs.IDP) : undefined,
+        ...needs,
+        picks: { ...needs.picks, [pos]: (needs.picks[pos] ?? 0) + 1 },
     };
 }
