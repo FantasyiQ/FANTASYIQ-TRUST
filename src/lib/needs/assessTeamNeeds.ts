@@ -137,7 +137,7 @@ function classifyStrength(opts: {
     return 'average';
 }
 
-function resolveLabel(depth: DepthClass, strength: StrengthClass): NeedsLabel {
+export function resolveLabel(depth: DepthClass, strength: StrengthClass): NeedsLabel {
     if (depth === 'empty') return 'Need';
     if (strength === 'strong')  return depth === 'deep' ? 'Strength' : 'Top-heavy';
     if (strength === 'average') return depth === 'deep' ? 'Solid'    : 'Shallow';

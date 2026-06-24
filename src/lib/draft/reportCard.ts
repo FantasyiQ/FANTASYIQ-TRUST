@@ -9,7 +9,7 @@ import { computeDTVSnapshot, computePickDTVNote, type DTVSnapshot } from './team
 import { computePickCommentary }                         from './pickCommentary';
 import { computeDraftIdentityLabel, type DraftIdentityLabel, DRAFT_IDENTITY_DESC } from './draftIdentityLabel';
 import { computeDraftStoryline }                         from './draftStoryline';
-import type { NeedsLabel } from '@/lib/needs/assessTeamNeeds';
+import { resolveLabel, type NeedsLabel, type DepthClass, type StrengthClass } from '@/lib/needs/assessTeamNeeds';
 
 // Unified Team Needs vocabulary → Draft Report presentation (A–F is cosmetic).
 function labelToGrade(l: NeedsLabel): 'A' | 'B' | 'C' | 'D' | 'F' {
@@ -17,7 +17,23 @@ function labelToGrade(l: NeedsLabel): 'A' | 'B' | 'C' | 'D' | 'F' {
 }
 // Narrative ordering: most urgent → least (Need first, Strength last).
 const LABEL_SEVERITY: Record<NeedsLabel, number> = { Need: 0, Shallow: 1, 'Top-heavy': 2, Solid: 3, Strength: 4 };
-const GRADE_SEVERITY: Record<string, number> = { F: 0, D: 1, C: 2, B: 3, A: 4 };
+
+// Core Strength = ABSOLUTE quality (the FiQ shown), not league-relative. FiQ is
+// dynastyValue/90: a quality starter ~50–65, elite 70+. A mediocre group must
+// NOT read "Strength" just because the rest of the league is also mediocre.
+const CORE_STRONG_FIQ = 62;
+const CORE_WEAK_FIQ   = 35;
+const CORE_DEPTH_TARGET: Record<string, number> = { QB: 2, RB: 4, WR: 6, TE: 2 };
+
+function coreReason(label: NeedsLabel, pos: string): string {
+    switch (label) {
+        case 'Strength':  return `Strong, deep ${pos} group`;
+        case 'Solid':     return `Solid ${pos} — startable quality and depth`;
+        case 'Top-heavy': return `Quality ${pos} starters, but thin depth`;
+        case 'Shallow':   return `${pos} has bodies, but the quality is thin`;
+        case 'Need':      return `Weak/thin at ${pos} — a clear gap`;
+    }
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -385,44 +401,35 @@ const AGE_YOUNG: Record<string, number> = { QB: 25, RB: 23, WR: 24, TE: 24 };
 const AGE_AGING: Record<string, number> = { QB: 32, RB: 28, WR: 30, TE: 30 };
 const AGE_TARGET: Record<string, number> = { QB: 2, RB: 4, WR: 6, TE: 2 };
 
-function computeCoreStrength(
-    players: RichRosterPlayer[],
-    verdictByPos?: Map<string, { label: NeedsLabel; reason: string }>,
-): PositionCoreScore[] {
-    const positions = ['QB', 'RB', 'WR', 'TE'];
-    const out = positions.map(pos => {
+function computeCoreStrength(players: RichRosterPlayer[]): PositionCoreScore[] {
+    const entries = ['QB', 'RB', 'WR', 'TE'].map(pos => {
         const group = players.filter(p => normalizePosition(p.position) === pos);
         const count = group.length;
         const avg   = count ? Math.round(group.reduce((s, p) => s + p.fiqScore, 0) / count) : 0;
-        const v = verdictByPos?.get(pos);
-        // Unified verdict drives the grade + label; FiQ avg kept for display.
-        const grade = v ? labelToGrade(v.label) : (count ? posGrade(avg) : 'F');
-        const label = v ? `${pos} · ${v.label}` : `${pos} Core`;
-        return { position: pos, grade, avgFiq: avg, count, label, reason: v?.reason };
+        // Quality from ABSOLUTE FiQ; depth from count vs a depth target.
+        const strength: StrengthClass = count === 0 ? 'weak'
+            : avg >= CORE_STRONG_FIQ ? 'strong'
+            : avg <  CORE_WEAK_FIQ   ? 'weak' : 'average';
+        const target = CORE_DEPTH_TARGET[pos] ?? 2;
+        const depth: DepthClass = count === 0 ? 'empty' : count >= target ? 'deep' : 'thin';
+        const lab = resolveLabel(depth, strength);
+        const cs: PositionCoreScore = {
+            position: pos, grade: labelToGrade(lab), avgFiq: avg, count,
+            label: `${pos} · ${lab}`, reason: coreReason(lab, pos),
+        };
+        return { cs, lab };
     });
-    // Sort worst → best so the grid reads like a narrative.
-    return out.sort((a, b) => {
-        const va = verdictByPos?.get(a.position), vb = verdictByPos?.get(b.position);
-        const sa = va ? LABEL_SEVERITY[va.label] : GRADE_SEVERITY[a.grade];
-        const sb = vb ? LABEL_SEVERITY[vb.label] : GRADE_SEVERITY[b.grade];
-        return sa - sb;
-    });
+    // Narrative ordering: most urgent → least.
+    entries.sort((a, b) => LABEL_SEVERITY[a.lab] - LABEL_SEVERITY[b.lab]);
+    return entries.map(e => e.cs);
 }
 
 function computePositionStability(
     players: RichRosterPlayer[],
     coreStrength: PositionCoreScore[],
-    labelByPos?: Map<string, NeedsLabel>,
 ): { stable: string[]; fragile: string[]; critical: string[] } {
     const stable: string[] = [], fragile: string[] = [], critical: string[] = [];
     for (const cs of coreStrength) {
-        const vlabel = labelByPos?.get(cs.position);
-        if (vlabel) {
-            if (vlabel === 'Strength' || vlabel === 'Solid') stable.push(cs.position);
-            else if (vlabel === 'Need') critical.push(cs.position);
-            else fragile.push(cs.position);   // Top-heavy, Shallow
-            continue;
-        }
         const target = AGE_TARGET[cs.position] ?? 2;
         const filled = cs.count >= target;
         if (cs.grade === 'A' || (cs.grade === 'B' && filled)) stable.push(cs.position);
@@ -563,9 +570,6 @@ export interface ReportCardInput {
         horizonYears: number;
         overallScore: number;
     } | null;
-    // Unified Team Needs verdicts (offense), league-relative — drives core
-    // strength grades + stability so the report matches Trade Partners / Mock.
-    needVerdicts?:   { position: string; label: NeedsLabel; reason: string }[];
 }
 
 export function computeReportCard(input: ReportCardInput): DraftReportCard {
@@ -765,10 +769,8 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
         : null;
 
     // Franchise state
-    const verdictByPos      = new Map((input.needVerdicts ?? []).map(v => [v.position, { label: v.label, reason: v.reason }] as const));
-    const labelByPos        = new Map((input.needVerdicts ?? []).map(v => [v.position, v.label] as const));
-    const coreStrength      = computeCoreStrength(rosterRich, verdictByPos);
-    const positionStability = computePositionStability(rosterRich, coreStrength, labelByPos);
+    const coreStrength      = computeCoreStrength(rosterRich);
+    const positionStability = computePositionStability(rosterRich, coreStrength);
     const ageCurve          = computeAgeCurve(rosterRich);
 
     // v3.3 trajectory: if engine returns PLATEAU (or no data), override with
