@@ -58,6 +58,14 @@ describe('label resolution (2×2 + Solid)', () => {
         assert.equal(v.depth, 'empty');
         assert.equal(v.label, 'Need');
     });
+
+    test('a league-average roster is Solid, NOT Strength (no over-grading to A)', () => {
+        // posValue ≈ league avg, with starter-quality players — must read average,
+        // not strong (this is the bug that produced all-A Core Strength grades).
+        const v = rb([2500, 2500, 2000], 7000); // top3 sum 7000 == leagueAvg
+        assert.equal(v.strength, 'average');
+        assert.equal(v.label, 'Solid');
+    });
 });
 
 describe('deriveSlots', () => {

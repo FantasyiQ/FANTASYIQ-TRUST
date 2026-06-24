@@ -130,7 +130,9 @@ function classifyStrength(opts: {
     const relWeak   = opts.leagueAvg ? opts.posValue < opts.leagueAvg * 0.85 : false;
     const hasStarters = opts.aboveThreshold >= Math.max(1, Math.round(opts.starters));
 
-    if (relStrong || hasStarters) return 'strong';
+    // "strong" = genuinely above league average. Merely owning startable players
+    // is NOT a strength — it only protects a group from reading "weak".
+    if (relStrong) return 'strong';
     if (relWeak && !hasStarters)  return 'weak';
     return 'average';
 }

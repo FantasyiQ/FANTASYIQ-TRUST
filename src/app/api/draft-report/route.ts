@@ -15,6 +15,7 @@ import { normalizePosition, getTier, computeTeamMode } from '@/lib/draft/context
 import type { DraftProfile, TrajectoryWindow, RosterProfile } from '@/lib/draft/context';
 import { computeReportCard, type PoolPlayer, type RichRosterPlayer } from '@/lib/draft/reportCard';
 import { assessTeamNeeds, deriveSlots, positionValue } from '@/lib/needs/assessTeamNeeds';
+import { normalizePlayerName } from '@/lib/playerName';
 import { getLeagueContext } from '@/lib/trajectory/contextLoader';
 import { computeTeamTrajectoryForLeague } from '@/lib/trajectory/teamTrajectory';
 import type { LeaguePhaseResult } from '@/lib/leaguePhase';
@@ -272,11 +273,12 @@ export async function GET(req: NextRequest): Promise<Response> {
     const allRosterSP = allRosteredIds.length > 0
         ? await prisma.sleeperPlayer.findMany({ where: { playerId: { in: allRosteredIds } }, select: { playerId: true, position: true, fullName: true } })
         : [];
-    const allNeedNames = allRosterSP.map(p => p.fullName).filter((n): n is string => Boolean(n));
-    const allNeedFc = allNeedNames.length > 0
-        ? await prisma.fantasyCalcValue.findMany({ where: { playerName: { in: allNeedNames } }, select: { playerName: true, dynastyValue: true, dynastyValueSf: true } })
-        : [];
-    const allDtvByName = new Map(allNeedFc.map(v => [v.playerName, superflex ? v.dynastyValueSf : v.dynastyValue]));
+    // Normalized DTV lookup — join on the canonical name (strips Jr./apostrophes/
+    // periods), NOT raw display names. Raw matching missed players → 0s →
+    // deflated league average → every group falsely read "strong"/A.
+    const allFcRows = await prisma.fantasyCalcValue.findMany({ select: { playerName: true, dynastyValue: true, dynastyValueSf: true } });
+    const dtvByNorm = new Map(allFcRows.map(v => [normalizePlayerName(v.playerName), superflex ? v.dynastyValueSf : v.dynastyValue]));
+    const dtvFor = (name?: string | null) => (name ? (dtvByNorm.get(normalizePlayerName(name)) ?? 0) : 0);
     const spByIdNeeds  = new Map(allRosterSP.map(p => [p.playerId, p]));
     const needSlots = deriveSlots(rosterPositions);
     const OFF = ['QB', 'RB', 'WR', 'TE'];
@@ -286,7 +288,7 @@ export async function GET(req: NextRequest): Promise<Response> {
             const sp = spByIdNeeds.get(pid); if (!sp?.position) continue;
             const pos = normalizePosition(sp.position);
             if (!OFF.includes(pos)) continue;
-            (m[pos] ??= []).push(sp.fullName ? (allDtvByName.get(sp.fullName) ?? 0) : 0);
+            (m[pos] ??= []).push(dtvFor(sp.fullName));
         }
         return m;
     };
@@ -296,11 +298,12 @@ export async function GET(req: NextRequest): Promise<Response> {
         const sum = rosters.reduce((s, r) => s + positionValue(teamOffenseByPos(r)[pos] ?? [], starters), 0);
         needLeagueAvg[pos] = sum / (rosters.length || 1);
     }
+    // User's post-draft offense roster — normalized DTV (fallback to rosterRich rawValue)
     const userOffenseByPos: Record<string, number[]> = {};
     for (const p of rosterRich) {
         const pos = normalizePosition(p.position);
         if (!OFF.includes(pos)) continue;
-        (userOffenseByPos[pos] ??= []).push(p.rawValue ?? 0);
+        (userOffenseByPos[pos] ??= []).push(dtvFor(p.playerName) || (p.rawValue ?? 0));
     }
     const needVerdicts = assessTeamNeeds({ playersByPos: userOffenseByPos, slots: needSlots, leagueAvgByPos: needLeagueAvg })
         .filter(v => OFF.includes(v.position))
