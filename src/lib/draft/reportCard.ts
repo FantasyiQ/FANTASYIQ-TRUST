@@ -15,6 +15,9 @@ import type { NeedsLabel } from '@/lib/needs/assessTeamNeeds';
 function labelToGrade(l: NeedsLabel): 'A' | 'B' | 'C' | 'D' | 'F' {
     return l === 'Strength' ? 'A' : l === 'Top-heavy' ? 'B' : l === 'Solid' ? 'C' : l === 'Shallow' ? 'D' : 'F';
 }
+// Narrative ordering: most urgent → least (Need first, Strength last).
+const LABEL_SEVERITY: Record<NeedsLabel, number> = { Need: 0, Shallow: 1, 'Top-heavy': 2, Solid: 3, Strength: 4 };
+const GRADE_SEVERITY: Record<string, number> = { F: 0, D: 1, C: 2, B: 3, A: 4 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -63,6 +66,7 @@ export interface PositionCoreScore {
     avgFiq:   number;
     count:    number;
     label:    string;
+    reason?:  string;   // unified verdict "why" (e.g. "strong starters, thin depth")
 }
 
 export interface FranchiseState {
@@ -383,18 +387,25 @@ const AGE_TARGET: Record<string, number> = { QB: 2, RB: 4, WR: 6, TE: 2 };
 
 function computeCoreStrength(
     players: RichRosterPlayer[],
-    labelByPos?: Map<string, NeedsLabel>,
+    verdictByPos?: Map<string, { label: NeedsLabel; reason: string }>,
 ): PositionCoreScore[] {
     const positions = ['QB', 'RB', 'WR', 'TE'];
-    return positions.map(pos => {
+    const out = positions.map(pos => {
         const group = players.filter(p => normalizePosition(p.position) === pos);
         const count = group.length;
         const avg   = count ? Math.round(group.reduce((s, p) => s + p.fiqScore, 0) / count) : 0;
-        const vlabel = labelByPos?.get(pos);
+        const v = verdictByPos?.get(pos);
         // Unified verdict drives the grade + label; FiQ avg kept for display.
-        const grade = vlabel ? labelToGrade(vlabel) : (count ? posGrade(avg) : 'F');
-        const label = vlabel ? `${pos} · ${vlabel}` : `${pos} Core`;
-        return { position: pos, grade, avgFiq: avg, count, label };
+        const grade = v ? labelToGrade(v.label) : (count ? posGrade(avg) : 'F');
+        const label = v ? `${pos} · ${v.label}` : `${pos} Core`;
+        return { position: pos, grade, avgFiq: avg, count, label, reason: v?.reason };
+    });
+    // Sort worst → best so the grid reads like a narrative.
+    return out.sort((a, b) => {
+        const va = verdictByPos?.get(a.position), vb = verdictByPos?.get(b.position);
+        const sa = va ? LABEL_SEVERITY[va.label] : GRADE_SEVERITY[a.grade];
+        const sb = vb ? LABEL_SEVERITY[vb.label] : GRADE_SEVERITY[b.grade];
+        return sa - sb;
     });
 }
 
@@ -554,7 +565,7 @@ export interface ReportCardInput {
     } | null;
     // Unified Team Needs verdicts (offense), league-relative — drives core
     // strength grades + stability so the report matches Trade Partners / Mock.
-    needVerdicts?:   { position: string; label: NeedsLabel }[];
+    needVerdicts?:   { position: string; label: NeedsLabel; reason: string }[];
 }
 
 export function computeReportCard(input: ReportCardInput): DraftReportCard {
@@ -754,8 +765,9 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
         : null;
 
     // Franchise state
+    const verdictByPos      = new Map((input.needVerdicts ?? []).map(v => [v.position, { label: v.label, reason: v.reason }] as const));
     const labelByPos        = new Map((input.needVerdicts ?? []).map(v => [v.position, v.label] as const));
-    const coreStrength      = computeCoreStrength(rosterRich, labelByPos);
+    const coreStrength      = computeCoreStrength(rosterRich, verdictByPos);
     const positionStability = computePositionStability(rosterRich, coreStrength, labelByPos);
     const ageCurve          = computeAgeCurve(rosterRich);
 

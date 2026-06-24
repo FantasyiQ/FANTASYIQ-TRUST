@@ -304,7 +304,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     }
     const needVerdicts = assessTeamNeeds({ playersByPos: userOffenseByPos, slots: needSlots, leagueAvgByPos: needLeagueAvg })
         .filter(v => OFF.includes(v.position))
-        .map(v => ({ position: v.position, label: v.label }));
+        .map(v => ({ position: v.position, label: v.label, reason: v.reason }));
 
     // ── Build report card ──────────────────────────────────────────────────────
     const myPickInputs = myPicksRaw.map(p => ({

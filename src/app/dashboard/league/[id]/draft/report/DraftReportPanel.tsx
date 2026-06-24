@@ -476,6 +476,7 @@ export default function DraftReportPanel({
                                             <p className="text-gray-500 text-xs mb-1">{cs.label}</p>
                                             <p className={`text-2xl font-black ${coreGradeColor(cs.grade)}`}>{cs.grade}</p>
                                             <p className="text-gray-600 text-[10px]">FiQ {cs.avgFiq} · {cs.count} players</p>
+                                            {cs.reason && <p className="text-gray-500 text-[10px] mt-1 leading-tight">{cs.reason}</p>}
                                         </div>
                                     ))}
                                 </div>
