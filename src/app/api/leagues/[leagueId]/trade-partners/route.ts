@@ -9,6 +9,7 @@ import { calcDtv, DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
 import type { Player, LeagueSettings, LeagueType } from '@/lib/trade-engine';
 import { computePlayerBaseValue } from '@/lib/player-universe';
 import type { UniversePlayer } from '@/lib/player-universe';
+import { assessTeamNeeds, deriveSlots, positionValue, type PositionVerdict, type NeedsLabel } from '@/lib/needs/assessTeamNeeds';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -354,6 +355,24 @@ export async function GET(
         leagueAvg[pos] = teamBuckets.reduce((s, t) => s + t.posValues[pos], 0) / (teamBuckets.length || 1);
     }
 
+    // ── Unified Team Needs (shared model — same vocabulary as Mock & Draft Report)
+    const needSlots = deriveSlots(league.rosterPositions);
+    const valuesByPos = (t: typeof teamBuckets[number]): Record<string, number[]> => {
+        const m: Record<string, number[]> = { QB: [], RB: [], WR: [], TE: [] };
+        for (const p of t.players) if (p.position in m) m[p.position].push(p.finalDtv);
+        return m;
+    };
+    const needLeagueAvg: Record<string, number> = {};
+    for (const pos of SCORED_POSITIONS) {
+        const starters = needSlots.starters[pos] ?? 0;
+        needLeagueAvg[pos] = teamBuckets.reduce((s, t) => s + positionValue(valuesByPos(t)[pos] ?? [], starters), 0) / (teamBuckets.length || 1);
+    }
+    const NEED_LABELS = new Set<NeedsLabel>(['Need', 'Top-heavy', 'Shallow']);
+    const verdictsFor = (t: typeof teamBuckets[number]): Map<string, PositionVerdict> => {
+        const vs = assessTeamNeeds({ playersByPos: valuesByPos(t), slots: needSlots, leagueAvgByPos: needLeagueAvg });
+        return new Map(vs.map(v => [v.position, v]));
+    };
+
     function strengthRatios(posValues: Record<string, number>): Record<string, number> {
         const out: Record<string, number> = {};
         for (const pos of SCORED_POSITIONS) {
@@ -385,9 +404,9 @@ export async function GET(
         return Response.json(body, { headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' } });
     }
 
-    const myRatios    = strengthRatios(myBucket.posValues);
-    const myNeeds     = SCORED_POSITIONS.filter(pos => strengthClass(myRatios[pos]) === 'Weak');
-    const myStrengths = SCORED_POSITIONS.filter(pos => strengthClass(myRatios[pos]) === 'Strong');
+    const myVerdicts  = verdictsFor(myBucket);
+    const myNeeds     = SCORED_POSITIONS.filter(pos => NEED_LABELS.has(myVerdicts.get(pos)?.label ?? 'Solid'));
+    const myStrengths = SCORED_POSITIONS.filter(pos => myVerdicts.get(pos)?.label === 'Strength');
     const myTier      = tierByRosterId.get(myBucket.rosterId) ?? 'Competitive';
     const myDeltas    = myBucket.players.map(p => p.delta).filter((d): d is number => d !== null);
     const myAvgDelta  = myDeltas.length > 0 ? myDeltas.reduce((a, b) => a + b, 0) / myDeltas.length : null;
@@ -396,9 +415,9 @@ export async function GET(
     const rawScored = teamBuckets
         .filter(t => t.rosterId !== myBucket.rosterId)
         .map(partner => {
-            const theirRatios    = strengthRatios(partner.posValues);
-            const theirNeeds     = SCORED_POSITIONS.filter(pos => strengthClass(theirRatios[pos]) === 'Weak');
-            const theirStrengths = SCORED_POSITIONS.filter(pos => strengthClass(theirRatios[pos]) === 'Strong');
+            const theirVerdicts  = verdictsFor(partner);
+            const theirNeeds     = SCORED_POSITIONS.filter(pos => NEED_LABELS.has(theirVerdicts.get(pos)?.label ?? 'Solid'));
+            const theirStrengths = SCORED_POSITIONS.filter(pos => theirVerdicts.get(pos)?.label === 'Strength');
             const theirTier      = tierByRosterId.get(partner.rosterId) ?? 'Competitive';
 
             // Complementarity: reward large gaps that match across rosters
@@ -444,13 +463,16 @@ export async function GET(
             // Human-readable notes
             const notes: string[] = [];
             for (const pos of myNeeds) {
-                if ((theirStrengths as string[]).includes(pos)) {
-                    notes.push(`They are strong at ${pos} (${Math.round(theirRatios[pos] * 100)}% of league avg) where you are weak (${Math.round(myRatios[pos] * 100)}%)`);
+                const tl = theirVerdicts.get(pos)?.label;
+                if (tl === 'Strength' || tl === 'Solid') {
+                    const mv = myVerdicts.get(pos);
+                    notes.push(`${pos}: you're ${mv?.label} (${mv?.reason.toLowerCase()}); they're ${tl} — natural fit`);
                 }
             }
             for (const pos of myStrengths) {
-                if ((theirNeeds as string[]).includes(pos)) {
-                    notes.push(`You are strong at ${pos} (${Math.round(myRatios[pos] * 100)}% of league avg) where they are weak (${Math.round(theirRatios[pos] * 100)}%)`);
+                const tl = theirVerdicts.get(pos)?.label;
+                if (tl && (NEED_LABELS as Set<string>).has(tl)) {
+                    notes.push(`${pos}: you're a Strength where they're ${tl} — you can sell high`);
                 }
             }
             if (theirAvgDelta !== null && theirAvgDelta > 3) {
