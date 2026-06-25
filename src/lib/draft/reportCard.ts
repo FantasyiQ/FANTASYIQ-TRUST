@@ -85,10 +85,33 @@ export interface PositionCoreScore {
     reason?:  string;   // unified verdict "why" (e.g. "strong starters, thin depth")
 }
 
+// ── Franchise window (5-state display taxonomy) ──────────────────────────────
+// Richer than the 4-value grading TrajectoryWindow: it splits "Aging" (veteran,
+// declining) out of "Rebuild" (young, pick-rich). The copy reads directly from
+// the same signals the engine uses to pick the window, so it can't contradict it.
+export type FranchiseWindow = 'Rebuild' | 'Stable' | 'Contender' | 'Aging' | 'Ascending';
+
+const WINDOW_COPY: Record<FranchiseWindow, { label: string; why: string; drivers: string }> = {
+    Rebuild:   { label: 'Rebuild Window',   why: 'Below-league starter value with a young core and strong pick capital.',          drivers: 'Starters ↓ · Age (young) ↑ · Picks ↑' },
+    Stable:    { label: 'Stable Window',    why: 'Balanced age curve and functional starter value with no immediate cliffs.',      drivers: 'Starters → · Age (prime) → · Picks →' },
+    Contender: { label: 'Contender Window', why: 'Above-league starter value with reliable anchors and a competitive age curve.',    drivers: 'Starters ↑ · Age (prime) → · Picks ↓' },
+    Aging:     { label: 'Aging Window',     why: 'Veteran-heavy core with declining insulation and a narrowing competitive runway.', drivers: 'Starters ↑ · Age (aging) ↓ · Picks ↓' },
+    Ascending: { label: 'Ascending Window', why: 'Improving starter value with a young, upward-trending foundation.',                drivers: 'Starters → · Age (young) ↑ · Picks →' },
+};
+
+// Fallback mapping when the engine returns no trajectory (4-value grading window).
+const TRAJ_TO_WINDOW: Record<string, FranchiseWindow> = {
+    WIN_NOW: 'Contender', ASCENDING: 'Ascending', REBUILD: 'Rebuild', PLATEAU: 'Stable',
+};
+
 export interface FranchiseState {
     trajectoryWindow:    string;
     horizonYears:        number;
     overallScore:        number | null;   // null = trajectory data unavailable
+    windowKey:           FranchiseWindow;  // 5-state display window
+    windowLabel:         string;           // "Rebuild Window"
+    windowWhy:           string;           // GM-tone driver sentence
+    windowDrivers:       string;           // "Starters ↓ · Age (young) ↑ · Picks ↑"
     coreStrength:        PositionCoreScore[];
     positionStability:   { stable: string[]; fragile: string[]; critical: string[] };
     ageCurve:            { young: number; prime: number; aging: number };
@@ -471,7 +494,7 @@ function computeWinProbDelta(picks: PickAlignment[], totalTeams: number, avgScor
 // absolute position grades. Position grades are secondary color only.
 
 function generateDynastyOutlook(
-    traj: TrajectoryWindow,
+    windowKey: FranchiseWindow,
     horizonYears: number,
     tierDist: TierDistribution,
     coreStrength: PositionCoreScore[],
@@ -502,9 +525,10 @@ function generateDynastyOutlook(
 
     // ── Trajectory close ──────────────────────────────────────────────────────
     const momentum =
-        traj === 'WIN_NOW'   ? 'The window is open — push for it.' :
-        traj === 'ASCENDING' ? `You're trending toward serious contention within ${horizonYears} season${horizonYears > 1 ? 's' : ''}.` :
-        traj === 'REBUILD'   ? 'Stay patient and keep stacking. The upside is real.' :
+        windowKey === 'Contender' ? 'The window is open — push for it.' :
+        windowKey === 'Ascending' ? `You're trending toward serious contention within ${horizonYears} season${horizonYears > 1 ? 's' : ''}.` :
+        windowKey === 'Rebuild'   ? 'Stay patient and keep stacking. The upside is real.' :
+        windowKey === 'Aging'     ? 'The window is closing — weigh cashing veterans for youth and picks.' :
         'Stay sharp — one move could shift the balance of power in this league.';
 
     // No league-relative standing when trajectory data is unavailable — lead
@@ -568,9 +592,10 @@ export interface ReportCardInput {
     totalTeams:      number;
     totalRounds:     number;
     trajectoryData?: {
-        window:       string;
-        horizonYears: number;
-        overallScore: number;
+        window:        string;
+        horizonYears:  number;
+        overallScore:  number;
+        displayWindow?: FranchiseWindow;
     } | null;
 }
 
@@ -783,9 +808,14 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
             ? deriveTrajectoryFromRoster(trajectoryData?.overallScore ?? 50, ageCurve)
             : rawTrajWindow;
 
+    // 5-state display window (Aging split out): prefer the engine's richer
+    // signal, else map the 4-value grading window.
+    const windowKey: FranchiseWindow = trajectoryData?.displayWindow ?? TRAJ_TO_WINDOW[franchiseTraj] ?? 'Stable';
+    const windowCopy = WINDOW_COPY[windowKey];
+
     const winProbDelta  = computeWinProbDelta(picks, totalTeams, avgScore);
     const dynastyOutlook = generateDynastyOutlook(
-        franchiseTraj,
+        windowKey,
         trajectoryData?.horizonYears ?? draftProfile.horizonYears,
         tierDistribution,
         coreStrength,
@@ -817,6 +847,10 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
         trajectoryWindow:    franchiseTraj,
         horizonYears:        trajectoryData?.horizonYears ?? draftProfile.horizonYears,
         overallScore:        trajectoryData?.overallScore ?? null,
+        windowKey,
+        windowLabel:         windowCopy.label,
+        windowWhy:           windowCopy.why,
+        windowDrivers:       windowCopy.drivers,
         coreStrength,
         positionStability,
         ageCurve,

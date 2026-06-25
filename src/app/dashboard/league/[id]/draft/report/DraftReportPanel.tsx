@@ -59,6 +59,15 @@ const TRAJ_COLOR: Record<string, string> = {
     REBUILD:   'text-indigo-300',
 };
 
+// 5-state franchise window colors (🟩 contender · 🟪 ascending · 🟦 rebuild · 🟧 stable · 🟥 aging)
+const WINDOW_COLOR: Record<string, string> = {
+    Contender: 'text-emerald-300',
+    Ascending: 'text-purple-300',
+    Rebuild:   'text-blue-300',
+    Stable:    'text-amber-300',
+    Aging:     'text-red-300',
+};
+
 const CLASS_LABEL: Record<ClassStrength, string> = {
     weak:    'Weak Class',
     average: 'Average Class',
@@ -448,8 +457,8 @@ export default function DraftReportPanel({
                             <div className="grid grid-cols-3 gap-3">
                                 <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
                                     <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Franchise Window</p>
-                                    <p className={`font-bold text-sm leading-tight ${TRAJ_COLOR[f.trajectoryWindow] ?? 'text-white'}`}>
-                                        {TRAJ_LABEL[f.trajectoryWindow] ?? f.trajectoryWindow}
+                                    <p className={`font-bold text-sm leading-tight ${WINDOW_COLOR[f.windowKey] ?? 'text-white'}`}>
+                                        {f.windowLabel}
                                     </p>
                                     <p className="text-gray-600 text-[10px] mt-0.5">{f.horizonYears}-yr horizon</p>
                                 </div>
@@ -465,6 +474,12 @@ export default function DraftReportPanel({
                                     </p>
                                     <p className="text-gray-600 text-[10px] mt-0.5">win probability</p>
                                 </div>
+                            </div>
+
+                            {/* Window — why + drivers */}
+                            <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
+                                <p className="text-gray-300 text-xs leading-relaxed">{f.windowWhy}</p>
+                                <p className="text-gray-500 text-[11px] mt-1 font-medium tracking-wide">{f.windowDrivers}</p>
                             </div>
 
                             {/* Core Strength Index */}

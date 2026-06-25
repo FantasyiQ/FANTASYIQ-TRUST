@@ -14,7 +14,7 @@ import {
 } from '@/lib/sleeper';
 import { normalizePosition, getTier, computeTeamMode } from '@/lib/draft/context';
 import type { DraftProfile, TrajectoryWindow, RosterProfile } from '@/lib/draft/context';
-import { computeReportCard, type PoolPlayer, type RichRosterPlayer } from '@/lib/draft/reportCard';
+import { computeReportCard, type PoolPlayer, type RichRosterPlayer, type FranchiseWindow } from '@/lib/draft/reportCard';
 import { getLeagueContext } from '@/lib/trajectory/contextLoader';
 import { computeTeamTrajectoryForLeague } from '@/lib/trajectory/teamTrajectory';
 import type { LeaguePhaseResult } from '@/lib/leaguePhase';
@@ -188,7 +188,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     const teamMode = computeTeamMode(existingPlayers.map(toProfile));
 
     // ── Trajectory ─────────────────────────────────────────────────────────────
-    let trajectoryData: { window: string; horizonYears: number; overallScore: number } | null = null;
+    let trajectoryData: { window: string; horizonYears: number; overallScore: number; displayWindow: FranchiseWindow } | null = null;
 
     try {
         const currentYear = new Date().getFullYear();
@@ -217,7 +217,15 @@ export async function GET(req: NextRequest): Promise<Response> {
             };
             const tw = (modeOverride[myTraj.mode] ?? winMap[myTraj.winCurve] ?? 'PLATEAU') as TrajectoryWindow;
             const horizonYears = tw === 'WIN_NOW' ? 1 : tw === 'ASCENDING' ? 2 : 3;
-            trajectoryData = { window: tw, horizonYears, overallScore: myTraj.overallScore };
+            // 5-state display window: split Aging (veteran, declining) out of Rebuild.
+            const displayModeMap: Record<string, FranchiseWindow> = {
+                CONTENDER: 'Contender', ASCENDING: 'Ascending', REBUILDER: 'Rebuild', DECLINING: 'Aging',
+            };
+            const displayCurveMap: Record<string, FranchiseWindow> = {
+                PEAKING_NOW: 'Contender', PEAK_AHEAD: 'Ascending', FALLING: 'Aging', FLAT: 'Stable',
+            };
+            const displayWindow = displayModeMap[myTraj.mode] ?? displayCurveMap[myTraj.winCurve] ?? 'Stable';
+            trajectoryData = { window: tw, horizonYears, overallScore: myTraj.overallScore, displayWindow };
         }
     } catch (err) {
         // Non-fatal: report still renders, but the Roster Score shows "—" rather
