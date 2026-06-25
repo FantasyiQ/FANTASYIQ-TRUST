@@ -344,13 +344,16 @@ export async function getTradedPicks(leagueId: string): Promise<SleeperTradedPic
 }
 
 /**
- * Returns current pick ownership for the league — one record per pick with
- * owner_id already resolved to the current holder.  More reliable than
- * /traded_picks for ownership lookups because it gives authoritative state
- * rather than a log of trade events that must be chain-reconstructed.
+ * Returns traded draft picks for the league (one record per *traded* pick:
+ * roster_id = original owner, owner_id = current holder). Callers reconstruct
+ * full ownership by defaulting each pick to its original roster and applying
+ * these trades (see computeOwnedPicks).
+ *
+ * NOTE: Sleeper has no `/draft_picks` endpoint — only `/traded_picks`. The old
+ * path 404'd, which silently broke the Team Trajectory engine for every league.
  */
 export async function getDraftPicks(leagueId: string): Promise<SleeperTradedPick[]> {
-    return sleeperFetch<SleeperTradedPick[]>(`/league/${leagueId}/draft_picks`, 0);
+    return sleeperFetch<SleeperTradedPick[]>(`/league/${leagueId}/traded_picks`, 0);
 }
 
 // ─── Live draft picks ──────────────────────────────────────────────────────────
