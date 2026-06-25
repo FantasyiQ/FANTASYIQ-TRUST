@@ -14,7 +14,7 @@ import {
 } from '@/lib/sleeper';
 import { normalizePosition, getTier, computeTeamMode } from '@/lib/draft/context';
 import type { DraftProfile, TrajectoryWindow, RosterProfile } from '@/lib/draft/context';
-import { computeReportCard, type PoolPlayer, type RichRosterPlayer, type FranchiseWindow } from '@/lib/draft/reportCard';
+import { computeReportCard, type PoolPlayer, type RichRosterPlayer, type FranchiseWindow, type WindowComponents } from '@/lib/draft/reportCard';
 import { getLeagueContext } from '@/lib/trajectory/contextLoader';
 import { computeTeamTrajectoryForLeague } from '@/lib/trajectory/teamTrajectory';
 import type { LeaguePhaseResult } from '@/lib/leaguePhase';
@@ -188,7 +188,10 @@ export async function GET(req: NextRequest): Promise<Response> {
     const teamMode = computeTeamMode(existingPlayers.map(toProfile));
 
     // ── Trajectory ─────────────────────────────────────────────────────────────
-    let trajectoryData: { window: string; horizonYears: number; overallScore: number; displayWindow: FranchiseWindow } | null = null;
+    let trajectoryData: {
+        window: string; horizonYears: number; overallScore: number; displayWindow: FranchiseWindow;
+        components: WindowComponents; leagueAvg: WindowComponents;
+    } | null = null;
 
     try {
         const currentYear = new Date().getFullYear();
@@ -225,7 +228,20 @@ export async function GET(req: NextRequest): Promise<Response> {
                 PEAKING_NOW: 'Contender', PEAK_AHEAD: 'Ascending', FALLING: 'Aging', FLAT: 'Stable',
             };
             const displayWindow = displayModeMap[myTraj.mode] ?? displayCurveMap[myTraj.winCurve] ?? 'Stable';
-            trajectoryData = { window: tw, horizonYears, overallScore: myTraj.overallScore, displayWindow };
+            // League averages of each component → factual driver arrows (↑/→/↓).
+            const allTraj = [...trajectoryMap.values()];
+            const avgOf = (sel: (t: typeof allTraj[number]) => number) =>
+                allTraj.length ? allTraj.reduce((s, t) => s + sel(t), 0) / allTraj.length : 0;
+            const leagueAvg: WindowComponents = {
+                starters: avgOf(t => t.starterQuality),
+                age:      avgOf(t => t.rosterAge),
+                picks:    avgOf(t => t.pickCapital),
+            };
+            trajectoryData = {
+                window: tw, horizonYears, overallScore: myTraj.overallScore, displayWindow,
+                components: { starters: myTraj.starterQuality, age: myTraj.rosterAge, picks: myTraj.pickCapital },
+                leagueAvg,
+            };
         }
     } catch (err) {
         // Non-fatal: report still renders, but the Roster Score shows "—" rather

@@ -104,6 +104,27 @@ const TRAJ_TO_WINDOW: Record<string, FranchiseWindow> = {
     WIN_NOW: 'Contender', ASCENDING: 'Ascending', REBUILD: 'Rebuild', PLATEAU: 'Stable',
 };
 
+// Component scores (0–100) for a team + the league averages, used to build a
+// FACTUAL driver row (vs the static archetype). Each arrow is the team's score
+// relative to its league: ≥+10% → ↑, within ±10% → →, ≤−10% → ↓.
+export interface WindowComponents { starters: number; age: number; picks: number; }
+
+function driverArrow(value: number, leagueAvg: number): '↑' | '→' | '↓' {
+    if (!leagueAvg || leagueAvg <= 0) return '→';
+    const ratio = value / leagueAvg;
+    return ratio >= 1.10 ? '↑' : ratio <= 0.90 ? '↓' : '→';
+}
+// rosterAge score is 0–100 where HIGHER = younger.
+function ageTier(age: number): 'young' | 'prime' | 'aging' {
+    return age >= 58 ? 'young' : age <= 42 ? 'aging' : 'prime';
+}
+function buildDriverRow(comp?: WindowComponents, leagueAvg?: WindowComponents): string | null {
+    if (!comp || !leagueAvg) return null;   // no engine data → caller uses static archetype
+    return `Starters ${driverArrow(comp.starters, leagueAvg.starters)}`
+         + ` · Age (${ageTier(comp.age)}) ${driverArrow(comp.age, leagueAvg.age)}`
+         + ` · Picks ${driverArrow(comp.picks, leagueAvg.picks)}`;
+}
+
 export interface FranchiseState {
     trajectoryWindow:    string;
     horizonYears:        number;
@@ -596,6 +617,8 @@ export interface ReportCardInput {
         horizonYears:  number;
         overallScore:  number;
         displayWindow?: FranchiseWindow;
+        components?:   WindowComponents;   // this team's starter/age/pick scores
+        leagueAvg?:    WindowComponents;   // league averages for the same
     } | null;
 }
 
@@ -812,6 +835,9 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
     // signal, else map the 4-value grading window.
     const windowKey: FranchiseWindow = trajectoryData?.displayWindow ?? TRAJ_TO_WINDOW[franchiseTraj] ?? 'Stable';
     const windowCopy = WINDOW_COPY[windowKey];
+    // Factual driver row from the team's component scores vs league; falls back
+    // to the static archetype only when the engine returned no trajectory.
+    const windowDrivers = buildDriverRow(trajectoryData?.components, trajectoryData?.leagueAvg) ?? windowCopy.drivers;
 
     const winProbDelta  = computeWinProbDelta(picks, totalTeams, avgScore);
     const dynastyOutlook = generateDynastyOutlook(
@@ -850,7 +876,7 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
         windowKey,
         windowLabel:         windowCopy.label,
         windowWhy:           windowCopy.why,
-        windowDrivers:       windowCopy.drivers,
+        windowDrivers,
         coreStrength,
         positionStability,
         ageCurve,
