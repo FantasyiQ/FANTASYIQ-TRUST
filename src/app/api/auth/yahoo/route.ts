@@ -33,15 +33,11 @@ export async function GET(request: Request): Promise<Response> {
 
     const redirectUri = getRedirectUri(request);
 
-    // NOTE: Do NOT send scope=fspt-r. Yahoo's current developer console only
-    // grants OpenID Connect permissions, and passing the legacy Fantasy scope
-    // makes Yahoo reject the request with `invalid_scope` before the consent
-    // screen. Fantasy Sports read access is governed by the registered app, so
-    // we omit scope entirely and let Yahoo authorize against the app's grant.
     const params = new URLSearchParams({
         client_id:     clientId,
         redirect_uri:  redirectUri,
         response_type: 'code',
+        scope:         'fspt-r',   // Fantasy Sports read
         state,
     });
 

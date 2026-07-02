@@ -466,8 +466,8 @@ export default async function DashboardPage({
                                         <Link href="/dashboard/sync/espn" className="inline-flex items-center gap-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold text-xs px-3 py-1.5 rounded-lg transition">
                                             Sync ESPN
                                         </Link>
-                                        <Link href="/dashboard/sync/yahoo" className="inline-flex items-center gap-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold text-xs px-3 py-1.5 rounded-lg transition">
-                                            Sync Yahoo
+                                        <Link href="/dashboard/sync/yahoo" className="inline-flex items-center gap-1.5 bg-gray-800/50 hover:bg-gray-800 text-gray-500 font-semibold text-xs px-3 py-1.5 rounded-lg transition" title="Yahoo integration coming soon">
+                                            Yahoo · Soon
                                         </Link>
                                         <Link href="/dashboard/sync/nfl" className="inline-flex items-center gap-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold text-xs px-3 py-1.5 rounded-lg transition">
                                             Sync NFL

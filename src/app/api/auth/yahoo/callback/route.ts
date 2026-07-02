@@ -21,16 +21,9 @@ export async function GET(request: Request): Promise<Response> {
     const state  = url.searchParams.get('state');
     const errParam = url.searchParams.get('error');
 
-    // Provider returned an error (user denied, invalid scope, app misconfig, …).
-    // Surface the real reason instead of a generic "cancelled" so it's diagnosable.
+    // User denied access
     if (errParam) {
-        const detail = url.searchParams.get('error_description') ?? '';
-        console.error('[Yahoo OAuth callback] provider error:', errParam, detail);
-        const u = new URL('/dashboard/sync/yahoo', request.url);
-        u.searchParams.set('error', 'denied');
-        u.searchParams.set('reason', errParam);
-        if (detail) u.searchParams.set('detail', detail.slice(0, 300));
-        return Response.redirect(u);
+        return Response.redirect(new URL('/dashboard/sync/yahoo?error=denied', request.url));
     }
 
     if (!code) {
@@ -66,9 +59,6 @@ export async function GET(request: Request): Promise<Response> {
         return Response.redirect(new URL('/dashboard/sync/yahoo?connected=true', request.url));
     } catch (err) {
         console.error('[Yahoo OAuth callback]', err);
-        const u = new URL('/dashboard/sync/yahoo', request.url);
-        u.searchParams.set('error', 'token_exchange');
-        u.searchParams.set('detail', (err instanceof Error ? err.message : String(err)).slice(0, 300));
-        return Response.redirect(u);
+        return Response.redirect(new URL('/dashboard/sync/yahoo?error=token_exchange', request.url));
     }
 }

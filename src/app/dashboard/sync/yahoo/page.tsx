@@ -192,6 +192,50 @@ function YahooSyncContent() {
 
     // ── Render ────────────────────────────────────────────────────────────────
 
+    // Yahoo Fantasy API access is pending on Yahoo's side (their current developer
+    // console no longer grants Fantasy Sports permission). Flip to `true` once the
+    // app has Fantasy read access — the full OAuth flow below is ready to go.
+    const YAHOO_ENABLED = false;
+
+    if (!YAHOO_ENABLED) {
+        return (
+            <main className="min-h-screen bg-gray-950 text-white pt-24 pb-20 px-4">
+                <div className="max-w-xl mx-auto space-y-8">
+                    <div>
+                        <Link href="/dashboard" className="text-gray-600 text-xs hover:text-gray-400 transition mb-4 block">
+                            ← Dashboard
+                        </Link>
+                        <div className="flex items-center gap-3 mb-1">
+                            <div className="w-8 h-8 rounded-lg bg-[#6B0FBF]/20 border border-[#6B0FBF]/40 flex items-center justify-center">
+                                <span className="text-[10px] font-black text-[#6B0FBF]">Y!</span>
+                            </div>
+                            <h1 className="text-2xl font-extrabold">Yahoo Fantasy</h1>
+                        </div>
+                    </div>
+
+                    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center space-y-4">
+                        <div className="text-4xl">🚧</div>
+                        <h2 className="text-xl font-bold">Coming Soon</h2>
+                        <p className="text-gray-400 text-sm leading-relaxed">
+                            Yahoo Fantasy integration is on the way — we&apos;re finalizing API access with Yahoo.
+                            In the meantime, connect your <strong className="text-white">Sleeper</strong> or{' '}
+                            <strong className="text-white">ESPN</strong> leagues to unlock full PRS, DTV, and
+                            commissioner tools today.
+                        </p>
+                        <div className="flex gap-3 justify-center pt-1">
+                            <Link href="/dashboard/sync" className="bg-[#D4AF37] hover:bg-[#BF9D2F] text-gray-950 font-bold text-sm px-5 py-2.5 rounded-lg transition">
+                                Connect Sleeper
+                            </Link>
+                            <Link href="/dashboard/sync/espn" className="border border-gray-700 hover:border-[#D4AF37]/50 text-white font-semibold text-sm px-5 py-2.5 rounded-lg transition">
+                                Connect ESPN
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        );
+    }
+
     return (
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-20 px-4">
             <div className="max-w-xl mx-auto space-y-8">
