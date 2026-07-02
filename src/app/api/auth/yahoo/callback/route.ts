@@ -21,9 +21,16 @@ export async function GET(request: Request): Promise<Response> {
     const state  = url.searchParams.get('state');
     const errParam = url.searchParams.get('error');
 
-    // User denied access
+    // Provider returned an error (user denied, invalid scope, app misconfig, …).
+    // Surface the real reason instead of a generic "cancelled" so it's diagnosable.
     if (errParam) {
-        return Response.redirect(new URL('/dashboard/sync/yahoo?error=denied', request.url));
+        const detail = url.searchParams.get('error_description') ?? '';
+        console.error('[Yahoo OAuth callback] provider error:', errParam, detail);
+        const u = new URL('/dashboard/sync/yahoo', request.url);
+        u.searchParams.set('error', 'denied');
+        u.searchParams.set('reason', errParam);
+        if (detail) u.searchParams.set('detail', detail.slice(0, 300));
+        return Response.redirect(u);
     }
 
     if (!code) {
