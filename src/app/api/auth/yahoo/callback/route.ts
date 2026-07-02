@@ -66,6 +66,9 @@ export async function GET(request: Request): Promise<Response> {
         return Response.redirect(new URL('/dashboard/sync/yahoo?connected=true', request.url));
     } catch (err) {
         console.error('[Yahoo OAuth callback]', err);
-        return Response.redirect(new URL('/dashboard/sync/yahoo?error=token_exchange', request.url));
+        const u = new URL('/dashboard/sync/yahoo', request.url);
+        u.searchParams.set('error', 'token_exchange');
+        u.searchParams.set('detail', (err instanceof Error ? err.message : String(err)).slice(0, 300));
+        return Response.redirect(u);
     }
 }
