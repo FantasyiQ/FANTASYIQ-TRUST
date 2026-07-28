@@ -291,6 +291,27 @@ export async function GET(req: NextRequest): Promise<Response> {
     // ── Load player pool ───────────────────────────────────────────────────────
     let boardPlayers: MockPlayer[] = [];
 
+    // Some real players share an exact fullName (e.g. two "Justin Jefferson"s —
+    // WR/MIN and LB/CLE). Match name+position first; only fall back to a bare
+    // name match when that name is unambiguous, so we never silently attach one
+    // player's team/age/id to a different player's card.
+    function makeSleeperResolver<T extends { fullName: string; position: string }>(players: T[]) {
+        const byNamePos = new Map<string, T>();
+        const byNameCount = new Map<string, number>();
+        const byNameSingle = new Map<string, T>();
+        for (const p of players) {
+            const nameKey = p.fullName.toLowerCase();
+            byNamePos.set(`${nameKey}|${p.position}`, p);
+            byNameCount.set(nameKey, (byNameCount.get(nameKey) ?? 0) + 1);
+            byNameSingle.set(nameKey, p);
+        }
+        return (name: string, position: string): T | undefined => {
+            const nameKey = name.toLowerCase();
+            return byNamePos.get(`${nameKey}|${position}`)
+                ?? (byNameCount.get(nameKey) === 1 ? byNameSingle.get(nameKey) : undefined);
+        };
+    }
+
     if (isRookieDraft) {
         // Dynasty rookie draft: FiQ rookie rankings as the pool.
         //
@@ -325,14 +346,14 @@ export async function GET(req: NextRequest): Promise<Response> {
         const sleeperPlayers = rookies.length > 0
             ? await prisma.sleeperPlayer.findMany({
                 where:  { fullName: { in: rookies.map(r => r.playerName) } },
-                select: { playerId: true, fullName: true, team: true, age: true, injuryStatus: true },
+                select: { playerId: true, fullName: true, team: true, age: true, position: true, injuryStatus: true },
               })
             : [];
-        const spByName = new Map(sleeperPlayers.map(p => [p.fullName.toLowerCase(), p]));
+        const resolveSleeper = makeSleeperResolver(sleeperPlayers);
 
         boardPlayers = rookies
             .map((r, i) => {
-                const sp        = spByName.get(r.playerName.toLowerCase());
+                const sp        = resolveSleeper(r.playerName, r.position);
                 const mult      = IDP_PLAYER_POSITIONS.includes(r.position)
                     ? idpMult
                     : (DYNASTY_POS_MULT[r.position] ?? 1.0);
@@ -387,15 +408,15 @@ export async function GET(req: NextRequest): Promise<Response> {
         const sleeperPlayers = fcValues.length > 0
             ? await prisma.sleeperPlayer.findMany({
                 where:  { fullName: { in: fcValues.map(v => v.playerName) }, active: true },
-                select: { playerId: true, fullName: true, team: true, age: true, injuryStatus: true },
+                select: { playerId: true, fullName: true, team: true, age: true, position: true, injuryStatus: true },
               })
             : [];
-        const spByName = new Map(sleeperPlayers.map(p => [p.fullName.toLowerCase(), p]));
+        const resolveSleeper = makeSleeperResolver(sleeperPlayers);
 
         const VALUE_CAP = isDynasty ? 9999 : 5000;
 
         boardPlayers = fcValues.map((v, i) => {
-            const sp     = spByName.get(v.playerName.toLowerCase());
+            const sp     = resolveSleeper(v.playerName, v.position);
             const rawVal = isDynasty
                 ? (superflex ? v.dynastyValueSf : v.dynastyValue)
                 : (superflex ? v.redraftValueSf : v.redraftValue);
