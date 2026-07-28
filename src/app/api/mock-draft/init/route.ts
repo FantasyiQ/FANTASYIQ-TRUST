@@ -190,7 +190,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     const totalTeams  = rosters.length || (league.totalRosters ?? 12);
     const defaultRounds = isRookieDraft ? 5 : (rosterPositions.length || (isDynasty ? 20 : 15));
     const totalRounds   = upcomingDraft?.settings?.rounds ?? defaultRounds;
-    const defaultType   = 'linear'; // dynasty startup drafts are linear; redraft too
+    const defaultType   = isRookieDraft ? 'linear' : 'snake'; // rookie drafts are linear; redraft & dynasty startup snake
     const isSnake       = (upcomingDraft?.type ?? defaultType) !== 'linear';
 
     const settings: MockDraftSettings = {

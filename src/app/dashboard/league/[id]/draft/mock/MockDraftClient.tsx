@@ -277,7 +277,7 @@ function IdleScreen({
 
     const modeDetails = isDynasty
         ? { label: 'Dynasty Mock Draft',  rounds: 'Dynasty values · Linear draft',                          desc: 'Long-term dynasty values — age curve, DTV, and startup draft calibration.' }
-        : { label: 'Redraft Mock Draft',  rounds: `${rounds} rounds · Season-long values · Linear draft`,   desc: 'Season-long values — best player available each round, all positions included.' };
+        : { label: 'Redraft Mock Draft',  rounds: `${rounds} rounds · Season-long values · Snake draft`,   desc: 'Season-long values — best player available each round, all positions included.' };
 
     const n = totalRosters;
     const slotLabel = draftSlot === 1 ? 'Pick 1 every round (first overall)'
