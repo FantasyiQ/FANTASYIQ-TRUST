@@ -280,9 +280,15 @@ function IdleScreen({
         : { label: 'Redraft Mock Draft',  rounds: `${rounds} rounds · Season-long values · Snake draft`,   desc: 'Season-long values — best player available each round, all positions included.' };
 
     const n = totalRosters;
-    const slotLabel = draftSlot === 1 ? 'Pick 1 every round (first overall)'
-        : draftSlot === n ? `Pick ${n} every round (last overall)`
-        : `Pick ${draftSlot} every round`;
+    // Redraft is always snake now; dynasty label covers the dominant rookie-draft
+    // (linear) case — true startup dynasty drafts are the rarer edge case here.
+    const slotLabel = isDynasty
+        ? (draftSlot === 1 ? 'Pick 1 every round (first overall)'
+            : draftSlot === n ? `Pick ${n} every round (last overall)`
+            : `Pick ${draftSlot} every round`)
+        : (draftSlot === 1 ? `Pick 1, then Pick ${n} next round (snake — first overall)`
+            : draftSlot === n ? `Pick ${n}, then Pick 1 next round (snake — last overall)`
+            : `Pick ${draftSlot} in odd rounds, Pick ${n - draftSlot + 1} in even rounds (snake)`);
 
     return (
         <div className="space-y-6">
