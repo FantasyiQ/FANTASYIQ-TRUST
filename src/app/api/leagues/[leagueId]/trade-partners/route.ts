@@ -4,11 +4,15 @@ import { requireLeaguePaidAccess } from '@/lib/access';
 import { prisma } from '@/lib/prisma';
 import { normalizePlayerName as normalizeName } from '@/lib/playerName';
 import { calculateAge } from '@/lib/calculateAge';
-import { getLeagueRosters, getLeagueUsers, getPlayers } from '@/lib/sleeper';
+import { getLeagueRosters, getLeagueUsers, getPlayers, getNflState } from '@/lib/sleeper';
 import { calcDtv, DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
 import type { Player, LeagueSettings, LeagueType } from '@/lib/trade-engine';
 import { computePlayerBaseValue } from '@/lib/player-universe';
 import type { UniversePlayer } from '@/lib/player-universe';
+import {
+    computeRealPoints, computePerfFactor, toStatsPerGame,
+    computePositionScoringFactor, combineScoringFactors, STANDARD_SCORING,
+} from '@/lib/rankings/leagueScoringPoints';
 import { assessTeamNeeds, deriveSlots, positionValue, type PositionVerdict, type NeedsLabel } from '@/lib/needs/assessTeamNeeds';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -170,8 +174,14 @@ export async function GET(
     const superflex       = leagueSettings.sfSlots > 0;
     const leagueSize      = league.totalRosters;
 
+    // League Scoring Points Engine: real per-league scoring adjustment. Fall
+    // back to the prior completed season when the current one has no stats
+    // yet (off-season / early weeks).
+    const nflState    = await getNflState();
+    const statsSeason = nflState.season;
+
     // 2. Fetch Sleeper rosters + members + dynasty universe + snapshot in parallel
-    const [rosters, members, fcRows, sleeperAllPlayers, latestSnapshot] = await Promise.all([
+    const [rosters, members, fcRows, sleeperAllPlayers, latestSnapshot, currentSeasonStats] = await Promise.all([
         getLeagueRosters(leagueId),
         getLeagueUsers(leagueId),
         prisma.fantasyCalcValue.findMany({
@@ -190,7 +200,24 @@ export async function GET(
             orderBy: { takenAt: 'desc' },
             select:  { takenAt: true },
         }),
+        prisma.playerSeasonStats.findMany({
+            where:  { season: statsSeason },
+            select: { playerId: true, gamesPlayed: true, rawStats: true },
+        }),
     ]);
+
+    const seasonStatsRows = currentSeasonStats.length > 0
+        ? currentSeasonStats
+        : await prisma.playerSeasonStats.findMany({
+            where:  { season: String(Number(statsSeason) - 1) },
+            select: { playerId: true, gamesPlayed: true, rawStats: true },
+        });
+    const statsByPlayerId = new Map(
+        seasonStatsRows.map(s => [s.playerId, {
+            gamesPlayed:  s.gamesPlayed,
+            statsPerGame: toStatsPerGame(s.rawStats as Record<string, number>, s.gamesPlayed),
+        }])
+    );
 
     // 3. Resolve all player IDs across all rosters
     const allPlayerIds = [...new Set(rosters.flatMap(r => r.players ?? []))];
@@ -199,7 +226,7 @@ export async function GET(
     // 4. Build Sleeper lookup by name+position (exact + normalized). Some real
     // players share an exact fullName (e.g. two "Justin Jefferson"s — WR/MIN and
     // LB/CLE); only fall back to a bare name match when that name is unambiguous.
-    type SleeperInfo = { team: string; injuryStatus: string | null; birthDate: string | null; age: number | null };
+    type SleeperInfo = { playerId: string; team: string; injuryStatus: string | null; birthDate: string | null; age: number | null };
     const byNamePos     = new Map<string, SleeperInfo>();
     const byNormNamePos = new Map<string, SleeperInfo>();
     const byNameCount     = new Map<string, number>();
@@ -207,7 +234,7 @@ export async function GET(
     const byNormNameCount = new Map<string, number>();
     const byNormName      = new Map<string, SleeperInfo>();
     for (const p of sleeperAllPlayers) {
-        const val: SleeperInfo = { team: p.team, injuryStatus: p.injuryStatus, birthDate: p.birthDate, age: p.age };
+        const val: SleeperInfo = { playerId: p.playerId, team: p.team, injuryStatus: p.injuryStatus, birthDate: p.birthDate, age: p.age };
         const exact = p.fullName.toLowerCase();
         const normd = normalizeName(p.fullName);
         byNamePos.set(`${exact}|${p.position}`, val);
@@ -226,13 +253,53 @@ export async function GET(
     }
 
     // 5. Build DTV map keyed by lowercase name
-    const dtvByName = new Map<string, { universe: UniversePlayer; finalDtv: number }>();
+    // Pass 1: resolve real per-game production (skill positions only) and
+    // accumulate positional totals — perfFactor can't be computed until every
+    // player in a position group has been seen.
+    type FcRow = (typeof fcRows)[number];
+    type Pending = {
+        r: FcRow; team: string | null; age: number; sl: SleeperInfo | null;
+        realPtsPerGame: number; standardPtsPerGame: number;
+        statsPerGame: Record<string, number> | null; gamesPlayed: number | null; playerId: string | null;
+    };
+    const pending: Pending[] = [];
+    const posPtsSum = new Map<string, number>(), posPtsCount = new Map<string, number>(), posStdPtsSum = new Map<string, number>();
+
     for (const r of fcRows) {
         const sl      = resolveSleeper(r.nameLower, r.position) ?? null;
         const rawTeam = sl?.team ?? null;
         const team    = (rawTeam && rawTeam !== 'FA') ? rawTeam : null;
         const age     = calculateAge(sl?.birthDate) ?? sl?.age ?? 0;
+        const playerId = sl?.playerId ?? null;
 
+        const isSkill = SKILL_POSITIONS.has(r.position);
+        const stats           = isSkill && playerId ? statsByPlayerId.get(playerId) : undefined;
+        const statsPerGame     = stats?.statsPerGame ?? null;
+        const gamesPlayed      = stats?.gamesPlayed ?? null;
+        const realPtsPerGame     = statsPerGame ? computeRealPoints(statsPerGame, scoringSettings) : 0;
+        const standardPtsPerGame = statsPerGame ? computeRealPoints(statsPerGame, STANDARD_SCORING) : 0;
+
+        if (statsPerGame && gamesPlayed) {
+            posPtsSum.set(r.position, (posPtsSum.get(r.position) ?? 0) + realPtsPerGame);
+            posPtsCount.set(r.position, (posPtsCount.get(r.position) ?? 0) + 1);
+            posStdPtsSum.set(r.position, (posStdPtsSum.get(r.position) ?? 0) + standardPtsPerGame);
+        }
+
+        pending.push({ r, team, age, sl, realPtsPerGame, standardPtsPerGame, statsPerGame, gamesPlayed, playerId });
+    }
+
+    const posAvgPtsPerGame = new Map<string, number>();
+    const posStdAvgPtsPerGame = new Map<string, number>();
+    for (const [pos, sum] of posPtsSum) posAvgPtsPerGame.set(pos, sum / (posPtsCount.get(pos) ?? 1));
+    for (const [pos, sum] of posStdPtsSum) posStdAvgPtsPerGame.set(pos, sum / (posPtsCount.get(pos) ?? 1));
+    const posScoringFactor = new Map<string, number>();
+    for (const pos of posAvgPtsPerGame.keys()) {
+        posScoringFactor.set(pos, computePositionScoringFactor(posAvgPtsPerGame.get(pos) ?? 0, posStdAvgPtsPerGame.get(pos) ?? 0));
+    }
+
+    // Pass 2: build the universe entry + DTV for each player
+    const dtvByName = new Map<string, { universe: UniversePlayer; finalDtv: number }>();
+    for (const { r, team, age, sl, realPtsPerGame, statsPerGame, gamesPlayed } of pending) {
         const u: UniversePlayer = {
             name:            r.playerName,
             position:        r.position,
@@ -246,7 +313,16 @@ export async function GET(
             injuryStatus:    sl?.injuryStatus ?? null,
             birthDate:       null,
             playerImageUrl:  null,
+            statsPerGame,
+            gamesPlayed,
         };
+
+        const individualFactor = statsPerGame && gamesPlayed
+            ? computePerfFactor(realPtsPerGame, posAvgPtsPerGame.get(r.position) ?? 0, gamesPlayed)
+            : 1.0;
+        const positionFactor = posScoringFactor.get(r.position) ?? 1.0;
+        const perfFactor     = combineScoringFactors(individualFactor, positionFactor);
+
         const baseValue = SKILL_POSITIONS.has(r.position)
             ? computePlayerBaseValue(u, r.position, {
                 leagueType, superflex, ppr, leagueSize,
@@ -257,7 +333,7 @@ export async function GET(
         const playerShell: Player = {
             rank: 0, name: r.playerName, position: r.position,
             team: team ?? 'FA', age, baseValue,
-            injuryStatus: sl?.injuryStatus,
+            injuryStatus: sl?.injuryStatus, perfFactor,
         };
         const dtv = SKILL_POSITIONS.has(r.position)
             ? calcDtv(playerShell, ppr, leagueType, undefined, leagueSettings)

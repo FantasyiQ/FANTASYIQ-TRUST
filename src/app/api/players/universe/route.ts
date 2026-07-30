@@ -4,6 +4,8 @@ import type { UniversePlayer, UniverseResponse } from '@/lib/player-universe';
 import { calculateAge } from '@/lib/calculateAge';
 import { checkPublicLimit, getClientIp } from '@/lib/ratelimit';
 import { normalizePlayerName as normalizeName } from '@/lib/playerName';
+import { getNflState } from '@/lib/sleeper';
+import { toStatsPerGame } from '@/lib/rankings/leagueScoringPoints';
 
 const VALUE_CAP = 9999;
 const SKILL_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE']);
@@ -18,7 +20,14 @@ function normalise(raw: number): number {
 export async function GET(request: NextRequest): Promise<Response> {
     const rl = await checkPublicLimit(getClientIp(request));
     if (rl.limited) return rl.response;
-    const [fcRows, sleeperPlayers, latestSync] = await Promise.all([
+
+    // statsPerGame is league-agnostic (real per-player production, not adjusted
+    // for any league's scoring) — safe to include in this shared, cached
+    // response. Per-league perfFactor is computed at the point of use.
+    const nflState    = await getNflState();
+    const statsSeason = nflState.season;
+
+    const [fcRows, sleeperPlayers, latestSync, currentSeasonStats] = await Promise.all([
         prisma.fantasyCalcValue.findMany({
             where: {
                 position: { in: ['QB', 'RB', 'WR', 'TE'] },
@@ -45,7 +54,24 @@ export async function GET(request: NextRequest): Promise<Response> {
             orderBy: { updatedAt: 'desc' },
             select:  { updatedAt: true },
         }),
+        prisma.playerSeasonStats.findMany({
+            where:  { season: statsSeason },
+            select: { playerId: true, gamesPlayed: true, rawStats: true },
+        }),
     ]);
+
+    const seasonStatsRows = currentSeasonStats.length > 0
+        ? currentSeasonStats
+        : await prisma.playerSeasonStats.findMany({
+            where:  { season: String(Number(statsSeason) - 1) },
+            select: { playerId: true, gamesPlayed: true, rawStats: true },
+        });
+    const statsByPlayerId = new Map(
+        seasonStatsRows.map(s => [s.playerId, {
+            gamesPlayed:  s.gamesPlayed,
+            statsPerGame: toStatsPerGame(s.rawStats as Record<string, number>, s.gamesPlayed),
+        }])
+    );
 
     // Some real players share an exact fullName (e.g. two "Justin Jefferson"s —
     // WR/MIN and LB/CLE). Resolve by name+position first (exact, then normalized
@@ -85,6 +111,7 @@ export async function GET(request: NextRequest): Promise<Response> {
             const rawTeam = sleeper?.team ?? null;
             const team    = (rawTeam && rawTeam !== 'FA') ? rawTeam : null;
             const age     = calculateAge(sleeper?.birthDate) ?? sleeper?.age ?? (r.age ? Math.round(r.age) : null);
+            const stats   = sleeper?.playerId ? statsByPlayerId.get(sleeper.playerId) : undefined;
 
             return {
                 name:            r.playerName,
@@ -99,6 +126,8 @@ export async function GET(request: NextRequest): Promise<Response> {
                 injuryStatus:    sleeper?.injuryStatus ?? null,
                 birthDate:       sleeper?.birthDate ?? null,
                 playerImageUrl:  sleeper ? `https://sleepercdn.com/content/nfl/players/${sleeper.playerId}.jpg` : null,
+                statsPerGame:    stats?.statsPerGame ?? null,
+                gamesPlayed:     stats?.gamesPlayed ?? null,
             };
         })
         .sort((a, b) => b.dynasty - a.dynasty || a.name.localeCompare(b.name));

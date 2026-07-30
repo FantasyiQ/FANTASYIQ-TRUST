@@ -84,11 +84,6 @@ export interface RawTeamData {
     ownedPicks: RawOwnedPick[];
 }
 
-interface ScoringSettings {
-    pass_td?:      number;
-    bonus_rec_te?: number;
-}
-
 interface Props {
     leagueId:             string;
     leagueName:           string;
@@ -98,7 +93,7 @@ interface Props {
     draftOrderProjected?: boolean;
     leagueType:           LeagueType;
     rosterPositions?:     string[];
-    scoringSettings?:     ScoringSettings;
+    scoringSettings?:     Record<string, number>;
     myTeamData?:          RawTeamData;
     otherTeamsData?:      RawTeamData[];
     /**
@@ -204,6 +199,7 @@ export default function LeagueTradeEvaluator({
                 initialLeagueSize={leagueSize}
                 initialLeagueType={leagueType}
                 initialLeagueSettings={leagueSettings}
+                rawScoringSettings={scoringSettings}
                 leagueLabel={label}
                 lockSettings
                 myTeam={myTeam}

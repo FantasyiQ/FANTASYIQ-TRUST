@@ -3,13 +3,17 @@ export const dynamic = 'force-dynamic';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getLeague, getLeagueRosters, getLeagueUsers, getPlayers } from '@/lib/sleeper';
+import { getLeague, getLeagueRosters, getLeagueUsers, getPlayers, getNflState } from '@/lib/sleeper';
 import { calculateAge, calculatePreciseAge } from '@/lib/calculateAge';
 import { calcDtv, DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
 import type { Player, LeagueSettings, LeagueType } from '@/lib/trade-engine';
 import { computePlayerBaseValue } from '@/lib/player-universe';
 import type { UniversePlayer } from '@/lib/player-universe';
 import { normalizePlayerName as normalizeName } from '@/lib/playerName';
+import {
+    computeRealPoints, computePerfFactor, toStatsPerGame,
+    computePositionScoringFactor, combineScoringFactors, STANDARD_SCORING,
+} from '@/lib/rankings/leagueScoringPoints';
 
 // ── ESPN Roster Page ──────────────────────────────────────────────────────────
 
@@ -382,7 +386,13 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
         );
     }
 
-    const [playerById, fcRows, sleeperPlayers] = await Promise.all([
+    // League Scoring Points Engine: real per-league scoring adjustment. Fall
+    // back to the prior completed season when the current one has no stats
+    // yet (off-season / early weeks).
+    const nflState    = await getNflState();
+    const statsSeason = nflState.season;
+
+    const [playerById, fcRows, sleeperPlayers, currentSeasonStats] = await Promise.all([
         getPlayers(allPids),
         prisma.fantasyCalcValue.findMany({
             where:  { OR: [{ dynastyValue: { gt: 0 } }, { redraftValue: { gt: 0 } }] },
@@ -394,13 +404,30 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
             where:  { playerId: { in: allPids } },
             select: { playerId: true, fullName: true, injuryStatus: true, team: true, birthDate: true, age: true, position: true },
         }),
+        prisma.playerSeasonStats.findMany({
+            where:  { season: statsSeason },
+            select: { playerId: true, gamesPlayed: true, rawStats: true },
+        }),
     ]);
+
+    const seasonStatsRows = currentSeasonStats.length > 0
+        ? currentSeasonStats
+        : await prisma.playerSeasonStats.findMany({
+            where:  { season: String(Number(statsSeason) - 1) },
+            select: { playerId: true, gamesPlayed: true, rawStats: true },
+        });
+    const statsByPlayerId = new Map(
+        seasonStatsRows.map(s => [s.playerId, {
+            gamesPlayed:  s.gamesPlayed,
+            statsPerGame: toStatsPerGame(s.rawStats as Record<string, number>, s.gamesPlayed),
+        }])
+    );
 
     // Build name+position-based Sleeper lookup so ages feed into the DTV calc
     // (matches roster-values route). Some real players share an exact fullName
     // (e.g. two "Justin Jefferson"s — WR/MIN and LB/CLE); only fall back to a bare
     // name match when that name is unambiguous.
-    type SleeperInfo = { team: string; injuryStatus: string | null; birthDate: string | null; age: number | null };
+    type SleeperInfo = { playerId: string; team: string; injuryStatus: string | null; birthDate: string | null; age: number | null };
     const byNamePos     = new Map<string, SleeperInfo>();
     const byNormNamePos = new Map<string, SleeperInfo>();
     const byNameCount     = new Map<string, number>();
@@ -409,7 +436,7 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
     const byNormName      = new Map<string, SleeperInfo>();
     const sleeperById    = new Map(sleeperPlayers.map(p => [p.playerId, p]));
     for (const p of sleeperPlayers) {
-        const val: SleeperInfo = { team: p.team, injuryStatus: p.injuryStatus, birthDate: p.birthDate, age: p.age };
+        const val: SleeperInfo = { playerId: p.playerId, team: p.team, injuryStatus: p.injuryStatus, birthDate: p.birthDate, age: p.age };
         const exact = p.fullName.toLowerCase();
         const normd = normalizeName(p.fullName);
         byNamePos.set(`${exact}|${p.position}`, val);
@@ -427,27 +454,75 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
             ?? (byNormNameCount.get(normd) === 1 ? byNormName.get(normd) : undefined);
     }
 
-    const dtvByName = new Map<string, number>();
+    // Pass 1: resolve real per-game production (skill positions only) and
+    // accumulate positional totals — perfFactor can't be computed until every
+    // player in this roster's position group has been seen.
+    type FcRow = (typeof fcRows)[number];
+    type Pending = {
+        r: FcRow; team: string | null; age: number; sl: SleeperInfo | null;
+        realPtsPerGame: number; standardPtsPerGame: number;
+        statsPerGame: Record<string, number> | null; gamesPlayed: number | null;
+    };
+    const pendingRoster: Pending[] = [];
+    const posPtsSum = new Map<string, number>(), posPtsCount = new Map<string, number>(), posStdPtsSum = new Map<string, number>();
+
     for (const r of fcRows) {
-        const exact = r.nameLower;
-        const normd = normalizeName(r.nameLower);
         const sl    = resolveSleeper(r.nameLower, r.position) ?? null;
         const team  = (sl?.team && sl.team !== 'FA') ? sl.team : null;
         const age   = calculateAge(sl?.birthDate) ?? sl?.age ?? 0;
+
+        const isSkill = SKILL_POSITIONS.has(r.position);
+        const stats           = isSkill && sl?.playerId ? statsByPlayerId.get(sl.playerId) : undefined;
+        const statsPerGame     = stats?.statsPerGame ?? null;
+        const gamesPlayed      = stats?.gamesPlayed ?? null;
+        const realPtsPerGame     = statsPerGame ? computeRealPoints(statsPerGame, scoringSettings) : 0;
+        const standardPtsPerGame = statsPerGame ? computeRealPoints(statsPerGame, STANDARD_SCORING) : 0;
+
+        if (statsPerGame && gamesPlayed) {
+            posPtsSum.set(r.position, (posPtsSum.get(r.position) ?? 0) + realPtsPerGame);
+            posPtsCount.set(r.position, (posPtsCount.get(r.position) ?? 0) + 1);
+            posStdPtsSum.set(r.position, (posStdPtsSum.get(r.position) ?? 0) + standardPtsPerGame);
+        }
+
+        pendingRoster.push({ r, team, age, sl, realPtsPerGame, standardPtsPerGame, statsPerGame, gamesPlayed });
+    }
+
+    const posAvgPtsPerGame = new Map<string, number>();
+    const posStdAvgPtsPerGame = new Map<string, number>();
+    for (const [pos, sum] of posPtsSum) posAvgPtsPerGame.set(pos, sum / (posPtsCount.get(pos) ?? 1));
+    for (const [pos, sum] of posStdPtsSum) posStdAvgPtsPerGame.set(pos, sum / (posPtsCount.get(pos) ?? 1));
+    const posScoringFactor = new Map<string, number>();
+    for (const pos of posAvgPtsPerGame.keys()) {
+        posScoringFactor.set(pos, computePositionScoringFactor(posAvgPtsPerGame.get(pos) ?? 0, posStdAvgPtsPerGame.get(pos) ?? 0));
+    }
+
+    // Pass 2: build the universe entry + DTV for each player
+    const dtvByName = new Map<string, number>();
+    for (const { r, team, age, sl, realPtsPerGame, statsPerGame, gamesPlayed } of pendingRoster) {
+        const exact = r.nameLower;
+        const normd = normalizeName(r.nameLower);
 
         const u: UniversePlayer = {
             name: r.playerName, position: r.position, team, age,
             dynasty: normalise(r.dynastyValue), dynastySf: normalise(r.dynastyValueSf),
             redraft: normalise(r.redraftValue), redraftSf: normalise(r.redraftValueSf),
             trend: null, injuryStatus: sl?.injuryStatus ?? null, birthDate: null, playerImageUrl: null,
+            statsPerGame, gamesPlayed,
         };
+
+        const individualFactor = statsPerGame && gamesPlayed
+            ? computePerfFactor(realPtsPerGame, posAvgPtsPerGame.get(r.position) ?? 0, gamesPlayed)
+            : 1.0;
+        const positionFactor = posScoringFactor.get(r.position) ?? 1.0;
+        const perfFactor     = combineScoringFactors(individualFactor, positionFactor);
+
         const baseValue = SKILL_POSITIONS.has(r.position)
             ? computePlayerBaseValue(u, r.position, { leagueType, superflex, ppr, leagueSize, passTd: leagueSettings.passTd, bonusRecTe: leagueSettings.bonusRecTe, rushAtt: leagueSettings.rushAtt })
             : 0;
         const ps: Player = {
             rank: 0, name: r.playerName, position: r.position,
             team: team ?? 'FA', age, baseValue,
-            injuryStatus: sl?.injuryStatus,
+            injuryStatus: sl?.injuryStatus, perfFactor,
         };
         const dtv = SKILL_POSITIONS.has(r.position)
             ? calcDtv(ps, ppr, leagueType, undefined, leagueSettings).finalDtv

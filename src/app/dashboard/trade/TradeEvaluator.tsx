@@ -7,6 +7,10 @@ import type { UniversePlayer, UniverseResponse, UniverseMeta, DeltaEntry, DeltaR
 import { computePlayerBaseValue, playerVolatility } from '@/lib/player-universe';
 import { normalizePlayerName } from '@/lib/playerName';
 import { calculateAge } from '@/lib/calculateAge';
+import {
+    computeRealPoints, computePerfFactor,
+    computePositionScoringFactor, combineScoringFactors, STANDARD_SCORING,
+} from '@/lib/rankings/leagueScoringPoints';
 import { evaluateUnifiedTrade } from '@/lib/rankings/unifiedTradeEvaluator';
 import type { DefenseValues } from '@/lib/rankings/unifiedTradeEvaluator';
 import type { LeaguePhaseResult } from '@/lib/leaguePhase';
@@ -496,6 +500,11 @@ interface TradeEvaluatorProps {
      */
     defenseValues?:         DefenseValues;
     phaseResult?:           LeaguePhaseResult;
+    /** Full raw league scoring_settings dict (League Scoring Points Engine) —
+     *  distinct from initialLeagueSettings, which only carries a few
+     *  pre-picked fields. Enables computeRealPoints to react to ANY scoring
+     *  rule the league has, not just the hand-picked ones. */
+    rawScoringSettings?:    Record<string, number>;
 }
 
 export default function TradeEvaluator({
@@ -514,6 +523,7 @@ export default function TradeEvaluator({
     otherTeams            = [],
     defenseValues         = {},
     phaseResult,
+    rawScoringSettings,
 }: TradeEvaluatorProps = {}) {
     const [ppr, setPpr]                         = useState<PprFormat>(initialPpr);
     const [leagueType, setLeagueType]           = useState<LeagueType>(initialLeagueType);
@@ -562,6 +572,38 @@ export default function TradeEvaluator({
         [universe],
     );
 
+    // League Scoring Points Engine: real per-league scoring adjustment,
+    // computed once for the whole universe and looked up by name wherever a
+    // Player object gets built (patchPlayer, allPlayers) — calcDtv already
+    // reads player.perfFactor directly, so no call site below needs to change.
+    const perfFactorByName = useMemo(() => {
+        const map = new Map<string, number>();
+        if (!rawScoringSettings) return map;
+
+        const posPtsSum = new Map<string, number>(), posPtsCount = new Map<string, number>(), posStdPtsSum = new Map<string, number>();
+        for (const u of universe) {
+            if (!u.statsPerGame || !u.gamesPlayed) continue;
+            const realPts = computeRealPoints(u.statsPerGame, rawScoringSettings);
+            const stdPts  = computeRealPoints(u.statsPerGame, STANDARD_SCORING);
+            posPtsSum.set(u.position, (posPtsSum.get(u.position) ?? 0) + realPts);
+            posPtsCount.set(u.position, (posPtsCount.get(u.position) ?? 0) + 1);
+            posStdPtsSum.set(u.position, (posStdPtsSum.get(u.position) ?? 0) + stdPts);
+        }
+        const posAvg = new Map<string, number>(), posStdAvg = new Map<string, number>(), posFactor = new Map<string, number>();
+        for (const [pos, sum] of posPtsSum) posAvg.set(pos, sum / (posPtsCount.get(pos) ?? 1));
+        for (const [pos, sum] of posStdPtsSum) posStdAvg.set(pos, sum / (posPtsCount.get(pos) ?? 1));
+        for (const pos of posAvg.keys()) posFactor.set(pos, computePositionScoringFactor(posAvg.get(pos) ?? 0, posStdAvg.get(pos) ?? 0));
+
+        for (const u of universe) {
+            const positional = posFactor.get(u.position) ?? 1.0;
+            const individual = u.statsPerGame && u.gamesPlayed
+                ? computePerfFactor(computeRealPoints(u.statsPerGame, rawScoringSettings), posAvg.get(u.position) ?? 0, u.gamesPlayed)
+                : 1.0;
+            map.set(u.name, combineScoringFactors(individual, positional));
+        }
+        return map;
+    }, [universe, rawScoringSettings]);
+
     // Overlay universe values onto an existing Player (used for roster players
     // whose names come from Sleeper and may already be Player-shaped objects).
     const patchPlayer = useCallback((p: Player): Player => {
@@ -585,8 +627,9 @@ export default function TradeEvaluator({
             birthDate:       u.birthDate ?? p.birthDate ?? null,
             playerImageUrl:  resolvedImageUrl,
             image:           resolvedImageUrl,
+            perfFactor:      perfFactorByName.get(u.name) ?? p.perfFactor ?? 1.0,
         };
-    }, [universeMap, universeNormMap, leagueType, superflex, ppr, leagueSize, leagueSettings, defenseValues]);
+    }, [universeMap, universeNormMap, leagueType, superflex, ppr, leagueSize, leagueSettings, defenseValues, perfFactorByName]);
 
     const allExcluded = [...sideA.map(p => p.name), ...sideB.map(p => p.name), ...sideC.map(p => p.name)];
 
@@ -603,9 +646,10 @@ export default function TradeEvaluator({
             birthDate:       u.birthDate,
             playerImageUrl:  u.playerImageUrl,
             image:           u.playerImageUrl,
+            perfFactor:      perfFactorByName.get(u.name) ?? 1.0,
         }));
         return [...players, ...draftPicks];
-    }, [universe, draftPicks, leagueType, superflex, ppr, leagueSize, leagueSettings]);
+    }, [universe, draftPicks, leagueType, superflex, ppr, leagueSize, leagueSettings, perfFactorByName]);
 
     // All picks available for search: league-synced picks + full draft pick grid
     // Deduplicated: league picks first (have correct values), fill in missing slots from draftPicks
