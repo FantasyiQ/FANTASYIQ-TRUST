@@ -649,6 +649,29 @@ model SleeperPlayer {
     updatedAt       DateTime @updatedAt
 
     projections     PlayerProjection[]
+    seasonStats     PlayerSeasonStats[]
+}
+
+// Raw per-player-season stat totals from Sleeper — populated by
+// /api/cron/player-stats-sync. Enables computing a player's real fantasy
+// points under ANY league's scoring_settings via a generic dot-product
+// (sum(scoringSettings[stat] * rawStats[stat])), instead of hand-coded
+// per-rule nudges. rawStats is the full raw Sleeper stat dict for this
+// player-season (pass_yd, rush_att, rec, bonus_rush_yd_200, rush_td_40p,
+// etc.) — stored as JSON, not typed columns, so new Sleeper stat keys
+// never require a migration.
+model PlayerSeasonStats {
+    id          String   @id @default(cuid())
+    playerId    String
+    season      String   // e.g. "2025"
+    gamesPlayed Int
+    rawStats    Json
+    updatedAt   DateTime @updatedAt @default(now())
+
+    player      SleeperPlayer @relation(fields: [playerId], references: [playerId], onDelete: Cascade)
+
+    @@unique([playerId, season])
+    @@index([season])
 }
 
 // Weekly fantasy point projections — populated by /api/cron/sleeper-projections.

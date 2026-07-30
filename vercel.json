@@ -9,6 +9,10 @@
       "schedule": "0 8 * * *"
     },
     {
+      "path": "/api/cron/player-stats-sync",
+      "schedule": "0 9 * * *"
+    },
+    {
       "path": "/api/cron/sleeper-sync",
       "schedule": "0 * * * *"
     },

@@ -66,9 +66,9 @@ function statVariance(seasonTotal: number, gamesPlayed: number, statKey: string)
 
 // ── Stat fetcher ───────────────────────────────────────────────────────────────
 
-type SleeperStatsMap = Record<string, Record<string, number>>;
+export type SleeperStatsMap = Record<string, Record<string, number>>;
 
-async function fetchSeasonStats(season: string): Promise<SleeperStatsMap | null> {
+export async function fetchSeasonStats(season: string): Promise<SleeperStatsMap | null> {
     try {
         const res = await fetch(SLEEPER_STATS_URL(season), {
             next: { revalidate: 3600 }, // cache for 1 hour
