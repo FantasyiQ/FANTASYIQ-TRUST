@@ -31,13 +31,9 @@ interface PlayerRow {
     injuryStatus: string | null;
 }
 
-// e.g. 24.8 → "24 (Late)" — the fraction is how far through that year of
-// life the player is; falls back to the plain whole number without birthDate.
 function formatAge(age: number | null, preciseAge: number | null): string {
-    if (preciseAge == null) return age != null ? String(age) : '—';
-    const whole = Math.floor(preciseAge);
-    const frac  = preciseAge - whole;
-    return `${whole} (${frac < 0.5 ? 'Early' : 'Late'})`;
+    if (preciseAge != null) return preciseAge.toFixed(1);
+    return age != null ? String(age) : '—';
 }
 
 interface Props {

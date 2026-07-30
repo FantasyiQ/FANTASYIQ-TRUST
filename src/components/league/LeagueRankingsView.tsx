@@ -30,14 +30,9 @@ const POS_COLORS: Record<string, string> = {
 
 const POS_FILTER_OPTIONS = ['All', 'QB', 'RB', 'WR', 'TE'];
 
-// e.g. 24.8 → "24 (Late)" — the fraction is how far through that year of
-// life the player is; whole-number ages with no precise data fall back to
-// the plain number.
 function formatAge(age: number | null, preciseAge: number | null): string {
-    if (preciseAge == null) return age != null ? String(age) : '—';
-    const whole = Math.floor(preciseAge);
-    const frac  = preciseAge - whole;
-    return `${whole} (${frac < 0.5 ? 'Early' : 'Late'})`;
+    if (preciseAge != null) return preciseAge.toFixed(1);
+    return age != null ? String(age) : '—';
 }
 
 function timeAgo(iso: string | null | undefined): string {
