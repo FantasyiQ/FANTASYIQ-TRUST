@@ -30,6 +30,11 @@ export interface Player {
     birthDate?:       string | null;  // ISO date from Sleeper — used for runtime age display
     playerImageUrl?:  string | null;  // Sleeper CDN headshot URL (raw)
     image?:           string | null;  // resolved UI image: draft icon for picks, headshot for players
+    /** Real per-league scoring adjustment (League Scoring Points Engine) — how much
+     *  this player's real production under the league's exact scoring_settings
+     *  deviates from their position's average, clamped to 0.85–1.15. Defaults to
+     *  1.0 (no adjustment) when omitted or unavailable. */
+    perfFactor?:      number;
 }
 
 export interface DtvResult extends Player {
@@ -199,14 +204,19 @@ export function calcDtv(
     const ageMultiplier = (leagueType === 'Dynasty' && !isPick)
         ? ageCurveDynasty(player.position, player.age)
         : 1;
+    // League Scoring Points Engine: real per-league scoring adjustment. _factors
+    // (explicit override) wins if passed; otherwise use whatever the caller
+    // already attached to the player object; defaults to 1.0 (no-op) so players
+    // without real-stats data (rookies, unmatched names, picks) are unaffected.
+    const perfFactor    = isPick ? 1 : (_factors?.perfFactor ?? player.perfFactor ?? 1.0);
     const rawDtv        = Math.round(player.baseValue * 10) / 10;
-    const finalDtv      = Math.round(rawDtv * posMultiplier * injuryFactor * ageMultiplier * 10) / 10;
+    const finalDtv      = Math.round(rawDtv * posMultiplier * injuryFactor * ageMultiplier * perfFactor * 10) / 10;
 
     return {
         ...player,
         posMultiplier,
         ageMultiplier,
-        perfFactor:     1,
+        perfFactor,
         schedFactor:    1,
         injuryFactor,
         situFactor:     1,

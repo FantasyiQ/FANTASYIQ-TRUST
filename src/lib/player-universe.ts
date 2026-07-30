@@ -25,6 +25,15 @@ export interface UniversePlayer {
     injuryStatus:    string | null;
     birthDate:       string | null;  // ISO date from Sleeper — runtime age source
     playerImageUrl:  string | null;  // Sleeper CDN headshot
+    // League-agnostic real production (from PlayerSeasonStats) — safe to include
+    // in the cached global universe response since it doesn't depend on any
+    // league's scoring settings. Per-league value adjustment (perfFactor) is
+    // computed at the point of use via computeRealPoints/computePerfFactor.
+    // Optional: only populated by call sites that have wired in Phase 2/3 of
+    // the League Scoring Points Engine; other builders omit it (undefined),
+    // which is treated the same as null (no real-stats adjustment available).
+    statsPerGame?:   Record<string, number> | null;
+    gamesPlayed?:    number | null;
 }
 
 // ── Delta types ──────────────────────────────────────────────────────────────

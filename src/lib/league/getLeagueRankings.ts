@@ -7,6 +7,10 @@ import { calcDtv, DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
 import type { Player, LeagueSettings, LeagueType, PprFormat } from '@/lib/trade-engine';
 import { computePlayerBaseValue } from '@/lib/player-universe';
 import type { UniversePlayer } from '@/lib/player-universe';
+import {
+    computeRealPoints, computePerfFactor, toStatsPerGame,
+    computePositionScoringFactor, combineScoringFactors, STANDARD_SCORING,
+} from '@/lib/rankings/leagueScoringPoints';
 import { calculateAge } from '@/lib/calculateAge';
 import { effectiveTierForLeague, tierLevel } from '@/lib/league-limits';
 import { stripe, priceIdToTier } from '@/lib/stripe';
@@ -197,7 +201,10 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
     const leagueSize      = league.totalRosters;
 
     // ── Fetch shared DB data (no Sleeper API yet) ─────────────────────────────
-    const [fcRows, sleeperPlayers, latestSync] = await Promise.all([
+    const nflState     = await getNflState();
+    const statsSeason  = nflState.season;
+
+    const [fcRows, sleeperPlayers, latestSync, currentSeasonStats] = await Promise.all([
         prisma.fantasyCalcValue.findMany({
             where: {
                 position: { in: ['QB', 'RB', 'WR', 'TE'] },
@@ -217,7 +224,28 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
             orderBy: { updatedAt: 'desc' },
             select:  { updatedAt: true },
         }),
+        prisma.playerSeasonStats.findMany({
+            where:  { season: statsSeason },
+            select: { playerId: true, gamesPlayed: true, rawStats: true },
+        }),
     ]);
+
+    // League Scoring Points Engine: real per-league scoring adjustment. Fall back
+    // to the prior completed season when the current season has no stats yet
+    // (off-season / early weeks with few games played) so positional averages
+    // aren't computed from an empty or near-empty sample.
+    const seasonStatsRows = currentSeasonStats.length > 0
+        ? currentSeasonStats
+        : await prisma.playerSeasonStats.findMany({
+            where:  { season: String(Number(statsSeason) - 1) },
+            select: { playerId: true, gamesPlayed: true, rawStats: true },
+        });
+    const statsByPlayerId = new Map(
+        seasonStatsRows.map(s => [s.playerId, {
+            gamesPlayed:  s.gamesPlayed,
+            statsPerGame: toStatsPerGame(s.rawStats as Record<string, number>, s.gamesPlayed),
+        }])
+    );
 
     // ── Build Sleeper player lookup (name+position → metadata) ────────────────
     // Some real players share an exact fullName (e.g. two "Justin Jefferson"s —
@@ -257,6 +285,21 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
     const dtvByExactName = new Map<string, UniverseEntry>(); // lowercase name → entry (ESPN name matching)
     const dtvByNormName  = new Map<string, UniverseEntry>(); // normalized name → entry (ESPN name matching)
 
+    // Pass 1: resolve each player's real per-game production under this league's
+    // scoring settings, and accumulate positional totals — perfFactor can't be
+    // computed until every player in a position group has been seen.
+    type Pending = {
+        r: (typeof fcRows)[number];
+        team: string | null; age: number | null; playerId: string | null;
+        injuryStatus: string | null; birthDate: string | null;
+        statsPerGame: Record<string, number> | null; gamesPlayed: number | null;
+        realPtsPerGame: number; standardPtsPerGame: number;
+    };
+    const pending: Pending[] = [];
+    const posPtsSum      = new Map<string, number>();
+    const posPtsCount    = new Map<string, number>();
+    const posStdPtsSum   = new Map<string, number>(); // same players, scored under STANDARD_SCORING
+
     for (const r of fcRows) {
         if (!SKILL_POSITIONS.has(r.position)) continue;
         const sl       = resolveSleeper(r.nameLower, r.position) ?? null;
@@ -264,6 +307,53 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
         const team     = (rawTeam && rawTeam !== 'FA') ? rawTeam : null;
         const age      = calculateAge(sl?.birthDate) ?? sl?.age ?? null;
         const playerId = sl?.playerId ?? null;
+
+        const stats             = playerId ? statsByPlayerId.get(playerId) : undefined;
+        const statsPerGame       = stats?.statsPerGame ?? null;
+        const gamesPlayed        = stats?.gamesPlayed ?? null;
+        const realPtsPerGame     = statsPerGame ? computeRealPoints(statsPerGame, scoringSettings) : 0;
+        const standardPtsPerGame = statsPerGame ? computeRealPoints(statsPerGame, STANDARD_SCORING) : 0;
+
+        if (statsPerGame && gamesPlayed) {
+            posPtsSum.set(r.position, (posPtsSum.get(r.position) ?? 0) + realPtsPerGame);
+            posPtsCount.set(r.position, (posPtsCount.get(r.position) ?? 0) + 1);
+            posStdPtsSum.set(r.position, (posStdPtsSum.get(r.position) ?? 0) + standardPtsPerGame);
+        }
+
+        pending.push({
+            r, team, age, playerId,
+            injuryStatus: sl?.injuryStatus ?? null, birthDate: sl?.birthDate ?? null,
+            statsPerGame, gamesPlayed, realPtsPerGame, standardPtsPerGame,
+        });
+    }
+
+    const posAvgPtsPerGame    = new Map<string, number>();
+    const posStdAvgPtsPerGame = new Map<string, number>();
+    for (const [pos, sum] of posPtsSum) {
+        posAvgPtsPerGame.set(pos, sum / (posPtsCount.get(pos) ?? 1));
+    }
+    for (const [pos, sum] of posStdPtsSum) {
+        posStdAvgPtsPerGame.set(pos, sum / (posPtsCount.get(pos) ?? 1));
+    }
+    // Cross-positional shift: how this league's real scoring moves each whole
+    // position relative to a generic PPR baseline — applies to every player at
+    // the position uniformly, unlike perfFactor which varies per player.
+    const posScoringFactor = new Map<string, number>();
+    for (const pos of posAvgPtsPerGame.keys()) {
+        posScoringFactor.set(pos, computePositionScoringFactor(
+            posAvgPtsPerGame.get(pos) ?? 0,
+            posStdAvgPtsPerGame.get(pos) ?? 0,
+        ));
+    }
+
+    // Pass 2: now that positional averages are known, compute perfFactor and
+    // build the final universe entry for each player.
+    for (const { r, team, age, playerId, injuryStatus, birthDate, statsPerGame, gamesPlayed, realPtsPerGame } of pending) {
+        const individualFactor = statsPerGame && gamesPlayed
+            ? computePerfFactor(realPtsPerGame, posAvgPtsPerGame.get(r.position) ?? 0, gamesPlayed)
+            : 1.0;
+        const positionFactor = posScoringFactor.get(r.position) ?? 1.0;
+        const perfFactor     = combineScoringFactors(individualFactor, positionFactor);
 
         const u: UniversePlayer = {
             name:           r.playerName,
@@ -275,9 +365,11 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
             redraft:        normalise(r.redraftValue),
             redraftSf:      normalise(r.redraftValueSf),
             trend:          null,
-            injuryStatus:   sl?.injuryStatus ?? null,
-            birthDate:      sl?.birthDate ?? null,
+            injuryStatus,
+            birthDate,
             playerImageUrl: playerId ? `https://sleepercdn.com/content/nfl/players/${playerId}.jpg` : null,
+            statsPerGame,
+            gamesPlayed,
         };
 
         const baseValue = computePlayerBaseValue(u, r.position, {
@@ -287,7 +379,7 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
 
         const p: Player = {
             rank: 0, name: u.name, position: u.position, team: u.team ?? 'FA',
-            age: u.age ?? 0, baseValue, injuryStatus: u.injuryStatus,
+            age: u.age ?? 0, baseValue, injuryStatus: u.injuryStatus, perfFactor,
         };
         const dtv   = calcDtv(p, ppr, leagueType, undefined, leagueSettings);
         const entry: UniverseEntry = { u, finalDtv: dtv.finalDtv, tier: dtv.tier };
@@ -385,10 +477,9 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
     }
 
     // ── Sleeper branch: fetch live rosters + members ──────────────────────────
-    const [rosters, members, nflState] = await Promise.all([
+    const [rosters, members] = await Promise.all([
         getLeagueRosters(league.leagueId),
         getLeagueUsers(league.leagueId),
-        getNflState(),
     ]);
 
     // ── Build display names from Sleeper users ────────────────────────────────
