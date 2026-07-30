@@ -30,6 +30,16 @@ const POS_COLORS: Record<string, string> = {
 
 const POS_FILTER_OPTIONS = ['All', 'QB', 'RB', 'WR', 'TE'];
 
+// e.g. 24.8 → "24 (Late)" — the fraction is how far through that year of
+// life the player is; whole-number ages with no precise data fall back to
+// the plain number.
+function formatAge(age: number | null, preciseAge: number | null): string {
+    if (preciseAge == null) return age != null ? String(age) : '—';
+    const whole = Math.floor(preciseAge);
+    const frac  = preciseAge - whole;
+    return `${whole} (${frac < 0.5 ? 'Early' : 'Late'})`;
+}
+
 function timeAgo(iso: string | null | undefined): string {
     if (!iso) return 'unknown';
     const diff = Date.now() - new Date(iso).getTime();
@@ -127,7 +137,7 @@ function PlayerRankingsTable({
                                     </span>
                                 </td>
                                 <td className="px-3 py-2.5 text-gray-400">{p.team ?? 'FA'}</td>
-                                <td className="px-3 py-2.5 text-right text-gray-400">{p.age ?? '—'}</td>
+                                <td className="px-3 py-2.5 text-right text-gray-400 whitespace-nowrap">{formatAge(p.age, p.preciseAge)}</td>
                                 <td className="px-3 py-2.5 text-right font-bold text-white">{p.finalDtv}</td>
                                 <td className={`px-4 py-2.5 text-right font-semibold text-xs ${TIER_COLORS[p.tier] ?? 'text-gray-400'}`}>{p.tier}</td>
                             </tr>

@@ -11,7 +11,7 @@ import {
     computeRealPoints, computePerfFactor, toStatsPerGame,
     computePositionScoringFactor, combineScoringFactors, STANDARD_SCORING,
 } from '@/lib/rankings/leagueScoringPoints';
-import { calculateAge } from '@/lib/calculateAge';
+import { calculateAge, calculatePreciseAge } from '@/lib/calculateAge';
 import { effectiveTierForLeague, tierLevel } from '@/lib/league-limits';
 import { stripe, priceIdToTier } from '@/lib/stripe';
 import type { SubscriptionTier } from '@prisma/client';
@@ -24,6 +24,10 @@ export type PlayerRankingRow = {
     position:      string;
     team:          string | null;
     age:           number | null;
+    /** Precise decimal age (e.g. 24.8) — the fraction is how far through that
+     *  year of life the player is, used to show "Early"/"Late" alongside the
+     *  whole-year age. Does not feed the DTV calc — that uses whole-year `age`. */
+    preciseAge:    number | null;
     finalDtv:      number;
     tier:          string;
     injuryStatus:  string | null;
@@ -405,6 +409,7 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
         position:       e.u.position,
         team:           e.u.team,
         age:            e.u.age,
+        preciseAge:     calculatePreciseAge(e.u.birthDate),
         finalDtv:       e.finalDtv,
         tier:           e.tier,
         injuryStatus:   e.u.injuryStatus,

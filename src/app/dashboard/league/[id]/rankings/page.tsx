@@ -8,6 +8,7 @@ import LeagueRankingsView from '@/components/league/LeagueRankingsView';
 import BackToOverview from '../_components/BackToOverview';
 import { trackFeature } from '@/app/actions/analytics';
 import { prisma } from '@/lib/prisma';
+import { calculatePreciseAge } from '@/lib/calculateAge';
 import RedraftRankingsView from './RedraftRankingsView';
 
 export default async function RankingsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -53,6 +54,7 @@ export default async function RankingsPage({ params }: { params: Promise<{ id: s
                 position:     true,
                 team:         true,
                 age:          true,
+                birthDate:    true,
                 searchRank:   true,
                 injuryStatus: true,
             },
@@ -67,6 +69,7 @@ export default async function RankingsPage({ params }: { params: Promise<{ id: s
                     position:     p.position ?? '',
                     team:         p.team,
                     age:          p.age,
+                    preciseAge:   calculatePreciseAge(p.birthDate),
                     adp:          p.searchRank ?? 999,
                     injuryStatus: p.injuryStatus,
                 }))}
