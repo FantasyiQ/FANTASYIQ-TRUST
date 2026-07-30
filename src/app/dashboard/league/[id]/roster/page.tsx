@@ -392,28 +392,46 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
         }),
         prisma.sleeperPlayer.findMany({
             where:  { playerId: { in: allPids } },
-            select: { playerId: true, fullName: true, injuryStatus: true, team: true, birthDate: true, age: true },
+            select: { playerId: true, fullName: true, injuryStatus: true, team: true, birthDate: true, age: true, position: true },
         }),
     ]);
 
-    // Build name-based Sleeper lookup so ages feed into the DTV calc (matches roster-values route)
+    // Build name+position-based Sleeper lookup so ages feed into the DTV calc
+    // (matches roster-values route). Some real players share an exact fullName
+    // (e.g. two "Justin Jefferson"s — WR/MIN and LB/CLE); only fall back to a bare
+    // name match when that name is unambiguous.
     type SleeperInfo = { team: string; injuryStatus: string | null; birthDate: string | null; age: number | null };
-    const sleeperByExact = new Map<string, SleeperInfo>();
-    const sleeperByNorm  = new Map<string, SleeperInfo>();
+    const byNamePos     = new Map<string, SleeperInfo>();
+    const byNormNamePos = new Map<string, SleeperInfo>();
+    const byNameCount     = new Map<string, number>();
+    const byName          = new Map<string, SleeperInfo>();
+    const byNormNameCount = new Map<string, number>();
+    const byNormName      = new Map<string, SleeperInfo>();
     const sleeperById    = new Map(sleeperPlayers.map(p => [p.playerId, p]));
     for (const p of sleeperPlayers) {
-        const val   = { team: p.team, injuryStatus: p.injuryStatus, birthDate: p.birthDate, age: p.age };
+        const val: SleeperInfo = { team: p.team, injuryStatus: p.injuryStatus, birthDate: p.birthDate, age: p.age };
         const exact = p.fullName.toLowerCase();
         const normd = normalizeName(p.fullName);
-        if (!sleeperByExact.has(exact)) sleeperByExact.set(exact, val);
-        if (!sleeperByNorm.has(normd))  sleeperByNorm.set(normd, val);
+        byNamePos.set(`${exact}|${p.position}`, val);
+        byNormNamePos.set(`${normd}|${p.position}`, val);
+        byNameCount.set(exact, (byNameCount.get(exact) ?? 0) + 1);
+        byName.set(exact, val);
+        byNormNameCount.set(normd, (byNormNameCount.get(normd) ?? 0) + 1);
+        byNormName.set(normd, val);
+    }
+    function resolveSleeper(nameLower: string, position: string): SleeperInfo | undefined {
+        const normd = normalizeName(nameLower);
+        return byNamePos.get(`${nameLower}|${position}`)
+            ?? byNormNamePos.get(`${normd}|${position}`)
+            ?? (byNameCount.get(nameLower) === 1 ? byName.get(nameLower) : undefined)
+            ?? (byNormNameCount.get(normd) === 1 ? byNormName.get(normd) : undefined);
     }
 
     const dtvByName = new Map<string, number>();
     for (const r of fcRows) {
         const exact = r.nameLower;
         const normd = normalizeName(r.nameLower);
-        const sl    = sleeperByExact.get(exact) ?? sleeperByNorm.get(normd) ?? null;
+        const sl    = resolveSleeper(r.nameLower, r.position) ?? null;
         const team  = (sl?.team && sl.team !== 'FA') ? sl.team : null;
         const age   = calculateAge(sl?.birthDate) ?? sl?.age ?? 0;
 

@@ -181,7 +181,7 @@ export async function GET(
         }),
         prisma.sleeperPlayer.findMany({
             where:  { active: true },
-            select: { playerId: true, fullName: true, team: true, injuryStatus: true, birthDate: true, age: true },
+            select: { playerId: true, fullName: true, team: true, injuryStatus: true, birthDate: true, age: true, position: true },
         }),
         // Latest snapshot for delta computation
         prisma.fantasyCalcSnapshot.findFirst({
@@ -196,24 +196,39 @@ export async function GET(
     )];
     const playerById = await getPlayers(allPlayerIds);
 
-    // 4. Build Sleeper lookup by fullName (exact + normalized)
+    // 4. Build Sleeper lookup by name+position (exact + normalized). Some real
+    // players share an exact fullName (e.g. two "Justin Jefferson"s — WR/MIN and
+    // LB/CLE); only fall back to a bare name match when that name is unambiguous.
     type SleeperInfo = { team: string; injuryStatus: string | null; birthDate: string | null; age: number | null };
-    const sleeperExact      = new Map<string, SleeperInfo>();
-    const sleeperNormalized = new Map<string, SleeperInfo>();
+    const byNamePos     = new Map<string, SleeperInfo>();
+    const byNormNamePos = new Map<string, SleeperInfo>();
+    const byNameCount     = new Map<string, number>();
+    const byName          = new Map<string, SleeperInfo>();
+    const byNormNameCount = new Map<string, number>();
+    const byNormName      = new Map<string, SleeperInfo>();
     for (const p of sleeperAllPlayers) {
-        const val = { team: p.team, injuryStatus: p.injuryStatus, birthDate: p.birthDate, age: p.age };
+        const val: SleeperInfo = { team: p.team, injuryStatus: p.injuryStatus, birthDate: p.birthDate, age: p.age };
         const exact = p.fullName.toLowerCase();
         const normd = normalizeName(p.fullName);
-        if (!sleeperExact.has(exact))      sleeperExact.set(exact, val);
-        if (!sleeperNormalized.has(normd)) sleeperNormalized.set(normd, val);
+        byNamePos.set(`${exact}|${p.position}`, val);
+        byNormNamePos.set(`${normd}|${p.position}`, val);
+        byNameCount.set(exact, (byNameCount.get(exact) ?? 0) + 1);
+        byName.set(exact, val);
+        byNormNameCount.set(normd, (byNormNameCount.get(normd) ?? 0) + 1);
+        byNormName.set(normd, val);
+    }
+    function resolveSleeper(nameLower: string, position: string): SleeperInfo | undefined {
+        const normd = normalizeName(nameLower);
+        return byNamePos.get(`${nameLower}|${position}`)
+            ?? byNormNamePos.get(`${normd}|${position}`)
+            ?? (byNameCount.get(nameLower) === 1 ? byName.get(nameLower) : undefined)
+            ?? (byNormNameCount.get(normd) === 1 ? byNormName.get(normd) : undefined);
     }
 
     // 5. Build DTV map keyed by lowercase name
     const dtvByName = new Map<string, { universe: UniversePlayer; finalDtv: number }>();
     for (const r of fcRows) {
-        const exact  = r.nameLower;
-        const normd  = normalizeName(r.nameLower);
-        const sl     = sleeperExact.get(exact) ?? sleeperNormalized.get(normd) ?? null;
+        const sl     = resolveSleeper(r.nameLower, r.position) ?? null;
         const rawTeam = sl?.team ?? null;
         const team   = (rawTeam && rawTeam !== 'FA') ? rawTeam : null;
         const age    = calculateAge(sl?.birthDate) ?? sl?.age ?? 0;
@@ -251,6 +266,8 @@ export async function GET(
         // Always prefer the higher-valued entry so a stale duplicate name (e.g.
         // "dj moore" with value 0 shadowing the canonical "d.j. moore" with value 4795)
         // never wins over the real entry.
+        const exact         = r.nameLower;
+        const normd         = normalizeName(r.nameLower);
         const existing      = dtvByName.get(exact);
         const existingNormd = dtvByName.get(normd);
         const entry         = { universe: u, finalDtv: dtv.finalDtv };

@@ -102,18 +102,19 @@ export default async function HubProjectionsPage({
 
                 const BENCH = new Set(['BN', 'IR']);
 
-                const teamStarterNames = new Map<number, string[]>();
-                const teamAllNames     = new Map<number, string[]>();
+                type EspnRosterName = { name: string; position: string };
+                const teamStarterNames = new Map<number, EspnRosterName[]>();
+                const teamAllNames     = new Map<number, EspnRosterName[]>();
                 const teamInfoMap      = new Map<number, { name: string }>();
 
                 for (const team of espnData.teams) {
-                    teamStarterNames.set(team.teamId, team.roster.filter(p => !BENCH.has(p.lineupSlot)).map(p => p.fullName));
-                    teamAllNames.set(team.teamId,     team.roster.map(p => p.fullName));
+                    teamStarterNames.set(team.teamId, team.roster.filter(p => !BENCH.has(p.lineupSlot)).map(p => ({ name: p.fullName, position: p.position })));
+                    teamAllNames.set(team.teamId,     team.roster.map(p => ({ name: p.fullName, position: p.position })));
                     teamInfoMap.set(team.teamId,      { name: team.name });
                 }
 
                 const allNameSet = new Set<string>();
-                for (const names of teamAllNames.values()) for (const n of names) allNameSet.add(n);
+                for (const entries of teamAllNames.values()) for (const e of entries) allNameSet.add(e.name);
                 const allNames = [...allNameSet];
 
                 const sleeperRows = await prisma.sleeperPlayer.findMany({
@@ -121,11 +122,33 @@ export default async function HubProjectionsPage({
                     select: { playerId: true, fullName: true, position: true, team: true, injuryStatus: true },
                 });
 
-                const nameToSleeper = new Map(sleeperRows.map(p => [p.fullName ?? '', p]));
-                const nameLower     = new Map(sleeperRows.map(p => [(p.fullName ?? '').toLowerCase(), p]));
-
-                function resolveId(name: string): string | null {
-                    return (nameToSleeper.get(name) ?? nameLower.get(name.toLowerCase()))?.playerId ?? null;
+                // Some real players share an exact fullName (e.g. two "Justin Jefferson"s —
+                // WR/MIN and LB/CLE). Resolve by name+position first (exact, then lowercase);
+                // only fall back to a bare name match when that name is unambiguous.
+                type SleeperRow = typeof sleeperRows[number];
+                const byNamePos      = new Map<string, SleeperRow>();
+                const byLowerNamePos = new Map<string, SleeperRow>();
+                const byNameCount      = new Map<string, number>();
+                const byName           = new Map<string, SleeperRow>();
+                const byLowerNameCount = new Map<string, number>();
+                const byLowerName      = new Map<string, SleeperRow>();
+                for (const p of sleeperRows) {
+                    const name  = p.fullName ?? '';
+                    const lower = name.toLowerCase();
+                    byNamePos.set(`${name}|${p.position}`, p);
+                    byLowerNamePos.set(`${lower}|${p.position}`, p);
+                    byNameCount.set(name, (byNameCount.get(name) ?? 0) + 1);
+                    byName.set(name, p);
+                    byLowerNameCount.set(lower, (byLowerNameCount.get(lower) ?? 0) + 1);
+                    byLowerName.set(lower, p);
+                }
+                function resolveId(name: string, position: string): string | null {
+                    const lower = name.toLowerCase();
+                    const sp = byNamePos.get(`${name}|${position}`)
+                        ?? byLowerNamePos.get(`${lower}|${position}`)
+                        ?? (byNameCount.get(name) === 1 ? byName.get(name) : undefined)
+                        ?? (byLowerNameCount.get(lower) === 1 ? byLowerName.get(lower) : undefined);
+                    return sp?.playerId ?? null;
                 }
 
                 const allMatchedIds = sleeperRows.map(p => p.playerId);
@@ -154,7 +177,7 @@ export default async function HubProjectionsPage({
                 const totalTeams    = league.totalRosters;
 
                 function makeSlot(teamId: number, livePts: number): RosterSlot {
-                    const toIds = (names: string[]) => names.map(n => resolveId(n)).filter(Boolean) as string[];
+                    const toIds = (entries: EspnRosterName[]) => entries.map(e => resolveId(e.name, e.position)).filter(Boolean) as string[];
                     return {
                         rosterId: teamId,
                         teamName: teamInfoMap.get(teamId)?.name ?? `Team ${teamId}`,

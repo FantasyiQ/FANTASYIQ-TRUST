@@ -107,23 +107,38 @@ export async function GET(request: Request): Promise<Response> {
     
         // Fetch matching Sleeper players in one query
         const names = rookies.map(r => r.playerName);
-        const sleeperMap = new Map(
-            (await prisma.sleeperPlayer.findMany({
-                where:  { fullName: { in: names } },
-                select: {
-                    fullName:        true,
-                    position:        true,
-                    depthChartOrder: true,
-                    searchRank:      true,
-                    injuryStatus:    true,
-                    active:          true,
-                    playerId:        true,
-                },
-            })).map(sp => [sp.fullName, sp])
-        );
-    
+        const sleeperRows = await prisma.sleeperPlayer.findMany({
+            where:  { fullName: { in: names } },
+            select: {
+                fullName:        true,
+                position:        true,
+                depthChartOrder: true,
+                searchRank:      true,
+                injuryStatus:    true,
+                active:          true,
+                playerId:        true,
+            },
+        });
+
+        // Some real players share an exact fullName (e.g. two "Justin Jefferson"s —
+        // WR/MIN and LB/CLE). Match name+position first; only fall back to a bare
+        // name match when that name is unambiguous, so a rookie never inherits a
+        // different player's depth chart / injury / playerId.
+        type SleeperRow = typeof sleeperRows[number];
+        const byNamePos = new Map<string, SleeperRow>();
+        const byNameCount = new Map<string, number>();
+        const byNameSingle = new Map<string, SleeperRow>();
+        for (const sp of sleeperRows) {
+            byNamePos.set(`${sp.fullName}|${sp.position}`, sp);
+            byNameCount.set(sp.fullName, (byNameCount.get(sp.fullName) ?? 0) + 1);
+            byNameSingle.set(sp.fullName, sp);
+        }
+        function resolveSleeper(name: string, position: string): SleeperRow | undefined {
+            return byNamePos.get(`${name}|${position}`)
+                ?? (byNameCount.get(name) === 1 ? byNameSingle.get(name) : undefined);
+        }
         // Fetch season projections for all matched players in one query
-        const playerIds = [...sleeperMap.values()].map(sp => sp.playerId);
+        const playerIds = sleeperRows.map(sp => sp.playerId);
         const projRows  = await prisma.playerProjection.findMany({
             where:  { season: SEASON, playerId: { in: playerIds } },
             select: { playerId: true, pointsPpr: true },
@@ -143,7 +158,7 @@ export async function GET(request: Request): Promise<Response> {
         let noMatch = 0;
 
         for (const rookie of rookies) {
-            const sp = sleeperMap.get(rookie.playerName);
+            const sp = resolveSleeper(rookie.playerName, rookie.position);
 
             // If baseFiQScore hasn't been set yet (existing rows seeded before this feature),
             // treat the current fiqScore as the base.

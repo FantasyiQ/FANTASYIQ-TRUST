@@ -47,19 +47,42 @@ export async function GET(request: NextRequest): Promise<Response> {
         }),
         prisma.fantasyCalcValue.findMany({
             where: { nameLower: { contains: ql } },
-            select: { nameLower: true, dynastyValue: true, redraftValue: true },
+            select: { nameLower: true, position: true, dynastyValue: true, redraftValue: true },
         }),
     ]);
 
-    const fcByName = new Map(fcRows.map(r => [r.nameLower, r]));
-    // Normalized fallback so suffix/apostrophe differences still match
-    // (e.g. Sleeper "Marvin Harrison" ↔ KTC "Marvin Harrison Jr.").
-    const fcByNorm = new Map(fcRows.map(r => [normalizePlayerName(r.nameLower), r]));
+    // Some real players share an exact fullName (e.g. two "Justin Jefferson"s —
+    // WR/MIN and LB/CLE). Match by name+position first (exact, then normalized
+    // name); only fall back to a bare name match when that name is unambiguous, so
+    // a Sleeper search result never inherits a different player's dynasty value.
+    type FcRow = typeof fcRows[number];
+    const byNamePos     = new Map<string, FcRow>();
+    const byNormNamePos = new Map<string, FcRow>();
+    const byNameCount     = new Map<string, number>();
+    const byName          = new Map<string, FcRow>();
+    const byNormNameCount = new Map<string, number>();
+    const byNormName      = new Map<string, FcRow>();
+    for (const r of fcRows) {
+        const normd = normalizePlayerName(r.nameLower);
+        byNamePos.set(`${r.nameLower}|${r.position}`, r);
+        byNormNamePos.set(`${normd}|${r.position}`, r);
+        byNameCount.set(r.nameLower, (byNameCount.get(r.nameLower) ?? 0) + 1);
+        byName.set(r.nameLower, r);
+        byNormNameCount.set(normd, (byNormNameCount.get(normd) ?? 0) + 1);
+        byNormName.set(normd, r);
+    }
+    function resolveFc(nameLower: string, position: string): FcRow | undefined {
+        const normd = normalizePlayerName(nameLower);
+        return byNamePos.get(`${nameLower}|${position}`)
+            ?? byNormNamePos.get(`${normd}|${position}`)
+            ?? (byNameCount.get(nameLower) === 1 ? byName.get(nameLower) : undefined)
+            ?? (byNormNameCount.get(normd) === 1 ? byNormName.get(normd) : undefined);
+    }
 
     // 2. Merge: dynasty value wins; fall back to position-based depth default
     const merged: Player[] = dbMatches.map((p, i) => {
         const nameLower = p.fullName.toLowerCase();
-        const fcRow  = fcByName.get(nameLower) ?? fcByNorm.get(normalizePlayerName(p.fullName));
+        const fcRow  = resolveFc(nameLower, p.position);
         const fcValue = fcRow !== undefined
             ? normaliseFc(Math.max(fcRow.dynastyValue, fcRow.redraftValue))
             : undefined;

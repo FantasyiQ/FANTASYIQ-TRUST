@@ -75,6 +75,25 @@ export async function GET(req: NextRequest): Promise<Response> {
     // ── Player pool ────────────────────────────────────────────────────────────
     const pool: PoolPlayer[] = [];
 
+    // Some real players share an exact fullName (e.g. two "Justin Jefferson"s —
+    // WR/MIN and LB/CLE). Match name+position first; only fall back to a bare
+    // name match when that name is unambiguous, so we never silently attach one
+    // player's team/age/id to a different player's card.
+    function makeSleeperResolver<T extends { fullName: string; position: string }>(players: T[]) {
+        const byNamePos = new Map<string, T>();
+        const byNameCount = new Map<string, number>();
+        const byNameSingle = new Map<string, T>();
+        for (const p of players) {
+            byNamePos.set(`${p.fullName}|${p.position}`, p);
+            byNameCount.set(p.fullName, (byNameCount.get(p.fullName) ?? 0) + 1);
+            byNameSingle.set(p.fullName, p);
+        }
+        return (name: string, position: string): T | undefined => {
+            return byNamePos.get(`${name}|${position}`)
+                ?? (byNameCount.get(name) === 1 ? byNameSingle.get(name) : undefined);
+        };
+    }
+
     if (draftType === 'rookie') {
         const rookies = await prisma.rookieRankingsPlayer.findMany({
             where:   { season: '2026' },
@@ -84,12 +103,12 @@ export async function GET(req: NextRequest): Promise<Response> {
 
         const sleeperPlayers = await prisma.sleeperPlayer.findMany({
             where:  { fullName: { in: rookies.map(r => r.playerName) } },
-            select: { fullName: true, playerId: true, team: true, age: true },
+            select: { fullName: true, playerId: true, team: true, age: true, position: true },
         });
-        const spByName = new Map(sleeperPlayers.map(p => [p.fullName, p]));
+        const spResolver = makeSleeperResolver(sleeperPlayers);
 
         for (const r of rookies) {
-            const sp = spByName.get(r.playerName);
+            const sp = spResolver(r.playerName, r.position);
             const fiqScore  = Math.round(r.fiqScore);
             const tierMatch = r.fiqTier?.match(/(\d+)/);
             const tier      = tierMatch ? parseInt(tierMatch[1], 10) : getTier(fiqScore);
@@ -121,12 +140,12 @@ export async function GET(req: NextRequest): Promise<Response> {
 
         const sleeperPlayers = await prisma.sleeperPlayer.findMany({
             where:  { fullName: { in: fcValues.map(v => v.playerName) }, active: true },
-            select: { fullName: true, playerId: true, team: true, age: true },
+            select: { fullName: true, playerId: true, team: true, age: true, position: true },
         });
-        const spByName = new Map(sleeperPlayers.map(p => [p.fullName, p]));
+        const spResolver = makeSleeperResolver(sleeperPlayers);
 
         for (const fcv of fcValues) {
-            const sp       = spByName.get(fcv.playerName);
+            const sp       = spResolver(fcv.playerName, fcv.position);
             const dynastyValue = superflex ? fcv.dynastyValueSf : fcv.dynastyValue;
             const fiqScore = Math.min(100, Math.round(dynastyValue / 90));
             pool.push({

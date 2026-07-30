@@ -211,7 +211,7 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
         }),
         prisma.sleeperPlayer.findMany({
             where:  { active: true, position: { in: ['QB', 'RB', 'WR', 'TE'] } },
-            select: { playerId: true, fullName: true, team: true, injuryStatus: true, birthDate: true, age: true },
+            select: { playerId: true, fullName: true, team: true, injuryStatus: true, birthDate: true, age: true, position: true },
         }),
         prisma.fantasyCalcValue.findFirst({
             orderBy: { updatedAt: 'desc' },
@@ -219,16 +219,35 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
         }),
     ]);
 
-    // ── Build Sleeper player lookup (name → metadata) ─────────────────────────
+    // ── Build Sleeper player lookup (name+position → metadata) ────────────────
+    // Some real players share an exact fullName (e.g. two "Justin Jefferson"s —
+    // WR/MIN and LB/CLE). Resolve by name+position first (exact, then normalized
+    // name); only fall back to a bare name match when that name is unambiguous,
+    // so we never silently attach one player's team/age/id onto a different row.
     type SleeperInfo = { playerId: string; team: string | null; injuryStatus: string | null; birthDate: string | null; age: number | null };
-    const sleeperExact      = new Map<string, SleeperInfo>();
-    const sleeperNormalized = new Map<string, SleeperInfo>();
+    const byNamePos     = new Map<string, SleeperInfo>();
+    const byNormNamePos = new Map<string, SleeperInfo>();
+    const byNameCount     = new Map<string, number>();
+    const byName          = new Map<string, SleeperInfo>();
+    const byNormNameCount = new Map<string, number>();
+    const byNormName      = new Map<string, SleeperInfo>();
     for (const p of sleeperPlayers) {
-        const val  = { playerId: p.playerId, team: p.team, injuryStatus: p.injuryStatus, birthDate: p.birthDate, age: p.age };
+        const val: SleeperInfo = { playerId: p.playerId, team: p.team, injuryStatus: p.injuryStatus, birthDate: p.birthDate, age: p.age };
         const exact = p.fullName.toLowerCase();
         const normd = normalizeName(p.fullName);
-        if (!sleeperExact.has(exact))      sleeperExact.set(exact, val);
-        if (!sleeperNormalized.has(normd)) sleeperNormalized.set(normd, val);
+        byNamePos.set(`${exact}|${p.position}`, val);
+        byNormNamePos.set(`${normd}|${p.position}`, val);
+        byNameCount.set(exact, (byNameCount.get(exact) ?? 0) + 1);
+        byName.set(exact, val);
+        byNormNameCount.set(normd, (byNormNameCount.get(normd) ?? 0) + 1);
+        byNormName.set(normd, val);
+    }
+    function resolveSleeper(nameLower: string, position: string): SleeperInfo | undefined {
+        const normd = normalizeName(nameLower);
+        return byNamePos.get(`${nameLower}|${position}`)
+            ?? byNormNamePos.get(`${normd}|${position}`)
+            ?? (byNameCount.get(nameLower) === 1 ? byName.get(nameLower) : undefined)
+            ?? (byNormNameCount.get(normd) === 1 ? byNormName.get(normd) : undefined);
     }
 
     // ── Build player universe + DTV ───────────────────────────────────────────
@@ -240,9 +259,7 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
 
     for (const r of fcRows) {
         if (!SKILL_POSITIONS.has(r.position)) continue;
-        const exact    = r.nameLower;
-        const normd    = normalizeName(r.nameLower);
-        const sl       = sleeperExact.get(exact) ?? sleeperNormalized.get(normd) ?? null;
+        const sl       = resolveSleeper(r.nameLower, r.position) ?? null;
         const rawTeam  = sl?.team ?? null;
         const team     = (rawTeam && rawTeam !== 'FA') ? rawTeam : null;
         const age      = calculateAge(sl?.birthDate) ?? sl?.age ?? null;
@@ -279,6 +296,8 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
         if (playerId) dtvByPlayerId.set(playerId, entry);
         // Index by name for ESPN (name-based matching) — prefer higher value so stale
         // de-punctuated duplicates (e.g. "dj moore" value 0) never shadow the real entry.
+        const exact = r.nameLower;
+        const normd = normalizeName(r.nameLower);
         const existingExact = dtvByExactName.get(exact);
         const existingNormd = dtvByNormName.get(normd);
         if (!existingExact || dtv.finalDtv > existingExact.finalDtv) dtvByExactName.set(exact, entry);

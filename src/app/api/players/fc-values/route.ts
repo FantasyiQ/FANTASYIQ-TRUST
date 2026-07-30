@@ -20,6 +20,7 @@ export async function GET(request: NextRequest): Promise<Response> {
         prisma.fantasyCalcValue.findMany({
             select: {
                 nameLower:      true,
+                position:       true,
                 dynastyValue:   true,
                 dynastyValueSf: true,
                 redraftValue:   true,
@@ -33,30 +34,40 @@ export async function GET(request: NextRequest): Promise<Response> {
         // so it's authoritative for trades/signings. Also provides injury status.
         prisma.sleeperPlayer.findMany({
             where:  { active: true },
-            select: { fullName: true, injuryStatus: true, team: true },
+            select: { fullName: true, injuryStatus: true, team: true, position: true },
         }),
     ]);
 
-    // Build injury + team lookups keyed by exact lowercase name AND normalized name.
-    // Exact key wins if present; normalized key catches suffix/period mismatches.
-    const injuryExact      = new Map<string, string | null>();
-    const injuryNormalized = new Map<string, string | null>();
-    const teamExact        = new Map<string, string | null>();
-    const teamNormalized   = new Map<string, string | null>();
+    // Build Sleeper lookup keyed by name+position (exact + normalized). Some real
+    // players share an exact fullName (e.g. two "Justin Jefferson"s — WR/MIN and
+    // LB/CLE); only fall back to a bare name match when that name is unambiguous.
+    type SleeperInfo = { injuryStatus: string | null; team: string | null };
+    const byNamePos     = new Map<string, SleeperInfo>();
+    const byNormNamePos = new Map<string, SleeperInfo>();
+    const byNameCount     = new Map<string, number>();
+    const byName          = new Map<string, SleeperInfo>();
+    const byNormNameCount = new Map<string, number>();
+    const byNormName      = new Map<string, SleeperInfo>();
 
     for (const p of sleeperPlayers) {
         const exact = p.fullName.toLowerCase();
         const normd = normalizeName(p.fullName);
-
-        if (p.injuryStatus != null) {
-            injuryExact.set(exact, p.injuryStatus);
-            if (!injuryNormalized.has(normd)) injuryNormalized.set(normd, p.injuryStatus);
-        }
-
         // team: 'FA' means free agent — treat as null for display
         const team = (p.team && p.team !== 'FA') ? p.team : null;
-        teamExact.set(exact, team);
-        if (!teamNormalized.has(normd)) teamNormalized.set(normd, team);
+        const val: SleeperInfo = { injuryStatus: p.injuryStatus, team };
+        byNamePos.set(`${exact}|${p.position}`, val);
+        byNormNamePos.set(`${normd}|${p.position}`, val);
+        byNameCount.set(exact, (byNameCount.get(exact) ?? 0) + 1);
+        byName.set(exact, val);
+        byNormNameCount.set(normd, (byNormNameCount.get(normd) ?? 0) + 1);
+        byNormName.set(normd, val);
+    }
+    function resolveSleeper(nameLower: string, position: string): SleeperInfo | undefined {
+        const normd = normalizeName(nameLower);
+        return byNamePos.get(`${nameLower}|${position}`)
+            ?? byNormNamePos.get(`${normd}|${position}`)
+            ?? (byNameCount.get(nameLower) === 1 ? byName.get(nameLower) : undefined)
+            ?? (byNormNameCount.get(normd) === 1 ? byNormName.get(normd) : undefined);
     }
 
     // Build set of normalized names for the warn pass below
@@ -84,14 +95,10 @@ export async function GET(request: NextRequest): Promise<Response> {
 
     for (const r of rows) {
         const exact = r.nameLower;
-        const normd = normalizeName(r.nameLower);
+        const sl    = resolveSleeper(r.nameLower, r.position);
 
-        const injuryStatus =
-            injuryExact.get(exact) ??
-            injuryNormalized.get(normd) ??
-            null;
-
-        const sleeperTeam = teamExact.get(exact) ?? teamNormalized.get(normd) ?? null;
+        const injuryStatus = sl?.injuryStatus ?? null;
+        const sleeperTeam  = sl?.team ?? null;
 
         map[exact] = {
             dynasty:      normalise(r.dynastyValue),

@@ -117,23 +117,43 @@ export async function GET(
         }),
         prisma.sleeperPlayer.findMany({
             where:  { active: true, position: { in: ['QB', 'RB', 'WR', 'TE'] } },
-            select: { fullName: true, team: true, injuryStatus: true, birthDate: true, age: true },
+            select: { fullName: true, team: true, injuryStatus: true, birthDate: true, age: true, position: true },
         }),
     ]);
 
-    const sleeperExact      = new Map<string, typeof sleeperPlayers[number]>();
-    const sleeperNormalized = new Map<string, typeof sleeperPlayers[number]>();
+    // Some real players share an exact fullName (e.g. two "Justin Jefferson"s —
+    // WR/MIN and LB/CLE). Resolve by name+position first (exact, then normalized
+    // name); only fall back to a bare name match when that name is unambiguous, so
+    // we never silently attach one player's team/age onto a different player's row.
+    type SleeperRow = typeof sleeperPlayers[number];
+    const byNamePos     = new Map<string, SleeperRow>();
+    const byNormNamePos = new Map<string, SleeperRow>();
+    const byNameCount     = new Map<string, number>();
+    const byName          = new Map<string, SleeperRow>();
+    const byNormNameCount = new Map<string, number>();
+    const byNormName      = new Map<string, SleeperRow>();
     for (const p of sleeperPlayers) {
         const exact = p.fullName.toLowerCase();
         const normd = normalizeName(p.fullName);
-        if (!sleeperExact.has(exact))      sleeperExact.set(exact, p);
-        if (!sleeperNormalized.has(normd)) sleeperNormalized.set(normd, p);
+        byNamePos.set(`${exact}|${p.position}`, p);
+        byNormNamePos.set(`${normd}|${p.position}`, p);
+        byNameCount.set(exact, (byNameCount.get(exact) ?? 0) + 1);
+        byName.set(exact, p);
+        byNormNameCount.set(normd, (byNormNameCount.get(normd) ?? 0) + 1);
+        byNormName.set(normd, p);
+    }
+    function resolveSleeper(nameLower: string, position: string): SleeperRow | undefined {
+        const normd = normalizeName(nameLower);
+        return byNamePos.get(`${nameLower}|${position}`)
+            ?? byNormNamePos.get(`${normd}|${position}`)
+            ?? (byNameCount.get(nameLower) === 1 ? byName.get(nameLower) : undefined)
+            ?? (byNormNameCount.get(normd) === 1 ? byNormName.get(normd) : undefined);
     }
 
     const universePlayers: UniversePlayer[] = fcRows
         .filter(r => SKILL_POSITIONS.has(r.position))
         .map(r => {
-            const sleeper = sleeperExact.get(r.nameLower) ?? sleeperNormalized.get(normalizeName(r.nameLower)) ?? null;
+            const sleeper = resolveSleeper(r.nameLower, r.position) ?? null;
             const rawTeam = sleeper?.team ?? null;
             return {
                 name:            r.playerName,
