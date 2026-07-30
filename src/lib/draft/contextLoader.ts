@@ -29,6 +29,35 @@ function normalizeDraftName(name: string): string {
         .replace(/\s+/g, ' ')
         .trim();
 }
+
+// Some real players share an exact fullName (e.g. two "Justin Jefferson"s \u2014 WR/MIN
+// and LB/CLE). Resolve by name+position first (exact, then normalized name); only
+// fall back to a bare name match when that name is unambiguous, so we never
+// silently attach one player's team/age/id to a different player's card.
+function makeSpResolver<T extends { fullName: string; position: string }>(players: T[]) {
+    const byNamePos     = new Map<string, T>();
+    const byNormNamePos = new Map<string, T>();
+    const byNameCount     = new Map<string, number>();
+    const byName          = new Map<string, T>();
+    const byNormNameCount = new Map<string, number>();
+    const byNormName      = new Map<string, T>();
+    for (const p of players) {
+        const normName = normalizeDraftName(p.fullName);
+        byNamePos.set(`${p.fullName}|${p.position}`, p);
+        byNormNamePos.set(`${normName}|${p.position}`, p);
+        byNameCount.set(p.fullName, (byNameCount.get(p.fullName) ?? 0) + 1);
+        byName.set(p.fullName, p);
+        byNormNameCount.set(normName, (byNormNameCount.get(normName) ?? 0) + 1);
+        byNormName.set(normName, p);
+    }
+    return (name: string, position: string): T | undefined => {
+        const normName = normalizeDraftName(name);
+        return byNamePos.get(`${name}|${position}`)
+            ?? byNormNamePos.get(`${normName}|${position}`)
+            ?? (byNameCount.get(name) === 1 ? byName.get(name) : undefined)
+            ?? (byNormNameCount.get(normName) === 1 ? byNormName.get(normName) : undefined);
+    };
+}
 import { getLeagueContext } from '@/lib/trajectory/contextLoader';
 import { computeTeamTrajectoryForLeague } from '@/lib/trajectory/teamTrajectory';
 import type { TeamTrajectory, TrajectoryMode, WinCurve } from '@/lib/trajectory/types';
@@ -314,19 +343,18 @@ export async function loadDraftContext(params: {
 
         const sleeperPlayers = await prisma.sleeperPlayer.findMany({
             where:  { fullName: { in: rookies.map(r => r.playerName) } },
-            select: { fullName: true, playerId: true, team: true, age: true },
+            select: { fullName: true, playerId: true, team: true, age: true, position: true },
         });
 
-        const spByName         = new Map(sleeperPlayers.map(p => [p.fullName, p]));
-        const spByNormalName   = new Map(sleeperPlayers.map(p => [normalizeDraftName(p.fullName), p]));
-        const spLookup = (name: string) => spByName.get(name) ?? spByNormalName.get(normalizeDraftName(name));
+        const spResolver = makeSpResolver(sleeperPlayers);
+        const spLookup = (name: string, position: string) => spResolver(name, position);
 
         // Pass 1: FiQ baseline pick — global rank across allowed positions by fiqScore (already sorted desc).
         // delta = myNextPick - fiqBaselineRank: positive = player available later than FiQ suggests.
         let fiqBaselineRank = 0;
         for (const r of rookies) {
             if (!allowedPositions.has(normalizePosition(r.position))) continue;
-            const sp = spLookup(r.playerName);
+            const sp = spLookup(r.playerName, r.position);
             if (!sp?.playerId) continue;
             fiqBaselineRank++;
             draftPoolPlayers.push(sp.playerId);
@@ -342,7 +370,7 @@ export async function loadDraftContext(params: {
         // Pass 2: available players = undrafted, allowed positions only
         for (const r of rookies) {
             if (!allowedPositions.has(normalizePosition(r.position))) continue;
-            const sp = spLookup(r.playerName);
+            const sp = spLookup(r.playerName, r.position);
             if (sp && draftedIds.has(sp.playerId)) continue;
             const fiqScore  = Math.round(r.fiqScore);
             const tierMatch = r.fiqTier?.match(/(\d+)/);
@@ -398,12 +426,11 @@ export async function loadDraftContext(params: {
 
         const sleeperPlayers = await prisma.sleeperPlayer.findMany({
             where:  { fullName: { in: allFpdoNames }, active: true },
-            select: { fullName: true, playerId: true, team: true, age: true },
+            select: { fullName: true, playerId: true, team: true, age: true, position: true },
         });
 
-        const spByName2       = new Map(sleeperPlayers.map(p => [p.fullName, p]));
-        const spByNormalName2 = new Map(sleeperPlayers.map(p => [normalizeDraftName(p.fullName), p]));
-        const spLookup2 = (name: string) => spByName2.get(name) ?? spByNormalName2.get(normalizeDraftName(name));
+        const spResolver2 = makeSpResolver(sleeperPlayers);
+        const spLookup2 = (name: string, position: string) => spResolver2(name, position);
 
         // Pass 1: FiQ baseline pick — global rank across allowed positions by dynasty value (fcFpdo already sorted desc).
         // delta = myNextPick - fiqBaselineRank: positive = player available later than FiQ suggests.
@@ -411,7 +438,7 @@ export async function loadDraftContext(params: {
         let fiqBaselineRank = 0;
         for (const fcv of fcFpdo) {
             if (!allowedPositions.has(normalizePosition(fcv.position))) continue;
-            const sp = spLookup2(fcv.playerName);
+            const sp = spLookup2(fcv.playerName, fcv.position);
             if (!sp?.playerId) continue;
             fiqBaselineRank++;
             draftPoolPlayers.push(sp.playerId);
@@ -427,7 +454,7 @@ export async function loadDraftContext(params: {
         // Pass 2: available players = undrafted, allowed positions only
         for (const fcv of fcValues) {
             if (!allowedPositions.has(normalizePosition(fcv.position))) continue;
-            const sp = spLookup2(fcv.playerName);
+            const sp = spLookup2(fcv.playerName, fcv.position);
             if (sp && draftedIds.has(sp.playerId)) continue;
             const dynastyValue = superflex ? fcv.dynastyValueSf : fcv.dynastyValue;
             const fiqScore = Math.min(100, Math.round(dynastyValue / 90));
