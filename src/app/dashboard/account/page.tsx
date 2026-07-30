@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import AccountSettings from './AccountSettings';
+import InstallInstructions from '@/components/pwa/InstallInstructions';
 
 export const metadata: Metadata = {
     title: 'Account — FantasyiQ Trust',
@@ -38,6 +39,8 @@ export default async function AccountPage() {
                     emailVerified={user.emailVerified}
                     hasPassword={!!user.hashedPassword}
                 />
+
+                <InstallInstructions />
 
             </div>
         </main>

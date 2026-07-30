@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { stripe, priceIdToTier } from '@/lib/stripe';
 import { createPortalSession } from '@/app/actions/stripe';
 import ConnectedLeagues from '@/components/ConnectedLeagues';
+import InstallAppBanner from '@/components/pwa/InstallAppBanner';
 import SleeperLeaguesList from './SleeperLeaguesList';
 import SyncedLeaguePicker from './SyncedLeaguePicker';
 import { getLeagueLimit, tierToLimitKey, nextTierName } from '@/lib/league-limits';
@@ -352,6 +353,8 @@ export default async function DashboardPage({
     return (
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
             <div className="max-w-5xl mx-auto space-y-8">
+
+                <InstallAppBanner />
 
                 {/* Payment failed banner */}
                 {hasPastDueSub && (
