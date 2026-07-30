@@ -79,6 +79,7 @@ export interface LeagueSettings {
     // Scoring
     passTd:     number;   // passing TD value (4 or 6) — boosts QB scarcity
     bonusRecTe: number;   // bonus pts per TE reception — boosts TE ppr value
+    rushAtt:    number;   // bonus pts per rush attempt — boosts RB value, dilutes WR
     // Roster starter slot counts (from roster_positions)
     qbSlots:   number;
     rbSlots:   number;
@@ -89,7 +90,7 @@ export interface LeagueSettings {
 }
 
 export const DEFAULT_LEAGUE_SETTINGS: LeagueSettings = {
-    passTd: 4, bonusRecTe: 0,
+    passTd: 4, bonusRecTe: 0, rushAtt: 0,
     qbSlots: 1, rbSlots: 2, wrSlots: 2, teSlots: 1, flexSlots: 1, sfSlots: 0,
 };
 

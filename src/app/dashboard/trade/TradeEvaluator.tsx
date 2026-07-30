@@ -578,7 +578,7 @@ export default function TradeEvaluator({
         const resolvedImageUrl = u.playerImageUrl ?? p.playerImageUrl ?? null;
         return {
             ...p,
-            baseValue:       computePlayerBaseValue(u, p.position, { leagueType, superflex, ppr, leagueSize, passTd: leagueSettings.passTd, bonusRecTe: leagueSettings.bonusRecTe }),
+            baseValue:       computePlayerBaseValue(u, p.position, { leagueType, superflex, ppr, leagueSize, passTd: leagueSettings.passTd, bonusRecTe: leagueSettings.bonusRecTe, rushAtt: leagueSettings.rushAtt }),
             team:            u.team ?? p.team,
             age:             u.age ?? p.age,
             injuryStatus:    u.injuryStatus ?? p.injuryStatus ?? null,
@@ -598,7 +598,7 @@ export default function TradeEvaluator({
             position:        u.position,
             team:            u.team ?? 'FA',
             age:             u.age ?? 0,
-            baseValue:       computePlayerBaseValue(u, u.position, { leagueType, superflex, ppr, leagueSize, passTd: leagueSettings.passTd, bonusRecTe: leagueSettings.bonusRecTe }),
+            baseValue:       computePlayerBaseValue(u, u.position, { leagueType, superflex, ppr, leagueSize, passTd: leagueSettings.passTd, bonusRecTe: leagueSettings.bonusRecTe, rushAtt: leagueSettings.rushAtt }),
             injuryStatus:    u.injuryStatus,
             birthDate:       u.birthDate,
             playerImageUrl:  u.playerImageUrl,

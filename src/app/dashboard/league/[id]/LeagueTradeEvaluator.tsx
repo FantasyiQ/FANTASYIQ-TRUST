@@ -36,6 +36,7 @@ function buildLeagueSettings(
     scoringSettings: {
         pass_td?:      number;
         bonus_rec_te?: number;
+        rush_att?:     number;
     } | null | undefined,
 ): LeagueSettings {
     scoringSettings = scoringSettings ?? {};
@@ -57,6 +58,7 @@ function buildLeagueSettings(
     return {
         passTd:     scoringSettings.pass_td     ?? DEFAULT_LEAGUE_SETTINGS.passTd,
         bonusRecTe: scoringSettings.bonus_rec_te ?? DEFAULT_LEAGUE_SETTINGS.bonusRecTe,
+        rushAtt:    scoringSettings.rush_att     ?? DEFAULT_LEAGUE_SETTINGS.rushAtt,
         qbSlots:    qbSlots  || DEFAULT_LEAGUE_SETTINGS.qbSlots,
         rbSlots:    rbSlots  || DEFAULT_LEAGUE_SETTINGS.rbSlots,
         wrSlots:    wrSlots  || DEFAULT_LEAGUE_SETTINGS.wrSlots,

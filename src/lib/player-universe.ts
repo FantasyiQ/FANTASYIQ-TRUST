@@ -131,6 +131,7 @@ export function computePlayerBaseValue(
         leagueSize:  number;
         passTd?:     number;
         bonusRecTe?: number;
+        rushAtt?:    number;
     },
 ): number {
     if (position === 'PICK') return 0; // picks have their own value calc
@@ -149,6 +150,15 @@ export function computePlayerBaseValue(
     // Scoring adjustments
     if (position === 'QB' && (opts.passTd ?? 4) >= 6)          v *= 1.08;
     if (position === 'TE' && (opts.bonusRecTe ?? 0) > 0)       v *= 1 + (opts.bonusRecTe ?? 0) * 0.06;
+
+    // Rush-attempt bonus: some leagues award points per carry (not just yardage),
+    // independent of reception format — shifts real scoring toward RB volume and
+    // away from WR. The PPR adjustment above doesn't capture this on its own.
+    const rushAtt = opts.rushAtt ?? 0;
+    if (rushAtt > 0) {
+        if (position === 'RB') v = v + rushAtt * 10;
+        if (position === 'WR') v = Math.max(1, v - rushAtt * 4);
+    }
 
     // League size scarcity
     v *= 1 + (opts.leagueSize - 12) * 0.012;

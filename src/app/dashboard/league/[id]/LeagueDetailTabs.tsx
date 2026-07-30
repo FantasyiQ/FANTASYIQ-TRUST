@@ -170,7 +170,7 @@ function PlayerRankingsCard({
                 position:     u.position,
                 team:         u.team ?? 'FA',
                 age:          u.age ?? 0,
-                baseValue:    computePlayerBaseValue(u, u.position, { leagueType, superflex, ppr, leagueSize: 12, passTd: leagueSettings.passTd, bonusRecTe: leagueSettings.bonusRecTe }),
+                baseValue:    computePlayerBaseValue(u, u.position, { leagueType, superflex, ppr, leagueSize: 12, passTd: leagueSettings.passTd, bonusRecTe: leagueSettings.bonusRecTe, rushAtt: leagueSettings.rushAtt }),
                 injuryStatus: u.injuryStatus,
             };
             return { p, dtv: calcDtv(p, ppr, leagueType, undefined, leagueSettings) };

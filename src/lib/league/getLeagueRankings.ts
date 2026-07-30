@@ -90,6 +90,7 @@ function buildLeagueSettings(
     return {
         passTd:     ss.pass_td      ?? DEFAULT_LEAGUE_SETTINGS.passTd,
         bonusRecTe: ss.bonus_rec_te ?? DEFAULT_LEAGUE_SETTINGS.bonusRecTe,
+        rushAtt:    ss.rush_att     ?? DEFAULT_LEAGUE_SETTINGS.rushAtt,
         qbSlots:    qbSlots  || DEFAULT_LEAGUE_SETTINGS.qbSlots,
         rbSlots:    rbSlots  || DEFAULT_LEAGUE_SETTINGS.rbSlots,
         wrSlots:    wrSlots  || DEFAULT_LEAGUE_SETTINGS.wrSlots,
@@ -264,7 +265,7 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
 
         const baseValue = computePlayerBaseValue(u, r.position, {
             leagueType, superflex, ppr, leagueSize,
-            passTd: leagueSettings.passTd, bonusRecTe: leagueSettings.bonusRecTe,
+            passTd: leagueSettings.passTd, bonusRecTe: leagueSettings.bonusRecTe, rushAtt: leagueSettings.rushAtt,
         });
 
         const p: Player = {

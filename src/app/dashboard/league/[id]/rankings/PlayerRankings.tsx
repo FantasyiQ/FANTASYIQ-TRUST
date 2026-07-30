@@ -77,7 +77,7 @@ export default function PlayerRankings({
                 position:     u.position,
                 team:         u.team ?? 'FA',
                 age:          u.age ?? 0,
-                baseValue:    computePlayerBaseValue(u, u.position, { leagueType, superflex, ppr, leagueSize: 12, passTd: leagueSettings.passTd, bonusRecTe: leagueSettings.bonusRecTe }),
+                baseValue:    computePlayerBaseValue(u, u.position, { leagueType, superflex, ppr, leagueSize: 12, passTd: leagueSettings.passTd, bonusRecTe: leagueSettings.bonusRecTe, rushAtt: leagueSettings.rushAtt }),
                 injuryStatus: u.injuryStatus,
             };
             return p;
