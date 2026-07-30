@@ -106,6 +106,7 @@ function PlayerRankingsTable({
                             <th className="px-3 py-3 font-medium">Player</th>
                             <th className="px-3 py-3 font-medium">Pos</th>
                             <th className="px-3 py-3 font-medium">Team</th>
+                            <th className="px-3 py-3 font-medium text-right">Age</th>
                             <th className="px-3 py-3 font-medium text-right">DTV</th>
                             <th className="px-4 py-3 font-medium text-right">Tier</th>
                         </tr>
@@ -126,12 +127,13 @@ function PlayerRankingsTable({
                                     </span>
                                 </td>
                                 <td className="px-3 py-2.5 text-gray-400">{p.team ?? 'FA'}</td>
+                                <td className="px-3 py-2.5 text-right text-gray-400">{p.age ?? '—'}</td>
                                 <td className="px-3 py-2.5 text-right font-bold text-white">{p.finalDtv}</td>
                                 <td className={`px-4 py-2.5 text-right font-semibold text-xs ${TIER_COLORS[p.tier] ?? 'text-gray-400'}`}>{p.tier}</td>
                             </tr>
                         ))}
                         {filtered.length === 0 && (
-                            <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-600">No players match your filter.</td></tr>
+                            <tr><td colSpan={7} className="px-6 py-8 text-center text-gray-600">No players match your filter.</td></tr>
                         )}
                     </tbody>
                 </table>
