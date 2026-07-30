@@ -6,7 +6,7 @@ import { useInstallPrompt } from './useInstallPrompt';
 const DISMISSED_KEY = 'fiq-install-banner-dismissed';
 
 export default function InstallAppBanner() {
-    const { isIOS, isAndroid, isStandalone, canPromptInstall, promptInstall } = useInstallPrompt();
+    const { isIOS, isIOSSafari, isAndroid, isStandalone, canPromptInstall, promptInstall } = useInstallPrompt();
     const [dismissed, setDismissed] = useState(true); // default hidden until localStorage check runs
 
     useEffect(() => {
@@ -25,9 +25,11 @@ export default function InstallAppBanner() {
             <div>
                 <p className="text-[#D4AF37] font-semibold text-sm">Install FiQ on your phone</p>
                 <p className="text-gray-400 text-xs mt-0.5">
-                    {isIOS
-                        ? 'Tap the Share icon, then "Add to Home Screen" for one-tap access.'
-                        : 'Add FiQ to your home screen for one-tap access, no browser bar.'}
+                    {isIOS && !isIOSSafari
+                        ? 'You need Safari to install — tap ••• or Share, then "Open in Safari," then Share → "Add to Home Screen."'
+                        : isIOS
+                            ? 'Tap the Share icon, then "Add to Home Screen" for one-tap access.'
+                            : 'Add FiQ to your home screen for one-tap access, no browser bar.'}
                 </p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
