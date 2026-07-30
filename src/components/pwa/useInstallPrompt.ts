@@ -17,7 +17,12 @@ export function useInstallPrompt() {
 
     useEffect(() => {
         const ua = navigator.userAgent;
-        setIsIOS(/iPad|iPhone|iPod/.test(ua) && !('MSStream' in window));
+        // iPadOS Safari has reported a desktop-Mac user agent by default since
+        // iOS 13 (no "iPad" substring at all) — detect it via the touch-point
+        // heuristic instead: a real Mac reports maxTouchPoints 0, an iPad
+        // masquerading as one reports >1.
+        const isIPadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+        setIsIOS((/iPad|iPhone|iPod/.test(ua) || isIPadOS) && !('MSStream' in window));
         setIsAndroid(/Android/.test(ua));
         setIsStandalone(
             window.matchMedia('(display-mode: standalone)').matches
