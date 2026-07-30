@@ -295,17 +295,20 @@ export function ageCurveDynasty(position: string, age: number): number {
 
     switch (position) {
         case 'RB':
-            // RB: cliff at 27, near-worthless by 30 in dynasty
+            // RB: cliff starts at 27, tapers off through 30+. A proven
+            // workhorse's real production can still floor this in calcDtv
+            // (see the perfFactor-gated ageMultiplier floor) — this curve is
+            // just the baseline for an average back at each age.
             if (age <= 21) return 1.10;
             if (age === 22) return 1.18;
             if (age === 23) return 1.22;
             if (age === 24) return 1.20;
             if (age === 25) return 1.10;
             if (age === 26) return 0.96;
-            if (age === 27) return 0.80;
-            if (age === 28) return 0.64;
-            if (age === 29) return 0.52;
-            return 0.42;  // 30+
+            if (age === 27) return 0.85;
+            if (age === 28) return 0.75;
+            if (age === 29) return 0.68;
+            return 0.60;  // 30+
 
         case 'WR':
             // WR: peak 24–27, gentle decline, still relevant at 30–31

@@ -190,6 +190,12 @@ const DEFAULT_FACTORS: PlayerFactors = {
     situFactor:   1.0,
 };
 
+// Dynasty age-curve workhorse floor (see calcDtv) — perfFactor threshold a
+// player must clear to be considered a still-elite real producer, and the
+// floor placed under their age multiplier once they clear it.
+const WORKHORSE_PERF_THRESHOLD = 1.10;
+const WORKHORSE_AGE_FLOOR      = 0.80;
+
 export function calcDtv(
     player: Player,
     _ppr: PprFormat = 1,
@@ -201,14 +207,24 @@ export function calcDtv(
     const isPick        = player.position === 'PICK';
     const posMultiplier = isPick ? 1 : computeScarcity(player.position, settings);
     const injuryFactor  = isPick ? 1 : calcInjuryFactor(player.injuryStatus);
-    const ageMultiplier = (leagueType === 'Dynasty' && !isPick)
-        ? ageCurveDynasty(player.position, player.age)
-        : 1;
     // League Scoring Points Engine: real per-league scoring adjustment. _factors
     // (explicit override) wins if passed; otherwise use whatever the caller
     // already attached to the player object; defaults to 1.0 (no-op) so players
     // without real-stats data (rookies, unmatched names, picks) are unaffected.
     const perfFactor    = isPick ? 1 : (_factors?.perfFactor ?? player.perfFactor ?? 1.0);
+    const rawAgeMultiplier = (leagueType === 'Dynasty' && !isPick)
+        ? ageCurveDynasty(player.position, player.age)
+        : 1;
+    // Workhorse floor: a proven, currently-elite real producer (e.g. Henry,
+    // McCaffrey, Barkley in their late 20s) shouldn't be crushed below a
+    // part-time/committee back just for being a year older — the age curve
+    // above is a baseline for an *average* back at that age, not a hard cap.
+    // Gated on perfFactor (already real per-game production vs. position,
+    // Phase 1-3 data) so this only engages for players actually still
+    // producing at an elite clip, not merely young.
+    const ageMultiplier = (rawAgeMultiplier < WORKHORSE_AGE_FLOOR && perfFactor >= WORKHORSE_PERF_THRESHOLD)
+        ? WORKHORSE_AGE_FLOOR
+        : rawAgeMultiplier;
     const rawDtv        = Math.round(player.baseValue * 10) / 10;
     const finalDtv      = Math.round(rawDtv * posMultiplier * injuryFactor * ageMultiplier * perfFactor * 10) / 10;
 
