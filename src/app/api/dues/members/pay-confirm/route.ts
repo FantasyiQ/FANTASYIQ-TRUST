@@ -29,7 +29,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     if (member.duesStatus !== 'paid') {
         const dues = await prisma.leagueDues.findUnique({
             where: { id: duesId },
-            select: { buyInAmount: true, potTotal: true },
+            select: { buyInAmount: true, potTotal: true, collectedAmount: true },
         });
         if (dues) {
             await prisma.$transaction([
@@ -45,7 +45,11 @@ export async function GET(request: NextRequest): Promise<Response> {
                 }),
                 prisma.leagueDues.update({
                     where: { id: duesId },
-                    data: { potTotal: dues.potTotal + dues.buyInAmount, status: 'active' },
+                    data: {
+                        potTotal:        dues.potTotal + dues.buyInAmount,
+                        collectedAmount: dues.collectedAmount + dues.buyInAmount,
+                        status:          'active',
+                    },
                 }),
             ]);
         }

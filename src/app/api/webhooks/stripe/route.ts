@@ -318,7 +318,11 @@ export async function POST(request: NextRequest): Promise<Response> {
                                     }),
                                     prisma.leagueDues.update({
                                         where: { id: duesId },
-                                        data:  { potTotal: { increment: dues.buyInAmount }, status: 'active' },
+                                        data:  {
+                                            potTotal:        { increment: dues.buyInAmount },
+                                            collectedAmount: { increment: dues.buyInAmount },
+                                            status:          'active',
+                                        },
                                     }),
                                 ]);
                             }
