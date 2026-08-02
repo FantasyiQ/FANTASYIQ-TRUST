@@ -96,9 +96,30 @@ export default async function LeagueOverviewPage({
               })).map(u => [u.swid!, u]))
             : new Map<string, { id: string; swid: string | null; prsScore: number | null; trustScore: number | null }>();
 
+        // Fallback match: DuesMember doesn't store an ESPN owner ID (only
+        // Sleeper gets that), but it does link userId once someone pays — cross-
+        // reference by team name against this league's dues roster so a real,
+        // paid-up member whose User.swid is blank doesn't wrongly show as
+        // unregistered.
+        const espnDues = await prisma.leagueDues.findFirst({
+            where:  { leagueName: { equals: league.leagueName, mode: 'insensitive' } },
+            orderBy: { season: 'desc' },
+            select: { id: true },
+        });
+        const fiqByTeamName = new Map<string, { id: string; prsScore: number | null; trustScore: number | null }>();
+        if (espnDues) {
+            const duesLinks = await prisma.duesMember.findMany({
+                where:  { leagueDuesId: espnDues.id, userId: { not: null } },
+                select: { displayName: true, userId: true, user: { select: { id: true, prsScore: true, trustScore: true } } },
+            });
+            for (const d of duesLinks) {
+                if (d.user) fiqByTeamName.set(d.displayName.toLowerCase(), d.user);
+            }
+        }
+
         const membersData: LeagueMemberData[] = espnTeams.map(t => {
-            const fiq         = t.ownerId ? fiqBySwid.get(t.ownerId) : null;
             const displayName = t.ownerName ?? (t.name || t.abbrev || `Team ${t.teamId}`);
+            const fiq = (t.ownerId ? fiqBySwid.get(t.ownerId) : null) ?? fiqByTeamName.get(displayName.toLowerCase());
             return {
                 sleeperUserId:    String(t.teamId),
                 displayName,

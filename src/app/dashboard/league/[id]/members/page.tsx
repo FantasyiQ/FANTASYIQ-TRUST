@@ -40,7 +40,11 @@ function Record({ w, l, t }: { w: number; l: number; t: number }) {
 
 // ── ESPN members view ─────────────────────────────────────────────────────────
 
-async function EspnMembersView({ teams, mySwid }: { teams: EspnTeamRow[]; mySwid: string | null }) {
+async function EspnMembersView({
+    teams, mySwid, leagueName, season,
+}: {
+    teams: EspnTeamRow[]; mySwid: string | null; leagueName: string; season: string | null;
+}) {
     // Match owners to FiQ accounts by SWID
     const ownerIds = teams.map(t => t.ownerId).filter(Boolean) as string[];
     const fiqUsers = ownerIds.length > 0
@@ -50,6 +54,23 @@ async function EspnMembersView({ teams, mySwid }: { teams: EspnTeamRow[]; mySwid
           })
         : [];
     const fiqBySWID = new Map(fiqUsers.map(u => [u.swid, u]));
+
+    // Fallback match: DuesMember doesn't store an ESPN owner ID (only Sleeper
+    // gets that), but it does link userId once someone pays — cross-reference
+    // by team name against this league's dues roster so a real, paid-up member
+    // whose User.swid is blank doesn't wrongly show as unregistered.
+    const dues = await prisma.leagueDues.findFirst({
+        where:  { leagueName: { equals: leagueName, mode: 'insensitive' }, season: season ?? undefined },
+        select: { id: true },
+    });
+    const registeredTeamNames = new Set<string>();
+    if (dues) {
+        const duesLinks = await prisma.duesMember.findMany({
+            where:  { leagueDuesId: dues.id, userId: { not: null } },
+            select: { displayName: true },
+        });
+        duesLinks.forEach(d => registeredTeamNames.add(d.displayName.toLowerCase()));
+    }
 
     const sorted = [...teams].sort((a, b) => {
         const wDiff = b.wins - a.wins;
@@ -64,9 +85,10 @@ async function EspnMembersView({ teams, mySwid }: { teams: EspnTeamRow[]; mySwid
             </div>
             <div className="divide-y divide-gray-800/50">
                 {sorted.map((team, i) => {
-                    const fiq        = team.ownerId ? fiqBySWID.get(team.ownerId) : null;
-                    const isMe       = mySwid && team.ownerId === mySwid;
                     const displayName = team.name || team.abbrev || `Team ${team.teamId}`;
+                    const hasAccount = (team.ownerId && fiqBySWID.has(team.ownerId))
+                        || registeredTeamNames.has(displayName.toLowerCase());
+                    const isMe       = mySwid && team.ownerId === mySwid;
                     const initials   = (team.ownerName ?? displayName)[0]?.toUpperCase() ?? '?';
                     return (
                         <div key={team.teamId} className={`flex items-center gap-4 px-5 py-3.5 ${isMe ? 'bg-[#D4AF37]/5' : 'hover:bg-gray-800/30'} transition`}>
@@ -80,7 +102,7 @@ async function EspnMembersView({ teams, mySwid }: { teams: EspnTeamRow[]; mySwid
                                     {isMe && (
                                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37]">You</span>
                                     )}
-                                    {fiq && (
+                                    {hasAccount && (
                                         <span className="text-[10px] text-emerald-400 font-semibold">✓ FiQ</span>
                                     )}
                                 </div>
@@ -245,6 +267,8 @@ export default async function MembersPage({ params }: { params: Promise<{ id: st
                 <EspnMembersView
                     teams={(league.standings as EspnTeamRow[] | null) ?? []}
                     mySwid={dbUser?.swid ?? null}
+                    leagueName={league.leagueName}
+                    season={league.season}
                 />
             ) : (
                 <SleeperMembersView
