@@ -362,6 +362,31 @@ export default async function LeagueOverviewPage({
 
     const dbUserBySleeperId = new Map(registeredUsers.map(u => [u.sleeperUserId!, u]));
 
+    // Fallback match: User.sleeperUserId is blank for anyone who registered
+    // another way (email/Google) instead of connecting Sleeper directly — but
+    // DuesMember already links sleeperUserId -> userId once they pay dues, so
+    // a fully real, paid-up FiQ user doesn't wrongly show as unregistered here.
+    const unmatchedSleeperIds = memberSleeperIds.filter(id => !dbUserBySleeperId.has(id));
+    if (unmatchedSleeperIds.length > 0) {
+        const duesLinks = await prisma.duesMember.findMany({
+            where:  { sleeperUserId: { in: unmatchedSleeperIds }, userId: { not: null } },
+            select: { sleeperUserId: true, userId: true },
+        });
+        const fallbackUserIds = [...new Set(duesLinks.map(d => d.userId!))];
+        if (fallbackUserIds.length > 0) {
+            const fallbackUsers = await prisma.user.findMany({
+                where:  { id: { in: fallbackUserIds } },
+                select: { id: true, prsScore: true, trustScore: true },
+            });
+            const fallbackUserById = new Map(fallbackUsers.map(u => [u.id, u]));
+            for (const link of duesLinks) {
+                if (!link.sleeperUserId) continue;
+                const u = fallbackUserById.get(link.userId!);
+                if (u) dbUserBySleeperId.set(link.sleeperUserId, { id: u.id, sleeperUserId: link.sleeperUserId, prsScore: u.prsScore, trustScore: u.trustScore });
+            }
+        }
+    }
+
     // Pre-fetch commissioner vouches for this league so the member card shows existing vouches.
     const commissionerUserId = session?.user?.id ?? null;
     const existingVouches = commissionerUserId

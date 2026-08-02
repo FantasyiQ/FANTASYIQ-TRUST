@@ -124,15 +124,29 @@ async function SleeperMembersView({
         );
     }
 
-    // Match Sleeper users to FiQ accounts
+    // Match Sleeper users to FiQ accounts. Primary signal is User.sleeperUserId
+    // (set when someone connects Sleeper to their account), but that's blank for
+    // users who registered another way (email/Google) — fall back to DuesMember,
+    // which already links sleeperUserId -> userId once a member pays dues, so
+    // someone can be a fully real, paid-up FiQ user without tripping the primary
+    // check.
     const sleeperIds = members.map(m => m.user_id).filter(Boolean);
-    const fiqUsers = sleeperIds.length > 0
-        ? await prisma.user.findMany({
-            where:  { sleeperUserId: { in: sleeperIds } },
-            select: { sleeperUserId: true, name: true, id: true },
-          })
-        : [];
-    const fiqBySleeperId = new Map(fiqUsers.map(u => [u.sleeperUserId, u]));
+    const [fiqUsers, duesLinks] = sleeperIds.length > 0
+        ? await Promise.all([
+            prisma.user.findMany({
+                where:  { sleeperUserId: { in: sleeperIds } },
+                select: { sleeperUserId: true },
+            }),
+            prisma.duesMember.findMany({
+                where:  { sleeperUserId: { in: sleeperIds }, userId: { not: null } },
+                select: { sleeperUserId: true },
+            }),
+          ])
+        : [[], []];
+    const registeredSleeperIds = new Set<string>([
+        ...fiqUsers.map(u => u.sleeperUserId).filter((id): id is string => !!id),
+        ...duesLinks.map(d => d.sleeperUserId).filter((id): id is string => !!id),
+    ]);
 
     const sorted = [...members].sort((a, b) => {
         const aIsComm = a.is_owner;
@@ -149,7 +163,7 @@ async function SleeperMembersView({
             </div>
             <div className="divide-y divide-gray-800/50">
                 {sorted.map(m => {
-                    const fiq  = fiqBySleeperId.get(m.user_id);
+                    const hasAccount = registeredSleeperIds.has(m.user_id);
                     const isMe = viewerSleeperUserId && m.user_id === viewerSleeperUserId;
                     const name = m.metadata?.team_name || m.display_name || m.username || 'Unknown';
                     const avatarId = m.avatar ?? null;
@@ -182,7 +196,7 @@ async function SleeperMembersView({
                                 )}
                             </div>
                             <div className="shrink-0">
-                                {fiq ? (
+                                {hasAccount ? (
                                     <span className="text-[10px] font-semibold text-emerald-400">✓ FiQ</span>
                                 ) : (
                                     <span className="text-[10px] text-gray-700 italic">Not on FiQ</span>
