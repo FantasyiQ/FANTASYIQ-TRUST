@@ -29,30 +29,18 @@ function getChromeRuntime(): ChromeRuntime | null {
 // During local dev, load the extension unpacked in Chrome and paste its ID here.
 const EXTENSION_ID = process.env.NEXT_PUBLIC_ESPN_EXTENSION_ID ?? '';
 
-// How-to videos — set these in Vercel env once each video exists. Left blank,
-// the embed is simply hidden, so this ships safely before either video does.
-// Install video: YouTube (the part after "v=" in its URL).
-// Manual-setup video: self-hosted mp4 (Vercel Blob), full URL.
-const INSTALL_VIDEO_ID  = process.env.NEXT_PUBLIC_ESPN_EXTENSION_VIDEO_ID ?? '';
-const MANUAL_VIDEO_URL  = process.env.NEXT_PUBLIC_ESPN_MANUAL_VIDEO_URL ?? '';
+// How-to video (self-hosted mp4 via Vercel Blob) covering both the extension
+// install and the manual DevTools cookie method. Set in Vercel env once
+// recorded — left blank, the embed is simply hidden.
+const SETUP_VIDEO_URL = process.env.NEXT_PUBLIC_ESPN_SETUP_VIDEO_URL ?? '';
 
-function HowToVideo({ videoId, videoUrl, label }: { videoId?: string; videoUrl?: string; label: string }) {
-    if (!videoId && !videoUrl) return null;
+function HowToVideo({ videoUrl, label }: { videoUrl: string; label: string }) {
+    if (!videoUrl) return null;
     return (
         <div className="space-y-1.5">
             <p className="text-gray-500 text-xs font-semibold">{label}</p>
             <div className="aspect-video rounded-lg overflow-hidden border border-gray-800 bg-black">
-                {videoUrl ? (
-                    <video src={videoUrl} controls preload="metadata" className="w-full h-full" />
-                ) : (
-                    <iframe
-                        src={`https://www.youtube-nocookie.com/embed/${videoId}`}
-                        title={label}
-                        className="w-full h-full"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                    />
-                )}
+                <video src={videoUrl} controls preload="metadata" className="w-full h-full" />
             </div>
         </div>
     );
@@ -286,7 +274,6 @@ function ExtensionConnector({
                     </button>
                 )}
                 <p className="text-gray-700 text-[10px]">The extension reads only your ESPN cookies (espn_s2 + SWID) and nothing else.</p>
-                <HowToVideo videoId={INSTALL_VIDEO_ID} label="Watch: How to install the extension" />
             </div>
         );
     }
@@ -558,6 +545,8 @@ export default function EspnSyncPage() {
                 {step === 'credentials' && (
                     <div className="space-y-4">
 
+                        <HowToVideo videoUrl={SETUP_VIDEO_URL} label="Watch: How to connect your ESPN league" />
+
                         {/* Extension connector (primary) */}
                         <div className="space-y-2">
                             <div className="flex items-center gap-2">
@@ -667,7 +656,6 @@ export default function EspnSyncPage() {
                                             Find <span className="font-mono bg-blue-900/40 px-1 rounded">espn_s2</span> and <span className="font-mono bg-blue-900/40 px-1 rounded">SWID</span> and copy their values.
                                         </li>
                                     </ol>
-                                    <HowToVideo videoUrl={MANUAL_VIDEO_URL} label="Watch: How to find your ESPN cookies" />
                                 </div>
                             )}
                         </div>
