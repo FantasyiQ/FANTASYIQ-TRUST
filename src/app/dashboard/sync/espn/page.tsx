@@ -29,25 +29,30 @@ function getChromeRuntime(): ChromeRuntime | null {
 // During local dev, load the extension unpacked in Chrome and paste its ID here.
 const EXTENSION_ID = process.env.NEXT_PUBLIC_ESPN_EXTENSION_ID ?? '';
 
-// How-to video IDs (the part after "v=" in a YouTube URL) — set these in Vercel
-// env once each video is recorded and uploaded. Left blank, the embed is
-// simply hidden, so this ships safely before either video exists.
-const INSTALL_VIDEO_ID = process.env.NEXT_PUBLIC_ESPN_EXTENSION_VIDEO_ID ?? '';
-const MANUAL_VIDEO_ID  = process.env.NEXT_PUBLIC_ESPN_MANUAL_VIDEO_ID ?? '';
+// How-to videos — set these in Vercel env once each video exists. Left blank,
+// the embed is simply hidden, so this ships safely before either video does.
+// Install video: YouTube (the part after "v=" in its URL).
+// Manual-setup video: self-hosted mp4 (Vercel Blob), full URL.
+const INSTALL_VIDEO_ID  = process.env.NEXT_PUBLIC_ESPN_EXTENSION_VIDEO_ID ?? '';
+const MANUAL_VIDEO_URL  = process.env.NEXT_PUBLIC_ESPN_MANUAL_VIDEO_URL ?? '';
 
-function HowToVideo({ videoId, label }: { videoId: string; label: string }) {
-    if (!videoId) return null;
+function HowToVideo({ videoId, videoUrl, label }: { videoId?: string; videoUrl?: string; label: string }) {
+    if (!videoId && !videoUrl) return null;
     return (
         <div className="space-y-1.5">
             <p className="text-gray-500 text-xs font-semibold">{label}</p>
             <div className="aspect-video rounded-lg overflow-hidden border border-gray-800 bg-black">
-                <iframe
-                    src={`https://www.youtube-nocookie.com/embed/${videoId}`}
-                    title={label}
-                    className="w-full h-full"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                />
+                {videoUrl ? (
+                    <video src={videoUrl} controls preload="metadata" className="w-full h-full" />
+                ) : (
+                    <iframe
+                        src={`https://www.youtube-nocookie.com/embed/${videoId}`}
+                        title={label}
+                        className="w-full h-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                    />
+                )}
             </div>
         </div>
     );
@@ -662,7 +667,7 @@ export default function EspnSyncPage() {
                                             Find <span className="font-mono bg-blue-900/40 px-1 rounded">espn_s2</span> and <span className="font-mono bg-blue-900/40 px-1 rounded">SWID</span> and copy their values.
                                         </li>
                                     </ol>
-                                    <HowToVideo videoId={MANUAL_VIDEO_ID} label="Watch: How to find your ESPN cookies" />
+                                    <HowToVideo videoUrl={MANUAL_VIDEO_URL} label="Watch: How to find your ESPN cookies" />
                                 </div>
                             )}
                         </div>
