@@ -170,7 +170,7 @@ async function EspnRosterPage({
                     </table>
                 </div>
                 <div className="px-5 py-3 border-t border-gray-800 text-xs text-gray-600">
-                    Data from last ESPN sync · Values from FantasyCalc
+                    Data from last ESPN sync
                 </div>
             </div>
         </div>
