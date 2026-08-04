@@ -134,7 +134,7 @@ export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier
                                 {!league.assignedPlanId && !league.assignedPlanType && (
                                     limitReachedIds.has(league.id) ? (
                                         <Link
-                                            href="/pricing"
+                                            href={`/pricing?tab=commissioner&mode=new&size=${league.totalRosters}&leagueName=${encodeURIComponent(league.leagueName)}`}
                                             onClick={e => e.stopPropagation()}
                                             className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border bg-yellow-900/30 text-yellow-400 border-yellow-800 hover:bg-yellow-900/50 transition"
                                         >
@@ -142,7 +142,7 @@ export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier
                                         </Link>
                                     ) : hasPlayerPlan ? null : (
                                         <Link
-                                            href="/pricing"
+                                            href={`/pricing?tab=commissioner&mode=new&size=${league.totalRosters}&leagueName=${encodeURIComponent(league.leagueName)}`}
                                             onClick={e => e.stopPropagation()}
                                             className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border bg-gray-800 text-gray-400 border-gray-700 hover:border-[#D4AF37]/50 hover:text-[#D4AF37] transition"
                                         >
