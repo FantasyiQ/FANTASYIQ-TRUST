@@ -55,15 +55,54 @@ const EVENT_TYPE_OPTIONS: { value: EventType; label: string }[] = [
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-US', {
-        weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC',
+// All-day events are stored as a literal UTC date with no meaningful time
+// component (the date picker's "YYYY-MM-DD" parsed directly as UTC midnight),
+// so UTC display round-trips correctly for them. Timed events store a real
+// UTC instant converted from an entered ET wall-clock time — those must be
+// read back through the America/New_York zone or they can appear to land on
+// the wrong calendar day (a 7pm ET draft is already past midnight UTC).
+function etDateTimeParts(iso: string): { year: string; month: string; day: string; hour: string; minute: string } {
+    const fmt = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York', hourCycle: 'h23',
+        year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
     });
+    const parts = Object.fromEntries(fmt.formatToParts(new Date(iso)).map(p => [p.type, p.value]));
+    return parts as { year: string; month: string; day: string; hour: string; minute: string };
 }
 
-function monthKey(iso: string): string {
-    const d = new Date(iso);
-    return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+// Converts a wall-clock date+time entered as America/New_York into the UTC
+// instant it actually represents, correctly accounting for DST.
+function etWallTimeToUTC(dateStr: string, timeStr: string): Date {
+    const [y, mo, d] = dateStr.split('-').map(Number);
+    const [h, mi]    = timeStr.split(':').map(Number);
+    const guess      = new Date(Date.UTC(y, mo - 1, d, h, mi));
+    const p          = etDateTimeParts(guess.toISOString());
+    const asIfUTC    = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute);
+    return new Date(guess.getTime() + (guess.getTime() - asIfUTC));
+}
+
+function formatDate(iso: string, allDay: boolean): string {
+    if (allDay) {
+        return new Date(iso).toLocaleDateString('en-US', {
+            weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC',
+        });
+    }
+    const p = etDateTimeParts(iso);
+    const asUtc = new Date(Date.UTC(+p.year, +p.month - 1, +p.day));
+    return asUtc.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+}
+
+function formatTime(iso: string): string {
+    const p = etDateTimeParts(iso);
+    const h24 = +p.hour;
+    const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+    return `${h12}:${p.minute} ${h24 < 12 ? 'AM' : 'PM'} ET`;
+}
+
+function monthKey(iso: string, allDay: boolean): string {
+    if (allDay) return new Date(iso).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+    const p = etDateTimeParts(iso);
+    return new Date(Date.UTC(+p.year, +p.month - 1, 1)).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
 function isPast(iso: string): boolean {
@@ -73,15 +112,23 @@ function isPast(iso: string): boolean {
 function groupByMonth(events: CalendarEvent[]): [string, CalendarEvent[]][] {
     const map = new Map<string, CalendarEvent[]>();
     for (const e of events) {
-        const key = monthKey(e.date);
+        const key = monthKey(e.date, e.allDay);
         if (!map.has(key)) map.set(key, []);
         map.get(key)!.push(e);
     }
     return Array.from(map.entries());
 }
 
-function toDateInputValue(iso: string): string {
-    return iso.slice(0, 10);
+function toDateInputValue(iso: string, allDay: boolean): string {
+    if (allDay) return iso.slice(0, 10);
+    const p = etDateTimeParts(iso);
+    return `${p.year}-${p.month}-${p.day}`;
+}
+
+function toTimeInputValue(iso: string, allDay: boolean): string {
+    if (allDay) return '';
+    const p = etDateTimeParts(iso);
+    return `${p.hour}:${p.minute}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -91,12 +138,13 @@ function toDateInputValue(iso: string): string {
 interface FormState {
     title:       string;
     date:        string;
+    time:        string; // "HH:MM" (America/New_York), empty = all-day
     type:        EventType;
     description: string;
 }
 
 function blankForm(): FormState {
-    return { title: '', date: '', type: 'custom', description: '' };
+    return { title: '', date: '', time: '', type: 'custom', description: '' };
 }
 
 // ---------------------------------------------------------------------------
@@ -112,7 +160,8 @@ function EventRow({ event, leagueId, onUpdate, onDelete }: {
     const [editing, setEditing] = useState(false);
     const [form, setForm]       = useState<FormState>({
         title:       event.title,
-        date:        toDateInputValue(event.date),
+        date:        toDateInputValue(event.date, event.allDay),
+        time:        toTimeInputValue(event.date, event.allDay),
         type:        event.type as EventType,
         description: event.description ?? '',
     });
@@ -127,12 +176,14 @@ function EventRow({ event, leagueId, onUpdate, onDelete }: {
         setSaving(true);
         setError('');
         try {
+            const isoDate = form.time ? etWallTimeToUTC(form.date, form.time).toISOString() : form.date;
             const res = await fetch(`/api/leagues/${leagueId}/calendar/${event.id}`, {
                 method:  'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body:    JSON.stringify({
                     title:       form.title.trim(),
-                    date:        form.date,
+                    date:        isoDate,
+                    allDay:      !form.time,
                     type:        form.type,
                     description: form.description.trim() || null,
                 }),
@@ -165,12 +216,21 @@ function EventRow({ event, leagueId, onUpdate, onDelete }: {
                         placeholder="Event title"
                         className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/60"
                     />
-                    <input
-                        type="date"
-                        value={form.date}
-                        onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
-                        className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#D4AF37]/60"
-                    />
+                    <div className="grid grid-cols-2 gap-2">
+                        <input
+                            type="date"
+                            value={form.date}
+                            onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+                            className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#D4AF37]/60"
+                        />
+                        <input
+                            type="time"
+                            value={form.time}
+                            onChange={e => setForm(f => ({ ...f, time: e.target.value }))}
+                            title="Time (ET) — leave blank for an all-day event"
+                            className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#D4AF37]/60"
+                        />
+                    </div>
                 </div>
                 <div className="grid sm:grid-cols-2 gap-3">
                     <select
@@ -209,10 +269,13 @@ function EventRow({ event, leagueId, onUpdate, onDelete }: {
             {/* Date badge */}
             <div className="shrink-0 w-12 text-center">
                 <p className="text-[10px] text-gray-600 uppercase tracking-wider font-semibold">
-                    {new Date(event.date).toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' })}
+                    {event.allDay
+                        ? new Date(event.date).toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' })
+                        : new Date(Date.UTC(+etDateTimeParts(event.date).year, +etDateTimeParts(event.date).month - 1, 1))
+                            .toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' })}
                 </p>
                 <p className="text-xl font-extrabold text-white leading-none">
-                    {new Date(event.date).getUTCDate()}
+                    {event.allDay ? new Date(event.date).getUTCDate() : +etDateTimeParts(event.date).day}
                 </p>
             </div>
 
@@ -224,6 +287,9 @@ function EventRow({ event, leagueId, onUpdate, onDelete }: {
                     <span className={`text-[10px] font-bold uppercase tracking-wide ${meta.color}`}>
                         {meta.label}
                     </span>
+                    {!event.allDay && (
+                        <span className="text-[10px] font-semibold text-gray-500">{formatTime(event.date)}</span>
+                    )}
                     {past && (
                         <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">Past</span>
                     )}
@@ -267,15 +333,16 @@ function AddEventForm({ leagueId, onAdd, onClose }: {
         setSaving(true);
         setError('');
         try {
+            const isoDate = form.time ? etWallTimeToUTC(form.date, form.time).toISOString() : form.date;
             const res = await fetch(`/api/leagues/${leagueId}/calendar`, {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body:    JSON.stringify({
                     title:       form.title.trim(),
-                    date:        form.date,
+                    date:        isoDate,
                     type:        form.type,
                     description: form.description.trim() || null,
-                    allDay:      true,
+                    allDay:      !form.time,
                 }),
             });
             const data = await res.json() as CalendarEvent & { error?: string };
@@ -302,14 +369,24 @@ function AddEventForm({ leagueId, onAdd, onClose }: {
                     autoFocus
                     className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/60"
                 />
-                <input
-                    type="date"
-                    value={form.date}
-                    onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
-                    required
-                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#D4AF37]/60"
-                />
+                <div className="grid grid-cols-2 gap-2">
+                    <input
+                        type="date"
+                        value={form.date}
+                        onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+                        required
+                        className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#D4AF37]/60"
+                    />
+                    <input
+                        type="time"
+                        value={form.time}
+                        onChange={e => setForm(f => ({ ...f, time: e.target.value }))}
+                        title="Time (ET) — leave blank for an all-day event"
+                        className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#D4AF37]/60"
+                    />
+                </div>
             </div>
+            <p className="text-gray-600 text-[11px] -mt-1">Time is Eastern (ET) — leave blank for an all-day event.</p>
             <div className="grid sm:grid-cols-2 gap-3">
                 <select
                     value={form.type}

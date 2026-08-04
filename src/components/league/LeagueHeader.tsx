@@ -83,7 +83,7 @@ function phaseBadgeClass(phase: LeaguePhase): string {
 export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
     const session = await auth();
 
-    const [league, dbUser] = await Promise.all([
+    const [league, dbUser, manualDraftEvent] = await Promise.all([
         prisma.league.findUnique({
             where:  { id: leagueId },
             select: {
@@ -103,9 +103,30 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
                 select: { subscriptionTier: true, sleeperUserId: true },
             })
             : null,
+        // Commissioner-set draft date (Calendar feature) — the only source for
+        // platforms without a live-synced draft time (ESPN/Yahoo/NFL), and a
+        // useful fallback for Sleeper leagues before Sleeper's own draft is
+        // scheduled. Prefer the nearest upcoming one; fall back to the most
+        // recent past one so a completed draft still displays sensibly.
+        prisma.leagueCalendarEvent.findFirst({
+            where:   { leagueDbId: leagueId, type: 'draft', date: { gte: new Date() } },
+            orderBy: { date: 'asc' },
+            select:  { date: true },
+        }).then(upcoming => upcoming ?? prisma.leagueCalendarEvent.findFirst({
+            where:   { leagueDbId: leagueId, type: 'draft' },
+            orderBy: { date: 'desc' },
+            select:  { date: true },
+        })),
     ]);
 
     if (!league) return null;
+
+    // Sleeper's live-synced draftStartTime wins when present; otherwise fall
+    // back to a commissioner-set manual draft date, which carries no live
+    // "drafting"/"complete" status of its own.
+    const effectiveDraftStartTime = league.draftStartTime
+        ?? (manualDraftEvent ? BigInt(manualDraftEvent.date.getTime()) : null);
+    const effectiveDraftStatus = league.draftStartTime ? league.draftStatus : null;
 
     // Compute phase using the same engine as Trade Evaluator / Draft Strategy
     let currentWeek = 0;
@@ -231,18 +252,19 @@ export default async function LeagueHeader({ leagueId }: { leagueId: string }) {
                     />
                 )}
 
-                {/* Draft date — Sleeper only */}
-                {league.platform !== 'espn' && (() => {
+                {/* Draft date — Sleeper's live-synced time, or a commissioner-set
+                    manual date (Calendar) for platforms without one */}
+                {(() => {
                     const { text, variant } = getDraftDisplay(
-                        league.draftStartTime ?? null,
-                        league.draftStatus ?? null,
+                        effectiveDraftStartTime,
+                        effectiveDraftStatus ?? null,
                         Date.now(),
                     );
                     return (
                         <span
                             title={
-                                league.draftStartTime
-                                    ? new Date(Number(league.draftStartTime)).toLocaleString('en-US', { timeZone: 'America/New_York', timeZoneName: 'long' })
+                                effectiveDraftStartTime
+                                    ? new Date(Number(effectiveDraftStartTime)).toLocaleString('en-US', { timeZone: 'America/New_York', timeZoneName: 'long' })
                                     : undefined
                             }
                             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition ${draftBadgeClass(variant)} ${variant === 'urgent' ? 'animate-pulse' : ''}`}
