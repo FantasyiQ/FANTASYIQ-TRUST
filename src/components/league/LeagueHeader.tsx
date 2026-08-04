@@ -36,24 +36,18 @@ function getDraftDisplay(
         hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York', timeZoneName: 'short',
     }).format(draftDate);
 
-    // Compare calendar days in ET to avoid "Today" showing for tomorrow's draft
+    // Compare calendar days in ET so "Today" only shows on the actual draft day
     const etFormatter = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
     const nowDay      = etFormatter.format(new Date(now));
     const draftDay    = etFormatter.format(draftDate);
-    const daysUntil   = Math.round(msUntil / (1000 * 60 * 60 * 24));
 
     if (nowDay === draftDay) {
         return { text: `Draft Today · ${timeStr}`, variant: 'urgent' };
     }
 
-    if (daysUntil === 1) {
-        return { text: `Draft Tomorrow · ${timeStr}`, variant: 'upcoming' };
-    }
-
-    if (daysUntil < 30) {
-        return { text: `Draft in ${daysUntil} day${daysUntil === 1 ? '' : 's'}`, variant: 'upcoming' };
-    }
-
+    // Every other upcoming case shows the exact date and time — a relative
+    // countdown ("in 28 days") doesn't tell you what day of the week or what
+    // time to actually block off.
     const dateStr = new Intl.DateTimeFormat('en-US', {
         month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/New_York',
     }).format(draftDate);
