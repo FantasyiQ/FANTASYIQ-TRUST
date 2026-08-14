@@ -7,6 +7,7 @@ import {
     deriveEspnStatus,
     deriveEspnScoringType,
     deriveEspnRosterPositions,
+    translateEspnScoring,
 } from '@/lib/espn';
 
 // POST /api/espn/sync-history
@@ -54,6 +55,7 @@ export async function POST(request: NextRequest): Promise<Response> {
                     status:          deriveEspnStatus(rawData),
                     totalRosters:    data.totalTeams,
                     scoringType:     deriveEspnScoringType(rawData.settings),
+                    scoringSettings: translateEspnScoring(rawData.settings),
                     rosterPositions: deriveEspnRosterPositions(rawData.settings),
                     standings:       data.teams.map(t => ({
                         teamId: t.teamId, name: t.name, abbrev: t.abbrev,
@@ -71,6 +73,7 @@ export async function POST(request: NextRequest): Promise<Response> {
                     status:          deriveEspnStatus(rawData),
                     totalRosters:    data.totalTeams,
                     scoringType:     deriveEspnScoringType(rawData.settings),
+                    scoringSettings: translateEspnScoring(rawData.settings),
                     rosterPositions: deriveEspnRosterPositions(rawData.settings),
                     standings:       data.teams.map(t => ({
                         teamId: t.teamId, name: t.name, abbrev: t.abbrev,

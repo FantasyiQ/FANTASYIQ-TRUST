@@ -10,6 +10,7 @@ import {
     deriveEspnRosterPositions,
     deriveEspnStatus,
     deriveEspnScoringType,
+    translateEspnScoring,
 } from '@/lib/espn';
 
 // POST /api/espn/sync — full sync: settings + teams + rosters + matchups
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest): Promise<Response> {
             status:          deriveEspnStatus(rawData),
             totalRosters:    data.totalTeams,
             scoringType:     deriveEspnScoringType(rawData.settings),
+            scoringSettings: translateEspnScoring(rawData.settings),
             rosterPositions: deriveEspnRosterPositions(rawData.settings),
             standings:       data.teams.map(t => ({
                 teamId:       t.teamId,

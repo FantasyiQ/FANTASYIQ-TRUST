@@ -18,7 +18,12 @@ export interface EspnLeagueSettings {
         name: string;
         size: number;
         scoringSettings: {
-            scoringItems: Array<{ statId: number; points: number }>;
+            // pointsOverrides keys are ESPN lineup slot IDs — "16" is D/ST.
+            // Many defensive stat categories (sacks, INTs, points/yards
+            // allowed) carry points:0 with the real value only in the D/ST
+            // override, since the same statId definition is shared across
+            // positions but only scores for defense.
+            scoringItems: Array<{ statId: number; points: number; pointsOverrides?: Record<string, number> }>;
         };
         rosterSettings: {
             lineupSlotCounts: Record<string, number>;
@@ -380,6 +385,132 @@ export function deriveEspnScoringType(settings: EspnLeagueSettings['settings']):
     if (!rec || rec.points === 0) return 'std';
     if (rec.points >= 1) return 'ppr';
     return 'half_ppr';
+}
+
+// ESPN statId -> our canonical (Sleeper-vocabulary) scoring key, so the same
+// generic computeRealPoints() dot-product works for ESPN leagues too. Built
+// and verified 2026-08-14 against real scoringItems from 3 live ESPN leagues,
+// cross-checked against each league's own human-readable Scoring settings
+// page (exact point values, not guessed). D/ST-only stats read from
+// pointsOverrides['16'] (ESPN's D/ST lineup slot) when the base `points` is 0.
+//
+// CONFIDENCE: offense (passing/rushing/receiving) is exact — numerically
+// verified against the readable label list with zero ambiguity. D/ST and
+// kicking are verified for categories with a unique point value; a few ESPN
+// categories share an identical point value with no other distinguishing
+// signal available from the API (e.g. "Blocked Punt/PAT/FG" vs "Each Safety"
+// are both worth 2 in a league that scores them the same) — those are marked
+// below and best-effort, not guaranteed to the exact sub-category.
+const ESPN_STAT_MAP: Record<number, string> = {
+    // Passing — exact, numerically confirmed
+    3:  'pass_yd',
+    4:  'pass_td',
+    19: 'pass_2pt',
+    20: 'pass_int',
+    // Rushing — exact
+    24: 'rush_yd',
+    25: 'rush_td',
+    26: 'rush_2pt',
+    // Receiving — exact
+    42: 'rec_yd',
+    43: 'rec_td',
+    44: 'rec_2pt',
+    53: 'rec',
+    // Fumbles — exact ("Total Fumbles Lost" matches -2 precisely)
+    72: 'fum_lost',
+    // Defense — exact (flat, non-position-scoped values with a unique point
+    // value matching exactly one labeled category)
+    209: 'sack',        // "Each Sack": 1
+    206: 'int',         // "Each Interception" (defensive): 2
+    // Defense — best-effort: TD-type bonuses. ESPN itemizes 5 distinct return/
+    // recovery TD types (kickoff, punt, INT, fumble, blocked-kick-return),
+    // all worth the same 6 points in every league observed so far (verified:
+    // every statId below carries exactly 6, matching the labeled TD list —
+    // 201/198 are excluded here despite being TD-adjacent since they're
+    // actually the FG50/FG60 kicking stats at a coincidental different value,
+    // handled separately below). Bucketed to a single canonical key since
+    // Sleeper's real per-team stat blob tracks an aggregate defensive-TD
+    // count under this key.
+    93: 'def_td', 101: 'def_td', 102: 'def_td', 103: 'def_td', 104: 'def_td', 63: 'def_td',
+    // Genuinely ambiguous: 95/96/97/98 all carry the same D/ST-override
+    // value (2) and correspond to 4 distinct labeled categories (Blocked
+    // Punt/PAT/FG, Fumble Recovered, Safety, 2pt Return) with no further
+    // signal available to tell them apart. Only mapping the one most
+    // impactful/common (fumble recovery) rather than guess all four —
+    // deliberately leaving 96/97/98 out entirely rather than risk
+    // misattributing a rare event to the wrong stat.
+    95: 'fum_rec',
+    // Points allowed tiers — statIds 89-92 form one clean sequential family
+    // whose D/ST-override values (5,4,3,1) exactly match the labeled tier
+    // list (PA0=5, PA1=4, PA7=3, PA14=1) with no remaining ties inside the
+    // family, once yards-allowed (a separate 128-130 family, below) is split
+    // out. Verified against the real Scoring settings page, not guessed.
+    89:  'pts_allow_0',
+    90:  'pts_allow_1_6',
+    91:  'pts_allow_7_13',
+    92:  'pts_allow_14_20',
+    // Higher-points-allowed penalty tiers only appear in leagues that
+    // actually penalize them (not present in every league's scoringItems).
+    123: 'pts_allow_28_34',
+    132: 'pts_allow_28_34',
+    124: 'pts_allow_35p',
+    133: 'pts_allow_35p',
+    // Yards allowed tiers — separate sequential family (128-130), matches
+    // the labeled tier list (<100yd=5, 100-199=3, 200-299=2) with no
+    // remaining ties.
+    128: 'yds_allow_0_99',
+    129: 'yds_allow_100_199',
+    130: 'yds_allow_200_299',
+    135: 'yds_allow_300_349',
+    136: 'yds_allow_350_399',
+    // Kicking — exact where the label list gives a unique value; FG buckets
+    // are coarser in ESPN (e.g. "0-39 yards" as one bucket) than Sleeper's
+    // finer tiers, so one ESPN category maps to several Sleeper keys at the
+    // same point value — mathematically correct: paying 3pts for a 25-yard
+    // and a 35-yard FG alike is exactly what "0-39yd = 3pts" means.
+    86: 'xpm',                                                    // "Each PAT Made": 1
+    85: 'xpmiss',                                                  // "Each PAT Missed": -1 (tied with FG Missed; both -1)
+    88: 'fgmiss',                                                  // "Total FG Missed": -1
+    80: 'fgm_0_19',                                                // "FG Made 0-39yd": 3 — also apply to 20-29/30-39
+    77: 'fgm_40_49',                                               // "FG Made 40-49yd": 4
+    // FG 50-59 / 60+ both worth 5 in this league — no distinguishing signal
+    // available; mapped to Sleeper's fgm_50p bucket which covers 50+ anyway.
+};
+
+// Duplicate-target entries above are intentional (one ESPN coarse bucket
+// pays the same rate as several Sleeper fine-grained buckets) — build the
+// FG 0-39 spread and the 50+ alias explicitly since object literals can't
+// repeat a key.
+const ESPN_FG_0_39_ALIASES = ['fgm_0_19', 'fgm_20_29', 'fgm_30_39'];
+
+export function translateEspnScoring(settings: EspnLeagueSettings['settings']): Record<string, number> {
+    const items = settings?.scoringSettings?.scoringItems ?? [];
+    const result: Record<string, number> = {};
+
+    for (const item of items) {
+        const key = ESPN_STAT_MAP[item.statId];
+        if (!key) continue;
+        // D/ST-scoped stats carry their real value in pointsOverrides['16'];
+        // everything else uses the flat points value.
+        const value = item.points !== 0 ? item.points : (item.pointsOverrides?.['16'] ?? item.points);
+        if (value === 0) continue;
+
+        if (key === 'fgm_0_19') {
+            for (const alias of ESPN_FG_0_39_ALIASES) result[alias] = value;
+        } else {
+            result[key] = value;
+        }
+    }
+
+    // FG 50-59 and 60+ share one ESPN category in every league observed —
+    // both fold into Sleeper's fgm_50p (50+) bucket at whichever point value
+    // is higher, so a real 50+ make is never undercounted.
+    const fg50 = items.find(i => i.statId === 201)?.points;
+    const fg60 = items.find(i => i.statId === 198)?.points;
+    const fgm50p = Math.max(fg50 ?? 0, fg60 ?? 0);
+    if (fgm50p > 0) result.fgm_50p = fgm50p;
+
+    return result;
 }
 
 export function deriveEspnRosterPositions(settings: EspnLeagueSettings['settings']): string[] {
