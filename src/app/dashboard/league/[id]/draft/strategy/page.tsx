@@ -5,6 +5,7 @@ import { redirect, notFound } from 'next/navigation';
 import { auth }   from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getNflState } from '@/lib/sleeper';
+import { calculateAge } from '@/lib/calculateAge';
 import DraftCenterTabBar from '../DraftCenterTabBar';
 import RookieDynastyRankings from './RookieDynastyRankings';
 import RedraftBigBoard from './RedraftBigBoard';
@@ -156,7 +157,7 @@ export default async function DraftStrategyPage({
 
     // ── Redraft big board ─────────────────────────────────────────────────────
     if (!isDynasty) {
-        const adpPlayers = await prisma.sleeperPlayer.findMany({
+        const rawAdpPlayers = await prisma.sleeperPlayer.findMany({
             where: {
                 searchRank: { not: null },
                 position:   { in: ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'] },
@@ -168,11 +169,28 @@ export default async function DraftStrategyPage({
                 position:     true,
                 team:         true,
                 age:          true,
+                birthDate:    true,
                 searchRank:   true,
                 injuryStatus: true,
             },
-            take: 300,
+            // Fetch a buffer beyond 300 since a few retired players get
+            // filtered out below (age check) but still occupy slots here.
+            take: 330,
         });
+
+        // Sleeper's own `active` flag and stale searchRank are unreliable for
+        // long-retired players (e.g. Drew Brees, Tom Brady both still show
+        // active:true with a low leftover searchRank) — no real NFL player is
+        // playing past their mid-40s, so a computed-age cutoff catches these
+        // reliably where the source data doesn't. Team defenses (no birthDate)
+        // are unaffected since calculateAge returns null for them.
+        const MAX_PLAUSIBLE_AGE = 45;
+        const adpPlayers = rawAdpPlayers
+            .filter(p => {
+                const computedAge = calculateAge(p.birthDate);
+                return computedAge === null || computedAge <= MAX_PLAUSIBLE_AGE;
+            })
+            .slice(0, 300);
 
         // Attach projections if in season
         const pprField = league.platform === 'sleeper' ? 'pointsPpr' : null;

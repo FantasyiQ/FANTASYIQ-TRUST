@@ -8,7 +8,7 @@ import LeagueRankingsView from '@/components/league/LeagueRankingsView';
 import BackToOverview from '../_components/BackToOverview';
 import { trackFeature } from '@/app/actions/analytics';
 import { prisma } from '@/lib/prisma';
-import { calculatePreciseAge } from '@/lib/calculateAge';
+import { calculateAge, calculatePreciseAge } from '@/lib/calculateAge';
 import RedraftRankingsView from './RedraftRankingsView';
 
 export default async function RankingsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -42,7 +42,7 @@ export default async function RankingsPage({ params }: { params: Promise<{ id: s
     const isDynasty = league?.leagueType === 'Dynasty';
 
     if (!isDynasty) {
-        const players = await prisma.sleeperPlayer.findMany({
+        const rawPlayers = await prisma.sleeperPlayer.findMany({
             where: {
                 searchRank: { not: null },
                 position:   { in: ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'] },
@@ -58,8 +58,24 @@ export default async function RankingsPage({ params }: { params: Promise<{ id: s
                 searchRank:   true,
                 injuryStatus: true,
             },
-            take: 300,
+            // Fetch a buffer beyond 300 since a few retired players get
+            // filtered out below (age check) but still occupy slots here.
+            take: 330,
         });
+
+        // Sleeper's own `active` flag and stale searchRank are unreliable for
+        // long-retired players (e.g. Drew Brees, Tom Brady both still show
+        // active:true with a low leftover searchRank) — no real NFL player is
+        // playing past their mid-40s, so a computed-age cutoff catches these
+        // reliably where the source data doesn't. Team defenses (no birthDate)
+        // are unaffected since calculateAge returns null for them.
+        const MAX_PLAUSIBLE_AGE = 45;
+        const players = rawPlayers
+            .filter(p => {
+                const computedAge = calculateAge(p.birthDate);
+                return computedAge === null || computedAge <= MAX_PLAUSIBLE_AGE;
+            })
+            .slice(0, 300);
 
         return (
             <RedraftRankingsView
