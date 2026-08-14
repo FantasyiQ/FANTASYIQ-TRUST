@@ -6,7 +6,7 @@ import { auth }   from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getNflState } from '@/lib/sleeper';
 import { computeRealRedraftBoard } from '@/lib/rankings/realRedraftBoard';
-import { STANDARD_SCORING } from '@/lib/rankings/leagueScoringPoints';
+import { STANDARD_SCORING, computeRealProjectedPoints } from '@/lib/rankings/leagueScoringPoints';
 import DraftCenterTabBar from '../DraftCenterTabBar';
 import RookieDynastyRankings from './RookieDynastyRankings';
 import RedraftBigBoard from './RedraftBigBoard';
@@ -34,7 +34,7 @@ export default async function DraftStrategyPage({
             rosterPositions: true, draftStatus: true, leagueType: true,
             playoffWeekStart: true, champWeek: true, platform: true,
             leagueId: true, totalRosters: true, sleeperUserId: true,
-            scoringSettings: true,
+            scoringSettings: true, scoringType: true,
         },
     });
 
@@ -167,14 +167,21 @@ export default async function DraftStrategyPage({
         const adpPlayers = await computeRealRedraftBoard(scoringSettings, superflex);
 
         // Attach projections if in season
-        const pprField = league.platform === 'sleeper' ? 'pointsPpr' : null;
         let projMap = new Map<string, number>();
-        if (pprField && currentWeek > 0) {
+        if (league.platform === 'sleeper' && currentWeek > 0) {
             const projs = await prisma.playerProjection.findMany({
                 where:  { season, week: currentWeek, playerId: { in: adpPlayers.map(p => p.playerId) } },
-                select: { playerId: true, pointsPpr: true },
+                select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true, rawProjection: true },
             });
-            projMap = new Map(projs.map(p => [p.playerId, p.pointsPpr ?? 0]));
+            projMap = new Map(projs.map(p => [
+                p.playerId,
+                computeRealProjectedPoints(
+                    p.rawProjection as Record<string, number> | null,
+                    scoringSettings,
+                    p,
+                    league.scoringType,
+                ),
+            ]));
         }
 
         return (

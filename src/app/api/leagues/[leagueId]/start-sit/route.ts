@@ -13,6 +13,7 @@ import {
     buildOpponentDefRankMap,
 } from '@/lib/projection-engine';
 import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
+import { computeRealProjectedPoints } from '@/lib/rankings/leagueScoringPoints';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -217,6 +218,7 @@ export async function POST(
             sleeperUserId:   true,
             assignedPlanId:   true,
             assignedPlanType: true,
+            scoringSettings:  true,
         },
     });
 
@@ -238,10 +240,8 @@ export async function POST(
         season = String(new Date().getFullYear());
     }
 
-    // ── Scoring field ─────────────────────────────────────────────────────────
-    const pprField: 'pointsPpr' | 'pointsStd' | 'pointsHalfPpr' =
-        league.scoringType === 'ppr'      ? 'pointsPpr'     :
-        league.scoringType === 'half_ppr' ? 'pointsHalfPpr' : 'pointsStd';
+    // ── Scoring settings ─────────────────────────────────────────────────────
+    const scoringSettings = league.scoringSettings as Record<string, number> | null;
 
     // ── Fetch both players ────────────────────────────────────────────────────
     const [players, projections] = await Promise.all([
@@ -251,12 +251,15 @@ export async function POST(
         }),
         prisma.playerProjection.findMany({
             where:  { season, week, playerId: { in: [playerAId, playerBId] } },
-            select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true },
+            select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true, rawProjection: true },
         }),
     ]);
 
     const playerMap = new Map(players.map(p => [p.playerId, p]));
-    const projMap   = new Map(projections.map(p => [p.playerId, p[pprField] ?? 0]));
+    const projMap   = new Map(projections.map(p => [
+        p.playerId,
+        computeRealProjectedPoints(p.rawProjection as Record<string, number> | null, scoringSettings, p, league.scoringType),
+    ]));
 
     const infoA = playerMap.get(playerAId);
     const infoB = playerMap.get(playerBId);
@@ -336,7 +339,7 @@ export async function POST(
                         const [allProjs, allInfo] = await Promise.all([
                             prisma.playerProjection.findMany({
                                 where:  { season, week, playerId: { in: [...allIds] } },
-                                select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true },
+                                select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true, rawProjection: true },
                             }),
                             prisma.sleeperPlayer.findMany({
                                 where:  { playerId: { in: [...allIds] } },
@@ -344,7 +347,10 @@ export async function POST(
                             }),
                         ]);
 
-                        const allProjMap = new Map(allProjs.map(p => [p.playerId, p[pprField] ?? 0]));
+                        const allProjMap = new Map(allProjs.map(p => [
+                            p.playerId,
+                            computeRealProjectedPoints(p.rawProjection as Record<string, number> | null, scoringSettings, p, league.scoringType),
+                        ]));
                         const allInfoMap = new Map(allInfo.map(p => [p.playerId, p]));
 
                         const rosterPositions = league.rosterPositions;

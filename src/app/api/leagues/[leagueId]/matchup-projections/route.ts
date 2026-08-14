@@ -16,6 +16,7 @@ import {
     type PlayerRecord,
     type MatchupProjection,
 } from '@/lib/projection-engine';
+import { computeRealProjectedPoints } from '@/lib/rankings/leagueScoringPoints';
 
 // Sleeper matchup response includes per-player points in live scoring
 interface SleeperMatchupFull {
@@ -52,6 +53,7 @@ export async function GET(
             platform:       true,
             assignedPlanId:   true,
             assignedPlanType: true,
+            scoringSettings:  true,
         },
     });
 
@@ -119,9 +121,7 @@ export async function GET(
     }
 
     // ── 6. Fetch projections + player info from DB in parallel ─────────────────
-    const pprField: 'pointsPpr' | 'pointsStd' | 'pointsHalfPpr' =
-        league.scoringType === 'ppr'      ? 'pointsPpr'     :
-        league.scoringType === 'half_ppr' ? 'pointsHalfPpr' : 'pointsStd';
+    const scoringSettings = league.scoringSettings as Record<string, number> | null;
 
     const [projections, players] = await Promise.all([
         prisma.playerProjection.findMany({
@@ -130,7 +130,7 @@ export async function GET(
                 week,
                 playerId: { in: [...allPlayerIds] },
             },
-            select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true },
+            select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true, rawProjection: true },
         }),
         prisma.sleeperPlayer.findMany({
             where: { playerId: { in: [...allPlayerIds] } },
@@ -138,7 +138,15 @@ export async function GET(
         }),
     ]);
 
-    const projByPlayer = new Map(projections.map(p => [p.playerId, p[pprField]]));
+    const projByPlayer = new Map(projections.map(p => [
+        p.playerId,
+        computeRealProjectedPoints(
+            p.rawProjection as Record<string, number> | null,
+            scoringSettings,
+            p,
+            league.scoringType,
+        ),
+    ]));
     const playerInfo   = new Map<string, PlayerRecord>(
         players.map(p => [p.playerId, {
             playerId:     p.playerId,

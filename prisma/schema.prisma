@@ -676,16 +676,20 @@ model PlayerSeasonStats {
 
 // Weekly fantasy point projections — populated by /api/cron/sleeper-projections.
 model PlayerProjection {
-    id        String   @id @default(cuid())
-    playerId  String
-    season    String
-    week      Int
-    pointsPpr Float
-    pointsStd Float
+    id            String   @id @default(cuid())
+    playerId      String
+    season        String
+    week          Int
+    pointsPpr     Float
+    pointsStd     Float
     pointsHalfPpr Float
-    updatedAt DateTime @updatedAt @default(now())
+    rawProjection Json?    // full per-stat Sleeper projection blob (pass_yd, rec, etc.) — lets any
+                           // league's real scoring_settings compute a real projected score, same
+                           // pattern as PlayerSeasonStats.rawStats. Null for rows synced before this
+                           // field existed; callers fall back to the pre-aggregated ppr/std/half columns.
+    updatedAt     DateTime @updatedAt @default(now())
 
-    player    SleeperPlayer @relation(fields: [playerId], references: [playerId], onDelete: Cascade)
+    player        SleeperPlayer @relation(fields: [playerId], references: [playerId], onDelete: Cascade)
 
     @@unique([playerId, season, week])
     @@index([season, week])

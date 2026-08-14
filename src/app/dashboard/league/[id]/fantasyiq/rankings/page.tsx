@@ -8,6 +8,7 @@ import { getNflState } from '@/lib/sleeper';
 import RankingsHub from './RankingsHub';
 import type { RankingPlayer } from '@/lib/rankings/rankingsUtils';
 import { trackFeature } from '@/app/actions/analytics';
+import { computeRealProjectedPoints } from '@/lib/rankings/leagueScoringPoints';
 
 const ALL_FANTASY_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE', 'K', 'DEF']);
 
@@ -29,6 +30,7 @@ export default async function RankingsPage({
             id: true, userId: true, platform: true,
             leagueId: true, leagueName: true, season: true,
             scoringType: true, rosterPositions: true, totalRosters: true,
+            scoringSettings: true,
         },
     });
 
@@ -62,14 +64,12 @@ export default async function RankingsPage({
 
     // ── Fetch projections ─────────────────────────────────────────────────────
 
-    const pprField: 'pointsPpr' | 'pointsHalfPpr' | 'pointsStd' =
-        league.scoringType === 'ppr'      ? 'pointsPpr'     :
-        league.scoringType === 'half_ppr' ? 'pointsHalfPpr' : 'pointsStd';
+    const scoringSettings = league.scoringSettings as Record<string, number> | null;
 
     const [projections, allPlayers] = await Promise.all([
         prisma.playerProjection.findMany({
             where:  { season, week },
-            select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true },
+            select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true, rawProjection: true },
         }),
         prisma.sleeperPlayer.findMany({
             where:  { position: { in: Array.from(FANTASY_POSITIONS) }, active: true },
@@ -83,7 +83,12 @@ export default async function RankingsPage({
     for (const proj of projections) {
         const info     = playerMap.get(proj.playerId);
         if (!info || !FANTASY_POSITIONS.has(info.position)) continue;
-        const baseProj = Math.round((proj[pprField] ?? 0) * 100) / 100;
+        const baseProj = Math.round(computeRealProjectedPoints(
+            proj.rawProjection as Record<string, number> | null,
+            scoringSettings,
+            proj,
+            league.scoringType,
+        ) * 100) / 100;
         if (baseProj <= 0) continue;
         rankingPlayers.push({
             playerId:     proj.playerId,

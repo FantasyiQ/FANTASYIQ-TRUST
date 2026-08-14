@@ -16,6 +16,7 @@ import {
 } from '@/lib/projection-engine';
 import MatchupProjections from '../../projections/MatchupProjections';
 import HubTabBar          from '../HubTabBar';
+import { computeRealProjectedPoints } from '@/lib/rankings/leagueScoringPoints';
 
 interface SleeperMatchupFull {
     matchup_id:     number | null;
@@ -45,7 +46,7 @@ export default async function HubProjectionsPage({
             id: true, userId: true, leagueId: true, leagueName: true,
             season: true, scoringType: true, totalRosters: true,
             rosterPositions: true, standings: true, platform: true,
-            currentMatchup: true,
+            currentMatchup: true, scoringSettings: true,
         },
     });
 
@@ -152,16 +153,21 @@ export default async function HubProjectionsPage({
                 }
 
                 const allMatchedIds = sleeperRows.map(p => p.playerId);
-
-                const pprField: 'pointsPpr' | 'pointsStd' | 'pointsHalfPpr' =
-                    league.scoringType === 'ppr'      ? 'pointsPpr'     :
-                    league.scoringType === 'half_ppr' ? 'pointsHalfPpr' : 'pointsStd';
+                const espnScoringSettings = league.scoringSettings as Record<string, number> | null;
 
                 const projs = await prisma.playerProjection.findMany({
                     where:  { season, week: espnWeek, playerId: { in: allMatchedIds } },
-                    select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true },
+                    select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true, rawProjection: true },
                 });
-                const projByPlayer = new Map(projs.map(p => [p.playerId, p[pprField] ?? 0]));
+                const projByPlayer = new Map(projs.map(p => [
+                    p.playerId,
+                    computeRealProjectedPoints(
+                        p.rawProjection as Record<string, number> | null,
+                        espnScoringSettings,
+                        p,
+                        league.scoringType,
+                    ),
+                ]));
 
                 const playerInfo = new Map<string, PlayerRecord>(
                     sleeperRows.map(p => [p.playerId, {
@@ -301,14 +307,12 @@ export default async function HubProjectionsPage({
         }
     }
 
-    const pprField: 'pointsPpr' | 'pointsStd' | 'pointsHalfPpr' =
-        league.scoringType === 'ppr'      ? 'pointsPpr'     :
-        league.scoringType === 'half_ppr' ? 'pointsHalfPpr' : 'pointsStd';
+    const sleeperScoringSettings = league.scoringSettings as Record<string, number> | null;
 
     const [projections, players] = await Promise.all([
         prisma.playerProjection.findMany({
             where:  { season, week, playerId: { in: [...allPlayerIds] } },
-            select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true },
+            select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true, rawProjection: true },
         }),
         prisma.sleeperPlayer.findMany({
             where:  { playerId: { in: [...allPlayerIds] } },
@@ -316,7 +320,15 @@ export default async function HubProjectionsPage({
         }),
     ]);
 
-    const projByPlayer = new Map(projections.map(p => [p.playerId, p[pprField]]));
+    const projByPlayer = new Map(projections.map(p => [
+        p.playerId,
+        computeRealProjectedPoints(
+            p.rawProjection as Record<string, number> | null,
+            sleeperScoringSettings,
+            p,
+            league.scoringType,
+        ),
+    ]));
     const playerInfo   = new Map<string, PlayerRecord>(
         players.map(p => [p.playerId, {
             playerId: p.playerId, name: p.fullName,

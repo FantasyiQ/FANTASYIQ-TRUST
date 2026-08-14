@@ -7,11 +7,19 @@ export const maxDuration = 300;
 // Sleeper's public projections endpoint — returns points for all players
 // for a given NFL season + week.
 // https://api.sleeper.app/v1/projections/nfl/{season}/{week}
+//
+// The response carries a full per-stat breakdown (pass_yd, rec, fgm_20_29,
+// etc. — the same canonical key vocabulary Sleeper's real stats endpoint
+// uses), not just the 3 pre-aggregated point totals below. That raw blob is
+// stored as rawProjection so any league's real scoring_settings can compute
+// a real projected score via the League Scoring Points Engine, instead of
+// every league being stuck on a generic ppr/std/half_ppr bucket.
 
 type SleeperProjection = {
     pts_ppr?:      number;
     pts_std?:      number;
     pts_half_ppr?: number;
+    [stat: string]: number | undefined;
 };
 
 function currentNflWeek(): { season: string; week: number } {
@@ -59,8 +67,9 @@ export async function GET(request: NextRequest): Promise<Response> {
                 pointsPpr:     p.pts_ppr      ?? 0,
                 pointsStd:     p.pts_std      ?? 0,
                 pointsHalfPpr: p.pts_half_ppr ?? 0,
+                rawProjection: p,
             }));
-    
+
         // Upsert in batches of 200
         const BATCH = 200;
         for (let i = 0; i < rows.length; i += BATCH) {
@@ -69,7 +78,7 @@ export async function GET(request: NextRequest): Promise<Response> {
                 prisma.playerProjection.upsert({
                     where: { playerId_season_week: { playerId: r.playerId, season: r.season, week: r.week } },
                     create: r,
-                    update: { pointsPpr: r.pointsPpr, pointsStd: r.pointsStd, pointsHalfPpr: r.pointsHalfPpr },
+                    update: { pointsPpr: r.pointsPpr, pointsStd: r.pointsStd, pointsHalfPpr: r.pointsHalfPpr, rawProjection: r.rawProjection },
                 }).catch(() => null) // skip if playerId doesn't exist in SleeperPlayer
             ));
         }

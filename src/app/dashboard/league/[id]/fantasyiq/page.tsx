@@ -29,6 +29,7 @@ import OptimizedLineups       from './OptimizedLineups';
 import WaiverWireTargets      from './WaiverWireTargets';
 import RosterIntelligencePanel from './RosterIntelligence';
 import HubContent             from './HubContent';
+import { computeRealProjectedPoints } from '@/lib/rankings/leagueScoringPoints';
 
 interface SleeperMatchupFull {
     matchup_id:     number | null;
@@ -61,6 +62,7 @@ export default async function FantasyiQHubPage({ params }: { params: Promise<{ i
             platform:         true,
             draftType:        true,
             assignedPlanType: true,
+            scoringSettings:  true,
         },
     });
 
@@ -123,13 +125,11 @@ export default async function FantasyiQHubPage({ params }: { params: Promise<{ i
                 }
             }
 
-            const pprField: 'pointsPpr' | 'pointsStd' | 'pointsHalfPpr' =
-                league.scoringType === 'ppr'      ? 'pointsPpr'     :
-                league.scoringType === 'half_ppr' ? 'pointsHalfPpr' : 'pointsStd';
+            const hubScoringSettings = league.scoringSettings as Record<string, number> | null;
 
             const allProjections = await prisma.playerProjection.findMany({
                 where:  { season, week },
-                select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true },
+                select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true, rawProjection: true },
             });
             const allProjectedIds = allProjections.map(p => p.playerId);
             const allPlayers = await prisma.sleeperPlayer.findMany({
@@ -137,7 +137,15 @@ export default async function FantasyiQHubPage({ params }: { params: Promise<{ i
                 select: { playerId: true, fullName: true, position: true, team: true, injuryStatus: true },
             });
 
-            const projByPlayer = new Map(allProjections.map(p => [p.playerId, p[pprField]]));
+            const projByPlayer = new Map(allProjections.map(p => [
+                p.playerId,
+                computeRealProjectedPoints(
+                    p.rawProjection as Record<string, number> | null,
+                    hubScoringSettings,
+                    p,
+                    league.scoringType,
+                ),
+            ]));
             const playerInfo   = new Map<string, PlayerRecord>(
                 allPlayers.map(p => [p.playerId, {
                     playerId:     p.playerId,

@@ -135,3 +135,25 @@ export function toStatsPerGame(
     }
     return perGame;
 }
+
+/**
+ * Real projected points for a single week under a league's exact scoring
+ * settings, computed from Sleeper's raw per-stat projection (same canonical
+ * key vocabulary as real stats, so computeRealPoints works unmodified).
+ * Falls back to the pre-aggregated ppr/std/half_ppr column — picked by the
+ * league's coarse scoringType — when either the row predates rawProjection
+ * capture or the league has no granular scoringSettings yet (Yahoo/NFL).
+ */
+export function computeRealProjectedPoints(
+    rawProjection:   Record<string, number> | null | undefined,
+    scoringSettings: Record<string, number> | null,
+    fallback:        { pointsPpr: number; pointsStd: number; pointsHalfPpr: number },
+    leagueScoringType: string | null,
+): number {
+    if (rawProjection && scoringSettings) {
+        return computeRealPoints(rawProjection, scoringSettings);
+    }
+    return leagueScoringType === 'ppr'      ? fallback.pointsPpr
+         : leagueScoringType === 'half_ppr' ? fallback.pointsHalfPpr
+         : fallback.pointsStd;
+}
