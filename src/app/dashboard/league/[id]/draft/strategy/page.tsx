@@ -206,6 +206,8 @@ export default async function DraftStrategyPage({
                         adp:            p.adp,
                         realPtsPerGame: p.realPtsPerGame,
                         hasRealData:    p.hasRealData,
+                        projPtsPerGame: p.projPtsPerGame,
+                        hasProjData:    p.hasProjData,
                         injuryStatus:   p.injuryStatus,
                         projection:     projMap.get(p.playerId) ?? null,
                     }))}

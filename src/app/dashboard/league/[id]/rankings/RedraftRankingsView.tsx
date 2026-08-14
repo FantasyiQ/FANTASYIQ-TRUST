@@ -30,6 +30,8 @@ interface PlayerRow {
     adp:            number;
     realPtsPerGame: number | null;
     hasRealData:    boolean;
+    projPtsPerGame: number | null;
+    hasProjData:    boolean;
     injuryStatus:   string | null;
 }
 
@@ -139,8 +141,12 @@ export default function RedraftRankingsView({ players, leagueName, season }: Pro
                                     <td className="px-4 py-2.5 text-right font-bold text-[#D4AF37]">
                                         {p.hasRealData ? (
                                             p.realPtsPerGame!.toFixed(1)
+                                        ) : p.hasProjData ? (
+                                            <span title="No season stats yet — ranked by projected points">
+                                                {p.projPtsPerGame!.toFixed(1)}<span className="text-[10px] font-normal text-gray-500 ml-0.5">proj</span>
+                                            </span>
                                         ) : p.adp < 999 ? (
-                                            <span className="font-normal text-gray-500" title="No season stats yet — ranked by ADP">
+                                            <span className="font-normal text-gray-500" title="No season stats or projection yet — ranked by ADP">
                                                 ADP {p.adp}
                                             </span>
                                         ) : (
@@ -158,7 +164,7 @@ export default function RedraftRankingsView({ players, leagueName, season }: Pro
                     </table>
                 </div>
                 <div className="px-4 py-3 border-t border-gray-800 text-xs text-gray-600">
-                    Real points/game computed under your league&apos;s exact scoring settings · players without season stats yet ranked by Sleeper ADP · {filtered.length} players shown
+                    Real points/game computed under your league&apos;s exact scoring settings · rookies and stat-less players ranked by real projected points, ADP as a last resort · {filtered.length} players shown
                 </div>
             </div>
         </div>

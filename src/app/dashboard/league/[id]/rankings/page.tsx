@@ -64,6 +64,8 @@ export default async function RankingsPage({ params }: { params: Promise<{ id: s
                     adp:            p.adp,
                     realPtsPerGame: p.realPtsPerGame,
                     hasRealData:    p.hasRealData,
+                    projPtsPerGame: p.projPtsPerGame,
+                    hasProjData:    p.hasProjData,
                     injuryStatus:   p.injuryStatus,
                 }))}
                 leagueName={league?.leagueName ?? ''}

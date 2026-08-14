@@ -36,7 +36,15 @@ import { getNflState } from '@/lib/sleeper';
 import {
     computeRealPoints, computePerfFactor, toStatsPerGame,
     computePositionScoringFactor, combineScoringFactors, STANDARD_SCORING,
+    computeRealProjectedPoints,
 } from './leagueScoringPoints';
+
+// Full-sample proxy for computePerfFactor's games-played regression weight —
+// a real weekly projection already reflects a full-season depth-chart/
+// opportunity estimate, not a small in-season sample that needs smoothing
+// toward the mean, so it should get the same full individual weight a
+// veteran with a complete season of stats would.
+const PROJECTION_FULL_SAMPLE_PROXY = 17;
 
 const REDRAFT_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'] as const;
 const MAX_PLAUSIBLE_AGE = 45;      // no real NFL player plays past their mid-40s
@@ -53,6 +61,8 @@ export interface RealRedraftPlayer {
     adp:            number;              // Sleeper searchRank — real market ADP, shown for reference
     realPtsPerGame: number | null;        // null when the player has no season stats yet
     hasRealData:    boolean;
+    projPtsPerGame: number | null;        // real projected points — only set when hasRealData is false
+    hasProjData:    boolean;
 }
 
 function normaliseFcValue(raw: number): number {
@@ -127,6 +137,39 @@ export async function computeRealRedraftBoard(
         return fcByNamePos.get(`${nameLower}|${position}`)
             ?? (fcNameCount.get(nameLower) === 1 ? fcByName.get(nameLower) : undefined);
     }
+
+    // Rookies and other stat-less players have no real season production to
+    // rank by — real projected points (Sleeper's per-stat weekly projection,
+    // run through this league's real scoring settings) is the best honest
+    // signal available for them, in place of falling back on ADP alone.
+    const projWeek = nflState.week > 0 ? nflState.week : 1;
+    const eligiblePlayerIds = rawPlayers.map(p => p.playerId);
+    let projectionRows = await prisma.playerProjection.findMany({
+        where:  { season: statsSeason, week: projWeek, playerId: { in: eligiblePlayerIds } },
+        select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true, rawProjection: true },
+    });
+    if (projectionRows.length === 0) {
+        // The requested season/week has no real data yet (e.g. the sync
+        // cron's own date heuristic can land on a different season/week
+        // than Sleeper's live nflState during the preseason calendar
+        // crossover) — fall back to whatever real projection snapshot is
+        // most recently available, rather than showing nothing.
+        const latest = await prisma.playerProjection.findFirst({
+            orderBy: [{ season: 'desc' }, { week: 'desc' }],
+            select: { season: true, week: true },
+        });
+        if (latest) {
+            projectionRows = await prisma.playerProjection.findMany({
+                where:  { season: latest.season, week: latest.week, playerId: { in: eligiblePlayerIds } },
+                select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true, rawProjection: true },
+            });
+        }
+    }
+    const projByPlayerId = new Map(
+        projectionRows.map(r => [r.playerId, computeRealProjectedPoints(
+            r.rawProjection as Record<string, number> | null, scoringSettings, r, null,
+        )])
+    );
 
     // Sleeper's active flag is unreliable for long-retired players still
     // marked active — a real computed-age cutoff catches what team!=FA
@@ -207,6 +250,24 @@ export async function computeRealRedraftBoard(
         ));
     }
 
+    // Positional average of real PROJECTED points, computed only from
+    // players who have real season stats — the positional baseline a
+    // rookie's projection gets compared against should be "what an
+    // established player at this position actually produces," not other
+    // projections (which would just compare rookies to each other).
+    const posProjPtsSum   = new Map<string, number>();
+    const posProjPtsCount = new Map<string, number>();
+    for (const { p, gamesPlayed } of pending) {
+        if (!gamesPlayed) continue;
+        const proj = projByPlayerId.get(p.playerId);
+        if (proj == null) continue;
+        const pos = p.position ?? '';
+        posProjPtsSum.set(pos, (posProjPtsSum.get(pos) ?? 0) + proj);
+        posProjPtsCount.set(pos, (posProjPtsCount.get(pos) ?? 0) + 1);
+    }
+    const posAvgProjPtsPerGame = new Map<string, number>();
+    for (const [pos, sum] of posProjPtsSum) posAvgProjPtsPerGame.set(pos, sum / (posProjPtsCount.get(pos) ?? 1));
+
     // ── DEF anchor: real production→value curve (no ADP/FC signal for D/ST) ──
     // Neither Sleeper ADP nor FantasyCalc cover team defenses, so there's no
     // direct market signal to calibrate against. Instead, build a second real
@@ -271,9 +332,17 @@ export async function computeRealRedraftBoard(
             const rawBaseValue = rawFcValue != null ? (rawFcValue + adpImpliedValue) / 2 : adpImpliedValue;
             const baseValue = normaliseFcValue(rawBaseValue);
 
+            // No season stats yet (rookies, new signings) — nudge off real
+            // projected points instead of leaving the market-consensus base
+            // untouched, using the same full individual weight a complete
+            // season of real stats would get (a projection is already a
+            // full-season estimate, not a small sample to regress).
+            const projPts = !gamesPlayed ? projByPlayerId.get(p.playerId) ?? null : null;
             const individualFactor = gamesPlayed
                 ? computePerfFactor(realPtsPerGame, posAvgPtsPerGame.get(pos) ?? 0, gamesPlayed)
-                : 1.0;
+                : projPts != null
+                    ? computePerfFactor(projPts, posAvgProjPtsPerGame.get(pos) ?? 0, PROJECTION_FULL_SAMPLE_PROXY)
+                    : 1.0;
             const positionFactor = posScoringFactor.get(pos) ?? 1.0;
             const perfFactor      = combineScoringFactors(individualFactor, positionFactor);
 
@@ -283,6 +352,8 @@ export async function computeRealRedraftBoard(
             const perfAdjustment = Math.round((perfFactor - 1) * 20);
             finalValue = Math.min(100, Math.max(1, baseValue + perfAdjustment));
         }
+
+        const projPtsForDisplay = pos !== 'DEF' && !gamesPlayed ? projByPlayerId.get(p.playerId) ?? null : null;
 
         return {
             playerId:       p.playerId,
@@ -295,6 +366,8 @@ export async function computeRealRedraftBoard(
             adp:            p.searchRank ?? 999,
             realPtsPerGame: gamesPlayed ? realPtsPerGame : null,
             hasRealData:    Boolean(gamesPlayed),
+            projPtsPerGame: projPtsForDisplay,
+            hasProjData:    projPtsForDisplay != null,
             finalValue,
         };
     });

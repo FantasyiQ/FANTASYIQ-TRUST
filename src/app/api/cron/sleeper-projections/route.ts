@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getNflState } from '@/lib/sleeper';
 import { captureError } from '@/lib/sentry';
 
 export const maxDuration = 300;
@@ -22,28 +23,22 @@ type SleeperProjection = {
     [stat: string]: number | undefined;
 };
 
-function currentNflWeek(): { season: string; week: number } {
-    // NFL season runs Sep–Jan; use current year or prior year if before Sep
-    const now = new Date();
-    const season = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
-    // Rough week estimate: season starts first Thursday of September
-    // For off-season just return week 1 of the coming season
-    const sepStart = new Date(season, 8, 1);
-    const firstThursday = new Date(sepStart);
-    firstThursday.setDate(sepStart.getDate() + ((4 - sepStart.getDay() + 7) % 7));
-    const msPerWeek = 7 * 24 * 60 * 60 * 1000;
-    const week = Math.max(1, Math.min(18, Math.floor((now.getTime() - firstThursday.getTime()) / msPerWeek) + 1));
-    return { season: String(season), week };
-}
-
 export async function GET(request: NextRequest): Promise<Response> {
     if (request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     try {
-    
-        const { season, week } = currentNflWeek();
+        // Sleeper's own authoritative state, not a local date heuristic — the
+        // previous getMonth()-based guess ("before September = still last
+        // season") desynced from Sleeper's real calendar during the preseason
+        // crossover, silently syncing a stale prior-season snapshot instead
+        // of the real current week (confirmed live: Sleeper's API already had
+        // rich real projections for the upcoming season's rookies while this
+        // cron kept fetching a week that predated their NFL careers).
+        const nflState = await getNflState();
+        const season   = nflState.season;
+        const week     = nflState.week > 0 ? nflState.week : 1;
     
         // Try the current week; fall back to week 1 if no projection data found
         let data: Record<string, SleeperProjection> = {};

@@ -29,6 +29,8 @@ interface Player {
     adp:            number;
     realPtsPerGame: number | null;
     hasRealData:    boolean;
+    projPtsPerGame: number | null;
+    hasProjData:    boolean;
     injuryStatus:   string | null;
     projection:     number | null;
 }
@@ -135,8 +137,12 @@ export default function RedraftBigBoard({ players, week }: Props) {
                                     <td className="px-4 py-2.5 text-right font-bold text-[#D4AF37]">
                                         {p.hasRealData ? (
                                             p.realPtsPerGame!.toFixed(1)
+                                        ) : p.hasProjData ? (
+                                            <span title="No season stats yet — ranked by projected points">
+                                                {p.projPtsPerGame!.toFixed(1)}<span className="text-[10px] font-normal text-gray-500 ml-0.5">proj</span>
+                                            </span>
                                         ) : p.adp < 999 ? (
-                                            <span className="font-normal text-gray-500" title="No season stats yet — ranked by ADP">
+                                            <span className="font-normal text-gray-500" title="No season stats or projection yet — ranked by ADP">
                                                 ADP {p.adp}
                                             </span>
                                         ) : (
