@@ -16,10 +16,20 @@
 // drafters + FantasyCalc's market-derived redraft value) already encodes.
 // League-specific scoring should nudge that consensus, not override it.
 //
-// DEF is the one exception: neither Sleeper ADP nor FantasyCalc cover team
-// defenses at all, so there's no market signal to anchor to — real points
-// under the league's own scoring (percentile-ranked among defenses) is the
-// only honest signal available for that position.
+// A naive linear percentile of Sleeper ADP was tried next for players/
+// positions FantasyCalc doesn't cover (K, and DEF by extension) and also
+// rejected: a straight rank-to-percentile transform stretches EVERY pool to
+// fill the full 1-100 range regardless of that pool's real ceiling, so the
+// single best-ADP kicker (real ADP ~100+) or best-scoring defense always
+// landed near 100 — competing directly with legitimate top-15 skill
+// players, which no real redraft market ever does. Fixed by calibrating ADP
+// against FantasyCalc's real value curve instead of inventing an
+// independent scale: for every player who has BOTH signals, we know their
+// real (ADP, FantasyCalc value) pair — interpolating along that real curve
+// gives an ADP-only player (K) an honestly-scaled value. DEF has no ADP
+// signal at all, so it's anchored directly below the worst real
+// FantasyCalc-covered skill player in the pool (see worstRealFcValue below)
+// — real market's own boundary, not a fabricated number.
 
 import { prisma } from '@/lib/prisma';
 import { getNflState } from '@/lib/sleeper';
@@ -129,21 +139,49 @@ export async function computeRealRedraftBoard(
         return age <= MAX_PLAUSIBLE_AGE;
     });
 
-    // ── Real market ADP, converted to a 1-100 percentile within this pool ───
-    const adpRanked = eligible
-        .filter(p => p.searchRank != null)
-        .sort((a, b) => (a.searchRank ?? 0) - (b.searchRank ?? 0));
-    const adpPercentile = new Map<string, number>();
-    adpRanked.forEach((p, i) => {
-        const pct = adpRanked.length > 1 ? 100 * (1 - i / (adpRanked.length - 1)) : 100;
-        adpPercentile.set(p.playerId, Math.max(1, Math.round(pct)));
-    });
+    // ── Real ADP↔FantasyCalc calibration curve ──────────────────────────────
+    // Built from every player in THIS pool who has both a real Sleeper ADP
+    // and a real FantasyCalc redraft value — the actual, observed shape of
+    // how the market prices each draft slot, not an invented formula.
+    // Sleeper uses sentinel values for "unranked" rather than leaving
+    // searchRank null — 9999999 for fully unranked players, and a cluster of
+    // hundreds of distinct players all tied at exactly 999 (statistically
+    // impossible as a genuine continuous rank). Neither is a real distinct
+    // market position; treating either as real ADP corrupts the calibration
+    // curve's tail and, through it, DEF's anchor point.
+    const SLEEPER_UNRANKED_SENTINEL = 999;
+    const calibPoints: { adp: number; fcValue: number }[] = [];
+    for (const p of eligible) {
+        if (p.searchRank == null || p.searchRank >= SLEEPER_UNRANKED_SENTINEL) continue;
+        const fc = resolveFc(p.fullName ?? '', p.position ?? '');
+        if (!fc) continue;
+        calibPoints.push({ adp: p.searchRank, fcValue: superflex ? fc.redraftValueSf : fc.redraftValue });
+    }
+    calibPoints.sort((a, b) => a.adp - b.adp);
+
+    // Linear interpolation along the real curve; clamps to the nearest real
+    // endpoint value for an ADP outside the observed range (e.g. beyond the
+    // worst real ADP in the pool) rather than extrapolating a guess.
+    function estimateFcValueFromAdp(adp: number): number {
+        if (calibPoints.length === 0) return 0;
+        if (adp <= calibPoints[0].adp) return calibPoints[0].fcValue;
+        const last = calibPoints[calibPoints.length - 1];
+        if (adp >= last.adp) return last.fcValue;
+        let lo = 0, hi = calibPoints.length - 1;
+        while (hi - lo > 1) {
+            const mid = Math.floor((lo + hi) / 2);
+            if (calibPoints[mid].adp <= adp) lo = mid; else hi = mid;
+        }
+        const a = calibPoints[lo], b = calibPoints[hi];
+        const t = b.adp === a.adp ? 0 : (adp - a.adp) / (b.adp - a.adp);
+        return a.fcValue + t * (b.fcValue - a.fcValue);
+    }
 
     // ── Pass 1: real per-game production + positional averages for perfFactor ─
     const posPtsSum = new Map<string, number>();
     const posPtsCount = new Map<string, number>();
     const posStdPtsSum = new Map<string, number>();
-    type Pending = { p: (typeof eligible)[number]; realPtsPerGame: number; gamesPlayed: number | null };
+    type Pending = { p: (typeof eligible)[number]; realPtsPerGame: number; standardPtsPerGame: number; gamesPlayed: number | null };
     const pending: Pending[] = [];
     for (const p of eligible) {
         const stats = statsByPlayerId.get(p.playerId);
@@ -155,7 +193,7 @@ export async function computeRealRedraftBoard(
             posPtsCount.set(pos, (posPtsCount.get(pos) ?? 0) + 1);
             posStdPtsSum.set(pos, (posStdPtsSum.get(pos) ?? 0) + standardPtsPerGame);
         }
-        pending.push({ p, realPtsPerGame, gamesPlayed: stats?.gamesPlayed ?? null });
+        pending.push({ p, realPtsPerGame, standardPtsPerGame, gamesPlayed: stats?.gamesPlayed ?? null });
     }
     const posAvgPtsPerGame = new Map<string, number>();
     const posStdAvgPtsPerGame = new Map<string, number>();
@@ -169,14 +207,49 @@ export async function computeRealRedraftBoard(
         ));
     }
 
-    // ── DEF-only real-points percentile (no market source exists for D/ST) ──
+    // ── DEF anchor: real production→value curve (no ADP/FC signal for D/ST) ──
+    // Neither Sleeper ADP nor FantasyCalc cover team defenses, so there's no
+    // direct market signal to calibrate against. Instead, build a second real
+    // curve — real points/game UNDER THIS LEAGUE'S OWN SCORING → FantasyCalc
+    // value, from skill players who have both — and look up the value real
+    // skill players who score like an average real defense (on the exact
+    // same real scoring scale) actually carry in the market. Deliberately
+    // NOT the STANDARD_SCORING baseline: it only defines offensive stat
+    // keys, so every defense would compute to exactly 0 points against it,
+    // collapsing this anchor to a worthless-outlier value regardless of the
+    // league's real defensive scoring. realPtsPerGame is apples-to-apples —
+    // both sides run through the same league scoring_settings dot product.
+    const pointsCalibPoints: { pts: number; fcValue: number }[] = [];
+    for (const { p, realPtsPerGame, gamesPlayed } of pending) {
+        if (!gamesPlayed) continue;
+        const fc = resolveFc(p.fullName ?? '', p.position ?? '');
+        if (!fc) continue;
+        pointsCalibPoints.push({ pts: realPtsPerGame, fcValue: superflex ? fc.redraftValueSf : fc.redraftValue });
+    }
+    // Real per-game production is a much noisier predictor of market value
+    // than ADP (a bench player can post a great single-sample rate off a
+    // crowded backfield opportunity while carrying near-zero real trade
+    // value) — a precise 2-point interpolation is fragile here and can land
+    // its bracket squarely between two outliers. Averaging over the nearest
+    // real neighborhood smooths that noise without fabricating anything.
+    const POINTS_CALIB_WINDOW = 15;
+    function estimateFcValueFromPoints(pts: number): number {
+        if (pointsCalibPoints.length === 0) return 0;
+        const windowSize = Math.min(POINTS_CALIB_WINDOW, pointsCalibPoints.length);
+        const nearest = [...pointsCalibPoints]
+            .sort((a, b) => Math.abs(a.pts - pts) - Math.abs(b.pts - pts))
+            .slice(0, windowSize);
+        return nearest.reduce((sum, c) => sum + c.fcValue, 0) / nearest.length;
+    }
+    const defAnchorFcValue = estimateFcValueFromPoints(posAvgPtsPerGame.get('DEF') ?? 0);
+
     const defRanked = pending
         .filter(x => x.p.position === 'DEF')
         .sort((a, b) => b.realPtsPerGame - a.realPtsPerGame);
-    const defPercentile = new Map<string, number>();
+    const defValue = new Map<string, number>();
     defRanked.forEach((x, i) => {
-        const pct = defRanked.length > 1 ? 100 * (1 - i / (defRanked.length - 1)) : 100;
-        defPercentile.set(x.p.playerId, Math.max(1, Math.round(pct)));
+        const frac = defRanked.length > 1 ? 1 - i / (defRanked.length - 1) : 1; // 1 = best DEF, ~0 = worst
+        defValue.set(x.p.playerId, frac * defAnchorFcValue);
     });
 
     // ── Pass 2: blend market value + real-scoring nudge into a final rank ───
@@ -185,13 +258,18 @@ export async function computeRealRedraftBoard(
         let finalValue: number;
 
         if (pos === 'DEF') {
-            // Real points already the sole anchor — no separate nudge on top.
-            finalValue = defPercentile.get(p.playerId) ?? 1;
+            finalValue = normaliseFcValue(defValue.get(p.playerId) ?? 0);
         } else {
             const fc       = resolveFc(p.fullName ?? '', pos);
-            const fcValue  = fc ? normaliseFcValue(superflex ? fc.redraftValueSf : fc.redraftValue) : null;
-            const adpValue = adpPercentile.get(p.playerId) ?? 1;
-            const baseValue = fcValue != null ? Math.round((fcValue + adpValue) / 2) : adpValue;
+            const rawFcValue = fc ? (superflex ? fc.redraftValueSf : fc.redraftValue) : null;
+            // Even players with real FC coverage get their ADP cross-checked
+            // against the real calibration curve (not a separately-scaled
+            // percentile) so both signals live on the same real value scale
+            // before blending — averaging two differently-shaped scales was
+            // what distorted mid/late-pick ordering in the first place.
+            const adpImpliedValue = p.searchRank != null ? estimateFcValueFromAdp(p.searchRank) : rawFcValue ?? 0;
+            const rawBaseValue = rawFcValue != null ? (rawFcValue + adpImpliedValue) / 2 : adpImpliedValue;
+            const baseValue = normaliseFcValue(rawBaseValue);
 
             const individualFactor = gamesPlayed
                 ? computePerfFactor(realPtsPerGame, posAvgPtsPerGame.get(pos) ?? 0, gamesPlayed)
