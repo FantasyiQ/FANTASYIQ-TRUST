@@ -21,14 +21,16 @@ const INJURY_COLORS: Record<string, string> = {
 const POSITIONS = ['All', 'QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
 
 interface Player {
-    playerId:     string;
-    name:         string;
-    position:     string;
-    team:         string | null;
-    age:          number | null;
-    adp:          number;
-    injuryStatus: string | null;
-    projection:   number | null;
+    playerId:       string;
+    name:           string;
+    position:       string;
+    team:           string | null;
+    age:            number | null;
+    adp:            number;
+    realPtsPerGame: number | null;
+    hasRealData:    boolean;
+    injuryStatus:   string | null;
+    projection:     number | null;
 }
 
 interface Props {
@@ -95,7 +97,7 @@ export default function RedraftBigBoard({ players, week }: Props) {
                                 {showProj && (
                                     <th className="text-right px-3 py-3 text-gray-500 font-medium">Proj Wk {week}</th>
                                 )}
-                                <th className="text-right px-4 py-3 text-gray-500 font-medium">ADP</th>
+                                <th className="text-right px-4 py-3 text-gray-500 font-medium">Pts/Gm</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -131,7 +133,15 @@ export default function RedraftBigBoard({ players, week }: Props) {
                                         </td>
                                     )}
                                     <td className="px-4 py-2.5 text-right font-bold text-[#D4AF37]">
-                                        {p.adp < 999 ? p.adp : <span className="text-gray-600">—</span>}
+                                        {p.hasRealData ? (
+                                            p.realPtsPerGame!.toFixed(1)
+                                        ) : p.adp < 999 ? (
+                                            <span className="font-normal text-gray-500" title="No season stats yet — ranked by ADP">
+                                                ADP {p.adp}
+                                            </span>
+                                        ) : (
+                                            <span className="text-gray-600">—</span>
+                                        )}
                                     </td>
                                 </tr>
                             ))}
@@ -146,7 +156,7 @@ export default function RedraftBigBoard({ players, week }: Props) {
                     </table>
                 </div>
                 <div className="px-4 py-3 border-t border-gray-800 text-xs text-gray-600">
-                    ADP sourced from Sleeper{showProj ? ` · Projections for Week ${week}` : ''} · {filtered.length} players shown
+                    Real points/game under your league&apos;s exact scoring settings{showProj ? ` · Projections for Week ${week}` : ''} · {filtered.length} players shown
                 </div>
             </div>
         </div>

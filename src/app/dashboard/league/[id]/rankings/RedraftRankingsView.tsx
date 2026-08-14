@@ -21,14 +21,16 @@ const INJURY_COLORS: Record<string, string> = {
 const POSITIONS = ['All', 'QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
 
 interface PlayerRow {
-    playerId:     string;
-    name:         string;
-    position:     string;
-    team:         string | null;
-    age:          number | null;
-    preciseAge:   number | null;
-    adp:          number;
-    injuryStatus: string | null;
+    playerId:       string;
+    name:           string;
+    position:       string;
+    team:           string | null;
+    age:            number | null;
+    preciseAge:     number | null;
+    adp:            number;
+    realPtsPerGame: number | null;
+    hasRealData:    boolean;
+    injuryStatus:   string | null;
 }
 
 function formatAge(age: number | null, preciseAge: number | null): string {
@@ -62,7 +64,7 @@ export default function RedraftRankingsView({ players, leagueName, season }: Pro
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-white">Player Rankings</h1>
-                    <p className="text-gray-500 text-sm mt-0.5">{leagueName} · {season} · ADP-based</p>
+                    <p className="text-gray-500 text-sm mt-0.5">{leagueName} · {season} · Real points under your league&apos;s scoring</p>
                 </div>
                 <div className="text-[10px] font-bold tracking-widest text-[#D4AF37]">FantasyiQ</div>
             </div>
@@ -106,7 +108,7 @@ export default function RedraftRankingsView({ players, leagueName, season }: Pro
                                 <th className="text-left px-3 py-3 text-gray-500 font-medium">Pos</th>
                                 <th className="text-left px-3 py-3 text-gray-500 font-medium hidden sm:table-cell">Team</th>
                                 <th className="text-right px-3 py-3 text-gray-500 font-medium hidden sm:table-cell">Age</th>
-                                <th className="text-right px-4 py-3 text-gray-500 font-medium">ADP</th>
+                                <th className="text-right px-4 py-3 text-gray-500 font-medium">Pts/Gm</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -135,7 +137,15 @@ export default function RedraftRankingsView({ players, leagueName, season }: Pro
                                         {formatAge(p.age, p.preciseAge)}
                                     </td>
                                     <td className="px-4 py-2.5 text-right font-bold text-[#D4AF37]">
-                                        {p.adp < 999 ? p.adp : <span className="text-gray-600">—</span>}
+                                        {p.hasRealData ? (
+                                            p.realPtsPerGame!.toFixed(1)
+                                        ) : p.adp < 999 ? (
+                                            <span className="font-normal text-gray-500" title="No season stats yet — ranked by ADP">
+                                                ADP {p.adp}
+                                            </span>
+                                        ) : (
+                                            <span className="text-gray-600">—</span>
+                                        )}
                                     </td>
                                 </tr>
                             ))}
@@ -148,7 +158,7 @@ export default function RedraftRankingsView({ players, leagueName, season }: Pro
                     </table>
                 </div>
                 <div className="px-4 py-3 border-t border-gray-800 text-xs text-gray-600">
-                    ADP sourced from Sleeper · {filtered.length} players shown
+                    Real points/game computed under your league&apos;s exact scoring settings · players without season stats yet ranked by Sleeper ADP · {filtered.length} players shown
                 </div>
             </div>
         </div>

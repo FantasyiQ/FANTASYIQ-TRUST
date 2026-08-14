@@ -5,7 +5,8 @@ import { redirect, notFound } from 'next/navigation';
 import { auth }   from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getNflState } from '@/lib/sleeper';
-import { calculateAge } from '@/lib/calculateAge';
+import { computeRealRedraftBoard } from '@/lib/rankings/realRedraftBoard';
+import { STANDARD_SCORING } from '@/lib/rankings/leagueScoringPoints';
 import DraftCenterTabBar from '../DraftCenterTabBar';
 import RookieDynastyRankings from './RookieDynastyRankings';
 import RedraftBigBoard from './RedraftBigBoard';
@@ -33,6 +34,7 @@ export default async function DraftStrategyPage({
             rosterPositions: true, draftStatus: true, leagueType: true,
             playoffWeekStart: true, champWeek: true, platform: true,
             leagueId: true, totalRosters: true, sleeperUserId: true,
+            scoringSettings: true,
         },
     });
 
@@ -157,45 +159,12 @@ export default async function DraftStrategyPage({
 
     // ── Redraft big board ─────────────────────────────────────────────────────
     if (!isDynasty) {
-        const rawAdpPlayers = await prisma.sleeperPlayer.findMany({
-            where: {
-                searchRank: { not: null },
-                position:   { in: ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'] },
-                // Not currently rostered on any NFL team — can't score fantasy
-                // points this season regardless of a leftover searchRank from
-                // whenever they were last relevant (catches long-inactive/
-                // released players that the age check alone would miss).
-                team:       { not: 'FA' },
-            },
-            orderBy: { searchRank: 'asc' },
-            select: {
-                playerId:     true,
-                fullName:     true,
-                position:     true,
-                team:         true,
-                age:          true,
-                birthDate:    true,
-                searchRank:   true,
-                injuryStatus: true,
-            },
-            // Fetch a buffer beyond 300 since a few retired players get
-            // filtered out below (age check) but still occupy slots here.
-            take: 330,
-        });
-
-        // Sleeper's own `active` flag and stale searchRank are unreliable for
-        // long-retired players (e.g. Drew Brees, Tom Brady both still show
-        // active:true with a low leftover searchRank) — no real NFL player is
-        // playing past their mid-40s, so a computed-age cutoff catches these
-        // reliably where the source data doesn't. Team defenses (no birthDate)
-        // are unaffected since calculateAge returns null for them.
-        const MAX_PLAUSIBLE_AGE = 45;
-        const adpPlayers = rawAdpPlayers
-            .filter(p => {
-                const computedAge = calculateAge(p.birthDate);
-                return computedAge === null || computedAge <= MAX_PLAUSIBLE_AGE;
-            })
-            .slice(0, 300);
+        // Real per-league scoring settings when available (Sleeper always;
+        // ESPN as of the translateEspnScoring capture) — falls back to a
+        // generic PPR baseline only for platforms that don't expose granular
+        // scoring yet (Yahoo/NFL), matching the pattern in rankings/page.tsx.
+        const scoringSettings = (league.scoringSettings as Record<string, number> | null) ?? STANDARD_SCORING;
+        const adpPlayers = await computeRealRedraftBoard(scoringSettings);
 
         // Attach projections if in season
         const pprField = league.platform === 'sleeper' ? 'pointsPpr' : null;
@@ -222,14 +191,16 @@ export default async function DraftStrategyPage({
                 <DraftCenterTabBar leagueId={id} isDynasty={false} />
                 <RedraftBigBoard
                     players={adpPlayers.map(p => ({
-                        playerId:     p.playerId,
-                        name:         p.fullName ?? '',
-                        position:     p.position ?? '',
-                        team:         p.team,
-                        age:          p.age,
-                        adp:          p.searchRank ?? 999,
-                        injuryStatus: p.injuryStatus,
-                        projection:   projMap.get(p.playerId) ?? null,
+                        playerId:       p.playerId,
+                        name:           p.name,
+                        position:       p.position,
+                        team:           p.team,
+                        age:            p.age,
+                        adp:            p.adp,
+                        realPtsPerGame: p.realPtsPerGame,
+                        hasRealData:    p.hasRealData,
+                        injuryStatus:   p.injuryStatus,
+                        projection:     projMap.get(p.playerId) ?? null,
                     }))}
                     week={currentWeek}
                 />
