@@ -33,6 +33,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { getNflState } from '@/lib/sleeper';
+import { INJURY_STATUS_RISK } from '@/lib/trade-engine';
 import {
     computeRealPoints, computePerfFactor, toStatsPerGame,
     computePositionScoringFactor, combineScoringFactors, STANDARD_SCORING,
@@ -45,6 +46,15 @@ import {
 // toward the mean, so it should get the same full individual weight a
 // veteran with a complete season of stats would.
 const PROJECTION_FULL_SAMPLE_PROXY = 17;
+
+// Reuses the same relative injury-severity ordering already vetted for
+// Dynasty DTV (trade-engine.ts), but scaled harder — an IR/Out player
+// contributes zero real production for a current-season redraft board,
+// which calls for a much more decisive discount than Dynasty's deliberately
+// soft ~15%-max long-term-asset nudge. Market ADP/FC value often lags a
+// very recent injury designation, so this is applied on top of, not instead
+// of, the market-consensus base.
+const REDRAFT_INJURY_ADJUSTMENT_SCALE = 40;
 
 const REDRAFT_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'] as const;
 const MAX_PLAUSIBLE_AGE = 45;      // no real NFL player plays past their mid-40s
@@ -200,24 +210,24 @@ export async function computeRealRedraftBoard(
         if (!fc) continue;
         calibPoints.push({ adp: p.searchRank, fcValue: superflex ? fc.redraftValueSf : fc.redraftValue });
     }
-    calibPoints.sort((a, b) => a.adp - b.adp);
-
-    // Linear interpolation along the real curve; clamps to the nearest real
-    // endpoint value for an ADP outside the observed range (e.g. beyond the
-    // worst real ADP in the pool) rather than extrapolating a guess.
+    // Deep-ADP FantasyCalc coverage is extremely bimodal — real rookies with
+    // draft-capital-driven stash value sit right next to genuinely worthless
+    // veterans at nearly the same ADP (e.g. real observed data: a player at
+    // ADP 435 carrying FC value 3401 immediately next to one at ADP 440
+    // carrying 0). A precise 2-point interpolation lets a single lucky/
+    // unlucky neighbor swing the estimate wildly — confirmed live: it
+    // ranked an injured, FC-uncovered deep player above a real rookie with
+    // legitimate FC coverage and a much better real ADP. Averaging over the
+    // nearest real neighborhood (same technique as the DEF/points curve
+    // below) smooths that noise into a representative estimate instead.
+    const ADP_CALIB_WINDOW = 15;
     function estimateFcValueFromAdp(adp: number): number {
         if (calibPoints.length === 0) return 0;
-        if (adp <= calibPoints[0].adp) return calibPoints[0].fcValue;
-        const last = calibPoints[calibPoints.length - 1];
-        if (adp >= last.adp) return last.fcValue;
-        let lo = 0, hi = calibPoints.length - 1;
-        while (hi - lo > 1) {
-            const mid = Math.floor((lo + hi) / 2);
-            if (calibPoints[mid].adp <= adp) lo = mid; else hi = mid;
-        }
-        const a = calibPoints[lo], b = calibPoints[hi];
-        const t = b.adp === a.adp ? 0 : (adp - a.adp) / (b.adp - a.adp);
-        return a.fcValue + t * (b.fcValue - a.fcValue);
+        const windowSize = Math.min(ADP_CALIB_WINDOW, calibPoints.length);
+        const nearest = [...calibPoints]
+            .sort((a, b) => Math.abs(a.adp - adp) - Math.abs(b.adp - adp))
+            .slice(0, windowSize);
+        return nearest.reduce((sum, c) => sum + c.fcValue, 0) / nearest.length;
     }
 
     // ── Pass 1: real per-game production + positional averages for perfFactor ─
@@ -352,6 +362,13 @@ export async function computeRealRedraftBoard(
             const perfAdjustment = Math.round((perfFactor - 1) * 20);
             finalValue = Math.min(100, Math.max(1, baseValue + perfAdjustment));
         }
+
+        // Current injury designation, applied on top of the market-consensus
+        // base — real market ADP/FC value often lags a very recent injury
+        // move, so a player just placed on IR shouldn't keep riding a
+        // pre-injury market value in a current-season redraft ranking.
+        const injuryRisk = INJURY_STATUS_RISK[p.injuryStatus ?? ''] ?? 0;
+        finalValue = Math.max(1, finalValue - Math.round(injuryRisk * REDRAFT_INJURY_ADJUSTMENT_SCALE));
 
         const projPtsForDisplay = pos !== 'DEF' && !gamesPlayed ? projByPlayerId.get(p.playerId) ?? null : null;
 

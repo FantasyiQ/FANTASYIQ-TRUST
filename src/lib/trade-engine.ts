@@ -160,7 +160,9 @@ function tier(finalDtv: number): string {
 // Injury risk → DTV discount. Only current status is used; historical games-missed
 // data can be wired in later when available per-season.
 // TODO: add historical component when per-season games-missed data is available.
-const INJURY_STATUS_RISK: Record<string, number> = {
+// Exported so other real-value surfaces (e.g. the redraft board) can reuse
+// the same relative severity ordering instead of inventing a parallel scale.
+export const INJURY_STATUS_RISK: Record<string, number> = {
     'Questionable': 0.10,
     'Doubtful':     0.20,
     'Out':          0.30,
