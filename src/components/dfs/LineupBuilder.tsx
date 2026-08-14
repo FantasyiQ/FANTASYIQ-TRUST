@@ -8,7 +8,9 @@ interface SleeperPlayer {
     position:      string;
     team:          string;
     injuryStatus:  string | null;
-    projections:   { pointsPpr: number; pointsStd: number; pointsHalfPpr: number }[];
+    // Pre-computed server-side under the league's real scoring_settings when
+    // leagueId is passed to /api/players/search — see projPoints() below.
+    projPts:       number | null;
 }
 
 interface LineupEntry {
@@ -22,7 +24,7 @@ interface LineupBuilderProps {
     slots:        string[];
     season:       string;
     week:         number;
-    scoringType:  string | null;
+    leagueId:     string;
     initialEntries?: { slot: string; playerId: string }[];
     gameSchedule?: Record<string, number>; // team → epoch ms of kickoff
     onSaved?: () => void;
@@ -40,16 +42,12 @@ function slotPositionFilter(slot: string): string {
     return FLEX_POSITIONS[slot] ?? slot;
 }
 
-function projPoints(player: SleeperPlayer, scoringType: string | null): number {
-    const p = player.projections[0];
-    if (!p) return 0;
-    if (scoringType === 'std')      return p.pointsStd;
-    if (scoringType === 'half_ppr') return p.pointsHalfPpr;
-    return p.pointsPpr;
+function projPoints(player: SleeperPlayer): number {
+    return player.projPts ?? 0;
 }
 
 export default function LineupBuilder({
-    contestId, slots, season, week, scoringType, initialEntries, gameSchedule, onSaved,
+    contestId, slots, season, week, leagueId, initialEntries, gameSchedule, onSaved,
 }: LineupBuilderProps) {
     // Build initial state
     const buildInitial = useCallback((): LineupEntry[] => {
@@ -109,7 +107,7 @@ export default function LineupBuilder({
 
         // Fetch each player by ID (search by ID is closest we have)
         Promise.all(missing.map(id =>
-            fetch(`/api/players/search?q=${id}&season=${season}&week=${week}`)
+            fetch(`/api/players/search?q=${id}&season=${season}&week=${week}&leagueId=${leagueId}`)
                 .then(r => r.json() as Promise<SleeperPlayer[]>)
                 .then(arr => arr.find(p => p.playerId === id) ?? null)
         )).then(players => {
@@ -132,7 +130,7 @@ export default function LineupBuilder({
             const pos  = slotPositionFilter(slot);
             // For flex slots, don't filter by position (send no position param)
             const isFlex = pos.includes(',');
-            const url = `/api/players/search?q=${encodeURIComponent(q)}&season=${season}&week=${week}${isFlex ? '' : `&position=${pos}`}`;
+            const url = `/api/players/search?q=${encodeURIComponent(q)}&season=${season}&week=${week}&leagueId=${leagueId}${isFlex ? '' : `&position=${pos}`}`;
             setSearching(true);
             try {
                 const data = await fetch(url).then(r => r.json() as Promise<SleeperPlayer[]>);
@@ -189,7 +187,7 @@ export default function LineupBuilder({
     }
 
     const allFilled  = entries.every(e => e.playerId !== '');
-    const totalProj  = entries.reduce((sum, e) => sum + (e.player ? projPoints(e.player, scoringType) : 0), 0);
+    const totalProj  = entries.reduce((sum, e) => sum + (e.player ? projPoints(e.player) : 0), 0);
 
     // Deduplicate selected players so user can't start same player twice
     const selectedIds = new Set(entries.map(e => e.playerId).filter(Boolean));
@@ -201,7 +199,7 @@ export default function LineupBuilder({
                 {entries.map((entry, i) => {
                     const isActive = activeSlot === i;
                     const locked   = isSlotLocked(entry);
-                    const pts      = entry.player ? projPoints(entry.player, scoringType) : null;
+                    const pts      = entry.player ? projPoints(entry.player) : null;
 
                     return (
                         <div key={i}>
@@ -288,7 +286,7 @@ export default function LineupBuilder({
                                             const alreadyUsed  = selectedIds.has(player.playerId);
                                             const gameStarted  = isPlayerGameStarted(player);
                                             const unavailable  = alreadyUsed || gameStarted;
-                                            const ppts         = projPoints(player, scoringType);
+                                            const ppts         = projPoints(player);
                                             return (
                                                 <button
                                                     key={player.playerId}

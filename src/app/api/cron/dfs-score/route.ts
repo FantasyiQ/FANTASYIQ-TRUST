@@ -36,7 +36,7 @@ export async function GET(request: NextRequest): Promise<Response> {
             where:   { status: { not: 'FINAL' } },
             include: {
                 lineups:     { select: { id: true, userId: true, entriesJson: true } },
-                sourceLeague: { select: { scoringType: true } },
+                sourceLeague: { select: { scoringType: true, scoringSettings: true } },
             },
         });
 
@@ -51,7 +51,11 @@ export async function GET(request: NextRequest): Promise<Response> {
             // Score every lineup
             for (const lineup of contest.lineups) {
                 const entries = lineup.entriesJson as DFSEntry[];
-                const pts     = await scoreLineup(entries, contest.season, contest.week, contest.sourceLeague.scoringType);
+                const pts     = await scoreLineup(
+                    entries, contest.season, contest.week,
+                    contest.sourceLeague.scoringType,
+                    contest.sourceLeague.scoringSettings as Record<string, number> | null,
+                );
                 await prisma.dFSLineup.update({
                     where: { id: lineup.id },
                     data:  { totalPoints: pts, locked: isPastWeek },

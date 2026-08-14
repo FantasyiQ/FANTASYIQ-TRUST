@@ -2,6 +2,7 @@
  * DFS Challenge utilities — server-only (imports prisma).
  */
 import { prisma } from '@/lib/prisma';
+import { computeRealProjectedPoints } from '@/lib/rankings/leagueScoringPoints';
 
 // ── NFL Week ──────────────────────────────────────────────────────────────────
 
@@ -54,24 +55,31 @@ export function scoringField(
 export type DFSEntry = { slot: string; playerId: string };
 
 /**
- * Sum projected/actual points for a lineup from PlayerProjection table.
+ * Sum projected/actual points for a lineup from PlayerProjection table,
+ * scored under the source league's real scoring_settings (via the League
+ * Scoring Points Engine) rather than a generic ppr/std/half_ppr bucket —
+ * this is FiQ's own in-league DFS challenge, scored against that league's
+ * real roster template and rules, not an external fixed-rules contest.
  * Returns 0 for any player without a projection row (bye week, etc.).
  */
 export async function scoreLineup(
-    entries:     DFSEntry[],
-    season:      number,
-    week:        number,
-    scoringType: string | null | undefined,
+    entries:         DFSEntry[],
+    season:          number,
+    week:            number,
+    scoringType:     string | null | undefined,
+    scoringSettings: Record<string, number> | null,
 ): Promise<number> {
     const playerIds = entries.map(e => e.playerId);
-    const field     = scoringField(scoringType);
 
     const rows = await prisma.playerProjection.findMany({
         where:  { playerId: { in: playerIds }, season: String(season), week },
-        select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true },
+        select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true, rawProjection: true },
     });
 
-    const byPlayer = new Map(rows.map(r => [r.playerId, r[field] as number]));
+    const byPlayer = new Map(rows.map(r => [
+        r.playerId,
+        computeRealProjectedPoints(r.rawProjection as Record<string, number> | null, scoringSettings, r, scoringType ?? null),
+    ]));
     return entries.reduce((sum, e) => sum + (byPlayer.get(e.playerId) ?? 0), 0);
 }
 

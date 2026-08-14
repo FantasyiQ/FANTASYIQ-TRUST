@@ -154,7 +154,7 @@ export default async function DFSChallengePage({
                                     slots={dfsSlots}
                                     season={league.season}
                                     week={contest.week}
-                                    scoringType={league.scoringType}
+                                    leagueId={league.id}
                                     initialEntries={userLineup?.entriesJson as DFSEntry[] | undefined}
                                     gameSchedule={gameSchedule}
                                 />
