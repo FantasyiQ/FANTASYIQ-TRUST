@@ -7,6 +7,8 @@ import {
     deriveEspnScoringType,
     deriveEspnStatus,
     buildEspnStandings,
+    translateEspnScoring,
+    deriveEspnRosterPositions,
 } from '@/lib/espn';
 
 // PATCH /api/espn/credentials — update stored ESPN cookies and re-sync a league
@@ -56,10 +58,12 @@ export async function PATCH(request: NextRequest): Promise<Response> {
             prisma.league.update({
                 where: { id: leagueDbId },
                 data: {
-                    status:       deriveEspnStatus(settings),
-                    scoringType:  deriveEspnScoringType(settings.settings),
+                    status:          deriveEspnStatus(settings),
+                    scoringType:     deriveEspnScoringType(settings.settings),
+                    scoringSettings: translateEspnScoring(settings.settings),
+                    rosterPositions: deriveEspnRosterPositions(settings.settings),
                     standings,
-                    lastSyncedAt: new Date(),
+                    lastSyncedAt:    new Date(),
                 },
             }),
         ]);

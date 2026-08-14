@@ -49,6 +49,7 @@ export async function POST(request: NextRequest): Promise<Response> {
                 status:           league.status,
                 totalRosters:     league.total_rosters,
                 scoringType:      deriveScoringType(league),
+                scoringSettings:  league.scoring_settings ?? {},
                 avatar:           league.avatar,
                 rosterPositions:  league.roster_positions,
                 sleeperUserId,

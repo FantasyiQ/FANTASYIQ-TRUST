@@ -62,6 +62,7 @@ async function syncLeague(
                     scoringType:      deriveScoringType(sleeperLeague),
                     leagueType:       sleeperLeague.settings?.type === 2 ? 'Dynasty' : 'Redraft',
                     scoringSettings:  sleeperLeague.scoring_settings ?? {},
+                    rosterPositions:  sleeperLeague.roster_positions,
                     standings,
                     draftStartTime,
                     draftStatus,

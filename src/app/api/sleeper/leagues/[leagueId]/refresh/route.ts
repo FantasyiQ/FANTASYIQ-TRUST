@@ -71,6 +71,7 @@ export async function POST(
                 status:          sleeperLeague.status,
                 totalRosters:    sleeperLeague.total_rosters,
                 scoringType:     deriveScoringType(sleeperLeague),
+                scoringSettings: sleeperLeague.scoring_settings ?? {},
                 avatar:          sleeperLeague.avatar ?? null,
                 rosterPositions: sleeperLeague.roster_positions,
                 standings,
