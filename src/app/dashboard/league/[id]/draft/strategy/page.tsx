@@ -161,6 +161,11 @@ export default async function DraftStrategyPage({
             where: {
                 searchRank: { not: null },
                 position:   { in: ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'] },
+                // Not currently rostered on any NFL team — can't score fantasy
+                // points this season regardless of a leftover searchRank from
+                // whenever they were last relevant (catches long-inactive/
+                // released players that the age check alone would miss).
+                team:       { not: 'FA' },
             },
             orderBy: { searchRank: 'asc' },
             select: {
