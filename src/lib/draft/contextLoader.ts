@@ -8,10 +8,15 @@ import {
     getSleeperDraft,
     getActiveDraftPicks,
     resolveDraftType,
+    getNflState,
     type SleeperRoster,
     type SleeperDraft,
     type SleeperDraftPickEntry,
 } from '@/lib/sleeper';
+import {
+    computeRealPoints, computePerfFactor, toStatsPerGame,
+    computePositionScoringFactor, combineScoringFactors, STANDARD_SCORING,
+} from '@/lib/rankings/leagueScoringPoints';
 import type {
     DraftContext, DraftType, RosterProfile,
     DraftProfile, TrajectoryWindow, HorizonYears, RiskTolerance, DraftPoolADPEntry,
@@ -223,7 +228,7 @@ export async function loadDraftContext(params: {
         getLeagueRosters(sleeperLeagueId),
         prisma.league.findUniqueOrThrow({
             where:  { id: leagueDbId },
-            select: { scoringType: true, rosterPositions: true, leagueType: true },
+            select: { scoringType: true, rosterPositions: true, leagueType: true, scoringSettings: true },
         }),
     ]);
 
@@ -435,6 +440,9 @@ export async function loadDraftContext(params: {
         // Pass 1: FiQ baseline pick — global rank across allowed positions by dynasty value (fcFpdo already sorted desc).
         // delta = myNextPick - fiqBaselineRank: positive = player available later than FiQ suggests.
         // Uses fcFpdo (value > 50) so the full draftable universe is ranked, not just top-300.
+        // Deliberately NOT perfFactor-adjusted — this is the market's real draft-capital
+        // baseline (analogous to ADP), a different signal from the per-league scoring
+        // adjustment applied to fiqScore below.
         let fiqBaselineRank = 0;
         for (const fcv of fcFpdo) {
             if (!allowedPositions.has(normalizePosition(fcv.position))) continue;
@@ -451,13 +459,97 @@ export async function loadDraftContext(params: {
             };
         }
 
-        // Pass 2: available players = undrafted, allowed positions only
+        // League Scoring Points Engine: adjust each player's fiqScore by how their
+        // real per-game production (under this league's exact scoring settings)
+        // compares to their position's average — same computePerfFactor/
+        // computePositionScoringFactor pattern already shipped on the Rankings page
+        // (getLeagueRankings.ts), so a league's real scoring rules (rush-attempt
+        // bonuses, TE premium, etc.) shift who the assistant recommends, not just a
+        // generic FantasyCalc market-consensus number.
+        const scoringSettings = (dbLeague.scoringSettings as Record<string, number> | null) ?? STANDARD_SCORING;
+        const nflState        = await getNflState();
+        const statsSeason     = nflState.season;
+        const currentSeasonStats = await prisma.playerSeasonStats.findMany({
+            where:  { season: statsSeason },
+            select: { playerId: true, gamesPlayed: true, rawStats: true },
+        });
+        const seasonStatsRows = currentSeasonStats.length > 0
+            ? currentSeasonStats
+            : await prisma.playerSeasonStats.findMany({
+                where:  { season: String(Number(statsSeason) - 1) },
+                select: { playerId: true, gamesPlayed: true, rawStats: true },
+            });
+        const statsByPlayerId = new Map(
+            seasonStatsRows.map(s => [s.playerId, {
+                gamesPlayed:  s.gamesPlayed,
+                statsPerGame: toStatsPerGame(s.rawStats as Record<string, number>, s.gamesPlayed),
+            }])
+        );
+
+        // Pass 2a: resolve real per-game production for every player in the
+        // recommendation pool and accumulate positional totals — perfFactor can't
+        // be computed until every player in a position group has been seen.
+        type FcPending = { fcv: (typeof fcValues)[number]; sp: ReturnType<typeof spLookup2>; realPtsPerGame: number; gamesPlayed: number | null };
+        const fcPending: FcPending[] = [];
+        const posPtsSum    = new Map<string, number>();
+        const posPtsCount  = new Map<string, number>();
+        const posStdPtsSum = new Map<string, number>(); // same players, scored under STANDARD_SCORING
+
         for (const fcv of fcValues) {
             if (!allowedPositions.has(normalizePosition(fcv.position))) continue;
             const sp = spLookup2(fcv.playerName, fcv.position);
             if (sp && draftedIds.has(sp.playerId)) continue;
+
+            const stats             = sp?.playerId ? statsByPlayerId.get(sp.playerId) : undefined;
+            const realPtsPerGame    = stats ? computeRealPoints(stats.statsPerGame, scoringSettings) : 0;
+            const standardPtsPerGame = stats ? computeRealPoints(stats.statsPerGame, STANDARD_SCORING) : 0;
+
+            if (stats && stats.gamesPlayed) {
+                posPtsSum.set(fcv.position, (posPtsSum.get(fcv.position) ?? 0) + realPtsPerGame);
+                posPtsCount.set(fcv.position, (posPtsCount.get(fcv.position) ?? 0) + 1);
+                posStdPtsSum.set(fcv.position, (posStdPtsSum.get(fcv.position) ?? 0) + standardPtsPerGame);
+            }
+
+            fcPending.push({ fcv, sp, realPtsPerGame, gamesPlayed: stats?.gamesPlayed ?? null });
+        }
+
+        const posAvgPtsPerGame    = new Map<string, number>();
+        const posStdAvgPtsPerGame = new Map<string, number>();
+        for (const [pos, sum] of posPtsSum)    posAvgPtsPerGame.set(pos, sum / (posPtsCount.get(pos) ?? 1));
+        for (const [pos, sum] of posStdPtsSum) posStdAvgPtsPerGame.set(pos, sum / (posPtsCount.get(pos) ?? 1));
+
+        // Cross-positional shift: how this league's real scoring moves each whole
+        // position relative to a generic PPR baseline — applies uniformly, unlike
+        // perfFactor which varies per player.
+        const posScoringFactor = new Map<string, number>();
+        for (const pos of posAvgPtsPerGame.keys()) {
+            posScoringFactor.set(pos, computePositionScoringFactor(
+                posAvgPtsPerGame.get(pos) ?? 0,
+                posStdAvgPtsPerGame.get(pos) ?? 0,
+            ));
+        }
+
+        // Pass 2b: available players = undrafted, allowed positions only, fiqScore
+        // adjusted by the combined perfFactor.
+        for (const { fcv, sp, realPtsPerGame, gamesPlayed } of fcPending) {
             const dynastyValue = superflex ? fcv.dynastyValueSf : fcv.dynastyValue;
-            const fiqScore = Math.min(100, Math.round(dynastyValue / 90));
+
+            const individualFactor = gamesPlayed
+                ? computePerfFactor(realPtsPerGame, posAvgPtsPerGame.get(fcv.position) ?? 0, gamesPlayed)
+                : 1.0;
+            const positionFactor = posScoringFactor.get(fcv.position) ?? 1.0;
+            const perfFactor     = combineScoringFactors(individualFactor, positionFactor);
+
+            // Additive, bounded nudge rather than a multiplier on dynastyValue directly —
+            // dynastyValue/90 already saturates at 100 for most elite players (dynastyValue
+            // caps at 9999), so multiplying by perfFactor (up to 1.4375x) would collapse
+            // the entire top of the pool to identical scores, exactly where the draft
+            // assistant's ranking matters most. A capped additive nudge (matches how
+            // scoreCandidate() layers needBoost/oppBoost onto fiqScore) preserves real
+            // differentiation while still reflecting the league's real scoring shift.
+            const baseFiqScore   = Math.min(100, Math.round(dynastyValue / 90));
+            const perfAdjustment = Math.round((perfFactor - 1) * 20);
+            const fiqScore       = Math.min(100, Math.max(1, baseFiqScore + perfAdjustment));
             availablePlayers.push({
                 sleeperPlayerId: sp?.playerId ?? '',
                 name:            fcv.playerName,
