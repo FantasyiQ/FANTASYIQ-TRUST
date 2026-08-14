@@ -1,23 +1,36 @@
 // FantasyIQ Trust — Real Redraft Big Board
 //
-// Ranks players for a specific league's redraft board using their real
-// per-game production computed under that league's exact scoring settings
-// (via the League Scoring Points Engine's computeRealPoints), rather than a
-// generic Sleeper ADP number that's identical for every league regardless of
-// PPR/Standard/custom scoring rules.
+// Ranks players for a specific league's redraft board using real market
+// consensus (Sleeper ADP + FantasyCalc redraft value) as the base, then
+// nudges that base by how a player's real per-game production compares to
+// their position's average under this league's exact scoring settings (via
+// the League Scoring Points Engine) — the same architecture already proven
+// on Dynasty rankings, just applied to the redraft market.
 //
-// Players with real season stats are ranked by computed points, descending.
-// Players with no stats yet (rookies, new signings) have no real signal to
-// rank by — rather than fabricate one, they're placed after every player
-// with real data, ordered among themselves by ADP (Sleeper's real market
-// consensus, the best available honest signal for them specifically).
+// Raw real points were tried as the PRIMARY sort key first and rejected:
+// under most scoring formats a starting QB outscores every RB/WR on paper
+// (passing stats accumulate fastest), which doesn't reflect real 1-QB-league
+// value — a QB you can replace off waivers is worth far less than a scarce
+// RB1, no matter how many raw points he scores. Real fantasy rankings are
+// about value relative to replacement, which market consensus (real human
+// drafters + FantasyCalc's market-derived redraft value) already encodes.
+// League-specific scoring should nudge that consensus, not override it.
+//
+// DEF is the one exception: neither Sleeper ADP nor FantasyCalc cover team
+// defenses at all, so there's no market signal to anchor to — real points
+// under the league's own scoring (percentile-ranked among defenses) is the
+// only honest signal available for that position.
 
 import { prisma } from '@/lib/prisma';
 import { getNflState } from '@/lib/sleeper';
-import { computeRealPoints, toStatsPerGame } from './leagueScoringPoints';
+import {
+    computeRealPoints, computePerfFactor, toStatsPerGame,
+    computePositionScoringFactor, combineScoringFactors, STANDARD_SCORING,
+} from './leagueScoringPoints';
 
 const REDRAFT_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'] as const;
-const MAX_PLAUSIBLE_AGE = 45; // no real NFL player plays past their mid-40s
+const MAX_PLAUSIBLE_AGE = 45;      // no real NFL player plays past their mid-40s
+const FC_VALUE_CAP      = 9999;    // FantasyCalc's own value ceiling (matches getLeagueRankings.ts)
 
 export interface RealRedraftPlayer {
     playerId:       string;
@@ -27,19 +40,24 @@ export interface RealRedraftPlayer {
     age:            number | null;
     birthDate:      string | null;
     injuryStatus:   string | null;
-    adp:            number;              // Sleeper searchRank — always present, used as the tiebreak/fallback signal
+    adp:            number;              // Sleeper searchRank — real market ADP, shown for reference
     realPtsPerGame: number | null;        // null when the player has no season stats yet
     hasRealData:    boolean;
 }
 
+function normaliseFcValue(raw: number): number {
+    return Math.min(100, Math.max(1, Math.round((raw / FC_VALUE_CAP) * 100)));
+}
+
 export async function computeRealRedraftBoard(
     scoringSettings: Record<string, number>,
+    superflex = false,
     limit = 300,
 ): Promise<RealRedraftPlayer[]> {
     const nflState    = await getNflState();
     const statsSeason = nflState.season;
 
-    const [rawPlayers, currentSeasonStats] = await Promise.all([
+    const [rawPlayers, currentSeasonStats, fcRows] = await Promise.all([
         prisma.sleeperPlayer.findMany({
             where: {
                 position: { in: [...REDRAFT_POSITIONS] },
@@ -61,6 +79,12 @@ export async function computeRealRedraftBoard(
             where:  { season: statsSeason },
             select: { playerId: true, gamesPlayed: true, rawStats: true },
         }),
+        // FantasyCalc doesn't cover K/DEF — QB/RB/WR/TE only, matches every
+        // other consumer of this table in the codebase.
+        prisma.fantasyCalcValue.findMany({
+            where:  { position: { in: ['QB', 'RB', 'WR', 'TE'] } },
+            select: { nameLower: true, position: true, redraftValue: true, redraftValueSf: true },
+        }),
     ]);
 
     const seasonStatsRows = currentSeasonStats.length > 0
@@ -76,43 +100,129 @@ export async function computeRealRedraftBoard(
         }])
     );
 
-    const players: RealRedraftPlayer[] = rawPlayers
-        // Sleeper's active flag is unreliable for long-retired players still
-        // marked active — a real computed-age cutoff catches what team!=FA
-        // alone can miss (see feedback_stale_sleeper_player_data).
-        .filter(p => {
-            if (!p.birthDate) return true; // team defenses — no birthDate, always fine
-            const dob = new Date(p.birthDate);
-            if (isNaN(dob.getTime())) return true;
-            const age = new Date().getFullYear() - dob.getFullYear();
-            return age <= MAX_PLAUSIBLE_AGE;
-        })
-        .map(p => {
-            const stats = statsByPlayerId.get(p.playerId);
-            const realPtsPerGame = stats && stats.gamesPlayed > 0
-                ? computeRealPoints(stats.statsPerGame, scoringSettings)
-                : null;
-            return {
-                playerId:       p.playerId,
-                name:           p.fullName ?? '',
-                position:       p.position ?? '',
-                team:           p.team,
-                age:            p.age,
-                birthDate:      p.birthDate,
-                injuryStatus:   p.injuryStatus,
-                adp:            p.searchRank ?? 999,
-                realPtsPerGame,
-                hasRealData:    realPtsPerGame !== null,
-            };
-        })
-        .sort((a, b) => {
-            // Real-data players first, ranked by computed points descending;
-            // no-data players after, ranked by ADP ascending among themselves.
-            if (a.hasRealData && b.hasRealData) return (b.realPtsPerGame ?? 0) - (a.realPtsPerGame ?? 0);
-            if (a.hasRealData !== b.hasRealData) return a.hasRealData ? -1 : 1;
-            return a.adp - b.adp;
-        })
-        .slice(0, limit);
+    // FantasyCalc redraft value, resolved by name+position (exact, then a
+    // normalized-name fallback only when that name is unambiguous) — mirrors
+    // the resolver pattern used in getLeagueRankings.ts / contextLoader.ts so
+    // two real players sharing a name never cross-attach.
+    const fcByNamePos = new Map<string, { redraftValue: number; redraftValueSf: number }>();
+    const fcByName     = new Map<string, { redraftValue: number; redraftValueSf: number }>();
+    const fcNameCount  = new Map<string, number>();
+    for (const fc of fcRows) {
+        fcByNamePos.set(`${fc.nameLower}|${fc.position}`, fc);
+        fcNameCount.set(fc.nameLower, (fcNameCount.get(fc.nameLower) ?? 0) + 1);
+        fcByName.set(fc.nameLower, fc);
+    }
+    function resolveFc(fullName: string, position: string) {
+        const nameLower = fullName.toLowerCase();
+        return fcByNamePos.get(`${nameLower}|${position}`)
+            ?? (fcNameCount.get(nameLower) === 1 ? fcByName.get(nameLower) : undefined);
+    }
 
-    return players;
+    // Sleeper's active flag is unreliable for long-retired players still
+    // marked active — a real computed-age cutoff catches what team!=FA
+    // alone can miss (see feedback_stale_sleeper_player_data).
+    const eligible = rawPlayers.filter(p => {
+        if (!p.birthDate) return true; // team defenses — no birthDate, always fine
+        const dob = new Date(p.birthDate);
+        if (isNaN(dob.getTime())) return true;
+        const age = new Date().getFullYear() - dob.getFullYear();
+        return age <= MAX_PLAUSIBLE_AGE;
+    });
+
+    // ── Real market ADP, converted to a 1-100 percentile within this pool ───
+    const adpRanked = eligible
+        .filter(p => p.searchRank != null)
+        .sort((a, b) => (a.searchRank ?? 0) - (b.searchRank ?? 0));
+    const adpPercentile = new Map<string, number>();
+    adpRanked.forEach((p, i) => {
+        const pct = adpRanked.length > 1 ? 100 * (1 - i / (adpRanked.length - 1)) : 100;
+        adpPercentile.set(p.playerId, Math.max(1, Math.round(pct)));
+    });
+
+    // ── Pass 1: real per-game production + positional averages for perfFactor ─
+    const posPtsSum = new Map<string, number>();
+    const posPtsCount = new Map<string, number>();
+    const posStdPtsSum = new Map<string, number>();
+    type Pending = { p: (typeof eligible)[number]; realPtsPerGame: number; gamesPlayed: number | null };
+    const pending: Pending[] = [];
+    for (const p of eligible) {
+        const stats = statsByPlayerId.get(p.playerId);
+        const realPtsPerGame     = stats ? computeRealPoints(stats.statsPerGame, scoringSettings) : 0;
+        const standardPtsPerGame = stats ? computeRealPoints(stats.statsPerGame, STANDARD_SCORING) : 0;
+        if (stats && stats.gamesPlayed) {
+            const pos = p.position ?? '';
+            posPtsSum.set(pos, (posPtsSum.get(pos) ?? 0) + realPtsPerGame);
+            posPtsCount.set(pos, (posPtsCount.get(pos) ?? 0) + 1);
+            posStdPtsSum.set(pos, (posStdPtsSum.get(pos) ?? 0) + standardPtsPerGame);
+        }
+        pending.push({ p, realPtsPerGame, gamesPlayed: stats?.gamesPlayed ?? null });
+    }
+    const posAvgPtsPerGame = new Map<string, number>();
+    const posStdAvgPtsPerGame = new Map<string, number>();
+    for (const [pos, sum] of posPtsSum)    posAvgPtsPerGame.set(pos, sum / (posPtsCount.get(pos) ?? 1));
+    for (const [pos, sum] of posStdPtsSum) posStdAvgPtsPerGame.set(pos, sum / (posPtsCount.get(pos) ?? 1));
+    const posScoringFactor = new Map<string, number>();
+    for (const pos of posAvgPtsPerGame.keys()) {
+        posScoringFactor.set(pos, computePositionScoringFactor(
+            posAvgPtsPerGame.get(pos) ?? 0,
+            posStdAvgPtsPerGame.get(pos) ?? 0,
+        ));
+    }
+
+    // ── DEF-only real-points percentile (no market source exists for D/ST) ──
+    const defRanked = pending
+        .filter(x => x.p.position === 'DEF')
+        .sort((a, b) => b.realPtsPerGame - a.realPtsPerGame);
+    const defPercentile = new Map<string, number>();
+    defRanked.forEach((x, i) => {
+        const pct = defRanked.length > 1 ? 100 * (1 - i / (defRanked.length - 1)) : 100;
+        defPercentile.set(x.p.playerId, Math.max(1, Math.round(pct)));
+    });
+
+    // ── Pass 2: blend market value + real-scoring nudge into a final rank ───
+    const players = pending.map(({ p, realPtsPerGame, gamesPlayed }) => {
+        const pos = p.position ?? '';
+        let finalValue: number;
+
+        if (pos === 'DEF') {
+            // Real points already the sole anchor — no separate nudge on top.
+            finalValue = defPercentile.get(p.playerId) ?? 1;
+        } else {
+            const fc       = resolveFc(p.fullName ?? '', pos);
+            const fcValue  = fc ? normaliseFcValue(superflex ? fc.redraftValueSf : fc.redraftValue) : null;
+            const adpValue = adpPercentile.get(p.playerId) ?? 1;
+            const baseValue = fcValue != null ? Math.round((fcValue + adpValue) / 2) : adpValue;
+
+            const individualFactor = gamesPlayed
+                ? computePerfFactor(realPtsPerGame, posAvgPtsPerGame.get(pos) ?? 0, gamesPlayed)
+                : 1.0;
+            const positionFactor = posScoringFactor.get(pos) ?? 1.0;
+            const perfFactor      = combineScoringFactors(individualFactor, positionFactor);
+
+            // Capped additive nudge, not a multiplier — a multiplier on an
+            // already ~1-100 bounded value saturates the top of the board to
+            // identical scores (see the same fix applied in contextLoader.ts).
+            const perfAdjustment = Math.round((perfFactor - 1) * 20);
+            finalValue = Math.min(100, Math.max(1, baseValue + perfAdjustment));
+        }
+
+        return {
+            playerId:       p.playerId,
+            name:           p.fullName ?? '',
+            position:       pos,
+            team:           p.team,
+            age:            p.age,
+            birthDate:      p.birthDate,
+            injuryStatus:   p.injuryStatus,
+            adp:            p.searchRank ?? 999,
+            realPtsPerGame: gamesPlayed ? realPtsPerGame : null,
+            hasRealData:    Boolean(gamesPlayed),
+            finalValue,
+        };
+    });
+
+    return players
+        .sort((a, b) => b.finalValue - a.finalValue)
+        .slice(0, limit)
+        .map(({ finalValue: _finalValue, ...rest }) => rest);
 }

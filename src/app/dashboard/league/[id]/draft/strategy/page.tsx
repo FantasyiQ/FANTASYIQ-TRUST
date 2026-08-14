@@ -164,7 +164,7 @@ export default async function DraftStrategyPage({
         // generic PPR baseline only for platforms that don't expose granular
         // scoring yet (Yahoo/NFL), matching the pattern in rankings/page.tsx.
         const scoringSettings = (league.scoringSettings as Record<string, number> | null) ?? STANDARD_SCORING;
-        const adpPlayers = await computeRealRedraftBoard(scoringSettings);
+        const adpPlayers = await computeRealRedraftBoard(scoringSettings, superflex);
 
         // Attach projections if in season
         const pprField = league.platform === 'sleeper' ? 'pointsPpr' : null;
