@@ -54,15 +54,21 @@ export async function GET(request: Request): Promise<Response> {
     
         const rows = Object.entries(data)
             .filter(([, p]) => p.position)
-            .map(([id, p]) => ({
+            .map(([id, p]) => {
+                const team = p.team ?? 'FA';
+                // Sleeper doesn't clear injury_status when a player leaves a
+                // roster — it's meaningless (and misleading) for a free agent,
+                // so drop it at the source rather than trusting it downstream.
+                const isFA = team === 'FA';
+                return {
                 playerId:       id,
                 fullName:       p.full_name || `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim(),
                 position:       p.position!,
-                team:           p.team ?? 'FA',
+                team,
                 active:         p.active ?? false,
                 espnId:         p.espn_id ? String(p.espn_id) : null,
-                injuryStatus:   p.injury_status ?? null,
-                injuryBodyPart: p.injury_body_part ?? null,
+                injuryStatus:   isFA ? null : (p.injury_status ?? null),
+                injuryBodyPart: isFA ? null : (p.injury_body_part ?? null),
                 jerseyNumber:   p.number ? parseInt(String(p.number)) || null : null,
                 height:         formatHeight(p.height),
                 weight:         p.weight ? parseInt(String(p.weight)) || null : null,
@@ -84,7 +90,8 @@ export async function GET(request: Request): Promise<Response> {
                 draftDay:       p.draft_pick?.round != null
                                     ? (p.draft_pick.round === 1 ? 1 : p.draft_pick.round <= 3 ? 2 : 3)
                                     : null,
-            }));
+                };
+            });
     
         // Upsert in batches of 500 to stay within statement limits
         const BATCH = 500;
