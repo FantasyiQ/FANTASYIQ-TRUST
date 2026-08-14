@@ -17,7 +17,7 @@ import { fetchSeasonStats } from '@/lib/rankings/sleeperStatsAdapter';
 
 export const maxDuration = 300;
 
-const SKILL_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE']);
+const SKILL_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE', 'K', 'DEF']);
 
 export async function GET(request: Request): Promise<Response> {
     if (request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
