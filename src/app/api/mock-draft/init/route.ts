@@ -444,7 +444,11 @@ export async function GET(req: NextRequest): Promise<Response> {
             ...(starterSlots['DEF'] > 0 ? ['DEF'] : []),
         ];
         const kdRaw = await prisma.sleeperPlayer.findMany({
-            where:  { position: { in: kdPositions }, active: true },
+            // active alone is unreliable — Sleeper leaves plenty of long-retired
+            // kickers (Gostkowski, Bailey, Vinatieri, etc.) marked active:true.
+            // team != 'FA' catches what active: true misses (~60% of the raw
+            // K/DEF pool was stale free agents, not real rosterable players).
+            where:  { position: { in: kdPositions }, active: true, team: { not: 'FA' } },
             select: { playerId: true, fullName: true, team: true, age: true, position: true, injuryStatus: true },
         });
         // Shuffle for variety, then score descending so the "best" ones go slightly earlier
