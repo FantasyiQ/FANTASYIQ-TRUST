@@ -52,7 +52,7 @@ export async function POST(request: NextRequest): Promise<Response> {
                 };
 
                 return prisma.league.upsert({
-                    where:  { userId_platform_leagueId: { userId, platform: 'nfl', leagueId: String(league.id) } },
+                    where:  { userId_platform_leagueId_season: { userId, platform: 'nfl', leagueId: String(league.id), season: leagueRecord.season } },
                     create: { userId, platform: 'nfl', leagueId: String(league.id), ...leagueRecord },
                     update: leagueRecord,
                     select: { id: true, leagueId: true, leagueName: true },
@@ -82,12 +82,9 @@ export async function DELETE(request: NextRequest): Promise<Response> {
     const leagueId = request.nextUrl.searchParams.get('leagueId');
     if (!leagueId) return Response.json({ error: 'leagueId is required' }, { status: 400 });
 
-    try {
-        await prisma.league.delete({
-            where: { userId_platform_leagueId: { userId, platform: 'nfl', leagueId } },
-        });
-        return Response.json({ deleted: true });
-    } catch {
-        return Response.json({ error: 'League not found' }, { status: 404 });
-    }
+    const { count } = await prisma.league.deleteMany({
+        where: { userId, platform: 'nfl', leagueId },
+    });
+    if (count === 0) return Response.json({ error: 'League not found' }, { status: 404 });
+    return Response.json({ deleted: true });
 }

@@ -65,7 +65,7 @@ async function acceptSleeperInvite(
 
     if (!dbLeagueId) {
         const r = await prisma.league.upsert({
-            where:  { userId_platform_leagueId: { userId, platform: 'sleeper', leagueId: sl.league_id } },
+            where:  { userId_platform_leagueId_season: { userId, platform: 'sleeper', leagueId: sl.league_id, season: sl.season } },
             create: { userId, platform: 'sleeper', ...fields },
             update: fields,
             select: { id: true },

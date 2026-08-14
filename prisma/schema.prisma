@@ -237,7 +237,7 @@ model League {
     announcements    Announcement[]
     documents        LeagueDocument[]
 
-    @@unique([userId, platform, leagueId])
+    @@unique([userId, platform, leagueId, season])
     @@index([userId])
 }
 

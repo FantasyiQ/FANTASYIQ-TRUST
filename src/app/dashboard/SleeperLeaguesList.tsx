@@ -153,7 +153,7 @@ export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier
                                 <span className="text-[#D4AF37] text-sm font-semibold whitespace-nowrap">View →</span>
                             </div>
                         </Link>
-                        <form action={unsyncLeague.bind(null, league.leagueId, league.platform)}>
+                        <form action={unsyncLeague.bind(null, league.id, league.leagueId, league.platform)}>
                             <button
                                 type="submit"
                                 title="Remove league"

@@ -44,11 +44,11 @@ export async function POST(request: NextRequest): Promise<Response> {
             const data    = normalizeEspnLeague(rawData, leagueId);
 
             await prisma.league.upsert({
-                where:  { userId_platform_leagueId: { userId, platform: 'espn', leagueId: `${leagueId}_${season}` } },
+                where:  { userId_platform_leagueId_season: { userId, platform: 'espn', leagueId, season: String(season) } },
                 create: {
                     userId,
                     platform:        'espn',
-                    leagueId:        `${leagueId}_${season}`,
+                    leagueId,
                     leagueName:      data.leagueName,
                     season:          String(season),
                     status:          deriveEspnStatus(rawData),
@@ -64,6 +64,7 @@ export async function POST(request: NextRequest): Promise<Response> {
                         players: t.roster.map(p => ({ name: p.fullName, position: p.position })),
                     })),
                     lastSyncedAt: new Date(),
+                    isHistorical: true,
                 },
                 update: {
                     leagueName:      data.leagueName,

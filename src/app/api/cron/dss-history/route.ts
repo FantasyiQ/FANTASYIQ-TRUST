@@ -111,7 +111,7 @@ async function processLeague(
         const isDynasty = historicalLeague.settings?.type === 2;
 
         await prisma.league.upsert({
-            where:  { userId_platform_leagueId: { userId, platform: 'sleeper', leagueId: historicalLeagueId } },
+            where:  { userId_platform_leagueId_season: { userId, platform: 'sleeper', leagueId: historicalLeagueId, season: historicalLeague.season } },
             create: {
                 userId,
                 platform:     'sleeper',

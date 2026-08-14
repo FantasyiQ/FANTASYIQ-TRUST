@@ -66,7 +66,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
         const [league] = await Promise.all([
             prisma.league.upsert({
-                where:  { userId_platform_leagueId: { userId, platform: 'espn', leagueId } },
+                where:  { userId_platform_leagueId_season: { userId, platform: 'espn', leagueId, season: leagueRecord.season } },
                 create: { userId, platform: 'espn', ...leagueRecord, standings: JSON.parse(JSON.stringify(leagueRecord.standings)) },
                 update: { ...leagueRecord, standings: JSON.parse(JSON.stringify(leagueRecord.standings)) },
                 select: { id: true, leagueId: true, leagueName: true },
@@ -140,12 +140,11 @@ export async function DELETE(request: NextRequest): Promise<Response> {
     const leagueId = request.nextUrl.searchParams.get('leagueId');
     if (!leagueId) return Response.json({ error: 'leagueId is required' }, { status: 400 });
 
-    try {
-        await prisma.league.delete({
-            where: { userId_platform_leagueId: { userId, platform: 'espn', leagueId } },
-        });
-        return Response.json({ deleted: true });
-    } catch {
-        return Response.json({ error: 'League not found' }, { status: 404 });
-    }
+    // leagueId+platform is no longer unique per user (a league can have
+    // multiple season rows) — remove every season row for it.
+    const { count } = await prisma.league.deleteMany({
+        where: { userId, platform: 'espn', leagueId },
+    });
+    if (count === 0) return Response.json({ error: 'League not found' }, { status: 404 });
+    return Response.json({ deleted: true });
 }
