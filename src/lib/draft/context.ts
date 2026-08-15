@@ -204,6 +204,7 @@ export interface DraftContext {
         fiqScore:         number;          // 0–100
         tier:             number;          // 1–5 FiQ tier
         opportunityScore: number | null;   // 0–100 year-1 role signal (rookies only)
+        injuryStatus:     string | null;
     }[];
 
     /** All player IDs in the draft pool, ordered by pool rank (best first). */

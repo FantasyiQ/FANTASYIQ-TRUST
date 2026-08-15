@@ -22,6 +22,17 @@ import type {
     DraftProfile, TrajectoryWindow, HorizonYears, RiskTolerance, DraftPoolADPEntry,
 } from './context';
 import { normalizePosition, getTier, computeTeamMode } from './context';
+import { INJURY_STATUS_RISK } from '@/lib/trade-engine';
+
+// Same real relative injury-severity ordering used across the app (Dynasty
+// DTV, the redraft board) — applied here too since a live draft assistant
+// recommending who to pick is exactly where a blind spot on "this player
+// can't play right now" matters most. Scaled to this file's 0-100 fiqScore.
+const DRAFT_INJURY_ADJUSTMENT_SCALE = 40;
+function injuryAdjustedFiqScore(fiqScore: number, injuryStatus: string | null | undefined): number {
+    const risk = INJURY_STATUS_RISK[injuryStatus ?? ''] ?? 0;
+    return Math.max(1, fiqScore - Math.round(risk * DRAFT_INJURY_ADJUSTMENT_SCALE));
+}
 
 /** Normalizes a player name for fuzzy fallback matching.
  *  Strips Jr/Sr/II/III/IV/V suffixes, apostrophes, periods, and extra whitespace. */
@@ -348,7 +359,7 @@ export async function loadDraftContext(params: {
 
         const sleeperPlayers = await prisma.sleeperPlayer.findMany({
             where:  { fullName: { in: rookies.map(r => r.playerName) } },
-            select: { fullName: true, playerId: true, team: true, age: true, position: true },
+            select: { fullName: true, playerId: true, team: true, age: true, position: true, injuryStatus: true },
         });
 
         const spResolver = makeSpResolver(sleeperPlayers);
@@ -377,7 +388,8 @@ export async function loadDraftContext(params: {
             if (!allowedPositions.has(normalizePosition(r.position))) continue;
             const sp = spLookup(r.playerName, r.position);
             if (sp && draftedIds.has(sp.playerId)) continue;
-            const fiqScore  = Math.round(r.fiqScore);
+            const baseFiqScore = Math.round(r.fiqScore);
+            const fiqScore  = injuryAdjustedFiqScore(baseFiqScore, sp?.injuryStatus);
             const tierMatch = r.fiqTier?.match(/(\d+)/);
             const tier      = tierMatch ? parseInt(tierMatch[1], 10) : getTier(fiqScore);
             availablePlayers.push({
@@ -389,6 +401,7 @@ export async function loadDraftContext(params: {
                 fiqScore,
                 tier,
                 opportunityScore: r.opportunityScore ?? null,
+                injuryStatus:     sp?.injuryStatus ?? null,
             });
         }
     } else {
@@ -431,7 +444,7 @@ export async function loadDraftContext(params: {
 
         const sleeperPlayers = await prisma.sleeperPlayer.findMany({
             where:  { fullName: { in: allFpdoNames }, active: true },
-            select: { fullName: true, playerId: true, team: true, age: true, position: true },
+            select: { fullName: true, playerId: true, team: true, age: true, position: true, injuryStatus: true },
         });
 
         const spResolver2 = makeSpResolver(sleeperPlayers);
@@ -549,7 +562,8 @@ export async function loadDraftContext(params: {
             // differentiation while still reflecting the league's real scoring shift.
             const baseFiqScore   = Math.min(100, Math.round(dynastyValue / 90));
             const perfAdjustment = Math.round((perfFactor - 1) * 20);
-            const fiqScore       = Math.min(100, Math.max(1, baseFiqScore + perfAdjustment));
+            const preInjuryScore = Math.min(100, Math.max(1, baseFiqScore + perfAdjustment));
+            const fiqScore       = injuryAdjustedFiqScore(preInjuryScore, sp?.injuryStatus);
             availablePlayers.push({
                 sleeperPlayerId: sp?.playerId ?? '',
                 name:            fcv.playerName,
@@ -559,6 +573,7 @@ export async function loadDraftContext(params: {
                 fiqScore,
                 tier:            getTier(fiqScore),
                 opportunityScore: null,
+                injuryStatus:    sp?.injuryStatus ?? null,
             });
         }
     }
