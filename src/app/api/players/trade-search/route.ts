@@ -4,10 +4,31 @@ import { calculateAge } from '@/lib/calculateAge';
 import type { Player } from '@/lib/trade-engine';
 import { checkSearchLimit, getClientIp } from '@/lib/ratelimit';
 import { normalizePlayerName } from '@/lib/playerName';
+import { computePlayerBaseValue } from '@/lib/player-universe';
 
 const VALUE_CAP = 9999;
 function normaliseFc(raw: number): number {
     return Math.min(100, Math.max(1, Math.round((raw / VALUE_CAP) * 100)));
+}
+
+// Real per-league context, passed by the Trade Evaluator's search box so a
+// player's value here matches what they'll show once actually added to a
+// trade side. Without this, the search preview used Math.max(dynastyValue,
+// redraftValue) with no superflex or real scoring-settings awareness at
+// all — a real bug: it silently ignored superflex format and showed an
+// inflated value relative to the correct computePlayerBaseValue() used
+// everywhere else (confirmed live on a real league: 78.4 vs the correct
+// 65.3 for the same player, same real settings).
+function parseLeagueContext(params: URLSearchParams) {
+    const leagueType  = params.get('leagueType') === 'Redraft' ? 'Redraft' as const : 'Dynasty' as const;
+    const superflex    = params.get('superflex') === '1';
+    const pprParam      = params.get('ppr');
+    const ppr: 0 | 0.5 | 1 = pprParam === '0' ? 0 : pprParam === '0.5' ? 0.5 : 1;
+    const leagueSize    = Number(params.get('leagueSize') ?? 12) || 12;
+    const passTd        = params.get('passTd')     != null ? Number(params.get('passTd'))     : 4;
+    const bonusRecTe    = params.get('bonusRecTe') != null ? Number(params.get('bonusRecTe')) : 0;
+    const rushAtt       = params.get('rushAtt')    != null ? Number(params.get('rushAtt'))    : 0;
+    return { leagueType, superflex, ppr, leagueSize, passTd, bonusRecTe, rushAtt };
 }
 
 // Default baseValues for unranked / non-skill-position players
@@ -34,6 +55,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     if (q.length < 2) return Response.json([]);
 
     const ql = q.toLowerCase();
+    const leagueCtx = parseLeagueContext(request.nextUrl.searchParams);
 
     // 1. Pull all DB matches (cast wide net, sort by relevance after)
     const [dbMatches, fcRows] = await Promise.all([
@@ -47,7 +69,7 @@ export async function GET(request: NextRequest): Promise<Response> {
         }),
         prisma.fantasyCalcValue.findMany({
             where: { nameLower: { contains: ql } },
-            select: { nameLower: true, position: true, dynastyValue: true, redraftValue: true },
+            select: { nameLower: true, position: true, dynastyValue: true, dynastyValueSf: true, redraftValue: true, redraftValueSf: true },
         }),
     ]);
 
@@ -79,20 +101,27 @@ export async function GET(request: NextRequest): Promise<Response> {
             ?? (byNormNameCount.get(normd) === 1 ? byNormName.get(normd) : undefined);
     }
 
-    // 2. Merge: dynasty value wins; fall back to position-based depth default
+    // 2. Merge: real per-league value (superflex + scoring settings aware,
+    // same computePlayerBaseValue() the rest of the app uses) wins; fall
+    // back to position-based depth default when FantasyCalc has no match.
     const merged: Player[] = dbMatches.map((p, i) => {
         const nameLower = p.fullName.toLowerCase();
         const fcRow  = resolveFc(nameLower, p.position);
-        const fcValue = fcRow !== undefined
-            ? normaliseFc(Math.max(fcRow.dynastyValue, fcRow.redraftValue))
-            : undefined;
+        const baseValue = fcRow !== undefined
+            ? computePlayerBaseValue({
+                dynasty:   normaliseFc(fcRow.dynastyValue),
+                dynastySf: normaliseFc(fcRow.dynastyValueSf),
+                redraft:   normaliseFc(fcRow.redraftValue),
+                redraftSf: normaliseFc(fcRow.redraftValueSf),
+            }, p.position, leagueCtx)
+            : (DEPTH_BASE[p.position] ?? 10);
         return {
             rank:            i + 1,
             name:            p.fullName,
             position:        p.position,
             team:            p.team,
             age:             calculateAge(p.birthDate) ?? p.age ?? 0,
-            baseValue:       fcValue ?? (DEPTH_BASE[p.position] ?? 10),
+            baseValue,
             birthDate:       p.birthDate ?? null,
             playerImageUrl:  `https://sleepercdn.com/content/nfl/players/${p.playerId}.jpg`,
             image:           `https://sleepercdn.com/content/nfl/players/${p.playerId}.jpg`,

@@ -395,7 +395,21 @@ function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEA
                 })
                 .slice(0, 8);
 
-            const res = await fetch(`/api/players/trade-search?q=${encodeURIComponent(q)}`);
+            // Real league context so the preview value matches what the
+            // player will actually show once added — without this the
+            // search box used a generic, superflex-blind formula that could
+            // disagree with the real per-league value shown after adding.
+            const ctxParams = new URLSearchParams({
+                q,
+                leagueType:  leagueType,
+                superflex:   settings.sfSlots > 0 ? '1' : '0',
+                ppr:         String(ppr),
+                leagueSize:  String(leagueSize),
+                passTd:      String(settings.passTd),
+                bonusRecTe:  String(settings.bonusRecTe),
+                rushAtt:     String(settings.rushAtt),
+            });
+            const res = await fetch(`/api/players/trade-search?${ctxParams.toString()}`);
             const playerData = await res.json() as Player[];
             const playerMatches = playerData.filter(p => !excluded.includes(p.name));
 
