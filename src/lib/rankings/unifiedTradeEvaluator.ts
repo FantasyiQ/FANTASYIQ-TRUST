@@ -96,7 +96,6 @@ export function buildGetPlayerValue(
     normalizedOffense: NormalizedOffenseValues,
     defenseValues:     DefenseValues,
 ): (id: string, name: string) => { value: number; source: 'offense' | 'defense' | 'unknown' } {
-    console.log("defenseValues keys:", Object.keys(defenseValues));
     return (id: string, name: string) => {
         // Defense-first: look up by Sleeper player ID
         if (defenseValues[id] !== undefined) {
@@ -106,7 +105,6 @@ export function buildGetPlayerValue(
         if (normalizedOffense[name] !== undefined) {
             return { value: normalizedOffense[name], source: 'offense' };
         }
-        console.log("Missing defensive value for:", id, name);
         return { value: 0, source: 'unknown' };
     };
 }

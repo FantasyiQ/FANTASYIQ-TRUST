@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { getEspnFullSync, normalizeEspnLeague, deriveEspnStatus, deriveEspnScoringType, translateEspnScoring, deriveEspnRosterPositions } from '@/lib/espn';
 import { shouldSkipLeague, withRetry, recordSyncFailure, recordSyncRecovered } from '@/lib/sync-recovery';
 import { captureError } from '@/lib/sentry';
+import { withCronLog } from '@/lib/cron-logger';
 
 export const maxDuration = 300;
 
@@ -11,7 +12,7 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     try {
-    
+        const result = await withCronLog('espn-sync', async () => {
         const users = await prisma.user.findMany({
             where: {
                 espnS2: { not: null },
@@ -75,7 +76,9 @@ export async function GET(request: Request): Promise<Response> {
             }
         }
     
-        return Response.json({ ok: true, synced, skipped, users: users.length });
+        return { processed: synced, message: `${synced} leagues synced · ${skipped} skipped · ${users.length} users` };
+        });
+        return Response.json({ ok: true, ...result });
     } catch (err) {
         captureError(err, { cron: 'espn-sync' });
         return Response.json({ error: 'Cron failed' }, { status: 500 });

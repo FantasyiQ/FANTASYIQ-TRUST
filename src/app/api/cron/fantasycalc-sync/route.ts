@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { captureError } from '@/lib/sentry';
 import { normalizePlayerName as normalizeName } from '@/lib/playerName';
+import { withCronLog } from '@/lib/cron-logger';
 
 export const maxDuration = 300;
 
@@ -50,7 +51,7 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     try {
-    
+        const result = await withCronLog('fantasycalc-sync', async () => {
         // ── Step 1: Snapshot current values (before today's update) ──────────────
         // Merge with Sleeper for accurate team/injury at snapshot time.
         const [currentRows, sleeperPlayers] = await Promise.all([
@@ -126,9 +127,13 @@ export async function GET(request: Request): Promise<Response> {
                 fetchKtcPage('https://keeptradecut.com/fantasy-rankings'),
             ]);
         } catch (err) {
-            return Response.json({ error: String(err) }, { status: 502 });
+            // Throw (not an early Response) so withCronLog records this as a
+            // real failure — this cron feeds every dynasty/redraft player
+            // value in the app, so a silent skip here is exactly the kind of
+            // blind spot that let leagues go stale for months undetected.
+            throw new Error(`KeepTradeCut fetch failed: ${String(err)}`);
         }
-    
+
         // The data source uses different playerIDs for the same player on dynasty vs redraft pages.
         // Match by name (lowercased) to correctly link redraft values.
         const redraftMap = new Map<string, number>();
@@ -225,7 +230,9 @@ export async function GET(request: Request): Promise<Response> {
             await prisma.fantasyCalcValue.deleteMany({ where: { nameLower: { in: staleNames } } }).catch(() => null);
         }
 
-        return Response.json({ ok: true, source: 'FantasyCalc', upserted, deduped: staleNames.length });
+        return { processed: upserted, message: `${upserted} players upserted, ${staleNames.length} deduped` };
+        });
+        return Response.json({ ok: true, source: 'FantasyCalc', ...result });
     } catch (err) {
         captureError(err, { cron: 'fantasycalc-sync' });
         return Response.json({ error: 'Cron failed' }, { status: 500 });

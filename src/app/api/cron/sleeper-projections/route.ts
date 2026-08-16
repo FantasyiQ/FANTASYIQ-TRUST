@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getNflState } from '@/lib/sleeper';
 import { captureError } from '@/lib/sentry';
+import { withCronLog } from '@/lib/cron-logger';
 
 export const maxDuration = 300;
 
@@ -29,6 +30,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     }
 
     try {
+        const result = await withCronLog('sleeper-projections', async () => {
         // Sleeper's own authoritative state, not a local date heuristic — the
         // previous getMonth()-based guess ("before September = still last
         // season") desynced from Sleeper's real calendar during the preseason
@@ -78,7 +80,17 @@ export async function GET(request: NextRequest): Promise<Response> {
             ));
         }
     
-        return Response.json({ ok: true, season, week, upserted: rows.length });
+        // A real day should always return data for thousands of players —
+        // zero rows almost always means Sleeper's response shape changed or
+        // the endpoint had an outage, not that there's genuinely nothing to
+        // sync. Flag it as an error so it doesn't silently read as "success."
+        return {
+            processed: rows.length,
+            errors:    rows.length === 0 ? 1 : 0,
+            message:   `season ${season} week ${week} — ${rows.length} projections upserted`,
+        };
+        });
+        return Response.json({ ok: true, ...result });
     } catch (err) {
         captureError(err, { cron: 'sleeper-projections' });
         return Response.json({ error: 'Cron failed' }, { status: 500 });
