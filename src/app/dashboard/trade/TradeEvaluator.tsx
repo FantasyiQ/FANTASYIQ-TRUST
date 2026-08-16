@@ -382,6 +382,15 @@ function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEA
     const [loading, setLoading] = useState(false);
     const debounceRef           = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+    // players (allPlayers) already carries the fully correct baseValue AND
+    // perfFactor (including the real per-league positional scoring nudge
+    // patchPlayer() applies to roster players — even stat-less rookies get
+    // a real, non-1.0 positional factor from this). The search API can't
+    // replicate that cheaply per-request, so prefer this authoritative
+    // object by name whenever it's available; the API result is a fallback
+    // only for players outside the FantasyCalc-covered universe.
+    const playersByName = useMemo(() => new Map(players.map(p => [p.name, p])), [players]);
+
     const search = useCallback(async (q: string) => {
         if (q.length < 2) { setResults([]); return; }
         setLoading(true);
@@ -411,7 +420,9 @@ function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEA
             });
             const res = await fetch(`/api/players/trade-search?${ctxParams.toString()}`);
             const playerData = await res.json() as Player[];
-            const playerMatches = playerData.filter(p => !excluded.includes(p.name));
+            const playerMatches = playerData
+                .filter(p => !excluded.includes(p.name))
+                .map(p => playersByName.get(p.name) ?? p);
 
             // Picks first if query looks like a pick
             const looksLikePick = /\d\.\d|\b20\d{2}\b|\b(early|mid|late)\b/i.test(q) ||
@@ -422,7 +433,7 @@ function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEA
             );
         } catch { /* ignore */ }
         finally { setLoading(false); }
-    }, [excluded, allPicks]);
+    }, [excluded, allPicks, playersByName, leagueType, settings, ppr, leagueSize]);
 
     function handleInput(e: React.ChangeEvent<HTMLInputElement>) {
         const val = e.target.value;
