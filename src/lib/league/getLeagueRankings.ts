@@ -2,7 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { normalizePlayerName as normalizeName } from '@/lib/playerName';
-import { getLeagueRosters, getLeagueUsers, getLeague, getNflState } from '@/lib/sleeper';
+import { getLeagueRosters, getLeagueUsers, getLeague, getNflState, getPlayers } from '@/lib/sleeper';
 import { calcDtv, DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
 import type { Player, LeagueSettings, LeagueType, PprFormat } from '@/lib/trade-engine';
 import { computePlayerBaseValue } from '@/lib/player-universe';
@@ -15,6 +15,10 @@ import { calculateAge, calculatePreciseAge } from '@/lib/calculateAge';
 import { effectiveTierForLeague, tierLevel } from '@/lib/league-limits';
 import { stripe, priceIdToTier } from '@/lib/stripe';
 import type { SubscriptionTier } from '@prisma/client';
+import { buildLeagueConfig } from '@/lib/rankings/leagueConfigBuilder';
+import { buildLeagueDefensiveAndKickerRankings } from '@/lib/rankings/defensiveEngine';
+import { buildIdpSeedProjections, buildKickerSeedProjections, buildDefenseSeedProjections, toIdpPosition } from '@/lib/rankings/seedProjections';
+import { buildProjectionsFromSleeperStats } from '@/lib/rankings/sleeperStatsAdapter';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -76,8 +80,28 @@ export type LeagueRankingsData = {
 const VALUE_CAP = 9999;
 const SKILL_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE']);
 
+// Real IDP roster slot types across Sleeper leagues — matches the set already
+// established in contextLoader.ts / draft/strategy page.tsx this session.
+const IDP_SLOTS = new Set(['DL','DE','DT','NT','LB','OLB','ILB','MLB','DB','CB','S','FS','SS','NB','IDP','IDPFLEX','IDP_FLEX']);
+// Real individual defensive positions a rostered IDP athlete can hold —
+// distinct from IDP_SLOTS (roster slot types) since a roster slot like
+// IDP_FLEX doesn't correspond to any player's own position.
+const IDP_PLAYER_POSITIONS = new Set(['DL','DE','DT','NT','EDGE','LB','OLB','ILB','MLB','DB','CB','S','FS','SS','NB','SAF']);
+
 function normalise(raw: number): number {
     return Math.min(100, Math.max(1, Math.round((raw / VALUE_CAP) * 100)));
+}
+
+// Mirrors trade-engine.ts's own (unexported) tier() thresholds so K/DEF/IDP
+// entries — scored by the defensive engine, not calcDtv — land in the same
+// tier labels as everything else on the same 0-100 finalDtv scale.
+function tierForValue(finalDtv: number): string {
+    if (finalDtv >= 85) return 'Elite';
+    if (finalDtv >= 70) return 'Star';
+    if (finalDtv >= 55) return 'Starter';
+    if (finalDtv >= 40) return 'Flex';
+    if (finalDtv >= 25) return 'Bench';
+    return 'Waiver';
 }
 
 
@@ -199,10 +223,24 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
     // ── League settings ───────────────────────────────────────────────────────
     const leagueType      = (league.leagueType as LeagueType) ?? 'Redraft';
     const scoringSettings = (league.scoringSettings as Record<string, number> | null) ?? {};
-    const leagueSettings  = buildLeagueSettings(league.rosterPositions as string[], scoringSettings);
+    const rosterPositions = league.rosterPositions as string[];
+    const leagueSettings  = buildLeagueSettings(rosterPositions, scoringSettings);
     const ppr: PprFormat  = league.scoringType === 'ppr' ? 1 : league.scoringType === 'half_ppr' ? 0.5 : 0;
     const superflex       = leagueSettings.sfSlots > 0;
     const leagueSize      = league.totalRosters;
+
+    // K/DEF/IDP are only relevant — and only shown — when this specific
+    // league actually rosters them. A league with no DEF slot has no real
+    // use for a defense's value, so showing one would be noise, not signal.
+    const hasK           = rosterPositions.includes('K');
+    const hasDef         = rosterPositions.includes('DEF');
+    const hasIdp         = rosterPositions.some(p => IDP_SLOTS.has(p));
+    const RANKED_POSITIONS = new Set([
+        ...SKILL_POSITIONS,
+        ...(hasK ? ['K'] : []),
+        ...(hasDef ? ['DEF'] : []),
+        ...(hasIdp ? [...IDP_PLAYER_POSITIONS] : []),
+    ]);
 
     // ── Fetch shared DB data (no Sleeper API yet) ─────────────────────────────
     const nflState     = await getNflState();
@@ -400,6 +438,99 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
         if (!existingNormd || dtv.finalDtv > existingNormd.finalDtv) dtvByNormName.set(normd, entry);
     }
 
+    // ── K/DEF/IDP — only computed when this league actually rosters them ─────
+    // Reuses the same defensive ranking engine already proven in the Trade
+    // Evaluator (real per-league scoring, positional scarcity from actual
+    // roster slot counts, ceilings that keep K/DEF/IDP from ever crowding out
+    // a legitimate skill player — verified there this session: K max 45,
+    // DEF max 55, IDP 60-70, all on this same 0-100 finalDtv scale).
+    if (hasK || hasDef || hasIdp) {
+        const allPlayersRaw = await getPlayers();
+        const { scoring, lineup } = buildLeagueConfig(scoringSettings, rosterPositions, leagueSize);
+
+        // Sleeper's free feed leaves long-retired players marked active with
+        // stale data (see feedback_stale_sleeper_player_data) — team!=FA
+        // plus a real-age cutoff catches what the raw feed alone can't.
+        const MAX_PLAUSIBLE_AGE = 45;
+        const allPlayers: typeof allPlayersRaw = {};
+        for (const [pid, player] of Object.entries(allPlayersRaw)) {
+            if (player.team === 'FA') continue;
+            if (player.age != null && player.age > MAX_PLAUSIBLE_AGE) continue;
+            allPlayers[pid] = player;
+        }
+
+        const idpPlayers: { playerId: string; position: 'DL' | 'LB' | 'DB' }[] = [];
+        const kickerIds: string[] = [];
+        for (const [pid, player] of Object.entries(allPlayers)) {
+            if (hasIdp) {
+                const idpPos = toIdpPosition(player.position);
+                if (idpPos) idpPlayers.push({ playerId: pid, position: idpPos });
+            }
+            if (hasK && player.position === 'K') kickerIds.push(pid);
+        }
+
+        // Live stats-based projections need a season with real completed
+        // games — try the current season first, fall back to the prior
+        // completed one during the preseason window when this year's stats
+        // don't exist yet (same fallback pattern used for PlayerSeasonStats
+        // elsewhere in this file).
+        const liveProjections = await buildProjectionsFromSleeperStats(statsSeason, allPlayers, scoringSettings)
+            ?? await buildProjectionsFromSleeperStats(String(Number(statsSeason) - 1), allPlayers, scoringSettings);
+        const idpProjections     = liveProjections?.idpProjections     ?? buildIdpSeedProjections(idpPlayers);
+        const kickerProjections  = liveProjections?.kickerProjections  ?? buildKickerSeedProjections(kickerIds);
+        const defenseProjections = liveProjections?.defenseProjections ?? buildDefenseSeedProjections();
+
+        const rankings = buildLeagueDefensiveAndKickerRankings(
+            scoring, lineup, idpProjections, kickerProjections, defenseProjections,
+            leagueType, liveProjections?.offensiveTop5Avg ?? {},
+        );
+
+        const defensiveEntities = [
+            ...(hasIdp ? rankings.idp       : []),
+            ...(hasK   ? rankings.kickers   : []),
+            ...(hasDef ? rankings.defenses  : []),
+        ];
+
+        if (defensiveEntities.length > 0) {
+            const entityIds = defensiveEntities.map(e => e.id);
+            const entityPlayers = await prisma.sleeperPlayer.findMany({
+                where:  { playerId: { in: entityIds } },
+                select: { playerId: true, fullName: true, position: true, team: true, age: true, birthDate: true, injuryStatus: true },
+            });
+            const entityById = new Map(entityPlayers.map(p => [p.playerId, p]));
+
+            for (const entity of defensiveEntities) {
+                const sp = entityById.get(entity.id);
+                if (!sp?.fullName) continue; // no real player/team match — skip rather than guess
+
+                const finalDtv = entity.valueScore;
+                const u: UniversePlayer = {
+                    name:           sp.fullName,
+                    position:       sp.position ?? entity.position,
+                    team:           (sp.team && sp.team !== 'FA') ? sp.team : null,
+                    age:            calculateAge(sp.birthDate) ?? sp.age,
+                    dynasty: 0, dynastySf: 0, redraft: 0, redraftSf: 0, // not FantasyCalc-covered — value comes entirely from the defensive engine
+                    trend:          null,
+                    injuryStatus:   sp.injuryStatus,
+                    birthDate:      sp.birthDate,
+                    playerImageUrl: `https://sleepercdn.com/content/nfl/players/${entity.id}.jpg`,
+                    statsPerGame:   null,
+                    gamesPlayed:    null,
+                };
+                const entry: UniverseEntry = { u, finalDtv, tier: tierForValue(finalDtv) };
+
+                universeEntries.push(entry);
+                dtvByPlayerId.set(entity.id, entry);
+                const exact = sp.fullName.toLowerCase();
+                const normd = normalizeName(sp.fullName);
+                const existingExact = dtvByExactName.get(exact);
+                const existingNormd = dtvByNormName.get(normd);
+                if (!existingExact || finalDtv > existingExact.finalDtv) dtvByExactName.set(exact, entry);
+                if (!existingNormd || finalDtv > existingNormd.finalDtv) dtvByNormName.set(normd, entry);
+            }
+        }
+    }
+
     universeEntries.sort((a, b) => b.finalDtv - a.finalDtv || a.u.name.localeCompare(b.u.name));
 
     // ── Player rankings (same for all platforms — full universe) ──────────────
@@ -434,7 +565,7 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
         const espnTeams = (league.standings as EspnTeam[] | null) ?? [];
 
         const rosterDtvList = espnTeams.map(team => {
-            const skillPlayers = (team.players ?? []).filter(p => SKILL_POSITIONS.has(p.position));
+            const skillPlayers = (team.players ?? []).filter(p => RANKED_POSITIONS.has(p.position));
             const scoredPlayers = skillPlayers
                 .map(p => {
                     const entry = dtvByExactName.get(p.name.toLowerCase()) ?? dtvByNormName.get(normalizeName(p.name));
