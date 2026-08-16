@@ -4,10 +4,7 @@ import { prisma } from '@/lib/prisma';
 import {
     getEspnFullSync,
     normalizeEspnLeague,
-    deriveEspnStatus,
-    deriveEspnScoringType,
-    deriveEspnRosterPositions,
-    translateEspnScoring,
+    buildCoreEspnLeagueFields,
 } from '@/lib/espn';
 
 // POST /api/espn/sync-history
@@ -47,16 +44,13 @@ export async function POST(request: NextRequest): Promise<Response> {
             await prisma.league.upsert({
                 where:  { userId_platform_leagueId_season: { userId, platform: 'espn', leagueId, season: String(season) } },
                 create: {
+                    ...buildCoreEspnLeagueFields(rawData),
                     userId,
                     platform:        'espn',
                     leagueId,
                     leagueName:      data.leagueName,
                     season:          String(season),
-                    status:          deriveEspnStatus(rawData),
                     totalRosters:    data.totalTeams,
-                    scoringType:     deriveEspnScoringType(rawData.settings),
-                    scoringSettings: translateEspnScoring(rawData.settings),
-                    rosterPositions: deriveEspnRosterPositions(rawData.settings),
                     standings:       data.teams.map(t => ({
                         teamId: t.teamId, name: t.name, abbrev: t.abbrev,
                         ownerId: t.ownerId, ownerName: t.ownerName,
@@ -69,12 +63,9 @@ export async function POST(request: NextRequest): Promise<Response> {
                     isHistorical: true,
                 },
                 update: {
+                    ...buildCoreEspnLeagueFields(rawData),
                     leagueName:      data.leagueName,
-                    status:          deriveEspnStatus(rawData),
                     totalRosters:    data.totalTeams,
-                    scoringType:     deriveEspnScoringType(rawData.settings),
-                    scoringSettings: translateEspnScoring(rawData.settings),
-                    rosterPositions: deriveEspnRosterPositions(rawData.settings),
                     standings:       data.teams.map(t => ({
                         teamId: t.teamId, name: t.name, abbrev: t.abbrev,
                         ownerId: t.ownerId, ownerName: t.ownerName,

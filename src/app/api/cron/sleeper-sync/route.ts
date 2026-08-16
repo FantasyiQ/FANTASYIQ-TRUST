@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { getSleeperLeagues, getLeague, getLeagueRosters, getLeagueDrafts, getNflState, deriveScoringType, rosterFpts, resolveDraftType, type SleeperLeague } from '@/lib/sleeper';
+import { getSleeperLeagues, getLeague, getLeagueRosters, getLeagueDrafts, getNflState, buildCoreSleeperLeagueFields, rosterFpts, resolveDraftType, type SleeperLeague } from '@/lib/sleeper';
 import { deriveChampWeek } from '@/lib/leaguePhase';
 import { shouldSkipLeague, withRetry, recordSyncFailure, recordSyncRecovered } from '@/lib/sync-recovery';
 import { withCronLog } from '@/lib/cron-logger';
@@ -58,11 +58,7 @@ async function syncLeague(
             await prisma.league.update({
                 where: { id: dbLeague.id },
                 data: {
-                    status:           sleeperLeague.status,
-                    scoringType:      deriveScoringType(sleeperLeague),
-                    leagueType:       sleeperLeague.settings?.type === 2 ? 'Dynasty' : 'Redraft',
-                    scoringSettings:  sleeperLeague.scoring_settings ?? {},
-                    rosterPositions:  sleeperLeague.roster_positions,
+                    ...buildCoreSleeperLeagueFields(sleeperLeague),
                     standings,
                     draftStartTime,
                     draftStatus,

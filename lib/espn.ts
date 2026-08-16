@@ -531,6 +531,21 @@ export function deriveEspnStatus(espn: EspnLeagueSettings): string {
     return 'complete';
 }
 
+/**
+ * The core real-data fields every ESPN league sync path must write. Same
+ * rationale as buildCoreSleeperLeagueFields (lib/sleeper.ts) — never
+ * hand-roll scoringSettings/rosterPositions/scoringType/status inline
+ * again; reach for this instead so a new sync path can't quietly omit one.
+ */
+export function buildCoreEspnLeagueFields(espn: EspnLeagueSettings) {
+    return {
+        scoringSettings: translateEspnScoring(espn.settings),
+        rosterPositions: deriveEspnRosterPositions(espn.settings),
+        scoringType:     deriveEspnScoringType(espn.settings),
+        status:          deriveEspnStatus(espn),
+    };
+}
+
 export function buildEspnStandings(teams: EspnTeam[]): Array<{
     teamId: number; abbrev: string; name: string;
     wins: number; losses: number; ties: number;

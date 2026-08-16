@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getSleeperLeagues, getNflState, deriveScoringType, type SleeperLeague } from '@/lib/sleeper';
+import { getSleeperLeagues, getNflState, buildCoreSleeperLeagueFields, type SleeperLeague } from '@/lib/sleeper';
 import { getLeagueLimit, tierToLimitKey } from '@/lib/league-limits';
 import { deriveChampWeek } from '@/lib/leaguePhase';
 
@@ -43,15 +43,12 @@ export async function POST(request: NextRequest): Promise<Response> {
                 ? deriveChampWeek(playoffWeekStart, playoffTeams, roundType)
                 : null;
             return {
+                ...buildCoreSleeperLeagueFields(league),
                 leagueId:         league.league_id,
                 leagueName:       league.name,
                 season:           league.season,
-                status:           league.status,
                 totalRosters:     league.total_rosters,
-                scoringType:      deriveScoringType(league),
-                scoringSettings:  league.scoring_settings ?? {},
                 avatar:           league.avatar,
-                rosterPositions:  league.roster_positions,
                 sleeperUserId,
                 ...(playoffWeekStart !== null && { playoffWeekStart }),
                 ...(champWeek        !== null && { champWeek }),

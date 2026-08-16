@@ -426,6 +426,33 @@ export function deriveScoringType(league: SleeperLeague): string {
     return 'std';
 }
 
+/**
+ * The core real-data fields every Sleeper league sync path must write.
+ * ANY code that creates or updates a League row from real Sleeper league
+ * data MUST spread this into its data object — never hand-roll
+ * scoringSettings/rosterPositions/scoringType/leagueType inline again.
+ *
+ * Why this exists: two real users' leagues went silently stale for months
+ * (found 2026-08-16) because this same field set was independently
+ * reconstructed in 4 separate sync call sites, and one field or another
+ * was quietly missing from each — scoringSettings omitted entirely from
+ * the initial-add and manual-refresh paths, leagueType omitted from 3 of
+ * the 4 (defaulting a brand-new Dynasty league to "Redraft" in the DB
+ * until the next hourly cron happened to correct it). A single shared
+ * builder makes that class of bug structurally harder to reintroduce —
+ * any new sync path reaches for this instead of re-deriving the field list
+ * from scratch.
+ */
+export function buildCoreSleeperLeagueFields(sleeperLeague: SleeperLeague) {
+    return {
+        scoringSettings: sleeperLeague.scoring_settings ?? {},
+        rosterPositions: sleeperLeague.roster_positions,
+        scoringType:     deriveScoringType(sleeperLeague),
+        leagueType:      sleeperLeague.settings?.type === 2 ? 'Dynasty' : 'Redraft',
+        status:          sleeperLeague.status,
+    };
+}
+
 export function scoringLabel(scoringType: string): string {
     switch (scoringType) {
         case 'ppr':      return 'PPR';

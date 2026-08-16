@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getLeague, getLeagueRosters, getLeagueDrafts, deriveScoringType, resolveDraftType } from '@/lib/sleeper';
+import { getLeague, getLeagueRosters, getLeagueDrafts, buildCoreSleeperLeagueFields, resolveDraftType } from '@/lib/sleeper';
 
 // POST /api/sleeper/leagues/[leagueId]/refresh
 // Re-fetches a single league from Sleeper and updates the DB record.
@@ -66,14 +66,11 @@ export async function POST(
         const updated = await prisma.league.update({
             where: { id: leagueId },
             data: {
+                ...buildCoreSleeperLeagueFields(sleeperLeague),
                 leagueName:      sleeperLeague.name,
                 season:          sleeperLeague.season,
-                status:          sleeperLeague.status,
                 totalRosters:    sleeperLeague.total_rosters,
-                scoringType:     deriveScoringType(sleeperLeague),
-                scoringSettings: sleeperLeague.scoring_settings ?? {},
                 avatar:          sleeperLeague.avatar ?? null,
-                rosterPositions: sleeperLeague.roster_positions,
                 standings,
                 draftStartTime,
                 draftStatus,

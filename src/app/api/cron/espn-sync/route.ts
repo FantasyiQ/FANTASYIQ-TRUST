@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { getEspnFullSync, normalizeEspnLeague, deriveEspnStatus, deriveEspnScoringType, translateEspnScoring, deriveEspnRosterPositions } from '@/lib/espn';
+import { getEspnFullSync, normalizeEspnLeague, buildCoreEspnLeagueFields } from '@/lib/espn';
 import { shouldSkipLeague, withRetry, recordSyncFailure, recordSyncRecovered } from '@/lib/sync-recovery';
 import { captureError } from '@/lib/sentry';
 import { withCronLog } from '@/lib/cron-logger';
@@ -48,10 +48,7 @@ export async function GET(request: Request): Promise<Response> {
                         await prisma.league.update({
                             where: { id: league.id },
                             data: {
-                                status:          deriveEspnStatus(rawData),
-                                scoringType:     deriveEspnScoringType(rawData.settings),
-                                scoringSettings: translateEspnScoring(rawData.settings),
-                                rosterPositions: deriveEspnRosterPositions(rawData.settings),
+                                ...buildCoreEspnLeagueFields(rawData),
                                 standings:   data.teams.map(t => ({
                                     teamId: t.teamId, name: t.name, abbrev: t.abbrev,
                                     ownerId: t.ownerId, ownerName: t.ownerName,

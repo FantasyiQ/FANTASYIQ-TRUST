@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getLeague, deriveScoringType } from '@/lib/sleeper';
+import { getLeague, buildCoreSleeperLeagueFields } from '@/lib/sleeper';
 import { calculateAndSavePrs } from '@/lib/prs';
 
 // Looks up the commissioner's active League row for this Sleeper league and
@@ -34,15 +34,12 @@ async function acceptSleeperInvite(
     const sl = await getLeague(invite.sleeperLeagueId);
 
     const fields = {
+        ...buildCoreSleeperLeagueFields(sl),
         leagueId:        sl.league_id,
         leagueName:      sl.name,
         season:          sl.season,
-        status:          sl.status,
         totalRosters:    sl.total_rosters,
-        scoringType:     deriveScoringType(sl),
-        scoringSettings: sl.scoring_settings ?? {},
         avatar:          sl.avatar ?? null,
-        rosterPositions: sl.roster_positions,
         sleeperUserId:   sleeperUserId ?? null,
         lastSyncedAt:    new Date(),
     };

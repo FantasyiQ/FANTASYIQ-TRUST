@@ -7,10 +7,7 @@ import {
     detectEspnSeason,
     getEspnFullSync,
     normalizeEspnLeague,
-    deriveEspnRosterPositions,
-    deriveEspnStatus,
-    deriveEspnScoringType,
-    translateEspnScoring,
+    buildCoreEspnLeagueFields,
 } from '@/lib/espn';
 
 // POST /api/espn/sync — full sync: settings + teams + rosters + matchups
@@ -37,14 +34,11 @@ export async function POST(request: NextRequest): Promise<Response> {
         const currentWeekMatchups = data.matchups.filter(m => m.week === data.currentWeek);
 
         const leagueRecord = {
+            ...buildCoreEspnLeagueFields(rawData),
             leagueId,
             leagueName:      data.leagueName,
             season:          String(data.season),
-            status:          deriveEspnStatus(rawData),
             totalRosters:    data.totalTeams,
-            scoringType:     deriveEspnScoringType(rawData.settings),
-            scoringSettings: translateEspnScoring(rawData.settings),
-            rosterPositions: deriveEspnRosterPositions(rawData.settings),
             standings:       data.teams.map(t => ({
                 teamId:       t.teamId,
                 name:         t.name,
