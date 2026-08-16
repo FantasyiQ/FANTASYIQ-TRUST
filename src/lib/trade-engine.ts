@@ -185,13 +185,6 @@ export interface PlayerFactors {
     situFactor:   number;
 }
 
-const DEFAULT_FACTORS: PlayerFactors = {
-    perfFactor:   1.0,
-    schedFactor:  1.0,
-    injuryFactor: 1.0,
-    situFactor:   1.0,
-};
-
 // Dynasty age-curve workhorse floor (see calcDtv) — perfFactor threshold a
 // player must clear to be considered a still-elite real producer, and the
 // floor placed under their age multiplier once they clear it.
@@ -293,8 +286,15 @@ export function evaluateTrade(
     verdict: string;
     winner:  'A' | 'B' | 'Even';
 } {
-    const a = sideA.map((p, i) => calcDtv(p, ppr, leagueType, factorsA[i] ?? DEFAULT_FACTORS, settings));
-    const b = sideB.map((p, i) => calcDtv(p, ppr, leagueType, factorsB[i] ?? DEFAULT_FACTORS, settings));
+    // No caller ever populates factorsA/factorsB with real overrides — falling
+    // back to DEFAULT_FACTORS here would force perfFactor to a hardcoded 1.0,
+    // silently discarding the real per-league perfFactor already attached to
+    // the player object (the same value RosterQuickPick/PlayerSearch read
+    // directly via calcDtv(p, ..., undefined, ...)). Passing factorsA[i]
+    // through as-is lets calcDtv's own fallback chain
+    // (_factors?.perfFactor ?? player.perfFactor ?? 1.0) apply correctly.
+    const a = sideA.map((p, i) => calcDtv(p, ppr, leagueType, factorsA[i], settings));
+    const b = sideB.map((p, i) => calcDtv(p, ppr, leagueType, factorsB[i], settings));
     const totalA = Math.round(a.reduce((s, p) => s + p.finalDtv, 0) * 10) / 10;
     const totalB = Math.round(b.reduce((s, p) => s + p.finalDtv, 0) * 10) / 10;
     const diff   = Math.round(Math.abs(totalA - totalB) * 10) / 10;
