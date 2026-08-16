@@ -40,6 +40,7 @@ async function acceptSleeperInvite(
         status:          sl.status,
         totalRosters:    sl.total_rosters,
         scoringType:     deriveScoringType(sl),
+        scoringSettings: sl.scoring_settings ?? {},
         avatar:          sl.avatar ?? null,
         rosterPositions: sl.roster_positions,
         sleeperUserId:   sleeperUserId ?? null,

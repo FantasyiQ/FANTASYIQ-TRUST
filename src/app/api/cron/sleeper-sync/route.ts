@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { getSleeperLeagues, getLeagueRosters, getLeagueDrafts, getNflState, deriveScoringType, rosterFpts, resolveDraftType, type SleeperLeague } from '@/lib/sleeper';
+import { getSleeperLeagues, getLeague, getLeagueRosters, getLeagueDrafts, getNflState, deriveScoringType, rosterFpts, resolveDraftType, type SleeperLeague } from '@/lib/sleeper';
 import { deriveChampWeek } from '@/lib/leaguePhase';
 import { shouldSkipLeague, withRetry, recordSyncFailure, recordSyncRecovered } from '@/lib/sync-recovery';
 import { withCronLog } from '@/lib/cron-logger';
@@ -108,6 +108,29 @@ async function syncUser(
     );
 }
 
+// Fallback path for leagues whose owning FiQ user has no personal Sleeper
+// account linked (sleeperUserId null) — e.g. someone who signed up with
+// email/password and only ever joined via a league invite link, never
+// connecting their own Sleeper account. syncUser() above can't even start
+// for them (it needs a real sleeperUserId to ask Sleeper "what leagues is
+// this person in"), which was silently leaving these leagues frozen forever
+// with no error and no scoringSettings. League-level data (roster
+// composition, scoring settings, standings) is public on Sleeper's API and
+// doesn't actually require the viewer's own account — only the league's own
+// leagueId, which every League row already stores directly.
+async function syncOrphanedLeague(userId: string, dbLeague: DbLeague): Promise<{ synced: number; skipped: number }> {
+    if (shouldSkipLeague(dbLeague)) return { synced: 0, skipped: 1 };
+    try {
+        // Only retry the fetch here — syncLeague() already has its own
+        // retry + failure/recovery tracking around the DB update itself.
+        const sleeperLeague = await withRetry(() => getLeague(dbLeague.leagueId));
+        return await syncLeague(userId, dbLeague, sleeperLeague);
+    } catch (err) {
+        await recordSyncFailure({ userId, leagueDbId: dbLeague.id, platform: 'sleeper', err });
+        return { synced: 0, skipped: 0 };
+    }
+}
+
 export async function GET(request: Request): Promise<Response> {
     if (request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -140,7 +163,30 @@ export async function GET(request: Request): Promise<Response> {
                 }
             }
 
-            return { processed: synced, message: `${synced} leagues synced · ${skipped} skipped · ${users.length} users` };
+            // Orphaned leagues: owned by a user with no personal Sleeper
+            // account linked (e.g. joined only via an invite link after an
+            // email/password signup) — syncUser() above never even looks at
+            // these since it can't ask Sleeper for a league list without a
+            // real sleeperUserId. Sync them directly by their own leagueId.
+            const orphanedLeagues = await prisma.league.findMany({
+                where:  { platform: 'sleeper', user: { sleeperUserId: null } },
+                select: { id: true, leagueId: true, userId: true, syncStatus: true, syncErrorCount: true, syncLastErrorAt: true },
+            });
+            let orphanSynced = 0;
+            for (let i = 0; i < orphanedLeagues.length; i += USER_BATCH_SIZE) {
+                const batch   = orphanedLeagues.slice(i, i + USER_BATCH_SIZE);
+                const results = await Promise.all(batch.map(l => syncOrphanedLeague(l.userId, l)));
+                for (const r of results) {
+                    synced      += r.synced;
+                    orphanSynced += r.synced;
+                    skipped     += r.skipped;
+                }
+            }
+
+            return {
+                processed: synced,
+                message: `${synced} leagues synced (${orphanSynced} orphaned) · ${skipped} skipped · ${users.length} users`,
+            };
         });
         return Response.json({ ok: true, ...result });
     } catch (err) {
