@@ -38,7 +38,7 @@ import { calculateAge, isPlausiblyActivePlayer } from '@/lib/calculateAge';
 import {
     computeRealPoints, computePerfFactor, toStatsPerGame,
     computePositionScoringFactor, combineScoringFactors, STANDARD_SCORING,
-    computeRealProjectedPoints,
+    computeRealProjectedPoints, blendTowardPositionAverage,
 } from './leagueScoringPoints';
 
 // Full-sample proxy for computePerfFactor's games-played regression weight —
@@ -211,7 +211,17 @@ export async function computeRealRedraftBoard(
         if (p.searchRank == null || p.searchRank >= SLEEPER_UNRANKED_SENTINEL) continue;
         const fc = resolveFc(p.fullName ?? '', p.position ?? '');
         if (!fc) continue;
-        calibPoints.push({ adp: p.searchRank, fcValue: superflex ? fc.redraftValueSf : fc.redraftValue });
+        const fcValue = superflex ? fc.redraftValueSf : fc.redraftValue;
+        // FantasyCalc value of exactly 0 means "the market assigns this real,
+        // stat-having player zero redraft value" — not a genuine calibration
+        // point, just noise that drags the windowed average down whenever a
+        // deep-ADP neighborhood happens to be contaminated by several of them
+        // (verified real case: a defense-comparable point range where over
+        // half the nearest 15 skill-player neighbors carried FC value 0,
+        // pulling the estimate below every real rosterable comparable sitting
+        // right alongside them).
+        if (fcValue <= 0) continue;
+        calibPoints.push({ adp: p.searchRank, fcValue });
     }
     // Deep-ADP FantasyCalc coverage is extremely bimodal — real rookies with
     // draft-capital-driven stash value sit right next to genuinely worthless
@@ -298,7 +308,14 @@ export async function computeRealRedraftBoard(
         if (!gamesPlayed) continue;
         const fc = resolveFc(p.fullName ?? '', p.position ?? '');
         if (!fc) continue;
-        pointsCalibPoints.push({ pts: realPtsPerGame, fcValue: superflex ? fc.redraftValueSf : fc.redraftValue });
+        const fcValue = superflex ? fc.redraftValueSf : fc.redraftValue;
+        // Same zero-value noise filter as the ADP curve above — real players
+        // scoring at a defense-comparable rate are disproportionately
+        // waiver-tier scrubs the market assigns zero value, which otherwise
+        // swamps the windowed average and can push DEF's estimate below every
+        // genuinely rosterable comparable at that same production level.
+        if (fcValue <= 0) continue;
+        pointsCalibPoints.push({ pts: realPtsPerGame, fcValue });
     }
     // Real per-game production is a much noisier predictor of market value
     // than ADP (a bench player can post a great single-sample rate off a
@@ -315,16 +332,34 @@ export async function computeRealRedraftBoard(
             .slice(0, windowSize);
         return nearest.reduce((sum, c) => sum + c.fcValue, 0) / nearest.length;
     }
-    const defAnchorFcValue = estimateFcValueFromPoints(posAvgPtsPerGame.get('DEF') ?? 0);
-
+    // Look up each defense's OWN real points/game directly on the calibration
+    // curve, rather than anchoring on the league-wide DEF average and scaling
+    // every defense by rank-fraction off that single point. The average-anchor
+    // approach undervalued every defense, worst of all the best ones: real
+    // spread between the best and average defense is substantial (verified —
+    // e.g. a real top defense at ~1.5x the league-average defense's points/game),
+    // but assigning the top defense 100% of the *average*-anchored value caps it
+    // at what a skill player with only average defensive-equivalent production
+    // is worth, never what a skill player with truly elite production is worth.
+    //
+    // A single season of real DEF production is blended toward the DEF
+    // positional average first (same regression-to-mean weighting already
+    // applied to every skill player's perfFactor) rather than trusted at full
+    // face value — one season of defensive stats is a genuinely noisy signal
+    // (matchup-driven variance is well-documented in real fantasy analysis),
+    // so this keeps an elite real season from being treated as fully
+    // predictive the way a full season of RB/WR opportunity share would be.
+    const defPosAvgPtsPerGame = posAvgPtsPerGame.get('DEF') ?? 0;
     const defRanked = pending
         .filter(x => x.p.position === 'DEF')
         .sort((a, b) => b.realPtsPerGame - a.realPtsPerGame);
     const defValue = new Map<string, number>();
-    defRanked.forEach((x, i) => {
-        const frac = defRanked.length > 1 ? 1 - i / (defRanked.length - 1) : 1; // 1 = best DEF, ~0 = worst
-        defValue.set(x.p.playerId, frac * defAnchorFcValue);
-    });
+    for (const x of defRanked) {
+        const blendedPts = x.gamesPlayed
+            ? blendTowardPositionAverage(x.realPtsPerGame, defPosAvgPtsPerGame, x.gamesPlayed)
+            : defPosAvgPtsPerGame;
+        defValue.set(x.p.playerId, estimateFcValueFromPoints(blendedPts));
+    }
 
     // ── Pass 2: blend market value + real-scoring nudge into a final rank ───
     const players = pending.map(({ p, realPtsPerGame, gamesPlayed }) => {

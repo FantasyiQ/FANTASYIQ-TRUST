@@ -77,6 +77,26 @@ export function computeRealPoints(
 }
 
 /**
+ * Blends one season's real per-game production toward the position average,
+ * weighted by sample size — a single season (even a full one) is regressed
+ * 30% toward the mean rather than trusted outright, since one season is a
+ * noisy estimate of true talent/opportunity. The shared confidence weighting
+ * behind computePerfFactor, exposed directly for callers that need the
+ * blended points value itself rather than a ratio against the average.
+ */
+export function blendTowardPositionAverage(
+    individualPtsPerGame:  number,
+    positionAvgPtsPerGame: number,
+    gamesPlayed:           number,
+): number {
+    if (positionAvgPtsPerGame <= 0) return individualPtsPerGame;
+    const sampleWeight     = Math.min(1, gamesPlayed / FULL_SAMPLE_GAMES);
+    const individualWeight = REGRESSION_WEIGHT * sampleWeight;
+    const meanWeight       = 1 - individualWeight;
+    return individualWeight * individualPtsPerGame + meanWeight * positionAvgPtsPerGame;
+}
+
+/**
  * How much a player's real per-game production under a league's real scoring
  * deviates from their position's average, smoothed via regression-to-mean and
  * clamped to a modest range so it nudges (not dominates) the market-consensus
@@ -90,11 +110,8 @@ export function computePerfFactor(
 ): number {
     if (positionAvgPtsPerGame <= 0) return 1.0;
 
-    const sampleWeight      = Math.min(1, gamesPlayed / FULL_SAMPLE_GAMES);
-    const individualWeight  = REGRESSION_WEIGHT * sampleWeight;
-    const meanWeight        = 1 - individualWeight;
-    const blended           = individualWeight * playerRealPtsPerGame + meanWeight * positionAvgPtsPerGame;
-    const ratio             = blended / positionAvgPtsPerGame;
+    const blended = blendTowardPositionAverage(playerRealPtsPerGame, positionAvgPtsPerGame, gamesPlayed);
+    const ratio   = blended / positionAvgPtsPerGame;
 
     return Math.min(PERF_FACTOR_MAX, Math.max(PERF_FACTOR_MIN, ratio));
 }
