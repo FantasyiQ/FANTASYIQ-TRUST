@@ -11,6 +11,8 @@ import {
     getLeagueUsers,
     getLeagueDrafts,
     getTradedPicks,
+    getNflState,
+    getPlayers,
 } from '@/lib/sleeper';
 import type { SleeperTradedPick } from '@/lib/sleeper';
 import type {
@@ -27,6 +29,14 @@ import type {
 import { buildNeedsProfile } from '@/lib/mock-draft/NeedsEngine';
 import { assessTeamNeeds, deriveSlots, positionValue } from '@/lib/needs/assessTeamNeeds';
 import { countStartersPerTeam }   from '@/lib/draft/draftStrategyUtils';
+import {
+    computeRealPoints, computePerfFactor, toStatsPerGame,
+    computePositionScoringFactor, combineScoringFactors, STANDARD_SCORING,
+} from '@/lib/rankings/leagueScoringPoints';
+import { buildLeagueConfig } from '@/lib/rankings/leagueConfigBuilder';
+import { buildLeagueDefensiveAndKickerRankings } from '@/lib/rankings/defensiveEngine';
+import { buildIdpSeedProjections, buildKickerSeedProjections, buildDefenseSeedProjections, toIdpPosition } from '@/lib/rankings/seedProjections';
+import { buildProjectionsFromSleeperStats } from '@/lib/rankings/sleeperStatsAdapter';
 
 export const maxDuration = 30;
 
@@ -102,6 +112,7 @@ export async function GET(req: NextRequest): Promise<Response> {
         select: {
             id: true, userId: true, leagueId: true, leagueName: true,
             leagueType: true, rosterPositions: true, scoringType: true,
+            scoringSettings: true,
             totalRosters: true, sleeperUserId: true, season: true,
             assignedPlanId: true, assignedPlanType: true,
             platform: true, standings: true,
@@ -121,12 +132,19 @@ export async function GET(req: NextRequest): Promise<Response> {
     const superflex       = rosterPositions.includes('SUPER_FLEX');
     const tePremium       = rosterPositions.includes('TE_FLEX');
 
+    // Real per-league scoring settings — drives both the League Scoring Points
+    // Engine (perfFactor nudge on QB/RB/WR/TE) and the defensive engine (K/DEF/IDP)
+    // below, same source of truth as Trade Evaluator / Dynasty Rankings / Redraft Board.
+    const scoringSettings = (league.scoringSettings as Record<string, number> | null) ?? STANDARD_SCORING;
+
     // IDP support: detect whether this league starts defensive players, and how
     // many IDP starter slots it has (drives whether IDP enter the rookie pool).
     const IDP_SLOTS = new Set(['DL','DE','DT','NT','LB','OLB','ILB','MLB','DB','CB','S','FS','SS','NB','IDP','IDPFLEX','IDP_FLEX']);
     const IDP_PLAYER_POSITIONS = ['DE','DT','NT','DL','EDGE','OLB','ILB','MLB','LB','CB','FS','SS','NB','S','DB','SAF'];
     const hasIDP          = rosterPositions.some(p => IDP_SLOTS.has(p));
     const idpStarterSlots = rosterPositions.filter(p => IDP_SLOTS.has(p)).length;
+    const hasK            = rosterPositions.includes('K');
+    const hasDef          = rosterPositions.includes('DEF');
 
     const rawSlots        = countStartersPerTeam(rosterPositions);
     const starterSlots    = {
@@ -145,13 +163,15 @@ export async function GET(req: NextRequest): Promise<Response> {
     const forceEmptyRosters = modeParam === 'redraft';
 
     // ── Parallel Sleeper fetches ───────────────────────────────────────────────
-    let [rosters, members, drafts, dbUser, tradedPicksRaw] = await Promise.all([
+    let [rosters, members, drafts, dbUser, tradedPicksRaw, nflState] = await Promise.all([
         getLeagueRosters(league.leagueId).catch(() => []),
         getLeagueUsers(league.leagueId).catch(() => []),
         getLeagueDrafts(league.leagueId).catch(() => []),
         prisma.user.findUnique({ where: { id: session.user.id }, select: { sleeperUserId: true } }),
         getTradedPicks(league.leagueId).catch(() => [] as SleeperTradedPick[]),
+        getNflState(),
     ]);
+    const statsSeason = nflState.season;
 
     // For ESPN / Yahoo / NFL leagues, Sleeper calls return [].
     // Fall back to team data stored in league.standings during ESPN sync.
@@ -413,14 +433,83 @@ export async function GET(req: NextRequest): Promise<Response> {
             : [];
         const resolveSleeper = makeSleeperResolver(sleeperPlayers);
 
+        // League Scoring Points Engine: real per-league scoring adjustment on
+        // top of the FantasyCalc market-consensus anchor — same source and
+        // same pattern already proven in Live Draft Assistant (contextLoader.ts).
+        const seasonStatsRows = fcValues.length > 0
+            ? await (async () => {
+                const playerIds = sleeperPlayers.map(p => p.playerId);
+                const current = await prisma.playerSeasonStats.findMany({
+                    where:  { season: statsSeason, playerId: { in: playerIds } },
+                    select: { playerId: true, gamesPlayed: true, rawStats: true },
+                });
+                return current.length > 0 ? current : await prisma.playerSeasonStats.findMany({
+                    where:  { season: String(Number(statsSeason) - 1), playerId: { in: playerIds } },
+                    select: { playerId: true, gamesPlayed: true, rawStats: true },
+                });
+              })()
+            : [];
+        const statsByPlayerId = new Map(
+            seasonStatsRows.map(s => [s.playerId, {
+                gamesPlayed:  s.gamesPlayed,
+                statsPerGame: toStatsPerGame(s.rawStats as Record<string, number>, s.gamesPlayed),
+            }])
+        );
+
+        // Pass 1: resolve real per-game production and accumulate positional
+        // totals — perfFactor can't be computed until every player in a
+        // position group has been seen.
+        type FcRow = (typeof fcValues)[number];
+        type PendingFc = {
+            v: FcRow; sp: (typeof sleeperPlayers)[number] | undefined;
+            realPtsPerGame: number; standardPtsPerGame: number;
+            gamesPlayed: number | null;
+        };
+        const pendingFc: PendingFc[] = [];
+        const posPtsSum = new Map<string, number>(), posPtsCount = new Map<string, number>(), posStdPtsSum = new Map<string, number>();
+
+        for (const v of fcValues) {
+            const sp     = resolveSleeper(v.playerName, v.position);
+            const stats  = sp?.playerId ? statsByPlayerId.get(sp.playerId) : undefined;
+            const realPtsPerGame     = stats ? computeRealPoints(stats.statsPerGame, scoringSettings) : 0;
+            const standardPtsPerGame = stats ? computeRealPoints(stats.statsPerGame, STANDARD_SCORING) : 0;
+
+            if (stats?.gamesPlayed) {
+                posPtsSum.set(v.position, (posPtsSum.get(v.position) ?? 0) + realPtsPerGame);
+                posPtsCount.set(v.position, (posPtsCount.get(v.position) ?? 0) + 1);
+                posStdPtsSum.set(v.position, (posStdPtsSum.get(v.position) ?? 0) + standardPtsPerGame);
+            }
+            pendingFc.push({ v, sp, realPtsPerGame, standardPtsPerGame, gamesPlayed: stats?.gamesPlayed ?? null });
+        }
+
+        const posAvgPtsPerGame = new Map<string, number>(), posStdAvgPtsPerGame = new Map<string, number>();
+        for (const [pos, sum] of posPtsSum) posAvgPtsPerGame.set(pos, sum / (posPtsCount.get(pos) ?? 1));
+        for (const [pos, sum] of posStdPtsSum) posStdAvgPtsPerGame.set(pos, sum / (posPtsCount.get(pos) ?? 1));
+        const posScoringFactor = new Map<string, number>();
+        for (const pos of posAvgPtsPerGame.keys()) {
+            posScoringFactor.set(pos, computePositionScoringFactor(posAvgPtsPerGame.get(pos) ?? 0, posStdAvgPtsPerGame.get(pos) ?? 0));
+        }
+
         const VALUE_CAP = isDynasty ? 9999 : 5000;
 
-        boardPlayers = fcValues.map((v, i) => {
-            const sp     = resolveSleeper(v.playerName, v.position);
+        boardPlayers = pendingFc.map(({ v, sp, realPtsPerGame, gamesPlayed }, i) => {
             const rawVal = isDynasty
                 ? (superflex ? v.dynastyValueSf : v.dynastyValue)
                 : (superflex ? v.redraftValueSf : v.redraftValue);
-            const baseScore = Math.min(100, Math.max(1, Math.round((rawVal / VALUE_CAP) * 100)));
+            const rawBaseScore = Math.min(100, Math.max(1, Math.round((rawVal / VALUE_CAP) * 100)));
+
+            const individualFactor = gamesPlayed
+                ? computePerfFactor(realPtsPerGame, posAvgPtsPerGame.get(v.position) ?? 0, gamesPlayed)
+                : 1.0;
+            const positionFactor = posScoringFactor.get(v.position) ?? 1.0;
+            const perfFactor     = combineScoringFactors(individualFactor, positionFactor);
+
+            // Additive, bounded nudge rather than a multiplier — rawBaseScore
+            // already saturates at 100 for elite players (same reasoning as
+            // contextLoader.ts's Live Draft Assistant), so multiplying by
+            // perfFactor (up to 1.4375x) would collapse the top of the pool.
+            const perfAdjustment = Math.round((perfFactor - 1) * 20);
+            const baseScore = Math.min(100, Math.max(1, rawBaseScore + perfAdjustment));
             const tier = baseScore >= 85 ? 1 : baseScore >= 70 ? 2 : baseScore >= 50 ? 3 : baseScore >= 30 ? 4 : 5;
             return {
                 playerId:     sp?.playerId ?? `fc-${i}`,
@@ -434,54 +523,91 @@ export async function GET(req: NextRequest): Promise<Response> {
                 injuryStatus: sp?.injuryStatus ?? null,
                 imageUrl:     sp ? `https://sleepercdn.com/content/nfl/players/${sp.playerId}.jpg` : null,
             };
-        });
+        }).sort((a, b) => b.baseScore - a.baseScore);
     }
 
-    // ── Redraft: append K and DEF to the player pool ──────────────────────────
-    if (isRedraftMode && (starterSlots['K'] > 0 || starterSlots['DEF'] > 0)) {
-        const kdPositions = [
-            ...(starterSlots['K']   > 0 ? ['K']   : []),
-            ...(starterSlots['DEF'] > 0 ? ['DEF'] : []),
+    // ── K/DEF/IDP: append to the player pool using the real defensive engine ──
+    // Reuses the same engine already proven in Trade Evaluator / Dynasty
+    // Rankings (real per-league scoring, positional scarcity from actual
+    // roster slot counts, ceilings K max 45 / DEF max 55 / IDP 60-70 on the
+    // same 0-100 scale as everything else on the board) instead of a random
+    // shuffle. Runs for both dynasty-startup and redraft mock drafts — not
+    // rookie drafts, which source IDP rookies from RookieRankingsPlayer above.
+    if (!isRookieDraft && (hasK || hasDef || hasIDP)) {
+        const allPlayersRaw = await getPlayers();
+        const { scoring, lineup } = buildLeagueConfig(scoringSettings, rosterPositions, totalTeams);
+
+        // Sleeper's free feed leaves long-retired players marked active with
+        // stale data — team!=FA plus a real-age cutoff catches what the raw
+        // feed alone can't (see feedback_stale_sleeper_player_data).
+        const MAX_PLAUSIBLE_AGE = 45;
+        const allPlayers: typeof allPlayersRaw = {};
+        for (const [pid, player] of Object.entries(allPlayersRaw)) {
+            if (player.team === 'FA') continue;
+            if (player.age != null && player.age > MAX_PLAUSIBLE_AGE) continue;
+            allPlayers[pid] = player;
+        }
+
+        const idpPlayersForEngine: { playerId: string; position: 'DL' | 'LB' | 'DB' }[] = [];
+        const kickerIdsForEngine: string[] = [];
+        for (const [pid, player] of Object.entries(allPlayers)) {
+            if (hasIDP) {
+                const idpPos = toIdpPosition(player.position);
+                if (idpPos) idpPlayersForEngine.push({ playerId: pid, position: idpPos });
+            }
+            if (hasK && player.position === 'K') kickerIdsForEngine.push(pid);
+        }
+
+        // Live stats-based projections need a season with real completed games —
+        // try the current season first, fall back to the prior completed one
+        // during the preseason window when this year's stats don't exist yet.
+        const liveProjections = await buildProjectionsFromSleeperStats(statsSeason, allPlayers, scoringSettings)
+            ?? await buildProjectionsFromSleeperStats(String(Number(statsSeason) - 1), allPlayers, scoringSettings);
+        const idpProjections     = liveProjections?.idpProjections     ?? buildIdpSeedProjections(idpPlayersForEngine);
+        const kickerProjections  = liveProjections?.kickerProjections  ?? buildKickerSeedProjections(kickerIdsForEngine);
+        const defenseProjections = liveProjections?.defenseProjections ?? buildDefenseSeedProjections();
+
+        const rankings = buildLeagueDefensiveAndKickerRankings(
+            scoring, lineup, idpProjections, kickerProjections, defenseProjections,
+            isDynasty ? 'Dynasty' : 'Redraft', liveProjections?.offensiveTop5Avg ?? {},
+        );
+
+        const defensiveEntities = [
+            ...(hasIDP ? rankings.idp      : []),
+            ...(hasK   ? rankings.kickers  : []),
+            ...(hasDef ? rankings.defenses : []),
         ];
-        const kdRaw = await prisma.sleeperPlayer.findMany({
-            // active alone is unreliable — Sleeper leaves plenty of long-retired
-            // kickers (Gostkowski, Bailey, Vinatieri, etc.) marked active:true.
-            // team != 'FA' catches what active: true misses (~60% of the raw
-            // K/DEF pool was stale free agents, not real rosterable players).
-            where:  { position: { in: kdPositions }, active: true, team: { not: 'FA' } },
-            select: { playerId: true, fullName: true, team: true, age: true, position: true, injuryStatus: true },
-        });
-        // Shuffle for variety, then score descending so the "best" ones go slightly earlier
-        const shuffled = [...kdRaw].sort(() => Math.random() - 0.5);
-        const kList    = shuffled.filter(p => p.position === 'K');
-        const defList  = shuffled.filter(p => p.position === 'DEF');
-        const kdMock: MockPlayer[] = [
-            ...kList.map((p, i) => ({
-                playerId:     p.playerId,
-                name:         p.fullName,
-                position:     'K' as MockPlayer['position'],
-                team:         p.team ?? null,
-                age:          p.age ?? null,
-                tier:         5,
-                baseScore:    Math.max(8, 16 - Math.floor(i * 8 / Math.max(kList.length, 1))),
-                isRookie:     false,
-                injuryStatus: p.injuryStatus ?? null,
-                imageUrl:     `https://sleepercdn.com/content/nfl/players/${p.playerId}.jpg`,
-            })),
-            ...defList.map((p, i) => ({
-                playerId:     p.playerId,
-                name:         p.fullName,
-                position:     'DEF' as MockPlayer['position'],
-                team:         p.team ?? null,
-                age:          p.age ?? null,
-                tier:         5,
-                baseScore:    Math.max(10, 20 - Math.floor(i * 10 / Math.max(defList.length, 1))),
-                isRookie:     false,
-                injuryStatus: p.injuryStatus ?? null,
-                imageUrl:     `https://sleepercdn.com/content/nfl/players/${p.playerId}.jpg`,
-            })),
-        ];
-        boardPlayers = [...boardPlayers, ...kdMock].sort((a, b) => b.baseScore - a.baseScore);
+
+        if (defensiveEntities.length > 0) {
+            const entityIds = defensiveEntities.map(e => e.id);
+            const entityPlayers = await prisma.sleeperPlayer.findMany({
+                where:  { playerId: { in: entityIds } },
+                select: { playerId: true, fullName: true, position: true, team: true, age: true, injuryStatus: true },
+            });
+            const entityById = new Map(entityPlayers.map(p => [p.playerId, p]));
+
+            const defMock: MockPlayer[] = [];
+            for (const entity of defensiveEntities) {
+                const sp = entityById.get(entity.id);
+                if (!sp?.fullName) continue; // no real player/team match — skip rather than guess
+                const isIdp = IDP_PLAYER_POSITIONS.includes(sp.position ?? '');
+                const baseScore = Math.min(100, Math.max(1, Math.round(entity.valueScore)));
+                const tier = baseScore >= 85 ? 1 : baseScore >= 70 ? 2 : baseScore >= 50 ? 3 : baseScore >= 30 ? 4 : 5;
+                defMock.push({
+                    playerId:     entity.id,
+                    name:         sp.fullName,
+                    position:     (isIdp ? 'IDP' : sp.position) as MockPlayer['position'],
+                    team:         sp.team ?? null,
+                    age:          sp.age ?? null,
+                    tier,
+                    baseScore,
+                    isRookie:     false,
+                    injuryStatus: sp.injuryStatus ?? null,
+                    imageUrl:     `https://sleepercdn.com/content/nfl/players/${entity.id}.jpg`,
+                });
+            }
+            boardPlayers = [...boardPlayers, ...defMock].sort((a, b) => b.baseScore - a.baseScore);
+        }
     }
 
     // ── Build existing roster position + name lookup ──────────────────────────
