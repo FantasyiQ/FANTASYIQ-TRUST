@@ -120,3 +120,12 @@ export interface MockDraftInitResponse {
     context: MockLeagueContext;
     board:   MockDraftBoard;
 }
+
+// Returned instead of MockDraftInitResponse when there's no real draft to
+// prep for — e.g. this season's rookie draft is already complete and next
+// season's rookie class isn't released yet. Not an error: a normal, expected
+// state the UI should explain rather than retry.
+export interface MockDraftUnavailable {
+    unavailable: true;
+    reason:      string;
+}

@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import type {
     MockDraftInitResponse,
+    MockDraftUnavailable,
     MockDraftStepResult,
     MockDraftResult,
     MockDraftState,
@@ -22,9 +23,10 @@ import DraftHistoryPanel  from './DraftHistoryPanel';
 
 // ── Phase types ───────────────────────────────────────────────────────────────
 
-type PhaseIdle    = { phase: 'idle' };
-type PhaseLoading = { phase: 'loading' };
-type PhaseError   = { phase: 'error'; message: string };
+type PhaseIdle        = { phase: 'idle' };
+type PhaseLoading     = { phase: 'loading' };
+type PhaseError       = { phase: 'error'; message: string };
+type PhaseUnavailable = { phase: 'unavailable'; reason: string };
 type PhaseOnClock = {
     phase:       'on_clock';
     stepResult:  Extract<MockDraftStepResult, { state: 'USER_ON_THE_CLOCK' }>;
@@ -36,7 +38,7 @@ type PhaseComplete = {
     initData: MockDraftInitResponse;
 };
 
-type ClientPhase = PhaseIdle | PhaseLoading | PhaseError | PhaseOnClock | PhaseComplete;
+type ClientPhase = PhaseIdle | PhaseLoading | PhaseError | PhaseUnavailable | PhaseOnClock | PhaseComplete;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -85,7 +87,12 @@ export default function MockDraftClient({
             const slotParam = isDynasty ? 0 : draftSlot;
             const res = await fetch(`/api/mock-draft/init?leagueId=${leagueId}&mode=${draftMode}&slot=${slotParam}`);
             if (!res.ok) throw new Error(`Status ${res.status}`);
-            const data: MockDraftInitResponse = await res.json();
+            const data: MockDraftInitResponse | MockDraftUnavailable = await res.json();
+
+            if ('unavailable' in data) {
+                setClientPhase({ phase: 'unavailable', reason: data.reason });
+                return;
+            }
 
             const state      = initializeDraftState(data.context);
             const stepResult = runUntilUserPick(state, data.context, data.board);
@@ -170,6 +177,21 @@ export default function MockDraftClient({
                     className="px-5 py-2 bg-[#D4AF37] text-black font-bold rounded-xl text-sm hover:bg-[#c9a227] transition"
                 >
                     Try Again
+                </button>
+            </div>
+        );
+    }
+
+    if (clientPhase.phase === 'unavailable') {
+        return (
+            <div className="text-center py-16 space-y-3 max-w-md mx-auto">
+                <p className="text-white font-semibold">Mock Draft isn&apos;t available right now</p>
+                <p className="text-gray-500 text-sm">{clientPhase.reason}</p>
+                <button
+                    onClick={() => setClientPhase({ phase: 'idle' })}
+                    className="px-5 py-2 bg-gray-800 text-gray-300 font-semibold rounded-xl text-sm hover:bg-gray-700 transition"
+                >
+                    Back
                 </button>
             </div>
         );

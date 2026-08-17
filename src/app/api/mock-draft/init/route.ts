@@ -207,6 +207,29 @@ export async function GET(req: NextRequest): Promise<Response> {
         ?? drafts.at(-1)
         ?? null;
 
+    // ── Rookie draft availability gate ─────────────────────────────────────────
+    // A rookie mock draft only means something if there's a real rookie draft
+    // left to prep for. If this league's own draft already ran (Sleeper marks
+    // it 'complete' and there's no pre_draft/drafting one), there's nothing
+    // upcoming until next year's incoming class is released — showing this
+    // year's already-drafted class as if it were still available is actively
+    // misleading (e.g. a top rookie already on a real roster still surfacing
+    // near the top of the mock board). Prefer next season's class if it's
+    // been published; otherwise report unavailable instead of a stale board.
+    let rookieDraftSeason = league.season ?? '2026';
+    if (isRookieDraft && upcomingDraft?.status === 'complete') {
+        const nextSeason = String(Number(rookieDraftSeason) + 1);
+        const nextSeasonCount = await prisma.rookieRankingsPlayer.count({ where: { season: nextSeason } });
+        if (nextSeasonCount > 0) {
+            rookieDraftSeason = nextSeason;
+        } else {
+            return Response.json({
+                unavailable: true,
+                reason: `Your ${rookieDraftSeason} rookie draft is already complete. Mock Draft will be back once next year's rookie class is released.`,
+            });
+        }
+    }
+
     const totalTeams  = rosters.length || (league.totalRosters ?? 12);
     const defaultRounds = isRookieDraft ? 5 : (rosterPositions.length || (isDynasty ? 20 : 15));
     const totalRounds   = upcomingDraft?.settings?.rounds ?? defaultRounds;
@@ -308,6 +331,12 @@ export async function GET(req: NextRequest): Promise<Response> {
 
     const draftOrder = buildDraftOrder(roundSlots, totalRounds, isSnake);
 
+    // Players already on any real roster in this league — excluded from the
+    // rookie draft pool below (a rookie already drafted onto a real roster
+    // isn't "available," even though FiQ rookie rankings has no concept of
+    // draft state and would otherwise keep surfacing them at full value).
+    const existingPlayerIds = [...new Set(rosters.flatMap(r => r.players ?? []).filter(Boolean))];
+
     // ── Load player pool ───────────────────────────────────────────────────────
     let boardPlayers: MockPlayer[] = [];
 
@@ -353,23 +382,32 @@ export async function GET(req: NextRequest): Promise<Response> {
         // ~0.62 at 1 slot → caps at 0.90 for deep IDP leagues. (tunable)
         const idpMult = Math.min(0.90, 0.55 + 0.07 * idpStarterSlots);
 
-        const season = league.season ?? '2026';
         const rookiePositions = hasIDP
             ? ['QB', 'RB', 'WR', 'TE', ...IDP_PLAYER_POSITIONS]
             : ['QB', 'RB', 'WR', 'TE'];
-        const rookies = await prisma.rookieRankingsPlayer.findMany({
-            where:   { season, position: { in: rookiePositions } },
+        const rookiesRaw = await prisma.rookieRankingsPlayer.findMany({
+            where:   { season: rookieDraftSeason, position: { in: rookiePositions } },
             orderBy: { fiqScore: 'desc' },
             select:  { playerName: true, position: true, fiqScore: true, fiqTier: true, height: true, weight: true, fortyTime: true },
         });
 
-        const sleeperPlayers = rookies.length > 0
+        const sleeperPlayers = rookiesRaw.length > 0
             ? await prisma.sleeperPlayer.findMany({
-                where:  { fullName: { in: rookies.map(r => r.playerName) } },
+                where:  { fullName: { in: rookiesRaw.map(r => r.playerName) } },
                 select: { playerId: true, fullName: true, team: true, age: true, position: true, injuryStatus: true },
               })
             : [];
         const resolveSleeper = makeSleeperResolver(sleeperPlayers);
+
+        // Exclude rookies already on a real roster in this league — already
+        // drafted/rostered, not actually available. A rookie with no Sleeper
+        // match can't be checked against rosters, so it's kept by default
+        // rather than guessed at.
+        const existingPlayerIdSet = new Set(existingPlayerIds);
+        const rookies = rookiesRaw.filter(r => {
+            const sp = resolveSleeper(r.playerName, r.position);
+            return !sp || !existingPlayerIdSet.has(sp.playerId);
+        });
 
         boardPlayers = rookies
             .map((r, i) => {
@@ -611,7 +649,6 @@ export async function GET(req: NextRequest): Promise<Response> {
     }
 
     // ── Build existing roster position + name lookup ──────────────────────────
-    const existingPlayerIds = [...new Set(rosters.flatMap(r => r.players ?? []).filter(Boolean))];
     const existingSleeperPlayers = existingPlayerIds.length > 0
         ? await prisma.sleeperPlayer.findMany({
             where:  { playerId: { in: existingPlayerIds } },
