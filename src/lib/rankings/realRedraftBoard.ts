@@ -370,7 +370,19 @@ export async function computeRealRedraftBoard(
             finalValue = normaliseFcValue(defValue.get(p.playerId) ?? 0);
         } else {
             const fc       = resolveFc(p.fullName ?? '', pos);
-            const rawFcValue = fc ? (superflex ? fc.redraftValueSf : fc.redraftValue) : null;
+            // FantasyCalc redraftValue of exactly 0 means "not really
+            // covered for this format," not "the market says this player
+            // is worthless" — same zero-value-noise principle as the
+            // calibration curves above. Verified real case: several 2025
+            // rookie RBs with real 2025 season stats and real 2026
+            // projections (Woody Marks, Bhayshul Tuten, Kyle Monangai) had
+            // redraftValue: 0 on file, which — averaged 50/50 with their
+            // real ADP-implied value — halved a legitimate mid-round RB2/3
+            // value down into deep-bench territory, burying them far below
+            // where Sleeper's own real market ADP has them drafted.
+            const rawFcValue = fc && (superflex ? fc.redraftValueSf : fc.redraftValue) > 0
+                ? (superflex ? fc.redraftValueSf : fc.redraftValue)
+                : null;
             // Even players with real FC coverage get their ADP cross-checked
             // against the real calibration curve (not a separately-scaled
             // percentile) so both signals live on the same real value scale
