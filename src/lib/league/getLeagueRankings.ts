@@ -8,7 +8,7 @@ import type { Player, LeagueSettings, LeagueType, PprFormat } from '@/lib/trade-
 import { computePlayerBaseValue } from '@/lib/player-universe';
 import type { UniversePlayer } from '@/lib/player-universe';
 import {
-    computeRealPoints, computePerfFactor, toStatsPerGame,
+    computeRealPoints, computePerfFactor,
     computePositionScoringFactor, combineScoringFactors, STANDARD_SCORING,
 } from '@/lib/rankings/leagueScoringPoints';
 import { calculateAge, calculatePreciseAge, isPlausiblyActivePlayer } from '@/lib/calculateAge';
@@ -19,6 +19,7 @@ import { buildLeagueConfig } from '@/lib/rankings/leagueConfigBuilder';
 import { buildLeagueDefensiveAndKickerRankings } from '@/lib/rankings/defensiveEngine';
 import { buildIdpSeedProjections, buildKickerSeedProjections, buildDefenseSeedProjections, toIdpPosition } from '@/lib/rankings/seedProjections';
 import { buildProjectionsFromSleeperStats } from '@/lib/rankings/sleeperStatsAdapter';
+import { resolveProductionSignals } from '@/lib/rankings/productionSignals';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -246,7 +247,7 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
     const nflState     = await getNflState();
     const statsSeason  = nflState.season;
 
-    const [fcRows, sleeperPlayers, latestSync, currentSeasonStats] = await Promise.all([
+    const [fcRows, sleeperPlayers, latestSync] = await Promise.all([
         prisma.fantasyCalcValue.findMany({
             where: {
                 position: { in: ['QB', 'RB', 'WR', 'TE'] },
@@ -266,28 +267,14 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
             orderBy: { updatedAt: 'desc' },
             select:  { updatedAt: true },
         }),
-        prisma.playerSeasonStats.findMany({
-            where:  { season: statsSeason },
-            select: { playerId: true, gamesPlayed: true, rawStats: true },
-        }),
     ]);
 
-    // League Scoring Points Engine: real per-league scoring adjustment. Fall back
-    // to the prior completed season when the current season has no stats yet
-    // (off-season / early weeks with few games played) so positional averages
-    // aren't computed from an empty or near-empty sample.
-    const seasonStatsRows = currentSeasonStats.length > 0
-        ? currentSeasonStats
-        : await prisma.playerSeasonStats.findMany({
-            where:  { season: String(Number(statsSeason) - 1) },
-            select: { playerId: true, gamesPlayed: true, rawStats: true },
-        });
-    const statsByPlayerId = new Map(
-        seasonStatsRows.map(s => [s.playerId, {
-            gamesPlayed:  s.gamesPlayed,
-            statsPerGame: toStatsPerGame(s.rawStats as Record<string, number>, s.gamesPlayed),
-        }])
-    );
+    // League Scoring Points Engine: real per-league scoring adjustment, sourced
+    // from whichever real signal each player actually has — this season's real
+    // stats, else this season's real projection (reflects this year's actual
+    // team/role/health, not a full-year-stale prior season), else last
+    // season's real stats as a final fallback. See productionSignals.ts.
+    const statsByPlayerId = await resolveProductionSignals(sleeperPlayers.map(p => p.playerId));
 
     // ── Build Sleeper player lookup (name+position → metadata) ────────────────
     // Some real players share an exact fullName (e.g. two "Justin Jefferson"s —

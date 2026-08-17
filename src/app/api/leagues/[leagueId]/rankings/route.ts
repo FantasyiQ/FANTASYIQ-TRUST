@@ -6,9 +6,9 @@ import { calcDtv, DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
 import type { Player, LeagueSettings, LeagueType } from '@/lib/trade-engine';
 import { computePlayerBaseValue } from '@/lib/player-universe';
 import type { UniversePlayer } from '@/lib/player-universe';
-import { getNflState } from '@/lib/sleeper';
+import { resolveProductionSignals } from '@/lib/rankings/productionSignals';
 import {
-    computeRealPoints, computePerfFactor, toStatsPerGame,
+    computeRealPoints, computePerfFactor,
     computePositionScoringFactor, combineScoringFactors, STANDARD_SCORING,
 } from '@/lib/rankings/leagueScoringPoints';
 
@@ -109,14 +109,8 @@ export async function GET(
     const superflex = leagueSettings.sfSlots > 0;
     const leagueSize = league.totalRosters;
 
-    // League Scoring Points Engine: real per-league scoring adjustment. Fall
-    // back to the prior completed season when the current one has no stats
-    // yet (off-season / early weeks).
-    const nflState    = await getNflState();
-    const statsSeason = nflState.season;
-
     // Fetch universe data directly from DB (same logic as /api/players/universe)
-    const [fcRows, sleeperPlayers, currentSeasonStats] = await Promise.all([
+    const [fcRows, sleeperPlayers] = await Promise.all([
         prisma.fantasyCalcValue.findMany({
             where: {
                 position: { in: ['QB', 'RB', 'WR', 'TE'] },
@@ -128,24 +122,14 @@ export async function GET(
             where:  { active: true, position: { in: ['QB', 'RB', 'WR', 'TE'] } },
             select: { playerId: true, fullName: true, team: true, injuryStatus: true, birthDate: true, age: true, position: true },
         }),
-        prisma.playerSeasonStats.findMany({
-            where:  { season: statsSeason },
-            select: { playerId: true, gamesPlayed: true, rawStats: true },
-        }),
     ]);
 
-    const seasonStatsRows = currentSeasonStats.length > 0
-        ? currentSeasonStats
-        : await prisma.playerSeasonStats.findMany({
-            where:  { season: String(Number(statsSeason) - 1) },
-            select: { playerId: true, gamesPlayed: true, rawStats: true },
-        });
-    const statsByPlayerId = new Map(
-        seasonStatsRows.map(s => [s.playerId, {
-            gamesPlayed:  s.gamesPlayed,
-            statsPerGame: toStatsPerGame(s.rawStats as Record<string, number>, s.gamesPlayed),
-        }])
-    );
+    // League Scoring Points Engine: real per-league scoring adjustment,
+    // sourced from whichever real signal each player actually has — this
+    // season's real stats, else this season's real projection (reflects
+    // this year's actual team/role/health), else last season's real stats
+    // as a final fallback. See productionSignals.ts.
+    const statsByPlayerId = await resolveProductionSignals(sleeperPlayers.map(p => p.playerId));
 
     // Some real players share an exact fullName (e.g. two "Justin Jefferson"s —
     // WR/MIN and LB/CLE). Resolve by name+position first (exact, then normalized

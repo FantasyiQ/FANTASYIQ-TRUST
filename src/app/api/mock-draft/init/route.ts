@@ -30,9 +30,10 @@ import { buildNeedsProfile } from '@/lib/mock-draft/NeedsEngine';
 import { assessTeamNeeds, deriveSlots, positionValue } from '@/lib/needs/assessTeamNeeds';
 import { countStartersPerTeam }   from '@/lib/draft/draftStrategyUtils';
 import {
-    computeRealPoints, computePerfFactor, toStatsPerGame,
+    computeRealPoints, computePerfFactor,
     computePositionScoringFactor, combineScoringFactors, STANDARD_SCORING,
 } from '@/lib/rankings/leagueScoringPoints';
+import { resolveProductionSignals } from '@/lib/rankings/productionSignals';
 import { buildLeagueConfig } from '@/lib/rankings/leagueConfigBuilder';
 import { buildLeagueDefensiveAndKickerRankings } from '@/lib/rankings/defensiveEngine';
 import { buildIdpSeedProjections, buildKickerSeedProjections, buildDefenseSeedProjections, toIdpPosition } from '@/lib/rankings/seedProjections';
@@ -475,25 +476,13 @@ export async function GET(req: NextRequest): Promise<Response> {
         // League Scoring Points Engine: real per-league scoring adjustment on
         // top of the FantasyCalc market-consensus anchor — same source and
         // same pattern already proven in Live Draft Assistant (contextLoader.ts).
-        const seasonStatsRows = fcValues.length > 0
-            ? await (async () => {
-                const playerIds = sleeperPlayers.map(p => p.playerId);
-                const current = await prisma.playerSeasonStats.findMany({
-                    where:  { season: statsSeason, playerId: { in: playerIds } },
-                    select: { playerId: true, gamesPlayed: true, rawStats: true },
-                });
-                return current.length > 0 ? current : await prisma.playerSeasonStats.findMany({
-                    where:  { season: String(Number(statsSeason) - 1), playerId: { in: playerIds } },
-                    select: { playerId: true, gamesPlayed: true, rawStats: true },
-                });
-              })()
-            : [];
-        const statsByPlayerId = new Map(
-            seasonStatsRows.map(s => [s.playerId, {
-                gamesPlayed:  s.gamesPlayed,
-                statsPerGame: toStatsPerGame(s.rawStats as Record<string, number>, s.gamesPlayed),
-            }])
-        );
+        // Sourced from whichever real signal each player actually has: this
+        // season's real stats, else this season's real projection (reflects
+        // this year's actual team/role/health), else last season's real
+        // stats as a final fallback. See productionSignals.ts.
+        const statsByPlayerId = fcValues.length > 0
+            ? await resolveProductionSignals(sleeperPlayers.map(p => p.playerId))
+            : new Map();
 
         // Pass 1: resolve real per-game production and accumulate positional
         // totals — perfFactor can't be computed until every player in a

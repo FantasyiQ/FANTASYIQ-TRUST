@@ -4,8 +4,7 @@ import type { UniversePlayer, UniverseResponse } from '@/lib/player-universe';
 import { calculateAge } from '@/lib/calculateAge';
 import { checkPublicLimit, getClientIp } from '@/lib/ratelimit';
 import { normalizePlayerName as normalizeName } from '@/lib/playerName';
-import { getNflState } from '@/lib/sleeper';
-import { toStatsPerGame } from '@/lib/rankings/leagueScoringPoints';
+import { resolveProductionSignals } from '@/lib/rankings/productionSignals';
 
 const VALUE_CAP = 9999;
 const SKILL_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE']);
@@ -24,10 +23,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     // statsPerGame is league-agnostic (real per-player production, not adjusted
     // for any league's scoring) — safe to include in this shared, cached
     // response. Per-league perfFactor is computed at the point of use.
-    const nflState    = await getNflState();
-    const statsSeason = nflState.season;
-
-    const [fcRows, sleeperPlayers, latestSync, currentSeasonStats] = await Promise.all([
+    const [fcRows, sleeperPlayers, latestSync] = await Promise.all([
         prisma.fantasyCalcValue.findMany({
             where: {
                 position: { in: ['QB', 'RB', 'WR', 'TE'] },
@@ -54,24 +50,13 @@ export async function GET(request: NextRequest): Promise<Response> {
             orderBy: { updatedAt: 'desc' },
             select:  { updatedAt: true },
         }),
-        prisma.playerSeasonStats.findMany({
-            where:  { season: statsSeason },
-            select: { playerId: true, gamesPlayed: true, rawStats: true },
-        }),
     ]);
 
-    const seasonStatsRows = currentSeasonStats.length > 0
-        ? currentSeasonStats
-        : await prisma.playerSeasonStats.findMany({
-            where:  { season: String(Number(statsSeason) - 1) },
-            select: { playerId: true, gamesPlayed: true, rawStats: true },
-        });
-    const statsByPlayerId = new Map(
-        seasonStatsRows.map(s => [s.playerId, {
-            gamesPlayed:  s.gamesPlayed,
-            statsPerGame: toStatsPerGame(s.rawStats as Record<string, number>, s.gamesPlayed),
-        }])
-    );
+    // Real production signal per player: this season's real stats if any
+    // games have been played, else this season's real projection (reflects
+    // this year's actual team/role/health, not a full-year-stale prior
+    // season), else last season's real stats as a final fallback.
+    const statsByPlayerId = await resolveProductionSignals(sleeperPlayers.map(p => p.playerId));
 
     // Some real players share an exact fullName (e.g. two "Justin Jefferson"s —
     // WR/MIN and LB/CLE). Resolve by name+position first (exact, then normalized

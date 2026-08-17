@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getLeague, getLeagueRosters, getLeagueUsers, getPlayers, getNflState } from '@/lib/sleeper';
+import { getLeague, getLeagueRosters, getLeagueUsers, getPlayers } from '@/lib/sleeper';
 import { calculateAge, calculatePreciseAge } from '@/lib/calculateAge';
 import { calcDtv, DEFAULT_LEAGUE_SETTINGS } from '@/lib/trade-engine';
 import type { Player, LeagueSettings, LeagueType } from '@/lib/trade-engine';
@@ -11,9 +11,10 @@ import { computePlayerBaseValue } from '@/lib/player-universe';
 import type { UniversePlayer } from '@/lib/player-universe';
 import { normalizePlayerName as normalizeName } from '@/lib/playerName';
 import {
-    computeRealPoints, computePerfFactor, toStatsPerGame,
+    computeRealPoints, computePerfFactor,
     computePositionScoringFactor, combineScoringFactors, STANDARD_SCORING,
 } from '@/lib/rankings/leagueScoringPoints';
+import { resolveProductionSignals } from '@/lib/rankings/productionSignals';
 
 // ── ESPN Roster Page ──────────────────────────────────────────────────────────
 
@@ -386,13 +387,12 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
         );
     }
 
-    // League Scoring Points Engine: real per-league scoring adjustment. Fall
-    // back to the prior completed season when the current one has no stats
-    // yet (off-season / early weeks).
-    const nflState    = await getNflState();
-    const statsSeason = nflState.season;
-
-    const [playerById, fcRows, sleeperPlayers, currentSeasonStats] = await Promise.all([
+    // League Scoring Points Engine: real per-league scoring adjustment,
+    // sourced from whichever real signal each player actually has — this
+    // season's real stats, else this season's real projection (reflects
+    // this year's actual team/role/health), else last season's real stats
+    // as a final fallback. See productionSignals.ts.
+    const [playerById, fcRows, sleeperPlayers, statsByPlayerId] = await Promise.all([
         getPlayers(allPids),
         prisma.fantasyCalcValue.findMany({
             where:  { OR: [{ dynastyValue: { gt: 0 } }, { redraftValue: { gt: 0 } }] },
@@ -404,24 +404,8 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
             where:  { playerId: { in: allPids } },
             select: { playerId: true, fullName: true, injuryStatus: true, team: true, birthDate: true, age: true, position: true },
         }),
-        prisma.playerSeasonStats.findMany({
-            where:  { season: statsSeason },
-            select: { playerId: true, gamesPlayed: true, rawStats: true },
-        }),
+        resolveProductionSignals(allPids),
     ]);
-
-    const seasonStatsRows = currentSeasonStats.length > 0
-        ? currentSeasonStats
-        : await prisma.playerSeasonStats.findMany({
-            where:  { season: String(Number(statsSeason) - 1) },
-            select: { playerId: true, gamesPlayed: true, rawStats: true },
-        });
-    const statsByPlayerId = new Map(
-        seasonStatsRows.map(s => [s.playerId, {
-            gamesPlayed:  s.gamesPlayed,
-            statsPerGame: toStatsPerGame(s.rawStats as Record<string, number>, s.gamesPlayed),
-        }])
-    );
 
     // Build name+position-based Sleeper lookup so ages feed into the DTV calc
     // (matches roster-values route). Some real players share an exact fullName

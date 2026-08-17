@@ -8,15 +8,15 @@ import {
     getSleeperDraft,
     getActiveDraftPicks,
     resolveDraftType,
-    getNflState,
     type SleeperRoster,
     type SleeperDraft,
     type SleeperDraftPickEntry,
 } from '@/lib/sleeper';
 import {
-    computeRealPoints, computePerfFactor, toStatsPerGame,
+    computeRealPoints, computePerfFactor,
     computePositionScoringFactor, combineScoringFactors, STANDARD_SCORING,
 } from '@/lib/rankings/leagueScoringPoints';
+import { resolveProductionSignals } from '@/lib/rankings/productionSignals';
 import type {
     DraftContext, DraftType, RosterProfile,
     DraftProfile, TrajectoryWindow, HorizonYears, RiskTolerance, DraftPoolADPEntry,
@@ -480,24 +480,11 @@ export async function loadDraftContext(params: {
         // bonuses, TE premium, etc.) shift who the assistant recommends, not just a
         // generic FantasyCalc market-consensus number.
         const scoringSettings = (dbLeague.scoringSettings as Record<string, number> | null) ?? STANDARD_SCORING;
-        const nflState        = await getNflState();
-        const statsSeason     = nflState.season;
-        const currentSeasonStats = await prisma.playerSeasonStats.findMany({
-            where:  { season: statsSeason },
-            select: { playerId: true, gamesPlayed: true, rawStats: true },
-        });
-        const seasonStatsRows = currentSeasonStats.length > 0
-            ? currentSeasonStats
-            : await prisma.playerSeasonStats.findMany({
-                where:  { season: String(Number(statsSeason) - 1) },
-                select: { playerId: true, gamesPlayed: true, rawStats: true },
-            });
-        const statsByPlayerId = new Map(
-            seasonStatsRows.map(s => [s.playerId, {
-                gamesPlayed:  s.gamesPlayed,
-                statsPerGame: toStatsPerGame(s.rawStats as Record<string, number>, s.gamesPlayed),
-            }])
-        );
+        // Real production signal per player: this season's real stats if any
+        // games have been played, else this season's real projection
+        // (reflects this year's actual team/role/health), else last
+        // season's real stats as a final fallback. See productionSignals.ts.
+        const statsByPlayerId = await resolveProductionSignals(sleeperPlayers.map(p => p.playerId));
 
         // Pass 2a: resolve real per-game production for every player in the
         // recommendation pool and accumulate positional totals — perfFactor can't
