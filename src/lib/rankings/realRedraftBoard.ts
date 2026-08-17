@@ -34,6 +34,7 @@
 import { prisma } from '@/lib/prisma';
 import { getNflState } from '@/lib/sleeper';
 import { INJURY_STATUS_RISK } from '@/lib/trade-engine';
+import { calculateAge, isPlausiblyActivePlayer } from '@/lib/calculateAge';
 import {
     computeRealPoints, computePerfFactor, toStatsPerGame,
     computePositionScoringFactor, combineScoringFactors, STANDARD_SCORING,
@@ -57,7 +58,6 @@ const PROJECTION_FULL_SAMPLE_PROXY = 17;
 const REDRAFT_INJURY_ADJUSTMENT_SCALE = 40;
 
 const REDRAFT_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'] as const;
-const MAX_PLAUSIBLE_AGE = 45;      // no real NFL player plays past their mid-40s
 const FC_VALUE_CAP      = 9999;    // FantasyCalc's own value ceiling (matches getLeagueRankings.ts)
 
 export interface RealRedraftPlayer {
@@ -103,6 +103,7 @@ export async function computeRealRedraftBoard(
             select: {
                 playerId: true, fullName: true, position: true, team: true,
                 birthDate: true, age: true, searchRank: true, injuryStatus: true,
+                depthChartOrder: true, yearsExp: true,
             },
         }),
         prisma.playerSeasonStats.findMany({
@@ -182,14 +183,16 @@ export async function computeRealRedraftBoard(
     );
 
     // Sleeper's active flag is unreliable for long-retired players still
-    // marked active — a real computed-age cutoff catches what team!=FA
-    // alone can miss (see feedback_stale_sleeper_player_data).
+    // marked active — a real computed-age cutoff catches what team!=FA alone
+    // can miss, and a depth-chart+experience check catches the rarer case
+    // where team AND birthDate are both stale (see feedback_stale_sleeper_player_data
+    // and feedback_mock_draft_stale_rookie_pool for the Ben Roethlisberger case:
+    // team frozen at 'PIT', birthDate off by ~5 years, age landing just under
+    // the plausible cutoff too).
     const eligible = rawPlayers.filter(p => {
         if (!p.birthDate) return true; // team defenses — no birthDate, always fine
-        const dob = new Date(p.birthDate);
-        if (isNaN(dob.getTime())) return true;
-        const age = new Date().getFullYear() - dob.getFullYear();
-        return age <= MAX_PLAUSIBLE_AGE;
+        const age = calculateAge(p.birthDate);
+        return isPlausiblyActivePlayer({ team: p.team, age, depthChartOrder: p.depthChartOrder, yearsExp: p.yearsExp });
     });
 
     // ── Real ADP↔FantasyCalc calibration curve ──────────────────────────────

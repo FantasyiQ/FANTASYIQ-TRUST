@@ -395,6 +395,9 @@ export interface SlimPlayer {
     position: string;
     team: string;
     age?: number;
+    birthDate?: string | null;
+    depthChartOrder?: number | null;
+    yearsExp?: number | null;
 }
 
 /**
@@ -409,7 +412,10 @@ export async function getPlayers(ids?: string[]): Promise<Record<string, SlimPla
         );
         const result: Record<string, SlimPlayer> = {};
         for (const r of rows) {
-            result[r.playerId] = { full_name: r.fullName, position: r.position, team: r.team, age: r.age ?? undefined };
+            result[r.playerId] = {
+                full_name: r.fullName, position: r.position, team: r.team, age: r.age ?? undefined,
+                birthDate: r.birthDate, depthChartOrder: r.depthChartOrder, yearsExp: r.yearsExp,
+            };
         }
         return result;
     } catch {

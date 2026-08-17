@@ -11,7 +11,7 @@ import {
     computeRealPoints, computePerfFactor, toStatsPerGame,
     computePositionScoringFactor, combineScoringFactors, STANDARD_SCORING,
 } from '@/lib/rankings/leagueScoringPoints';
-import { calculateAge, calculatePreciseAge } from '@/lib/calculateAge';
+import { calculateAge, calculatePreciseAge, isPlausiblyActivePlayer } from '@/lib/calculateAge';
 import { effectiveTierForLeague, tierLevel } from '@/lib/league-limits';
 import { stripe, priceIdToTier } from '@/lib/stripe';
 import type { SubscriptionTier } from '@prisma/client';
@@ -449,13 +449,16 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
         const { scoring, lineup } = buildLeagueConfig(scoringSettings, rosterPositions, leagueSize);
 
         // Sleeper's free feed leaves long-retired players marked active with
-        // stale data (see feedback_stale_sleeper_player_data) — team!=FA
-        // plus a real-age cutoff catches what the raw feed alone can't.
-        const MAX_PLAUSIBLE_AGE = 45;
+        // stale data (see feedback_stale_sleeper_player_data) — team!=FA plus
+        // a real-age cutoff catches most of it, and a depth-chart+experience
+        // check catches the rarer case where team AND birthDate are both
+        // stale (confirmed real for IDP-eligible positions too — e.g. Eric
+        // Weddle, Jadeveon Clowney, Malcolm Jenkins all still pass team!=FA
+        // + age<=45 despite having been out of the league for years).
         const allPlayers: typeof allPlayersRaw = {};
         for (const [pid, player] of Object.entries(allPlayersRaw)) {
-            if (player.team === 'FA') continue;
-            if (player.age != null && player.age > MAX_PLAUSIBLE_AGE) continue;
+            const age = calculateAge(player.birthDate) ?? player.age ?? null;
+            if (!isPlausiblyActivePlayer({ team: player.team, age, depthChartOrder: player.depthChartOrder, yearsExp: player.yearsExp })) continue;
             allPlayers[pid] = player;
         }
 

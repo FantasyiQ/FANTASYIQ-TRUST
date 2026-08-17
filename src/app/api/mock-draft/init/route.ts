@@ -37,6 +37,7 @@ import { buildLeagueConfig } from '@/lib/rankings/leagueConfigBuilder';
 import { buildLeagueDefensiveAndKickerRankings } from '@/lib/rankings/defensiveEngine';
 import { buildIdpSeedProjections, buildKickerSeedProjections, buildDefenseSeedProjections, toIdpPosition } from '@/lib/rankings/seedProjections';
 import { buildProjectionsFromSleeperStats } from '@/lib/rankings/sleeperStatsAdapter';
+import { calculateAge, isPlausiblyActivePlayer } from '@/lib/calculateAge';
 
 export const maxDuration = 30;
 
@@ -576,13 +577,14 @@ export async function GET(req: NextRequest): Promise<Response> {
         const { scoring, lineup } = buildLeagueConfig(scoringSettings, rosterPositions, totalTeams);
 
         // Sleeper's free feed leaves long-retired players marked active with
-        // stale data — team!=FA plus a real-age cutoff catches what the raw
-        // feed alone can't (see feedback_stale_sleeper_player_data).
-        const MAX_PLAUSIBLE_AGE = 45;
+        // stale data — team!=FA plus a real-age cutoff catches most of it,
+        // and a depth-chart+experience check catches the rarer case where
+        // team AND birthDate are both stale (see feedback_stale_sleeper_player_data,
+        // feedback_mock_draft_stale_rookie_pool).
         const allPlayers: typeof allPlayersRaw = {};
         for (const [pid, player] of Object.entries(allPlayersRaw)) {
-            if (player.team === 'FA') continue;
-            if (player.age != null && player.age > MAX_PLAUSIBLE_AGE) continue;
+            const age = calculateAge(player.birthDate) ?? player.age ?? null;
+            if (!isPlausiblyActivePlayer({ team: player.team, age, depthChartOrder: player.depthChartOrder, yearsExp: player.yearsExp })) continue;
             allPlayers[pid] = player;
         }
 

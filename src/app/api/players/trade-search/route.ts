@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { calculateAge } from '@/lib/calculateAge';
+import { calculateAge, isPlausiblyActivePlayer } from '@/lib/calculateAge';
 import type { Player } from '@/lib/trade-engine';
 import { checkSearchLimit, getClientIp } from '@/lib/ratelimit';
 import { normalizePlayerName } from '@/lib/playerName';
@@ -64,8 +64,11 @@ export async function GET(request: NextRequest): Promise<Response> {
                 OR: [{ active: true }, { team: { not: 'FA' } }],
                 fullName: { contains: q, mode: 'insensitive' },
             },
-            select: { playerId: true, fullName: true, position: true, team: true, birthDate: true, age: true },
-            take: 50,
+            select: {
+                playerId: true, fullName: true, position: true, team: true, birthDate: true, age: true,
+                depthChartOrder: true, yearsExp: true,
+            },
+            take: 60, // extra headroom — stale-record filtering below may drop a few before the take:12 cap
         }),
         prisma.fantasyCalcValue.findMany({
             where: { nameLower: { contains: ql } },
@@ -101,10 +104,19 @@ export async function GET(request: NextRequest): Promise<Response> {
             ?? (byNormNameCount.get(normd) === 1 ? byNormName.get(normd) : undefined);
     }
 
+    // active:true / team!=FA alone miss long-retired players Sleeper's feed
+    // still marks as rosterable (see feedback_stale_sleeper_player_data,
+    // feedback_mock_draft_stale_rookie_pool) — a trade search for a retired
+    // player's name shouldn't offer them as a real, tradeable option.
+    const activeMatches = dbMatches.filter(p => !p.birthDate || isPlausiblyActivePlayer({
+        team: p.team, age: calculateAge(p.birthDate) ?? p.age,
+        depthChartOrder: p.depthChartOrder, yearsExp: p.yearsExp,
+    }));
+
     // 2. Merge: real per-league value (superflex + scoring settings aware,
     // same computePlayerBaseValue() the rest of the app uses) wins; fall
     // back to position-based depth default when FantasyCalc has no match.
-    const merged: Player[] = dbMatches.map((p, i) => {
+    const merged: Player[] = activeMatches.map((p, i) => {
         const nameLower = p.fullName.toLowerCase();
         const fcRow  = resolveFc(nameLower, p.position);
         const baseValue = fcRow !== undefined
