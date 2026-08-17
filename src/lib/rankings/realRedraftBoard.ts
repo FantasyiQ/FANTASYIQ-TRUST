@@ -411,24 +411,47 @@ export async function computeRealRedraftBoard(
         const projPtsForDisplay = pos !== 'DEF' && !gamesPlayed ? projByPlayerId.get(p.playerId) ?? null : null;
 
         return {
-            playerId:       p.playerId,
-            name:           p.fullName ?? '',
-            position:       pos,
-            team:           p.team,
-            age:            p.age,
-            birthDate:      p.birthDate,
-            injuryStatus:   p.injuryStatus,
-            adp:            p.searchRank ?? 999,
-            realPtsPerGame: gamesPlayed ? realPtsPerGame : null,
-            hasRealData:    Boolean(gamesPlayed),
-            projPtsPerGame: projPtsForDisplay,
-            hasProjData:    projPtsForDisplay != null,
+            playerId:        p.playerId,
+            name:            p.fullName ?? '',
+            position:        pos,
+            team:            p.team,
+            age:             p.age,
+            birthDate:       p.birthDate,
+            injuryStatus:    p.injuryStatus,
+            adp:             p.searchRank ?? 999,
+            realPtsPerGame:  gamesPlayed ? realPtsPerGame : null,
+            hasRealData:     Boolean(gamesPlayed),
+            projPtsPerGame:  projPtsForDisplay,
+            hasProjData:     projPtsForDisplay != null,
+            depthChartOrder: p.depthChartOrder,
             finalValue,
         };
     });
 
+    // A backup QB (not the confirmed current starter) has essentially no
+    // standalone redraft value beyond handcuff insurance — they only see the
+    // field if the real starter is hurt, so a real market-value/ADP blend
+    // alone can't capture this (verified real case: a team's real backup QB
+    // out-ranking an actual Week 1 starter elsewhere, purely off unproven
+    // rookie-prospect hype the market hasn't discounted for zero real path
+    // to snaps). No non-starting QB should ever rank above the worst real
+    // starting QB — capped against that value directly (self-calibrating to
+    // whatever this season's weakest real starter is actually worth) rather
+    // than an arbitrary fixed number.
+    const starterQbValues = players
+        .filter(x => x.position === 'QB' && x.depthChartOrder === 1)
+        .map(x => x.finalValue);
+    if (starterQbValues.length > 0) {
+        const worstStarterValue = Math.min(...starterQbValues);
+        for (const x of players) {
+            if (x.position === 'QB' && x.depthChartOrder !== 1) {
+                x.finalValue = Math.min(x.finalValue, worstStarterValue - 1);
+            }
+        }
+    }
+
     return players
         .sort((a, b) => b.finalValue - a.finalValue)
         .slice(0, limit)
-        .map(({ finalValue: _finalValue, ...rest }) => rest);
+        .map(({ finalValue: _finalValue, depthChartOrder: _depthChartOrder, ...rest }) => rest);
 }
