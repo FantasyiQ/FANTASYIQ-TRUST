@@ -23,7 +23,7 @@ export default async function RankingsPage({ params }: { params: Promise<{ id: s
         isLeagueCommissionerCovered(id),
         prisma.league.findUnique({
             where:  { id },
-            select: { leagueType: true, scoringType: true, leagueName: true, season: true, scoringSettings: true, rosterPositions: true },
+            select: { leagueType: true, scoringType: true, leagueName: true, season: true, scoringSettings: true, rosterPositions: true, totalRosters: true },
         }),
     ]);
 
@@ -49,8 +49,8 @@ export default async function RankingsPage({ params }: { params: Promise<{ id: s
         // generic PPR baseline only for platforms that don't expose granular
         // scoring yet (Yahoo/NFL), so the board is never simply blank.
         const scoringSettings = (league?.scoringSettings as Record<string, number> | null) ?? STANDARD_SCORING;
-        const superflex = ((league?.rosterPositions as string[] | null) ?? []).includes('SUPER_FLEX');
-        const players = await computeRealRedraftBoard(scoringSettings, superflex);
+        const rosterPositions = (league?.rosterPositions as string[] | null) ?? [];
+        const players = await computeRealRedraftBoard(scoringSettings, rosterPositions, league?.totalRosters ?? 12);
 
         return (
             <RedraftRankingsView

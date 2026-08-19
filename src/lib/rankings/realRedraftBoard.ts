@@ -1,37 +1,49 @@
 // FantasyIQ Trust — Real Redraft Big Board
 //
-// Ranks players for a specific league's redraft board by real projected
-// SEASON points under that league's exact scoring settings, blended with
-// real Sleeper ADP. Explicit design, confirmed directly by the user:
-// "Projected points for the season. Rank them highest to lowest points
-// based on scoring settings in that league" — points are the primary
-// driver, not a bounded nudge on top of a market-value anchor.
+// Ranks players for a specific league's redraft board by real Value Over
+// Replacement (VOR) — real projected season points under this league's
+// exact scoring settings, minus the real replacement-level point total at
+// that player's position.
 //
-// Why ADP is still blended in, not points alone: verified live that pure
-// season points puts 15 different QBs above the real consensus #1 overall
-// picks (Jahmyr Gibbs, Bijan Robinson — both real ADP 1), including
-// several deep-ADP veteran QBs (e.g. a QB with real ADP 77 outscoring
-// them on paper) — because passing stats accumulate faster than rushing/
-// receiving ones under most scoring formats, not because that QB is
-// actually more valuable in a real 1-QB draft. Real Sleeper ADP already
-// encodes real human drafters' positional-scarcity judgment that a raw
-// point total can't see on its own, so blending it back in corrects that
-// without reintroducing a market-value anchor that overrides points
-// (confirmed live: with the blend, Gibbs/Robinson correctly land back in
-// the top 10 and the deep-ADP QB drops to a realistic mid-board slot).
+// Why not raw points: verified live that raw season points puts 14 of the
+// top 15 players at QB, because QBs touch the ball on every offensive
+// snap and passing production accumulates faster than rushing/receiving
+// under most scoring formats — a real fact about the sport, not a bug.
+// The real problem is that points alone doesn't capture positional
+// scarcity: you can only ever start one QB, so even a mediocre real
+// starter scores a lot relative to what you could stream off waivers,
+// while RB/WR production varies far more by opportunity.
 //
-// FantasyCalc is deliberately NOT used anywhere in this file anymore
-// (previously blended 50/50 with ADP) — the user's instruction is
-// specifically points + ADP, not points + market trade value.
+// Why replacement level can't be "starters + FLEX" alone: verified live —
+// that produced kickers ranking in round 2, because a starters-only model
+// has no way to know that real drafters extensively bench-stash RB/WR
+// (handcuffs, breakout bets, bye-week insurance) but essentially never
+// bench-stash K/DEF (always freely available on waivers). Bench
+// utilization is a behavioral property of the drafter population, not a
+// mathematical property of the roster — you can't derive it from roster
+// size alone, but real ADP already measures it directly: how deep a
+// position gets drafted, in practice, before a real team's whole roster
+// fills up. So replacement level is computed as: take this league's total
+// real draftable roster spots (teams × non-IR roster slots), walk down
+// the real ADP-sorted list that many players deep, and count how many of
+// each position actually appear in that realistically-drafted slice —
+// that count IS the replacement index for that position. RB/WR naturally
+// come out deep (real bench-stash behavior), K/DEF naturally come out
+// shallow (real streaming behavior) — no positional heuristics, no
+// assumed FLEX split, just what real ADP shows actually happens.
 //
-// DEF has no real ADP signal (Sleeper never assigns team defenses a
-// searchRank) and no projection source of its own, so it's anchored the
-// same way as before: real per-game production run through THIS league's
-// own scoring, regressed toward the DEF positional average (one season of
-// defensive stats is a genuinely noisy signal), then looked up on a real
-// points→blended-score curve built from skill players who have both —
-// recalibrated to the new points+ADP blended score instead of FantasyCalc
-// value, so the whole board stays on one consistent scale.
+// DEF has no real ADP source at all (Sleeper never assigns one), so it
+// falls back to a starters-only replacement index (teams × real DEF
+// starter slots) — the one position where "no bench stashing" is true by
+// definition regardless of what ADP would show if it existed.
+//
+// Real, format-specific ADP (matched to this league's actual superflex/
+// PPR settings, not Sleeper's superflex-skewed generic searchRank — see
+// feedback_searchrank_superflex_skew) both drives the replacement-level
+// calculation above AND breaks a genuine VOR tie — never blended directly
+// into a player's own ranking value.
+//
+// FantasyCalc is not used anywhere in this file.
 
 import { prisma } from '@/lib/prisma';
 import { getNflState } from '@/lib/sleeper';
@@ -42,17 +54,16 @@ import { resolveProductionSignals } from './productionSignals';
 
 // Multiplicative discount, not additive — scale-independent regardless of
 // how high real season points run under a given league's scoring
-// generosity. Same relative severity as the prior 0-100-scale version (an
-// IR/Out player could lose up to 40% of a 100-point range there).
+// generosity. An IR/Out player can lose up to 40% of their real projected
+// season points.
 const REDRAFT_INJURY_MAX_DISCOUNT = 0.4;
 
 const REDRAFT_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'] as const;
+type RedraftPosition = (typeof REDRAFT_POSITIONS)[number];
 
 // Sleeper uses sentinel values for "unranked" rather than leaving
-// searchRank null — 9999999 for fully unranked players, and a cluster of
-// hundreds of distinct players all tied at exactly 999 (statistically
-// impossible as a genuine continuous rank). Neither is a real distinct
-// market position.
+// searchRank/adp_* null — 9999999 or 999+ for fully unranked players.
+// Neither is a real distinct market position.
 const SLEEPER_UNRANKED_SENTINEL = 999;
 
 // A representative season length for converting DEF's per-game blended
@@ -69,18 +80,28 @@ export interface RealRedraftPlayer {
     age:            number | null;
     birthDate:      string | null;
     injuryStatus:   string | null;
-    adp:            number;              // Sleeper searchRank — real market ADP, shown for reference
+    adp:            number;              // real, format-specific market ADP — tiebreaker only, shown for reference
     realPtsPerGame: number | null;        // null when the player has no season stats yet
     hasRealData:    boolean;
     projPtsPerGame: number | null;        // real projected points — only set when hasRealData is false
     hasProjData:    boolean;
 }
 
+// Real DEF starter slots for this league — DEF has no real ADP source, so
+// its replacement index falls back to starters-only (no assumed roster,
+// parsed from the league's actual rosterPositions array).
+function countRealDefStarterSlots(rosterPositions: string[]): number {
+    return rosterPositions.filter(slot => slot === 'DEF').length;
+}
+
 export async function computeRealRedraftBoard(
     scoringSettings: Record<string, number>,
-    superflex = false,
+    rosterPositions: string[],
+    totalTeams: number,
     limit = 300,
 ): Promise<RealRedraftPlayer[]> {
+    const superflex = rosterPositions.includes('SUPER_FLEX');
+
     const rawPlayers = await prisma.sleeperPlayer.findMany({
         where: {
             position: { in: [...REDRAFT_POSITIONS] },
@@ -108,12 +129,11 @@ export async function computeRealRedraftBoard(
 
     // Real, FORMAT-SPECIFIC ADP — SleeperPlayer.searchRank is a single
     // generic rank that tracks superflex/2QB draft behavior almost exactly
-    // (verified live: a real QB's searchRank landed within ~1 pick of his
-    // own adp_2qb, while his real adp_std — the actual standard 1-QB
-    // number — was 5x later), which silently fed superflex-inflated QB
-    // demand into every non-superflex league's board. Sleeper's own season
-    // projection payload already carries real format-specific ADP fields
-    // (adp_std / adp_half_ppr / adp_ppr / adp_2qb) for the exact same
+    // regardless of a league's real format (verified live: a real QB's
+    // searchRank landed within ~1 pick of his own adp_2qb, while his real
+    // adp_std — the actual standard 1-QB number — was 5x later). Sleeper's
+    // own season projection payload carries real format-specific ADP
+    // fields (adp_std / adp_half_ppr / adp_ppr / adp_2qb) for the same
     // players — select the one matching THIS league's real format instead.
     const currentSeason = (await getNflState()).season;
     const seasonProjRows = await prisma.playerSeasonProjection.findMany({
@@ -136,9 +156,6 @@ export async function computeRealRedraftBoard(
         const adp = pickFormatAdp(r.rawStats);
         if (adp != null) formatAdpById.set(r.playerId, adp);
     }
-    // Real ADP for this player, format-aware where we have it, falling back
-    // to the generic searchRank only for the rare player with no season
-    // projection on file.
     function resolveAdp(p: { playerId: string; searchRank: number | null }): number | null {
         const formatAdp = formatAdpById.get(p.playerId);
         if (formatAdp != null) return formatAdp;
@@ -158,7 +175,7 @@ export async function computeRealRedraftBoard(
         return isPlausiblyActivePlayer({ team: p.team, age, depthChartOrder: p.depthChartOrder, yearsExp: p.yearsExp });
     });
 
-    // ── Pass 1: real projected SEASON points under this league's own scoring ──
+    // ── Real projected SEASON points under this league's own scoring ───────
     type Pending = {
         p: (typeof eligible)[number];
         adp: number | null;
@@ -178,48 +195,12 @@ export async function computeRealRedraftBoard(
         };
     });
 
-    // ── Real ADP → real season points calibration curve (skill positions) ──
-    // Built from every skill player in this pool who has both a real
-    // format-specific ADP and real season points — the actual, observed
-    // shape of how the market prices each draft slot in real point terms,
-    // not an invented formula.
-    const calibPoints: { adp: number; pts: number }[] = [];
-    for (const { p, adp, seasonPoints, gamesPlayed } of pending) {
-        if (p.position === 'DEF' || !gamesPlayed || adp == null) continue;
-        calibPoints.push({ adp, pts: seasonPoints });
-    }
-    // A precise 2-point interpolation lets a single lucky/unlucky neighbor
-    // swing the estimate wildly in noisy deep-ADP territory — averaging
-    // over the nearest real neighborhood smooths that without fabricating
-    // anything (same technique already proven for the DEF anchor below).
-    const ADP_CALIB_WINDOW = 15;
-    function estimatePointsFromAdp(adp: number): number {
-        if (calibPoints.length === 0) return 0;
-        const windowSize = Math.min(ADP_CALIB_WINDOW, calibPoints.length);
-        const nearest = [...calibPoints]
-            .sort((a, b) => Math.abs(a.adp - adp) - Math.abs(b.adp - adp))
-            .slice(0, windowSize);
-        return nearest.reduce((sum, c) => sum + c.pts, 0) / nearest.length;
-    }
-
-    // ── Blend: real season points + real ADP-implied season points ─────────
-    const blendedPointsById = new Map<string, number>();
-    for (const { p, adp, seasonPoints } of pending) {
-        if (p.position === 'DEF') continue; // DEF handled separately below
-        const adpImplied = adp != null ? estimatePointsFromAdp(adp) : seasonPoints;
-        blendedPointsById.set(p.playerId, (seasonPoints + adpImplied) / 2);
-    }
-
-    // ── DEF anchor: real production → comparable skill-player blended score ──
-    // Neither Sleeper ADP nor a projection source covers team defenses, so
-    // there's no direct market signal to calibrate against. Real per-game
-    // production is regressed toward the DEF positional average first (one
-    // season of defensive stats is a genuinely noisy, matchup-driven
-    // signal — not as predictive as a full season of RB/WR opportunity
-    // share), converted to a season-equivalent total, then looked up on a
-    // real points→blended-score curve built from skill players who have
-    // both — the value real skill players who score like that defense (on
-    // the exact same real per-league scoring scale) actually land at.
+    // ── DEF: real production → real season points, no ADP signal exists ────
+    // One season of defensive stats is a genuinely noisy, matchup-driven
+    // signal (not as predictive as a full season of RB/WR opportunity
+    // share), so real per-game production is regressed toward the DEF
+    // positional average first, then converted to a season total on the
+    // exact same real-points scale as every skill player.
     let defPosPtsSum = 0, defPosPtsCount = 0;
     for (const { p, perGamePoints, gamesPlayed } of pending) {
         if (p.position !== 'DEF' || !gamesPlayed) continue;
@@ -228,45 +209,67 @@ export async function computeRealRedraftBoard(
     }
     const defPosAvgPtsPerGame = defPosPtsCount > 0 ? defPosPtsSum / defPosPtsCount : 0;
 
-    const pointsToBlendedCalib: { pts: number; blended: number }[] = [];
-    for (const { p, seasonPoints } of pending) {
-        if (p.position === 'DEF') continue;
-        const blended = blendedPointsById.get(p.playerId);
-        if (blended == null) continue;
-        pointsToBlendedCalib.push({ pts: seasonPoints, blended });
-    }
-    const POINTS_CALIB_WINDOW = 15;
-    function estimateBlendedFromPoints(pts: number): number {
-        if (pointsToBlendedCalib.length === 0) return 0;
-        const windowSize = Math.min(POINTS_CALIB_WINDOW, pointsToBlendedCalib.length);
-        const nearest = [...pointsToBlendedCalib]
-            .sort((a, b) => Math.abs(a.pts - pts) - Math.abs(b.pts - pts))
-            .slice(0, windowSize);
-        return nearest.reduce((sum, c) => sum + c.blended, 0) / nearest.length;
-    }
-
-    const defValueById = new Map<string, number>();
-    for (const { p, perGamePoints, gamesPlayed } of pending) {
-        if (p.position !== 'DEF') continue;
-        const blendedPtsPerGame = gamesPlayed
-            ? blendTowardPositionAverage(perGamePoints, defPosAvgPtsPerGame, gamesPlayed)
-            : defPosAvgPtsPerGame;
-        defValueById.set(p.playerId, estimateBlendedFromPoints(blendedPtsPerGame * REPRESENTATIVE_SEASON_GAMES));
-    }
-
-    // ── Pass 2: injury discount + final assembly ────────────────────────────
-    const players = pending.map(({ p, adp, perGamePoints, seasonPoints, gamesPlayed, fromProjection }) => {
-        const pos = p.position ?? '';
-        let finalValue = pos === 'DEF'
-            ? (defValueById.get(p.playerId) ?? 0)
-            : (blendedPointsById.get(p.playerId) ?? seasonPoints);
-
-        // Current injury designation, applied on top of the points+ADP
-        // base — real ADP often lags a very recent injury move, so a
-        // player just placed on IR shouldn't keep riding a pre-injury
-        // value in a current-season redraft ranking.
+    // Final real season points per player (injury-discounted) — this is
+    // what VOR gets computed against.
+    type Scored = Pending & { finalPoints: number };
+    const scored: Scored[] = pending.map(entry => {
+        const { p, perGamePoints, seasonPoints, gamesPlayed } = entry;
+        let finalPoints = seasonPoints;
+        if (p.position === 'DEF') {
+            const blendedPtsPerGame = gamesPlayed
+                ? blendTowardPositionAverage(perGamePoints, defPosAvgPtsPerGame, gamesPlayed)
+                : defPosAvgPtsPerGame;
+            finalPoints = blendedPtsPerGame * REPRESENTATIVE_SEASON_GAMES;
+        }
         const injuryRisk = INJURY_STATUS_RISK[p.injuryStatus ?? ''] ?? 0;
-        finalValue = Math.max(0, finalValue * (1 - injuryRisk * REDRAFT_INJURY_MAX_DISCOUNT));
+        finalPoints = Math.max(0, finalPoints * (1 - injuryRisk * REDRAFT_INJURY_MAX_DISCOUNT));
+        return { ...entry, finalPoints };
+    });
+
+    // ── Value Over Replacement: real ADP depth → replacement level ─────────
+    // Real ADP measures actual drafter bench-stash behavior — walk down
+    // this league's own real ADP-sorted list exactly as many players as
+    // this league's real total draftable roster spots (teams × non-IR
+    // roster slots), and count how many of each position actually appear
+    // in that realistically-drafted slice. That count is the position's
+    // replacement index: RB/WR come out deep (real handcuff/bench-stash
+    // demand), K/DEF come out shallow (real streaming behavior) — no
+    // assumed FLEX split, no positional heuristics, just what this
+    // league's real ADP shows actually happens.
+    const draftableSlotsPerTeam = rosterPositions.filter(slot => slot !== 'IR').length;
+    const totalDraftedPlayers   = totalTeams * draftableSlotsPerTeam;
+
+    const adpSorted = scored
+        .filter(x => x.p.position !== 'DEF' && x.adp != null) // DEF has no real ADP source — handled separately below
+        .sort((a, b) => a.adp! - b.adp!)
+        .slice(0, totalDraftedPlayers);
+
+    const replacementIndex: Record<RedraftPosition, number> = { QB: 0, RB: 0, WR: 0, TE: 0, K: 0, DEF: 0 };
+    for (const x of adpSorted) replacementIndex[x.p.position as RedraftPosition]++;
+    // DEF: no real ADP source exists at all (Sleeper never assigns team
+    // defenses one), so it falls back to starters-only — the one position
+    // where "no bench stashing" is true by definition, not an assumption.
+    replacementIndex.DEF = totalTeams * countRealDefStarterSlots(rosterPositions);
+
+    const sortedByPos: Record<RedraftPosition, number[]> = { QB: [], RB: [], WR: [], TE: [], K: [], DEF: [] };
+    for (const pos of REDRAFT_POSITIONS) {
+        sortedByPos[pos] = scored
+            .filter(x => x.p.position === pos)
+            .map(x => x.finalPoints)
+            .sort((a, b) => b - a);
+    }
+
+    const replacementPoints: Record<RedraftPosition, number> = { QB: 0, RB: 0, WR: 0, TE: 0, K: 0, DEF: 0 };
+    for (const pos of REDRAFT_POSITIONS) {
+        const list = sortedByPos[pos];
+        const idx  = Math.min(replacementIndex[pos], list.length - 1);
+        replacementPoints[pos] = idx >= 0 ? list[idx] : 0;
+    }
+
+    // ── Final assembly: VOR, ADP as tiebreak only ───────────────────────────
+    const players = scored.map(({ p, adp, perGamePoints, gamesPlayed, fromProjection, finalPoints }) => {
+        const pos = (p.position ?? '') as RedraftPosition;
+        const vor = finalPoints - (replacementPoints[pos] ?? 0);
 
         return {
             playerId:        p.playerId,
@@ -276,43 +279,50 @@ export async function computeRealRedraftBoard(
             age:             p.age,
             birthDate:       p.birthDate,
             injuryStatus:    p.injuryStatus,
-            // Real, format-specific ADP where available (matches what
-            // actually drove this ranking); falls back to the generic
-            // searchRank only for the rare player with neither.
+            // Real, format-specific ADP where available (tiebreaker only —
+            // never moves a player above/below another with a clearly
+            // different VOR); falls back to the generic searchRank only
+            // for the rare player with neither.
             adp:             adp ?? p.searchRank ?? 999,
             realPtsPerGame:  gamesPlayed && !fromProjection ? perGamePoints : null,
             hasRealData:     Boolean(gamesPlayed) && !fromProjection,
             projPtsPerGame:  gamesPlayed && fromProjection ? perGamePoints : null,
             hasProjData:     Boolean(gamesPlayed) && fromProjection,
             depthChartOrder: p.depthChartOrder,
-            finalValue,
+            vor,
         };
     });
 
     // A backup QB (not the confirmed current starter) has essentially no
-    // standalone redraft value beyond handcuff insurance — they only see the
-    // field if the real starter is hurt, so a real points+ADP blend alone
-    // can't capture this (verified real case: a team's real backup QB
-    // out-ranking an actual Week 1 starter elsewhere, purely off unproven
-    // rookie-prospect hype the market hasn't discounted for zero real path
-    // to snaps). No non-starting QB should ever rank above the worst real
-    // starting QB — capped against that value directly (self-calibrating to
-    // whatever this season's weakest real starter is actually worth) rather
-    // than an arbitrary fixed number.
-    const starterQbValues = players
+    // standalone redraft value beyond handcuff insurance — they only see
+    // the field if the real starter is hurt. VOR alone can still be
+    // fooled by a highly-touted backup's real season projection assuming
+    // more playing time than they'll realistically get, so no non-starting
+    // QB should ever rank above the worst real starting QB — capped
+    // against that VOR directly (self-calibrating to whatever this
+    // season's weakest real starter is actually worth) rather than an
+    // arbitrary fixed number.
+    const starterQbVor = players
         .filter(x => x.position === 'QB' && x.depthChartOrder === 1)
-        .map(x => x.finalValue);
-    if (starterQbValues.length > 0) {
-        const worstStarterValue = Math.min(...starterQbValues);
+        .map(x => x.vor);
+    if (starterQbVor.length > 0) {
+        const worstStarterVor = Math.min(...starterQbVor);
         for (const x of players) {
             if (x.position === 'QB' && x.depthChartOrder !== 1) {
-                x.finalValue = Math.min(x.finalValue, worstStarterValue - 1);
+                x.vor = Math.min(x.vor, worstStarterVor - 1);
             }
         }
     }
 
+    // VOR first, full stop — ADP only breaks a real tie (rounded to the
+    // nearest whole point, since exact floating-point equality is rare but
+    // two players "effectively tied" on VOR is common).
     return players
-        .sort((a, b) => b.finalValue - a.finalValue)
+        .sort((a, b) => {
+            const byVor = Math.round(b.vor) - Math.round(a.vor);
+            if (byVor !== 0) return byVor;
+            return a.adp - b.adp; // lower (better) real ADP wins ties
+        })
         .slice(0, limit)
-        .map(({ finalValue: _finalValue, depthChartOrder: _depthChartOrder, ...rest }) => rest);
+        .map(({ vor: _vor, depthChartOrder: _depthChartOrder, ...rest }) => rest);
 }
