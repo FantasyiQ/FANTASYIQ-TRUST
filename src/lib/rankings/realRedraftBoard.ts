@@ -1,18 +1,29 @@
 // FantasyIQ Trust — Real Redraft Big Board
 //
 // Ranks players for a specific league's redraft board by real Value Over
-// Replacement (VOR) — real projected season points under this league's
-// exact scoring settings, minus the real replacement-level point total at
-// that player's position.
+// Replacement (VOR) — a blended "real value" per player minus the real
+// replacement-level value at that player's position.
 //
-// Why not raw points: verified live that raw season points puts 14 of the
-// top 15 players at QB, because QBs touch the ball on every offensive
-// snap and passing production accumulates faster than rushing/receiving
-// under most scoring formats — a real fact about the sport, not a bug.
-// The real problem is that points alone doesn't capture positional
-// scarcity: you can only ever start one QB, so even a mediocre real
-// starter scores a lot relative to what you could stream off waivers,
-// while RB/WR production varies far more by opportunity.
+// QB/RB/WR/TE real value = 0.67 * real projected season points (under
+// this league's exact scoring settings) + 0.33 * ADP-implied season
+// points (real, format-specific market ADP looked up on a real
+// points-vs-ADP calibration curve, smoothed over its nearest real
+// neighbors). K/DEF are deliberately excluded from this blend — they keep
+// pure real season points, unchanged, so the ADP-depth replacement-level
+// fix that already correctly produces realistic K/DEF rounds (see below)
+// never moves.
+//
+// Why not raw points alone: verified live that raw season points puts 14
+// of the top 15 players at QB, because QBs touch the ball on every
+// offensive snap and passing production accumulates faster than rushing/
+// receiving under most scoring formats — a real fact about the sport, not
+// a bug. Positional scarcity (only one starting QB vs. deep RB/WR bench
+// demand) is captured by VOR/replacement level, not by this blend — the
+// blend's job is narrower: keep points as the primary signal while
+// letting real market ADP pull back a player whose raw point total
+// doesn't reflect how real drafters actually value them (e.g. a
+// scrambling QB whose real ADP runs well ahead of a pure-passer with a
+// similar point total).
 //
 // Why replacement level can't be "starters + FLEX" alone: verified live —
 // that produced kickers ranking in round 2, because a starters-only model
@@ -43,6 +54,18 @@
 // calculation above AND breaks a genuine VOR tie — never blended directly
 // into a player's own ranking value.
 //
+// Positional stability/fragility multiplier: applied as a flat scaling
+// factor on top of the fully-computed VOR — QB +12.5%, WR +7.5%, RB
+// -12.5%, TE -7.5%, K/DEF unchanged. This is an explicit, requested
+// override, not a measured signal — real week-to-week bust/consistency
+// data isn't what's driving these numbers. It moves QB/WR up and RB/TE
+// down relative to raw VOR without touching replacement level, ADP depth,
+// or the points+ADP blend underneath. Verified live it narrows but does
+// not fully close the gap to the RB-heavy top of the board — the top
+// RBs' raw VOR lead is large enough that even the requested range's
+// maximum can't put a QB in the top 5 of a standard league; see
+// feedback_vor_redraft_design for the exact numbers checked.
+//
 // FantasyCalc is not used anywhere in this file.
 
 import { prisma } from '@/lib/prisma';
@@ -71,6 +94,24 @@ const SLEEPER_UNRANKED_SENTINEL = 999;
 // totals — matches the games-played proxy used elsewhere in the League
 // Scoring Points Engine.
 const REPRESENTATIVE_SEASON_GAMES = 17;
+
+// Positional stability/fragility smoothing — applied as a flat multiplier
+// on top of the already-computed VOR (never touching replacement level,
+// the ADP-depth calculation, or the points+ADP blend that feeds VOR).
+// Not derived from a measured signal — a deliberate, explicit override
+// requested to counteract how thin real replacement level makes RB/TE
+// look and how deep it makes QB/WR look, independent of true week-to-week
+// bust/stability risk. Midpoint of each requested range: QB +12.5%
+// (stability), WR +7.5% (consistency), RB -12.5% (fragility), TE -7.5%
+// (volatility), K/DEF unchanged (streaming positions).
+const POSITION_STABILITY_MULTIPLIER: Record<RedraftPosition, number> = {
+    QB: 1.125,
+    RB: 0.875,
+    WR: 1.075,
+    TE: 0.925,
+    K:  1,
+    DEF: 1,
+};
 
 export interface RealRedraftPlayer {
     playerId:       string;
@@ -195,6 +236,38 @@ export async function computeRealRedraftBoard(
         };
     });
 
+    // ── Real ADP → real season points calibration curve (skill positions) ──
+    // Built from every non-DEF/K player in this pool who has both a real
+    // format-specific ADP and real season points — the actual, observed
+    // shape of how the market prices each draft slot in real point terms,
+    // not an invented formula. A precise 2-point interpolation lets a
+    // single lucky/unlucky neighbor swing the estimate wildly in noisy
+    // deep-ADP territory — averaging over the nearest real neighborhood
+    // smooths that without fabricating anything.
+    const calibPoints: { adp: number; pts: number }[] = [];
+    for (const { p, adp, seasonPoints, gamesPlayed } of pending) {
+        if (p.position === 'DEF' || !gamesPlayed || adp == null) continue;
+        calibPoints.push({ adp, pts: seasonPoints });
+    }
+    const ADP_CALIB_WINDOW = 15;
+    function estimatePointsFromAdp(adp: number): number {
+        if (calibPoints.length === 0) return 0;
+        const windowSize = Math.min(ADP_CALIB_WINDOW, calibPoints.length);
+        const nearest = [...calibPoints]
+            .sort((a, b) => Math.abs(a.adp - adp) - Math.abs(b.adp - adp))
+            .slice(0, windowSize);
+        return nearest.reduce((sum, c) => sum + c.pts, 0) / nearest.length;
+    }
+
+    // ── Blend: 0.67 real season points + 0.33 ADP-implied season points ────
+    // QB/RB/WR/TE only. K/DEF keep pure real points — see file header.
+    const blendedScoreById = new Map<string, number>();
+    for (const { p, adp, seasonPoints } of pending) {
+        if (p.position === 'DEF' || p.position === 'K') continue;
+        const adpImplied = adp != null ? estimatePointsFromAdp(adp) : seasonPoints;
+        blendedScoreById.set(p.playerId, 0.67 * seasonPoints + 0.33 * adpImplied);
+    }
+
     // ── DEF: real production → real season points, no ADP signal exists ────
     // One season of defensive stats is a genuinely noisy, matchup-driven
     // signal (not as predictive as a full season of RB/WR opportunity
@@ -209,12 +282,13 @@ export async function computeRealRedraftBoard(
     }
     const defPosAvgPtsPerGame = defPosPtsCount > 0 ? defPosPtsSum / defPosPtsCount : 0;
 
-    // Final real season points per player (injury-discounted) — this is
-    // what VOR gets computed against.
+    // Final real value per player (injury-discounted) — this is what VOR
+    // gets computed against. QB/RB/WR/TE: the 0.67/0.33 points+ADP blend
+    // above. K/DEF: pure real points, unchanged.
     type Scored = Pending & { finalPoints: number };
     const scored: Scored[] = pending.map(entry => {
         const { p, perGamePoints, seasonPoints, gamesPlayed } = entry;
-        let finalPoints = seasonPoints;
+        let finalPoints = blendedScoreById.get(p.playerId) ?? seasonPoints;
         if (p.position === 'DEF') {
             const blendedPtsPerGame = gamesPlayed
                 ? blendTowardPositionAverage(perGamePoints, defPosAvgPtsPerGame, gamesPlayed)
@@ -269,7 +343,7 @@ export async function computeRealRedraftBoard(
     // ── Final assembly: VOR, ADP as tiebreak only ───────────────────────────
     const players = scored.map(({ p, adp, perGamePoints, gamesPlayed, fromProjection, finalPoints }) => {
         const pos = (p.position ?? '') as RedraftPosition;
-        const vor = finalPoints - (replacementPoints[pos] ?? 0);
+        const vor = (finalPoints - (replacementPoints[pos] ?? 0)) * (POSITION_STABILITY_MULTIPLIER[pos] ?? 1);
 
         return {
             playerId:        p.playerId,
@@ -324,5 +398,5 @@ export async function computeRealRedraftBoard(
             return a.adp - b.adp; // lower (better) real ADP wins ties
         })
         .slice(0, limit)
-        .map(({ vor: _vor, depthChartOrder: _depthChartOrder, ...rest }) => rest);
+        .map(({ depthChartOrder: _depthChartOrder, ...rest }) => rest);
 }
