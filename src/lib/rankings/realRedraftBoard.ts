@@ -8,10 +8,12 @@
 // this league's exact scoring settings) + 0.33 * ADP-implied season
 // points (real, format-specific market ADP looked up on a real
 // points-vs-ADP calibration curve, smoothed over its nearest real
-// neighbors). K/DEF are deliberately excluded from this blend — they keep
-// pure real season points, unchanged, so the ADP-depth replacement-level
-// fix that already correctly produces realistic K/DEF rounds (see below)
-// never moves.
+// neighbors). K/DEF are deliberately excluded from this blend — instead
+// their real per-game production is regressed toward their own real
+// positional average first (one season of kicking or defensive stats is
+// a genuinely noisy, matchup-driven signal), since an unregressed
+// single-player point estimate at either position can create an outsized
+// VOR spike no real drafter would act on.
 //
 // Why not raw points alone: verified live that raw season points puts 14
 // of the top 15 players at QB, because QBs touch the ball on every
@@ -268,31 +270,44 @@ export async function computeRealRedraftBoard(
         blendedScoreById.set(p.playerId, 0.67 * seasonPoints + 0.33 * adpImplied);
     }
 
-    // ── DEF: real production → real season points, no ADP signal exists ────
-    // One season of defensive stats is a genuinely noisy, matchup-driven
-    // signal (not as predictive as a full season of RB/WR opportunity
-    // share), so real per-game production is regressed toward the DEF
-    // positional average first, then converted to a season total on the
-    // exact same real-points scale as every skill player.
-    let defPosPtsSum = 0, defPosPtsCount = 0;
-    for (const { p, perGamePoints, gamesPlayed } of pending) {
-        if (p.position !== 'DEF' || !gamesPlayed) continue;
-        defPosPtsSum += perGamePoints;
-        defPosPtsCount++;
+    // ── DEF & K: real production → real season points, regressed toward ────
+    // each position's own real average — no ADP-blend signal for either
+    // (see the points+ADP blend above). One season of defensive OR
+    // kicking stats is a genuinely noisy, matchup-driven signal (not as
+    // predictive as a full season of RB/WR opportunity share) — real
+    // per-game production is regressed toward that position's own real
+    // average first, then converted to a season total on the exact same
+    // real-points scale as every skill player. Applied identically to K
+    // as to DEF: an unregressed single-kicker point estimate can create
+    // an outsized apparent VOR spike no real drafter would act on (verified
+    // live: a K with a modestly favorable real projection ranked #67
+    // overall pre-fix), the same failure mode this regression already
+    // fixes for DEF.
+    function computePosAvgPtsPerGame(pos: RedraftPosition): number {
+        let sum = 0, count = 0;
+        for (const { p, perGamePoints, gamesPlayed } of pending) {
+            if (p.position !== pos || !gamesPlayed) continue;
+            sum += perGamePoints;
+            count++;
+        }
+        return count > 0 ? sum / count : 0;
     }
-    const defPosAvgPtsPerGame = defPosPtsCount > 0 ? defPosPtsSum / defPosPtsCount : 0;
+    const defPosAvgPtsPerGame = computePosAvgPtsPerGame('DEF');
+    const kPosAvgPtsPerGame   = computePosAvgPtsPerGame('K');
 
     // Final real value per player (injury-discounted) — this is what VOR
     // gets computed against. QB/RB/WR/TE: the 0.67/0.33 points+ADP blend
-    // above. K/DEF: pure real points, unchanged.
+    // above. K/DEF: real points regressed toward their own positional
+    // average.
     type Scored = Pending & { finalPoints: number };
     const scored: Scored[] = pending.map(entry => {
         const { p, perGamePoints, seasonPoints, gamesPlayed } = entry;
         let finalPoints = blendedScoreById.get(p.playerId) ?? seasonPoints;
-        if (p.position === 'DEF') {
+        if (p.position === 'DEF' || p.position === 'K') {
+            const posAvgPtsPerGame = p.position === 'DEF' ? defPosAvgPtsPerGame : kPosAvgPtsPerGame;
             const blendedPtsPerGame = gamesPlayed
-                ? blendTowardPositionAverage(perGamePoints, defPosAvgPtsPerGame, gamesPlayed)
-                : defPosAvgPtsPerGame;
+                ? blendTowardPositionAverage(perGamePoints, posAvgPtsPerGame, gamesPlayed)
+                : posAvgPtsPerGame;
             finalPoints = blendedPtsPerGame * REPRESENTATIVE_SEASON_GAMES;
         }
         const injuryRisk = INJURY_STATUS_RISK[p.injuryStatus ?? ''] ?? 0;
