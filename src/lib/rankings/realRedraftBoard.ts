@@ -34,6 +34,7 @@
 // value, so the whole board stays on one consistent scale.
 
 import { prisma } from '@/lib/prisma';
+import { getNflState } from '@/lib/sleeper';
 import { INJURY_STATUS_RISK } from '@/lib/trade-engine';
 import { calculateAge, isPlausiblyActivePlayer } from '@/lib/calculateAge';
 import { computeRealPoints, blendTowardPositionAverage } from './leagueScoringPoints';
@@ -105,6 +106,45 @@ export async function computeRealRedraftBoard(
     // productionSignals.ts.
     const productionSignals = await resolveProductionSignals(rawPlayers.map(p => p.playerId));
 
+    // Real, FORMAT-SPECIFIC ADP — SleeperPlayer.searchRank is a single
+    // generic rank that tracks superflex/2QB draft behavior almost exactly
+    // (verified live: a real QB's searchRank landed within ~1 pick of his
+    // own adp_2qb, while his real adp_std — the actual standard 1-QB
+    // number — was 5x later), which silently fed superflex-inflated QB
+    // demand into every non-superflex league's board. Sleeper's own season
+    // projection payload already carries real format-specific ADP fields
+    // (adp_std / adp_half_ppr / adp_ppr / adp_2qb) for the exact same
+    // players — select the one matching THIS league's real format instead.
+    const currentSeason = (await getNflState()).season;
+    const seasonProjRows = await prisma.playerSeasonProjection.findMany({
+        where:  { season: currentSeason },
+        select: { playerId: true, rawStats: true },
+    });
+    const receptionPoints = scoringSettings.rec ?? 0;
+    function pickFormatAdp(rawStats: unknown): number | null {
+        const raw = rawStats as Record<string, number> | null;
+        if (!raw) return null;
+        const val = superflex
+            ? raw.adp_2qb
+            : receptionPoints >= 0.75 ? raw.adp_ppr
+            : receptionPoints >= 0.25 ? raw.adp_half_ppr
+            : raw.adp_std;
+        return val != null && val < SLEEPER_UNRANKED_SENTINEL ? val : null;
+    }
+    const formatAdpById = new Map<string, number>();
+    for (const r of seasonProjRows) {
+        const adp = pickFormatAdp(r.rawStats);
+        if (adp != null) formatAdpById.set(r.playerId, adp);
+    }
+    // Real ADP for this player, format-aware where we have it, falling back
+    // to the generic searchRank only for the rare player with no season
+    // projection on file.
+    function resolveAdp(p: { playerId: string; searchRank: number | null }): number | null {
+        const formatAdp = formatAdpById.get(p.playerId);
+        if (formatAdp != null) return formatAdp;
+        return p.searchRank != null && p.searchRank < SLEEPER_UNRANKED_SENTINEL ? p.searchRank : null;
+    }
+
     // Sleeper's active flag is unreliable for long-retired players still
     // marked active — a real computed-age cutoff catches what team!=FA alone
     // can miss, and a depth-chart+experience check catches the rarer case
@@ -121,6 +161,7 @@ export async function computeRealRedraftBoard(
     // ── Pass 1: real projected SEASON points under this league's own scoring ──
     type Pending = {
         p: (typeof eligible)[number];
+        adp: number | null;
         perGamePoints: number;
         seasonPoints: number;
         gamesPlayed: number | null;
@@ -131,7 +172,7 @@ export async function computeRealRedraftBoard(
         const perGamePoints = signal ? computeRealPoints(signal.statsPerGame, scoringSettings) : 0;
         const seasonPoints  = signal ? perGamePoints * signal.gamesPlayed : 0;
         return {
-            p, perGamePoints, seasonPoints,
+            p, adp: resolveAdp(p), perGamePoints, seasonPoints,
             gamesPlayed: signal?.gamesPlayed ?? null,
             fromProjection: signal?.fromProjection ?? false,
         };
@@ -139,14 +180,13 @@ export async function computeRealRedraftBoard(
 
     // ── Real ADP → real season points calibration curve (skill positions) ──
     // Built from every skill player in this pool who has both a real
-    // Sleeper ADP and real season points — the actual, observed shape of
-    // how the market prices each draft slot in real point terms, not an
-    // invented formula.
+    // format-specific ADP and real season points — the actual, observed
+    // shape of how the market prices each draft slot in real point terms,
+    // not an invented formula.
     const calibPoints: { adp: number; pts: number }[] = [];
-    for (const { p, seasonPoints, gamesPlayed } of pending) {
-        if (p.position === 'DEF' || !gamesPlayed) continue;
-        if (p.searchRank == null || p.searchRank >= SLEEPER_UNRANKED_SENTINEL) continue;
-        calibPoints.push({ adp: p.searchRank, pts: seasonPoints });
+    for (const { p, adp, seasonPoints, gamesPlayed } of pending) {
+        if (p.position === 'DEF' || !gamesPlayed || adp == null) continue;
+        calibPoints.push({ adp, pts: seasonPoints });
     }
     // A precise 2-point interpolation lets a single lucky/unlucky neighbor
     // swing the estimate wildly in noisy deep-ADP territory — averaging
@@ -164,10 +204,9 @@ export async function computeRealRedraftBoard(
 
     // ── Blend: real season points + real ADP-implied season points ─────────
     const blendedPointsById = new Map<string, number>();
-    for (const { p, seasonPoints } of pending) {
+    for (const { p, adp, seasonPoints } of pending) {
         if (p.position === 'DEF') continue; // DEF handled separately below
-        const hasAdp = p.searchRank != null && p.searchRank < SLEEPER_UNRANKED_SENTINEL;
-        const adpImplied = hasAdp ? estimatePointsFromAdp(p.searchRank!) : seasonPoints;
+        const adpImplied = adp != null ? estimatePointsFromAdp(adp) : seasonPoints;
         blendedPointsById.set(p.playerId, (seasonPoints + adpImplied) / 2);
     }
 
@@ -216,7 +255,7 @@ export async function computeRealRedraftBoard(
     }
 
     // ── Pass 2: injury discount + final assembly ────────────────────────────
-    const players = pending.map(({ p, perGamePoints, seasonPoints, gamesPlayed, fromProjection }) => {
+    const players = pending.map(({ p, adp, perGamePoints, seasonPoints, gamesPlayed, fromProjection }) => {
         const pos = p.position ?? '';
         let finalValue = pos === 'DEF'
             ? (defValueById.get(p.playerId) ?? 0)
@@ -237,7 +276,10 @@ export async function computeRealRedraftBoard(
             age:             p.age,
             birthDate:       p.birthDate,
             injuryStatus:    p.injuryStatus,
-            adp:             p.searchRank ?? 999,
+            // Real, format-specific ADP where available (matches what
+            // actually drove this ranking); falls back to the generic
+            // searchRank only for the rare player with neither.
+            adp:             adp ?? p.searchRank ?? 999,
             realPtsPerGame:  gamesPlayed && !fromProjection ? perGamePoints : null,
             hasRealData:     Boolean(gamesPlayed) && !fromProjection,
             projPtsPerGame:  gamesPlayed && fromProjection ? perGamePoints : null,
