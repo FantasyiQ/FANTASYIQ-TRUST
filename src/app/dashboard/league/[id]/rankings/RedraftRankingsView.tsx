@@ -66,7 +66,13 @@ export default function RedraftRankingsView({ players, leagueName, season }: Pro
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-white">Player Rankings</h1>
-                    <p className="text-gray-500 text-sm mt-0.5">{leagueName} · {season} · Real points under your league&apos;s scoring</p>
+                    <p className="text-gray-500 text-sm mt-0.5">{leagueName} · {season}</p>
+                    <p className="text-gray-500 text-sm mt-1.5 max-w-xl">
+                        These rankings use your league&apos;s scoring to calculate each player&apos;s projected points, then adjust for positional value — how quickly each position falls off — and current draft trends.
+                    </p>
+                    <p className="text-gray-500 text-sm mt-1 max-w-xl">
+                        The result is an intuitive board that reflects true fantasy value in {leagueName}, not generic rankings.
+                    </p>
                 </div>
                 <div className="text-[10px] font-bold tracking-widest text-[#D4AF37]">FantasyiQ</div>
             </div>
