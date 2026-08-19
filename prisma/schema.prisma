@@ -650,6 +650,7 @@ model SleeperPlayer {
 
     projections     PlayerProjection[]
     seasonStats     PlayerSeasonStats[]
+    seasonProjections PlayerSeasonProjection[]
 }
 
 // Raw per-player-season stat totals from Sleeper — populated by
@@ -693,6 +694,30 @@ model PlayerProjection {
 
     @@unique([playerId, season, week])
     @@index([season, week])
+}
+
+// Full-season fantasy point projections — populated by
+// /api/cron/sleeper-season-projections. Same shape as PlayerSeasonStats
+// (season-total raw stats + games played) rather than PlayerProjection's
+// per-week shape, so League Scoring Points Engine consumers can treat a
+// season projection and a season of real stats identically: run
+// toStatsPerGame(rawStats, gamesPlayed) then computeRealPoints() against
+// any league's real scoring settings. This is the primary ranking signal
+// before real season stats exist — a full-season total, not a single
+// week's snapshot (which is exposed to normal week-to-week projection
+// noise, e.g. a real short-term injury designation).
+model PlayerSeasonProjection {
+    id          String   @id @default(cuid())
+    playerId    String
+    season      String   // e.g. "2026"
+    gamesPlayed Int       // Sleeper's own projected games-played for the full season
+    rawStats    Json      // full per-stat season-total projection blob, same shape as PlayerSeasonStats.rawStats
+    updatedAt   DateTime @updatedAt @default(now())
+
+    player      SleeperPlayer @relation(fields: [playerId], references: [playerId], onDelete: Cascade)
+
+    @@unique([playerId, season])
+    @@index([season])
 }
 
 model FantasyCalcValue {

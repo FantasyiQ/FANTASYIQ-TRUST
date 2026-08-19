@@ -13,6 +13,10 @@
       "schedule": "0 9 * * *"
     },
     {
+      "path": "/api/cron/sleeper-season-projections",
+      "schedule": "15 9 * * *"
+    },
+    {
       "path": "/api/cron/sleeper-sync",
       "schedule": "0 * * * *"
     },
