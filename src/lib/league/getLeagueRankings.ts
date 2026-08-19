@@ -13,6 +13,7 @@ import {
 } from '@/lib/rankings/leagueScoringPoints';
 import { calculateAge, calculatePreciseAge, isPlausiblyActivePlayer } from '@/lib/calculateAge';
 import { effectiveTierForLeague, tierLevel } from '@/lib/league-limits';
+import { isLeagueCommissionerCovered } from '@/lib/access';
 import { stripe, priceIdToTier } from '@/lib/stripe';
 import type { SubscriptionTier } from '@prisma/client';
 import { buildLeagueConfig } from '@/lib/rankings/leagueConfigBuilder';
@@ -208,17 +209,19 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
         } catch { /* fall back to DB */ }
     }
 
-    const commSub = await prisma.subscription.findFirst({
-        where:   { type: 'commissioner', leagueName: { equals: league.leagueName, mode: 'insensitive' }, status: { in: ['active', 'trialing'] } },
-        orderBy: { createdAt: 'desc' },
-        select:  { tier: true },
-    });
+    // Matching by leagueName (even case-insensitively) is fragile — real
+    // case confirmed live: League.leagueName synced with a trailing space
+    // never matched the commissioner's own Subscription.leagueName (no
+    // trailing space), incorrectly denying a real commissioner-covered
+    // member. Use the same real, ID-based check as everywhere else instead
+    // of a second, divergent name-based one (see getTradeEvaluatorContent.ts).
+    const isCommCovered = await isLeagueCommissionerCovered(id);
 
     const isLeagueAssigned =
         playerTier === 'PLAYER_ELITE' ||
         (!!activePlayerSub && league.assignedPlanId === activePlayerSub.id) ||
-        league.assignedPlanType === 'commissioner';
-    const effectiveTier = effectiveTierForLeague(playerTier, commSub?.tier ?? null, isLeagueAssigned);
+        isCommCovered;
+    const effectiveTier = effectiveTierForLeague(playerTier, isCommCovered ? 'COMMISSIONER_ELITE' : null, isLeagueAssigned);
     if (tierLevel(effectiveTier) < 2) notFound();
 
     // ── League settings ───────────────────────────────────────────────────────

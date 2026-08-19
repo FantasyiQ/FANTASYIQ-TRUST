@@ -7,6 +7,7 @@ import {
 } from '@/lib/sleeper';
 import { getPickSeasons } from '@/lib/fantasy/getPickSeasons';
 import { effectiveTierForLeague, tierLevel } from '@/lib/league-limits';
+import { isLeagueCommissionerCovered } from '@/lib/access';
 import { stripe, priceIdToTier } from '@/lib/stripe';
 import type { SubscriptionTier } from '@prisma/client';
 import type { LeagueType } from '@/lib/trade-engine';
@@ -115,17 +116,21 @@ export async function getTradeEvaluatorContent(id: string): Promise<TradeEvaluat
         } catch { /* fall back to DB */ }
     }
 
-    const commSub = await prisma.subscription.findFirst({
-        where:   { type: 'commissioner', leagueName: { equals: league.leagueName, mode: 'insensitive' }, status: { in: ['active', 'trialing'] } },
-        orderBy: { createdAt: 'desc' },
-        select:  { tier: true },
-    });
+    // Matching by leagueName (even case-insensitively) is fragile — real
+    // case confirmed live: League.leagueName synced with a trailing space
+    // ("Any Given Sunday ") never matched the commissioner's own
+    // Subscription.leagueName (no trailing space), so a real commissioner-
+    // covered member got a bare notFound() here despite the page-level
+    // gate (isLeagueCommissionerCovered, matched by real Sleeper leagueId)
+    // correctly granting access one step earlier. Use the same real,
+    // ID-based check everywhere instead of a second, divergent one.
+    const isCommCovered = await isLeagueCommissionerCovered(id);
 
     const isLeagueAssigned =
         playerTier === 'PLAYER_ELITE' ||
         (!!activePlayerSub && league.assignedPlanId === activePlayerSub.id) ||
-        league.assignedPlanType === 'commissioner';
-    const effectiveTier       = effectiveTierForLeague(playerTier, commSub?.tier ?? null, isLeagueAssigned);
+        isCommCovered;
+    const effectiveTier       = effectiveTierForLeague(playerTier, isCommCovered ? 'COMMISSIONER_ELITE' : null, isLeagueAssigned);
     if (tierLevel(effectiveTier) < 2) notFound();
 
     // ── Build pick data ───────────────────────────────────────────────────────
