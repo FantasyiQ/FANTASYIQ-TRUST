@@ -4,14 +4,9 @@ import { toStatsPerGame } from './leagueScoringPoints';
 
 export interface ProductionSignal {
     statsPerGame:   Record<string, number>;  // per-game stat rate dict — feed into computeRealPoints() with any scoring dict
-    gamesPlayed:    number;                  // real games if fromProjection=false; a full-season proxy if fromProjection=true
+    gamesPlayed:    number;                  // real games if fromProjection=false; Sleeper's own projected games-played if fromProjection=true
     fromProjection: boolean;
 }
-
-// A real weekly projection is already a full-season-equivalent estimate of
-// role/usage, not a small in-season sample that needs regression — matches
-// PROJECTION_FULL_SAMPLE_PROXY as previously defined locally in realRedraftBoard.ts.
-const PROJECTION_FULL_SAMPLE_PROXY = 17;
 
 /**
  * Resolves the best available real per-game production signal for each
@@ -21,9 +16,15 @@ const PROJECTION_FULL_SAMPLE_PROXY = 17;
  * everywhere else. Priority:
  *   1. This season's real per-game stats, if any games have been played —
  *      the best possible signal.
- *   2. This season's real weekly projection — reflects this year's actual
- *      team/role/health context (a new team, a coaching change, a real
- *      injury) that a full-year-stale prior season can't capture. Used
+ *   2. This season's real FULL-SEASON projection (PlayerSeasonProjection) —
+ *      reflects this year's actual team/role/health context (a new team, a
+ *      coaching change, a real injury) that a full-year-stale prior season
+ *      can't capture. Deliberately the season-long total, not a single
+ *      week's projection: one week is exposed to normal week-to-week noise
+ *      (a short-term injury designation, a preseason-adjacent placeholder
+ *      before the real season starts) that a season total isn't — verified
+ *      live, a real elite starter's single-week projection collapsed to a
+ *      fraction of his real season total for exactly this reason. Used
  *      during the preseason window before this year's stats exist, or any
  *      time a specific player has none yet (new signings, etc.).
  *   3. Last season's real stats — final fallback only for players with
@@ -62,39 +63,19 @@ export async function resolveProductionSignals(
         });
     }
 
-    // 2. This season's real projection, for anyone without real games yet.
+    // 2. This season's real full-season projection, for anyone without real
+    // games yet.
     const afterStats = playerIds.filter(id => !result.has(id));
     if (afterStats.length > 0) {
-        const projWeek = nflState.week > 0 ? nflState.week : 1;
-        let projRows = await prisma.playerProjection.findMany({
-            where:  { season: currentSeason, week: projWeek, playerId: { in: afterStats } },
-            select: { playerId: true, rawProjection: true },
+        const seasonProjRows = await prisma.playerSeasonProjection.findMany({
+            where:  { season: currentSeason, playerId: { in: afterStats } },
+            select: { playerId: true, gamesPlayed: true, rawStats: true },
         });
-        if (projRows.length === 0) {
-            // Requested week has no data yet (sync timing) — use whatever
-            // real projection week is actually available this season.
-            const latest = await prisma.playerProjection.findFirst({
-                where:   { season: currentSeason },
-                orderBy: { week: 'desc' },
-                select:  { week: true },
-            });
-            if (latest) {
-                projRows = await prisma.playerProjection.findMany({
-                    where:  { season: currentSeason, week: latest.week, playerId: { in: afterStats } },
-                    select: { playerId: true, rawProjection: true },
-                });
-            }
-        }
-        for (const r of projRows) {
-            // rawProjection is already a per-game rate dict (Sleeper's own
-            // weekly projection shape), unlike PlayerSeasonStats.rawStats
-            // which needs toStatsPerGame() to convert season totals down.
-            // Null only for rows synced before this field existed — skip
-            // rather than credit a real player with a fabricated 0-stat line.
-            if (!r.rawProjection) continue;
+        for (const r of seasonProjRows) {
+            if (!r.gamesPlayed) continue;
             result.set(r.playerId, {
-                statsPerGame: r.rawProjection as Record<string, number>,
-                gamesPlayed:  PROJECTION_FULL_SAMPLE_PROXY,
+                statsPerGame: toStatsPerGame(r.rawStats as Record<string, number>, r.gamesPlayed),
+                gamesPlayed:  r.gamesPlayed,
                 fromProjection: true,
             });
         }
