@@ -297,18 +297,34 @@ export async function computeRealRedraftBoard(
 
     // Final real value per player (injury-discounted) — this is what VOR
     // gets computed against. QB/RB/WR/TE: the 0.67/0.33 points+ADP blend
-    // above. K/DEF: real points regressed toward their own positional
-    // average.
+    // above. DEF: real points regressed toward the DEF positional average.
+    // K: same regression, but only for the confirmed real depth-chart
+    // starter (depthChartOrder === 1) — a backup/camp-competition kicker
+    // has no standalone redraft value, same principle as the backup-QB cap
+    // below, applied at the source. Real drafters never roster a backup
+    // kicker; forcing finalPoints to 0 guarantees VOR <= 0, dropping them
+    // out of the draftable range instead of tying them to the position
+    // average alongside real starters (verified live: an unrostered-role K
+    // with zero real signal was ranking ahead of real starters with actual,
+    // if modest, real production).
     type Scored = Pending & { finalPoints: number };
     const scored: Scored[] = pending.map(entry => {
         const { p, perGamePoints, seasonPoints, gamesPlayed } = entry;
         let finalPoints = blendedScoreById.get(p.playerId) ?? seasonPoints;
-        if (p.position === 'DEF' || p.position === 'K') {
-            const posAvgPtsPerGame = p.position === 'DEF' ? defPosAvgPtsPerGame : kPosAvgPtsPerGame;
+        if (p.position === 'DEF') {
             const blendedPtsPerGame = gamesPlayed
-                ? blendTowardPositionAverage(perGamePoints, posAvgPtsPerGame, gamesPlayed)
-                : posAvgPtsPerGame;
+                ? blendTowardPositionAverage(perGamePoints, defPosAvgPtsPerGame, gamesPlayed)
+                : defPosAvgPtsPerGame;
             finalPoints = blendedPtsPerGame * REPRESENTATIVE_SEASON_GAMES;
+        } else if (p.position === 'K') {
+            if (p.depthChartOrder !== 1) {
+                finalPoints = 0;
+            } else {
+                const blendedPtsPerGame = gamesPlayed
+                    ? blendTowardPositionAverage(perGamePoints, kPosAvgPtsPerGame, gamesPlayed)
+                    : kPosAvgPtsPerGame;
+                finalPoints = blendedPtsPerGame * REPRESENTATIVE_SEASON_GAMES;
+            }
         }
         const injuryRisk = INJURY_STATUS_RISK[p.injuryStatus ?? ''] ?? 0;
         finalPoints = Math.max(0, finalPoints * (1 - injuryRisk * REDRAFT_INJURY_MAX_DISCOUNT));
