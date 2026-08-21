@@ -467,7 +467,11 @@ export default function EspnSyncPage() {
             setSyncSummary(data.summary ?? null);
             setStep('done');
             if (data.redirectTo) {
-                setTimeout(() => router.replace(data.redirectTo!), 1500);
+                // Invited members came here specifically to pay dues — send them
+                // straight there, matching the Sleeper auto-accept flow instead
+                // of dropping them on the general league overview page.
+                const target = fromInvite ? `${data.redirectTo}/dues/pay` : data.redirectTo;
+                setTimeout(() => router.replace(target), 1500);
             }
         } catch {
             clearInterval(interval);
