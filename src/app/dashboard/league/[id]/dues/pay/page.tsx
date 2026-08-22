@@ -43,20 +43,22 @@ export default async function PayDuesPage({
 
     const dbUser = await prisma.user.findUnique({
         where:  { id: user.id },
-        select: { id: true, email: true, name: true, stripeCustomerId: true, sleeperUserId: true },
+        select: { id: true, email: true, name: true, stripeCustomerId: true, sleeperUserId: true, swid: true },
     });
     if (!dbUser) redirect('/dashboard');
 
     const allMembers = await prisma.duesMember.findMany({
         where:  { leagueDuesId: dues.id },
-        select: { id: true, duesStatus: true, displayName: true, userId: true, email: true, sleeperUserId: true },
+        select: { id: true, duesStatus: true, displayName: true, userId: true, email: true, sleeperUserId: true, espnOwnerId: true },
     });
 
-    // Four-tier auto-match: userId → sleeperUserId → email → displayName
+    // Five-tier auto-match: userId → sleeperUserId → espnOwnerId → email → displayName
     let member = allMembers.find(m =>
         (m.userId       != null && m.userId === user.id) ||
         (m.sleeperUserId != null && dbUser.sleeperUserId != null &&
             m.sleeperUserId === dbUser.sleeperUserId) ||
+        (m.espnOwnerId  != null && dbUser.swid != null &&
+            m.espnOwnerId === dbUser.swid) ||
         (m.email        != null && dbUser.email != null &&
             m.email.toLowerCase() === dbUser.email.toLowerCase()) ||
         (m.userId == null && m.email == null && dbUser.name != null &&

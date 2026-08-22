@@ -399,6 +399,7 @@ model DuesMember {
     leagueDuesId    String
     userId          String?   // null until member creates a FantasyIQ account and links
     sleeperUserId   String?   // Sleeper user_id — enables auto-match on the pay page without email
+    espnOwnerId     String?   // ESPN owner SWID — enables auto-match on the pay page without email
     displayName     String    // name entered by commissioner or pulled from platform
     email           String?   // for payment link delivery
     teamName        String?
@@ -423,6 +424,7 @@ model DuesMember {
     @@index([leagueDuesId])
     @@index([userId])
     @@index([sleeperUserId])
+    @@index([espnOwnerId])
 }
 
 // Configurable payout spots set by the commissioner before season end.

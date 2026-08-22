@@ -51,11 +51,11 @@ export async function POST(
         );
     }
 
-    let teams: { displayName: string; teamName: string | null; sleeperUserId: string | null }[] = [];
+    let teams: { displayName: string; teamName: string | null; sleeperUserId: string | null; espnOwnerId: string | null }[] = [];
 
     if (league.platform === 'espn') {
         // ESPN: build team list from stored standings JSON
-        type EspnTeam = { teamId: number; name: string; abbrev?: string; ownerName?: string | null };
+        type EspnTeam = { teamId: number; name: string; abbrev?: string; ownerName?: string | null; ownerId?: string | null };
         const espnTeams = (league.standings as EspnTeam[] | null) ?? [];
         if (espnTeams.length === 0) {
             return Response.json(
@@ -71,6 +71,10 @@ export async function POST(
             displayName:   t.name || t.ownerName || t.abbrev || `Team ${t.teamId}`,
             teamName:      t.abbrev ?? null,
             sleeperUserId: null,
+            // Real ESPN owner SWID — same auto-match role sleeperUserId
+            // plays for Sleeper leagues. Every connected ESPN user already
+            // has their own SWID stored on User.swid from the connect flow.
+            espnOwnerId:   t.ownerId ?? null,
         }));
     } else {
         // Sleeper: fetch live roster + member data
@@ -87,6 +91,7 @@ export async function POST(
                 displayName,
                 teamName:      teamName !== displayName ? teamName : null,
                 sleeperUserId: roster.owner_id ?? null,
+                espnOwnerId:   null,
             };
         });
     }
@@ -105,6 +110,7 @@ export async function POST(
             displayName:   t.displayName,
             teamName:      t.teamName ?? null,
             sleeperUserId: t.sleeperUserId ?? null,
+            espnOwnerId:   t.espnOwnerId ?? null,
             duesStatus:    'unpaid',
         })),
     });
