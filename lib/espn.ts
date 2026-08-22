@@ -325,13 +325,21 @@ export function normalizeEspnLeague(raw: EspnLeagueSettings, leagueId: string): 
     }
 
     const teams = (raw.teams ?? []).map((t): EspnNormalizedTeam => {
-        const ownerId = t.owners?.[0] ?? null;
+        const ownerId   = t.owners?.[0] ?? null;
+        const ownerName = ownerId ? (memberMap.get(ownerId) ?? null) : null;
+        // ESPN leaves location+nickname both blank whenever an owner never
+        // customized their team name (common, not an edge case — verified
+        // live: an entire real 10-team league had every team come back
+        // empty) — falling straight through to '' broke the dues "which
+        // team are you?" picker (every slot rendered blank). Real owner
+        // display name is a far better fallback than a raw team ID.
+        const rawName   = `${t.location ?? ''} ${t.nickname ?? ''}`.trim();
         return {
         teamId:    t.id,
-        name:      `${t.location ?? ''} ${t.nickname ?? ''}`.trim(),
+        name:      rawName || ownerName || `Team ${t.id}`,
         abbrev:    t.abbrev ?? '',
         ownerId,
-        ownerName: ownerId ? (memberMap.get(ownerId) ?? null) : null,
+        ownerName,
         wins:         t.record?.overall?.wins ?? 0,
         losses:       t.record?.overall?.losses ?? 0,
         ties:         t.record?.overall?.ties ?? 0,

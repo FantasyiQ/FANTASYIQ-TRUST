@@ -55,7 +55,7 @@ export async function POST(
 
     if (league.platform === 'espn') {
         // ESPN: build team list from stored standings JSON
-        type EspnTeam = { teamId: number; name: string; abbrev?: string };
+        type EspnTeam = { teamId: number; name: string; abbrev?: string; ownerName?: string | null };
         const espnTeams = (league.standings as EspnTeam[] | null) ?? [];
         if (espnTeams.length === 0) {
             return Response.json(
@@ -63,7 +63,15 @@ export async function POST(
                 { status: 404 },
             );
         }
-        teams = espnTeams.map(t => ({ displayName: t.name, teamName: t.abbrev ?? null, sleeperUserId: null }));
+        // Defense in depth alongside the normalizeEspnLeague() fallback: a
+        // league synced before that fix can still have '' team names stored
+        // — never let a blank displayName reach the dues "which team are
+        // you?" picker.
+        teams = espnTeams.map(t => ({
+            displayName:   t.name || t.ownerName || t.abbrev || `Team ${t.teamId}`,
+            teamName:      t.abbrev ?? null,
+            sleeperUserId: null,
+        }));
     } else {
         // Sleeper: fetch live roster + member data
         const [members, rosters] = await Promise.all([
