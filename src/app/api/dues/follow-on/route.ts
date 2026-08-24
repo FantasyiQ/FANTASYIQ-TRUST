@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
+import { canCreateDuesTracker } from '@/lib/dues-access';
 
 // POST — create a follow-on season tracker from an existing one (no subscription required)
 export async function POST(request: NextRequest): Promise<Response> {
@@ -10,6 +11,9 @@ export async function POST(request: NextRequest): Promise<Response> {
     if (rl.limited) return rl.response!;
     const session = await auth();
     if (!session?.user?.email) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!canCreateDuesTracker(session.user.email)) {
+        return Response.json({ error: 'Dues collection is not yet available for your account.' }, { status: 403 });
+    }
 
     const user = await prisma.user.findUnique({
         where: { email: session.user.email },
