@@ -5,6 +5,7 @@ import { stripe } from '@/lib/stripe';
 import { notify } from '@/lib/notifications/service';
 import { NotificationType } from '@/lib/notifications/types';
 import { captureError } from '@/lib/sentry';
+import { getStripeAvailableForLeaguePayout } from '@/lib/dues-payout-guard';
 
 export const maxDuration = 300;
 
@@ -79,6 +80,27 @@ export async function GET(request: NextRequest): Promise<Response> {
                 throttleMs: 0,
                 data:       { itemId: item.id, leagueName, winnerName },
             }).catch(err => captureError(err, { context: 'payout-retry balance insufficient', itemId: item.id }));
+            skipped++;
+            continue;
+        }
+
+        // Per-league check: this league's own real Stripe-collected dues
+        // must cover this transfer — the platform-wide balance check above
+        // can't tell this league's money apart from another league's, or
+        // from cash that was only ever logged, not actually collected via
+        // Stripe. Matters even more here since this runs unattended.
+        const leagueStripeAvailable = await getStripeAvailableForLeaguePayout(item.proposal.leagueDues.id);
+        if (leagueStripeAvailable < item.amount) {
+            await notify({
+                userId:     commissionerId,
+                type:       NotificationType.PAYOUT_FAILED,
+                title:      'Payout balance insufficient',
+                body:       `${winnerName}'s payout for ${leagueName} ($${item.amount.toFixed(2)}) could not be sent: this league only collected $${leagueStripeAvailable.toFixed(2)} via Stripe. Any cash/Venmo-recorded dues must be paid out manually.`,
+                inApp:      true,
+                email:      true,
+                throttleMs: 0,
+                data:       { itemId: item.id, leagueName, winnerName },
+            }).catch(err => captureError(err, { context: 'payout-retry league balance insufficient', itemId: item.id }));
             skipped++;
             continue;
         }

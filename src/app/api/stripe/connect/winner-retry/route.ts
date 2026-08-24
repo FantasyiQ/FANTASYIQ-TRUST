@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
+import { getStripeAvailableForLeaguePayout } from '@/lib/dues-payout-guard';
 
 function appUrl() {
     const u = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL;
@@ -115,6 +116,17 @@ export async function POST(req: NextRequest): Promise<Response> {
     if (availableCents < neededCents) {
         return Response.json({
             error: `Stripe platform balance ($${(availableCents / 100).toFixed(2)}) is insufficient for this payout ($${item.amount.toFixed(2)}).`,
+        }, { status: 400 });
+    }
+
+    // Per-league check: this league's own real Stripe-collected dues must
+    // cover this transfer — the platform-wide balance check above can't
+    // tell this league's money apart from another league's, or from cash
+    // that was only ever logged, not actually collected via Stripe.
+    const leagueStripeAvailable = await getStripeAvailableForLeaguePayout(item.proposal.leagueDues.id);
+    if (leagueStripeAvailable < item.amount) {
+        return Response.json({
+            error: `This league only collected $${leagueStripeAvailable.toFixed(2)} via Stripe, but this payout is $${item.amount.toFixed(2)}. Any cash/Venmo-recorded dues must be paid out manually, not through Stripe.`,
         }, { status: 400 });
     }
 

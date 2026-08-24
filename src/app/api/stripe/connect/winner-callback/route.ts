@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
+import { getStripeAvailableForLeaguePayout } from '@/lib/dues-payout-guard';
 
 // GET /api/stripe/connect/winner-callback?claimToken=xxx
 // Stripe redirects here after winner completes Express onboarding.
@@ -42,6 +43,20 @@ export async function GET(req: NextRequest): Promise<Response> {
     const neededCents     = Math.round(item.amount * 100);
     if (availableCents < neededCents) {
         console.error('[winner-callback] insufficient Stripe balance', { available: availableCents, needed: neededCents });
+        redirect(`/claim-winnings/${claimToken}?status=error`);
+    }
+
+    // Per-league check: this league's own real Stripe-collected dues must
+    // cover this transfer — the platform-wide balance check above can't
+    // tell this league's money apart from another league's, or from cash
+    // that was only ever logged, not actually collected via Stripe.
+    const leagueStripeAvailable = await getStripeAvailableForLeaguePayout(item.proposal.leagueDues.id);
+    if (leagueStripeAvailable < item.amount) {
+        console.error('[winner-callback] league has insufficient Stripe-collected dues', {
+            leagueDuesId: item.proposal.leagueDues.id,
+            available:    leagueStripeAvailable,
+            needed:       item.amount,
+        });
         redirect(`/claim-winnings/${claimToken}?status=error`);
     }
 
