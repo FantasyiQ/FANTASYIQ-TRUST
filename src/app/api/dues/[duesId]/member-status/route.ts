@@ -30,10 +30,13 @@ export async function PATCH(
     if (!dues) return Response.json({ error: 'Not found.' }, { status: 404 });
     if (dues.commissionerId !== user.id) return Response.json({ error: 'Forbidden.' }, { status: 403 });
 
-    const body = await request.json() as { memberId?: string; status?: string };
-    const { memberId, status } = body;
+    const body = await request.json() as { memberId?: string; status?: string; note?: string };
+    const { memberId, status, note } = body;
     if (!memberId || (status !== 'paid' && status !== 'unpaid')) {
         return Response.json({ error: 'memberId and status (paid|unpaid) required.' }, { status: 400 });
+    }
+    if (note !== undefined && typeof note !== 'string') {
+        return Response.json({ error: 'note must be a string.' }, { status: 400 });
     }
 
     const member = await prisma.duesMember.findUnique({
@@ -99,6 +102,7 @@ export async function PATCH(
             actorId:  user.id,
             action:   nowPaid ? 'mark_paid' : 'remove_payment',
             amount:   dues.buyInAmount,
+            note:     nowPaid ? (note?.trim() || null) : null,
         },
     }).catch(err => console.error('[member-status] audit log failed', err));
 

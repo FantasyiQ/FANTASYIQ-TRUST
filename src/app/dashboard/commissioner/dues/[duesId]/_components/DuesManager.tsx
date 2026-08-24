@@ -18,6 +18,7 @@ export interface DuesMember {
     duesStatus: string;
     paidAt: string | null; // JSON-serialised Date
     paymentMethod: string | null;
+    paymentNote: string | null; // e.g. "Venmo", "Cash App" — set when marking paid manually
 }
 
 export interface PayoutSpot {
@@ -84,6 +85,7 @@ export default function DuesManager({
     const [loadingMemberId, setLoadingMemberId] = useState<string | null>(null);
     const [memberError, setMemberError]         = useState<Record<string, string>>({});
     const [manualModalId, setManualModalId]     = useState<string | null>(null);
+    const [manualNote, setManualNote]           = useState('');
 
     // Sync state
     const [syncing, setSyncing]       = useState(false);
@@ -151,13 +153,15 @@ export default function DuesManager({
 
     async function markPaidManually(member: DuesMember) {
         setManualModalId(null);
+        const note = manualNote.trim();
+        setManualNote('');
         clearMemberErr(member.id);
         setMemberLoading(member.id, true);
         try {
             const res  = await fetch(`/api/dues/${duesId}/member-status`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ memberId: member.id, status: 'paid' }),
+                body: JSON.stringify({ memberId: member.id, status: 'paid', note: note || undefined }),
             });
             const data = await res.json();
             if (!res.ok) {
@@ -444,7 +448,7 @@ export default function DuesManager({
                                                     )}
                                                     {isManual && (
                                                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-800 text-gray-400 border border-gray-700">
-                                                            Commissioner Entered — ${buyInAmount.toFixed(2)}
+                                                            Commissioner Entered{member.paymentNote ? ` (${member.paymentNote})` : ''} — ${buyInAmount.toFixed(2)}
                                                         </span>
                                                     )}
                                                     {!isStripe && !isManual && (
@@ -454,7 +458,7 @@ export default function DuesManager({
                                                     )}
                                                     {member.paidAt && (
                                                         <p className="text-gray-600 text-xs">
-                                                            {isStripe ? 'Via Stripe · ' : isManual ? 'Manual · ' : ''}
+                                                            {isStripe ? 'Via Stripe · ' : isManual ? `${member.paymentNote ?? 'Manual'} · ` : ''}
                                                             {new Date(member.paidAt).toLocaleDateString()}
                                                         </p>
                                                     )}
@@ -532,9 +536,36 @@ export default function DuesManager({
                                                             </p>
                                                         </div>
                                                     </div>
+                                                    <div>
+                                                        <label className="text-gray-500 text-xs font-semibold uppercase tracking-wide">
+                                                            How were they paid? <span className="font-normal normal-case text-gray-600">(optional)</span>
+                                                        </label>
+                                                        <div className="flex gap-1.5 flex-wrap mt-1.5">
+                                                            {['Venmo', 'Cash App', 'Zelle', 'Cash'].map(opt => (
+                                                                <button
+                                                                    key={opt}
+                                                                    type="button"
+                                                                    onClick={() => setManualNote(opt)}
+                                                                    className={`text-xs font-medium px-2.5 py-1 rounded-lg border transition ${
+                                                                        manualNote === opt
+                                                                            ? 'bg-[#D4AF37]/10 border-[#D4AF37]/50 text-[#D4AF37]'
+                                                                            : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500'
+                                                                    }`}>
+                                                                    {opt}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                        <input
+                                                            type="text"
+                                                            value={manualNote}
+                                                            onChange={e => setManualNote(e.target.value)}
+                                                            placeholder="Or type your own"
+                                                            className="w-full mt-2 bg-gray-800 border border-gray-700 focus:border-[#D4AF37]/60 rounded-lg px-3 py-2 text-white placeholder-gray-600 text-sm focus:outline-none transition"
+                                                        />
+                                                    </div>
                                                     <div className="flex gap-3 pt-1">
                                                         <button
-                                                            onClick={() => setManualModalId(null)}
+                                                            onClick={() => { setManualModalId(null); setManualNote(''); }}
                                                             className="flex-1 bg-[#D4AF37] hover:bg-[#BF9D2F] text-black font-bold py-2.5 rounded-xl text-sm transition">
                                                             Cancel
                                                         </button>

@@ -28,6 +28,21 @@ export default async function DuesTrackerPage({ params }: { params: Promise<{ du
     if (!dues) notFound();
     if (dues.commissionerId !== user.id) redirect('/dashboard/commissioner/dues');
 
+    // Most recent "mark_paid" note per member (e.g. "Venmo", "Cash App") —
+    // surfaced next to the Manual badge so the commissioner can tell members
+    // apart by how they actually paid, not just that it was recorded by hand.
+    const paidNotes = await prisma.paymentAuditLog.findMany({
+        where:   { leagueDuesId: duesId, action: 'mark_paid', memberId: { not: null }, note: { not: null } },
+        orderBy: { createdAt: 'desc' },
+        select:  { memberId: true, note: true },
+    });
+    const paymentNoteByMemberId = new Map<string, string>();
+    for (const log of paidNotes) {
+        if (log.memberId && !paymentNoteByMemberId.has(log.memberId)) {
+            paymentNoteByMemberId.set(log.memberId, log.note!);
+        }
+    }
+
     const matchedLeague = await prisma.league.findFirst({
         where: {
             userId: user.id,
@@ -47,7 +62,8 @@ export default async function DuesTrackerPage({ params }: { params: Promise<{ du
             potTotal={dues.potTotal}
             members={dues.members.map(m => ({
                 ...m,
-                paidAt: m.paidAt?.toISOString() ?? null,
+                paidAt:      m.paidAt?.toISOString() ?? null,
+                paymentNote: paymentNoteByMemberId.get(m.id) ?? null,
             }))}
             payoutSpots={dues.payoutSpots}
             hasProposal={dues.proposals.length > 0}
