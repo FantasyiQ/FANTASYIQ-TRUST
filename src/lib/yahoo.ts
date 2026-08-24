@@ -200,9 +200,169 @@ export function deriveYahooScoringType(_league: YahooLeague): 'ppr' | 'half_ppr'
     return 'std';
 }
 
-// Basic roster position defaults for Yahoo leagues (refined by cron later)
+// Basic roster position defaults for Yahoo leagues (used only until the
+// first real settings fetch — getYahooLeagueSettings — lands via sync/cron)
 export function defaultYahooRosterPositions(league: YahooLeague): string[] {
     const base = ['QB', 'WR', 'WR', 'RB', 'RB', 'TE', 'W/R/T', 'K', 'DEF',
                   'BN', 'BN', 'BN', 'BN', 'BN', 'BN'];
     return league.numTeams >= 14 ? [...base, 'BN', 'BN'] : base;
+}
+
+// ── Standings ─────────────────────────────────────────────────────────────────
+
+export interface YahooTeamStanding {
+    teamKey:       string;
+    teamId:        string;
+    name:          string;
+    ownerName:     string | null;
+    wins:          number;
+    losses:        number;
+    ties:          number;
+    pointsFor:     number;
+    pointsAgainst: number;
+    rank:          number;
+}
+
+export async function getYahooStandings(leagueKey: string, accessToken: string): Promise<YahooTeamStanding[]> {
+    const data = await yahooFetch(`league/${leagueKey}/standings?format=json`, accessToken) as {
+        fantasy_content: { league: unknown[] };
+    };
+
+    const standingsHolder = data.fantasy_content.league[1] as { standings?: unknown[] } | undefined;
+    const teamsContainer  = (standingsHolder?.standings?.[0] as { teams?: Record<string, unknown> } | undefined)?.teams;
+    if (!teamsContainer) return [];
+
+    const teamCount = (teamsContainer['count'] as number) ?? 0;
+    const result: YahooTeamStanding[] = [];
+
+    for (let i = 0; i < teamCount; i++) {
+        const teamEntry = teamsContainer[String(i)] as { team: unknown[] } | undefined;
+        if (!teamEntry) continue;
+
+        const meta = teamEntry.team[0] as {
+            team_key: string;
+            team_id:  string;
+            name:     string;
+            managers?: { manager: { nickname?: string } | { nickname?: string }[] };
+        };
+        const standingsBlock = (teamEntry.team[1] as {
+            team_standings?: {
+                rank?:            number | string;
+                outcome_totals?:  { wins?: number | string; losses?: number | string; ties?: number | string };
+                points_for?:      number | string;
+                points_against?:  number | string;
+            };
+        } | undefined)?.team_standings ?? {};
+
+        const managerEntry = Array.isArray(meta.managers?.manager)
+            ? meta.managers?.manager[0]
+            : meta.managers?.manager;
+
+        result.push({
+            teamKey:       meta.team_key,
+            teamId:        meta.team_id,
+            name:          meta.name,
+            ownerName:     managerEntry?.nickname ?? null,
+            wins:          Number(standingsBlock.outcome_totals?.wins ?? 0),
+            losses:        Number(standingsBlock.outcome_totals?.losses ?? 0),
+            ties:          Number(standingsBlock.outcome_totals?.ties ?? 0),
+            pointsFor:     Number(standingsBlock.points_for ?? 0),
+            pointsAgainst: Number(standingsBlock.points_against ?? 0),
+            rank:          Number(standingsBlock.rank ?? 0),
+        });
+    }
+
+    return result;
+}
+
+// ── League settings (real roster positions + PPR/standard scoring) ────────────
+
+export interface YahooLeagueSettings {
+    rosterPositions: string[];
+    scoringType:     'ppr' | 'half_ppr' | 'std';
+}
+
+// Yahoo's own position codes map fairly directly onto FiQ's vocabulary —
+// the flex slot is the one real divergence ("W/R/T" etc. rather than "FLEX").
+const YAHOO_POSITION_MAP: Record<string, string> = {
+    QB: 'QB', WR: 'WR', RB: 'RB', TE: 'TE', K: 'K', DEF: 'DEF',
+    DL: 'DL', LB: 'LB', DB: 'DB', DP: 'DP',
+    'W/R/T': 'FLEX', 'W/R': 'FLEX', 'W/T': 'FLEX', 'Q/W/R/T': 'FLEX', 'R/W': 'FLEX', 'R/T': 'FLEX',
+    BN: 'BN', IR: 'IR',
+};
+
+export async function getYahooLeagueSettings(leagueKey: string, accessToken: string): Promise<YahooLeagueSettings> {
+    const data = await yahooFetch(`league/${leagueKey}/settings?format=json`, accessToken) as {
+        fantasy_content: { league: unknown[] };
+    };
+
+    const settingsHolder = data.fantasy_content.league[1] as { settings?: unknown[] } | undefined;
+    const settings = settingsHolder?.settings?.[0] as {
+        roster_positions?: { roster_position: { position: string; count: number | string } | { position: string; count: number | string }[] };
+        stat_categories?:  { stats: { stat: { stat_id: number; name: string }[] } };
+        stat_modifiers?:   { stats: { stat: { stat_id: number; value: number | string }[] } };
+    } | undefined;
+
+    const rosterPositions: string[] = [];
+    const rawPositions = settings?.roster_positions?.roster_position;
+    const positionList = rawPositions ? (Array.isArray(rawPositions) ? rawPositions : [rawPositions]) : [];
+    for (const p of positionList) {
+        const label = YAHOO_POSITION_MAP[p.position] ?? p.position;
+        const count = Number(p.count ?? 0);
+        for (let i = 0; i < count; i++) rosterPositions.push(label);
+    }
+
+    // Yahoo doesn't expose a top-level "is this PPR" flag — it's derived from
+    // the scoring modifier on the Reception stat itself (0 = std, 0.5 = half
+    // PPR, 1+ = full PPR), same signal ESPN exposes via statId 53.
+    const statCategories = settings?.stat_categories?.stats?.stat ?? [];
+    const statModifiers  = settings?.stat_modifiers?.stats?.stat ?? [];
+    const receptionStat  = statCategories.find(s => /reception/i.test(s.name));
+    const receptionMod   = receptionStat
+        ? statModifiers.find(m => m.stat_id === receptionStat.stat_id)
+        : undefined;
+    const recValue = Number(receptionMod?.value ?? 0);
+
+    const scoringType: YahooLeagueSettings['scoringType'] =
+        recValue >= 1 ? 'ppr' : recValue > 0 ? 'half_ppr' : 'std';
+
+    return { rosterPositions, scoringType };
+}
+
+// ── Combined full sync ──────────────────────────────────────────────────────────
+
+export interface YahooFullSync {
+    standings: YahooTeamStanding[];
+    settings:  YahooLeagueSettings;
+}
+
+export async function getYahooFullSync(leagueKey: string, accessToken: string): Promise<YahooFullSync> {
+    const [standings, settings] = await Promise.all([
+        getYahooStandings(leagueKey, accessToken),
+        getYahooLeagueSettings(leagueKey, accessToken),
+    ]);
+    return { standings, settings };
+}
+
+/**
+ * The core real-data fields every Yahoo league sync path must write. Same
+ * rationale as buildCoreEspnLeagueFields/buildCoreSleeperLeagueFields —
+ * never hand-roll scoringType/rosterPositions/standings inline again.
+ */
+export function buildCoreYahooLeagueFields(full: YahooFullSync) {
+    return {
+        scoringType:     full.settings.scoringType,
+        rosterPositions: full.settings.rosterPositions,
+        standings:       full.standings.map(t => ({
+            teamId:        t.teamKey,
+            name:          t.name,
+            ownerName:     t.ownerName,
+            wins:          t.wins,
+            losses:        t.losses,
+            ties:          t.ties,
+            fpts:          t.pointsFor,
+            fptsAgainst:   t.pointsAgainst,
+            rank:          t.rank,
+        })),
+    };
 }

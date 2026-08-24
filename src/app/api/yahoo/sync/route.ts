@@ -8,8 +8,8 @@ import {
     getYahooLeagues,
     refreshYahooToken,
     deriveYahooStatus,
-    deriveYahooScoringType,
-    defaultYahooRosterPositions,
+    getYahooFullSync,
+    buildCoreYahooLeagueFields,
     type YahooLeague,
 } from '@/lib/yahoo';
 
@@ -67,13 +67,14 @@ export async function POST(request: NextRequest): Promise<Response> {
 
         const results = await Promise.all(
             toSync.map(async (league: YahooLeague) => {
+                const full = await getYahooFullSync(league.leagueKey, accessToken);
+
                 const leagueRecord = {
+                    ...buildCoreYahooLeagueFields(full),
                     leagueName:      league.name,
                     season:          league.season,
                     status:          deriveYahooStatus(league),
                     totalRosters:    league.numTeams,
-                    scoringType:     deriveYahooScoringType(league),
-                    rosterPositions: defaultYahooRosterPositions(league),
                     lastSyncedAt:    new Date(),
                 };
 

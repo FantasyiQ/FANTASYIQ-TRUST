@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { getYahooLeagues, refreshYahooToken, deriveYahooStatus, deriveYahooScoringType, defaultYahooRosterPositions } from '@/lib/yahoo';
+import { getYahooLeagues, refreshYahooToken, deriveYahooStatus, getYahooFullSync, buildCoreYahooLeagueFields } from '@/lib/yahoo';
 import { shouldSkipLeague, withRetry, recordSyncFailure, recordSyncRecovered } from '@/lib/sync-recovery';
 import { captureError } from '@/lib/sentry';
 import { withCronLog } from '@/lib/cron-logger';
@@ -76,15 +76,15 @@ export async function GET(request: Request): Promise<Response> {
 
                     try {
                         await withRetry(async () => {
+                            const full = await getYahooFullSync(yahooLeague.leagueKey, accessToken);
                             await prisma.league.update({
                                 where: { id: league.id },
                                 data: {
+                                    ...buildCoreYahooLeagueFields(full),
                                     leagueName:      yahooLeague.name,
                                     season:          yahooLeague.season,
                                     status:          deriveYahooStatus(yahooLeague),
                                     totalRosters:    yahooLeague.numTeams,
-                                    scoringType:     deriveYahooScoringType(yahooLeague),
-                                    rosterPositions: defaultYahooRosterPositions(yahooLeague),
                                     lastSyncedAt:    new Date(),
                                 },
                             });
