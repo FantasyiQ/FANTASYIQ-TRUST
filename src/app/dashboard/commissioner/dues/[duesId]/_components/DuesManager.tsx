@@ -90,6 +90,11 @@ export default function DuesManager({
     const [syncMessage, setSyncMessage] = useState<string | null>(null);
     const [syncError, setSyncError]   = useState<string | null>(null);
 
+    // Add-to-pot state (record cash/Venmo received — required before marking members paid manually)
+    const [addAmount, setAddAmount] = useState('');
+    const [addSaving, setAddSaving] = useState(false);
+    const [addError, setAddError]   = useState('');
+
     // ---------------------------------------------------------------------------
     // Derived values
     // ---------------------------------------------------------------------------
@@ -180,6 +185,33 @@ export default function DuesManager({
             router.refresh();
         } catch {
             setMemberLoading(member.id, false);
+        }
+    }
+
+    async function handleAddToPot(e: React.FormEvent) {
+        e.preventDefault();
+        if (addSaving) return;
+        const amount = parseFloat(addAmount);
+        if (!addAmount || isNaN(amount) || amount <= 0) {
+            setAddError('Enter a valid amount.');
+            return;
+        }
+        setAddError('');
+        setAddSaving(true);
+        try {
+            const res  = await fetch(`/api/dues/${duesId}/collect`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amount }),
+            });
+            const data = await res.json() as { collectedAmount?: number; error?: string };
+            if (!res.ok) { setAddError(data.error ?? 'Failed to add.'); return; }
+            setAddAmount('');
+            router.refresh();
+        } catch {
+            setAddError('Network error — please try again.');
+        } finally {
+            setAddSaving(false);
         }
     }
 
@@ -298,6 +330,38 @@ export default function DuesManager({
                             )}
                         </div>
                     )}
+
+                    <div className="border-t border-gray-800 pt-4">
+                        <form onSubmit={(e) => { void handleAddToPot(e); }}>
+                            <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                                Record Cash Received <span className="text-gray-600 font-normal normal-case">(required before marking members paid manually)</span>
+                            </p>
+                            <div className="flex gap-2">
+                                <div className="relative flex-1">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none">$</span>
+                                    <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={addAmount}
+                                        onChange={e => { setAddAmount(e.target.value); setAddError(''); }}
+                                        placeholder="0"
+                                        className="w-full bg-gray-800 border border-gray-700 focus:border-[#D4AF37]/60 rounded-lg pl-7 pr-3 py-2 text-white placeholder-gray-600 text-sm focus:outline-none transition"
+                                    />
+                                </div>
+                                <button
+                                    type="submit"
+                                    disabled={addSaving || !addAmount.trim()}
+                                    className="bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-50 text-gray-950 font-bold px-4 py-2 rounded-lg text-sm transition whitespace-nowrap"
+                                >
+                                    {addSaving ? '…' : '+ Add'}
+                                </button>
+                            </div>
+                            {addError && <p className="text-red-400 text-xs mt-1.5">{addError}</p>}
+                            <p className="text-gray-600 text-xs mt-1.5">
+                                Enter cash or Venmo received. Balance must cover each member before marking them paid.
+                            </p>
+                        </form>
+                    </div>
                 </div>
 
                 {/* ── League Roster ──────────────────────────────────────── */}
