@@ -117,6 +117,13 @@ export default async function LeagueOverviewPage({
             }
         }
 
+        // Pre-fetch commissioner vouches for this league so the member card shows existing vouches.
+        const existingEspnVouches = await prisma.commissionerVouch.findMany({
+            where:  { fromUserId: session.user.id },
+            select: { toUserId: true, vouchType: true },
+        });
+        const espnVouchByUserId = new Map(existingEspnVouches.map(v => [v.toUserId, v.vouchType]));
+
         const membersData: LeagueMemberData[] = espnTeams.map(t => {
             const displayName = t.ownerName ?? (t.name || t.abbrev || `Team ${t.teamId}`);
             const fiq = (t.ownerId ? fiqBySwid.get(t.ownerId) : null) ?? fiqByTeamName.get(displayName.toLowerCase());
@@ -131,7 +138,7 @@ export default async function LeagueOverviewPage({
                 prsScore:         fiq?.prsScore ?? null,
                 trustScore:       fiq?.trustScore ?? null,
                 lfCommissioner:   null,
-                existingVouch:    null,
+                existingVouch:    (fiq?.id ? (espnVouchByUserId.get(fiq.id) as LeagueMemberData['existingVouch'] ?? null) : null),
             };
         });
 
