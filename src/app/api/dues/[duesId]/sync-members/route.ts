@@ -69,7 +69,12 @@ export async function POST(
         // you?" picker.
         teams = espnTeams.map(t => ({
             displayName:   t.name || t.ownerName || t.abbrev || `Team ${t.teamId}`,
-            teamName:      t.abbrev ?? null,
+            // ESPN's abbrev is a short 2-4 letter code (e.g. "XXX", "RUDE"),
+            // not a real distinct team name the way Sleeper's roster
+            // metadata.team_name is — storing it here made the dues picker
+            // render the cryptic code instead of the resolved name/ownerName
+            // above, since teamName || displayName always preferred it.
+            teamName:      null,
             sleeperUserId: null,
             // Real ESPN owner SWID — same auto-match role sleeperUserId
             // plays for Sleeper leagues. Every connected ESPN user already
