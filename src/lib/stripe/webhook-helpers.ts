@@ -19,8 +19,8 @@ export function resolvePaymentMethod(
     type: 'LEAGUE_DUES' | 'LEAGUE_DUES_ON_BEHALF' | 'FUTURE_DUES',
 ): string {
     switch (type) {
-        case 'LEAGUE_DUES':             return 'stripe_direct';
-        case 'LEAGUE_DUES_ON_BEHALF':   return 'stripe_on_behalf';
+        case 'LEAGUE_DUES':             return 'stripe_connect_direct';
+        case 'LEAGUE_DUES_ON_BEHALF':   return 'stripe_connect_on_behalf';
         case 'FUTURE_DUES':             return 'stripe_future_dues';
     }
 }

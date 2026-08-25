@@ -28,9 +28,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const dues = await prisma.leagueDues.findUnique({
         where:  { id: duesId },
-        select: { commissionerId: true, leagueName: true, potTotal: true },
+        select: {
+            commissionerId: true, leagueName: true, potTotal: true,
+            commissioner: { select: { stripeConnectAccountId: true } },
+        },
     });
     if (!dues || dues.commissionerId !== user.id) return Response.json({ error: 'Forbidden.' }, { status: 403 });
+
+    // Connect-routed leagues: dues already sit in the commissioner's own
+    // Stripe account, never FiQ's platform balance. There's nothing to check
+    // FiQ's balance for, and no claim-link email to send — the commissioner
+    // pays winners directly, then marks each spot paid manually.
+    const isConnectRouted = !!dues.commissioner.stripeConnectAccountId;
 
     const body = await request.json() as { proposalId?: string; assignments?: Record<string, string> };
     const { proposalId, assignments } = body;
@@ -70,27 +79,35 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     // ── Invariant 2: Stripe platform balance must cover total pending payouts ──
-    // This compares against ALL pending payouts across all leagues, not just this one.
-    const [stripeBalance, allPendingItems] = await Promise.all([
-        stripe.balance.retrieve(),
-        prisma.payoutProposalItem.findMany({
-            where:  { status: 'claim_sent' },
-            select: { amount: true },
-        }),
-    ]);
+    // Only applies to the legacy pooled model — Connect-routed leagues never
+    // touch FiQ's platform balance at all, so there's nothing to check here.
+    if (!isConnectRouted) {
+        // This compares against ALL pending payouts across all leagues, not just this one.
+        const [stripeBalance, allPendingItems] = await Promise.all([
+            stripe.balance.retrieve(),
+            prisma.payoutProposalItem.findMany({
+                where:  { status: 'claim_sent' },
+                select: { amount: true },
+            }),
+        ]);
 
-    const availableCents      = stripeBalance.available.find(b => b.currency === 'usd')?.amount ?? 0;
-    const pendingPayoutsCents = allPendingItems.reduce((sum, i) => sum + dollarsToCents(i.amount), 0);
+        const availableCents      = stripeBalance.available.find(b => b.currency === 'usd')?.amount ?? 0;
+        const pendingPayoutsCents = allPendingItems.reduce((sum, i) => sum + dollarsToCents(i.amount), 0);
 
-    if (!hasEnoughBalance(availableCents, pendingPayoutsCents, dollarsToCents(payoutTotal))) {
-        const availableDollars    = availableCents / 100;
-        const totalPendingDollars = (pendingPayoutsCents / 100) + payoutTotal;
-        return Response.json({
-            error: `Stripe platform balance ($${availableDollars.toFixed(2)}) is insufficient to cover all pending payouts ($${totalPendingDollars.toFixed(2)}). Contact support.`,
-        }, { status: 400 });
+        if (!hasEnoughBalance(availableCents, pendingPayoutsCents, dollarsToCents(payoutTotal))) {
+            const availableDollars    = availableCents / 100;
+            const totalPendingDollars = (pendingPayoutsCents / 100) + payoutTotal;
+            return Response.json({
+                error: `Stripe platform balance ($${availableDollars.toFixed(2)}) is insufficient to cover all pending payouts ($${totalPendingDollars.toFixed(2)}). Contact support.`,
+            }, { status: 400 });
+        }
     }
 
-    // ── Send claim links to each winner ───────────────────────────────────────
+    // ── Notify winners ─────────────────────────────────────────────────────────
+    // Legacy pooled model: send a Stripe claim link. Connect-routed: the
+    // commissioner already holds the money and pays directly, so items go
+    // straight to 'approved' (ready for manual payout) with no claim token —
+    // just a heads-up notification, not a payment action.
     const base = appUrl();
 
     for (const item of proposal.items) {
@@ -101,6 +118,24 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             where:  { id: memberId },
             select: { displayName: true, userId: true, email: true },
         });
+
+        if (isConnectRouted) {
+            await prisma.payoutProposalItem.update({
+                where: { id: item.id },
+                data:  { memberId, status: 'approved' },
+            });
+
+            if (member?.userId) {
+                notify({
+                    userId: member.userId,
+                    type:   NotificationType.PAYOUTS_RELEASED,
+                    title:  `You won! ${dues.leagueName}`,
+                    body:   `Your ${item.payoutSpot.label} payout of $${item.amount} has been approved. Your commissioner will pay you directly.`,
+                    data:   { leagueId: duesId, leagueName: dues.leagueName, duesId, amount: item.amount },
+                }).catch(err => console.error('[approve] notify winner failed', err));
+            }
+            continue;
+        }
 
         const claimToken = randomBytes(32).toString('hex');
 

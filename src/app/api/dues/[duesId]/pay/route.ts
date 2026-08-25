@@ -10,8 +10,10 @@ function appUrl() {
 
 // POST /api/dues/[duesId]/pay
 // Creates a Stripe Checkout session for the authenticated member's buy-in.
-// Funds land on FiQ's platform account — no transfer_data.destination.
-// FiQ transfers to winners when commissioner approves payouts.
+// Funds route directly into the commissioner's own Stripe Connect account
+// via transfer_data.destination — the commissioner holds true custody of
+// their own league's dues, not FiQ. Requires the commissioner to have
+// completed Connect onboarding first (see commissioner-onboard route).
 export async function POST(
     req: NextRequest,
     { params }: { params: Promise<{ duesId: string }> },
@@ -37,6 +39,14 @@ export async function POST(
 
     if (dues.commissionerId === user.id) {
         return Response.json({ error: 'Commissioners use Record Cash Received.' }, { status: 403 });
+    }
+
+    const commissioner = await prisma.user.findUnique({
+        where:  { id: dues.commissionerId },
+        select: { stripeConnectAccountId: true },
+    });
+    if (!commissioner?.stripeConnectAccountId) {
+        return Response.json({ error: "This league's commissioner hasn't connected their Stripe account yet." }, { status: 409 });
     }
 
     const member = await prisma.duesMember.findFirst({
@@ -73,7 +83,10 @@ export async function POST(
     const cs = await stripe.checkout.sessions.create({
         customer: customerId,
         mode: 'payment',
-        payment_intent_data: { receipt_email: user.email ?? undefined },
+        payment_intent_data: {
+            receipt_email: user.email ?? undefined,
+            transfer_data: { destination: commissioner.stripeConnectAccountId },
+        },
         line_items: [{
             quantity: 1,
             price_data: {

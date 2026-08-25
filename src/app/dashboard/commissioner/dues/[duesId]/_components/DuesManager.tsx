@@ -108,7 +108,7 @@ export default function DuesManager({
     const potWhole    = potTotal >= fullPot && members.length === teamCount;
 
     const stripePaid = members.filter(m =>
-        m.duesStatus === 'paid' && (m.paymentMethod === 'stripe_direct' || m.paymentMethod === 'stripe_on_behalf')
+        m.duesStatus === 'paid' && (m.paymentMethod === 'stripe_direct' || m.paymentMethod === 'stripe_on_behalf' || m.paymentMethod === 'stripe_connect_direct' || m.paymentMethod === 'stripe_connect_on_behalf')
     );
     const manualPaid = members.filter(m =>
         m.duesStatus === 'paid' && m.paymentMethod === 'manual'
@@ -414,7 +414,7 @@ export default function DuesManager({
                         <ul className="divide-y divide-gray-800/50">
                             {members.map(member => {
                                 const isPaid    = member.duesStatus === 'paid';
-                                const isStripe  = member.paymentMethod === 'stripe_direct' || member.paymentMethod === 'stripe_on_behalf';
+                                const isStripe  = member.paymentMethod === 'stripe_direct' || member.paymentMethod === 'stripe_on_behalf' || member.paymentMethod === 'stripe_connect_direct' || member.paymentMethod === 'stripe_connect_on_behalf';
                                 const isManual  = member.paymentMethod === 'manual';
                                 const isLoading = loadingMemberId === member.id;
                                 const err       = memberError[member.id];

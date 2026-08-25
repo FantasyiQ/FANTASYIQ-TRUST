@@ -1,13 +1,20 @@
-// Temporary containment measure: dues money currently pools in FiQ's own
-// Stripe balance with no per-league fund separation (see project memory —
-// Stripe pooled-balance hold risk). Until that's reworked, new dues trackers
-// are limited to the founder's own leagues so the blast radius of that risk
-// stays contained to known, already-collected money.
-const DUES_CREATION_ALLOWLIST = new Set([
-    'russell@fantasyiqtrust.com',
-]);
+import { prisma } from '@/lib/prisma';
 
-export function canCreateDuesTracker(email: string | null | undefined): boolean {
+// Real containment, not an allowlist: manual (Venmo/cash) dues trackers carry
+// no Stripe/pooled-balance risk at all, so they're open to every commissioner.
+// Stripe-backed trackers require the commissioner to have completed Stripe
+// Connect onboarding first — dues then route directly into their own
+// account (see commissioner-onboard route), never FiQ's platform balance.
+export async function canCreateDuesTracker(
+    email: string | null | undefined,
+    paymentModel: 'stripe' | 'manual' = 'manual',
+): Promise<boolean> {
     if (!email) return false;
-    return DUES_CREATION_ALLOWLIST.has(email.toLowerCase());
+    if (paymentModel === 'manual') return true;
+
+    const user = await prisma.user.findUnique({
+        where:  { email },
+        select: { stripeConnectAccountId: true },
+    });
+    return !!user?.stripeConnectAccountId;
 }

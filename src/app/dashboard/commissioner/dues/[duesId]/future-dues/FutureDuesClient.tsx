@@ -283,7 +283,7 @@ export default function FutureDuesClient({ duesId, currentSeason, buyInAmount, m
                                             </span>
                                             {o.paidAt && (
                                                 <p className="text-gray-600 text-xs mt-0.5">
-                                                    {o.paymentMethod === 'stripe_on_behalf' ? 'Via Stripe · ' : 'Manual · '}
+                                                    {(o.paymentMethod === 'stripe_on_behalf' || o.paymentMethod === 'stripe_connect_on_behalf') ? 'Via Stripe · ' : 'Manual · '}
                                                     {new Date(o.paidAt).toLocaleDateString()}
                                                 </p>
                                             )}

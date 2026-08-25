@@ -105,7 +105,7 @@ export async function getLeagueDues(id: string): Promise<LeagueDuesData> {
     const fullPot    = dues.buyInAmount * dues.teamCount;
     const paidCount  = dues.members.filter(m => m.duesStatus === 'paid').length;
     const potTotal   = dues.members.filter(m => m.duesStatus === 'paid').length * dues.buyInAmount;
-    const stripePaid = dues.members.filter(m => m.duesStatus === 'paid' && (m.paymentMethod === 'stripe_direct' || m.paymentMethod === 'stripe_on_behalf'));
+    const stripePaid = dues.members.filter(m => m.duesStatus === 'paid' && m.paymentMethod !== 'manual' && m.paymentMethod != null);
     const manualPaid = dues.members.filter(m => m.duesStatus === 'paid' && m.paymentMethod === 'manual');
 
     return {

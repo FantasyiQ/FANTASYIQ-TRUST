@@ -13,9 +13,10 @@ interface SyncedLeague {
 
 interface Props {
     syncedLeagues: SyncedLeague[];
+    stripeConnected: boolean;
 }
 
-export default function DuesSetupForm({ syncedLeagues }: Props) {
+export default function DuesSetupForm({ syncedLeagues, stripeConnected }: Props) {
     const router = useRouter();
     const params = useSearchParams();
     const subId     = params.get('subId') ?? '';
@@ -37,6 +38,8 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [paymentModel, setPaymentModel] = useState<'stripe' | 'manual'>('stripe');
+    const [connecting, setConnecting] = useState(false);
+    const [connectError, setConnectError] = useState('');
 
     // Payout spots
     interface PayoutSpot { label: string; amount: string; }
@@ -75,12 +78,35 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
         }
     }
 
+    async function connectStripe() {
+        setConnectError('');
+        setConnecting(true);
+        try {
+            const res  = await fetch('/api/stripe/connect/commissioner-onboard', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ returnPath: '/dashboard/commissioner/dues/setup' }),
+            });
+            const data = await res.json() as { url?: string; error?: string };
+            if (!res.ok || !data.url) { setConnectError(data.error ?? 'Could not start Stripe onboarding.'); return; }
+            window.location.href = data.url;
+        } catch {
+            setConnectError('Network error — please try again.');
+        } finally {
+            setConnecting(false);
+        }
+    }
+
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         setError('');
         if (!leagueName.trim()) { setError('League name is required.'); return; }
         if (!buyIn || parseFloat(buyIn) <= 0) { setError('Buy-in must be greater than $0.'); return; }
         if (!selectedSeasons.length) { setError('Select at least one season.'); return; }
+        if (paymentModel === 'stripe' && !stripeConnected) {
+            setError('Connect your Stripe account first — see above.');
+            return;
+        }
 
         // Validate payout spots if any amounts filled in
         const filledSpots = spots.filter(s => s.amount && parseFloat(s.amount) > 0);
@@ -107,6 +133,7 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
                     seasons: selectedSeasons,
                     buyInAmount: parseFloat(buyIn),
                     teamCount: parseInt(teamCount),
+                    paymentModel,
                 }),
             });
             const data = await res.json() as { id?: string; ids?: string[]; error?: string };
@@ -202,6 +229,29 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
                         <span className="shrink-0 mt-0.5">⚠</span>
                         Manual payments are not automatically verified and rely on commissioner accuracy. Members can still pay via Stripe if they choose.
                     </p>
+                )}
+                {paymentModel === 'stripe' && (
+                    stripeConnected ? (
+                        <p className="text-emerald-400/90 text-xs flex items-start gap-1.5 bg-emerald-900/10 border border-emerald-900/30 rounded-lg px-3 py-2">
+                            <span className="shrink-0 mt-0.5">✓</span>
+                            Your Stripe account is connected — dues route directly to you, never through FiQ.
+                        </p>
+                    ) : (
+                        <div className="bg-[#D4AF37]/5 border border-[#D4AF37]/25 rounded-lg px-3 py-3 space-y-2">
+                            <p className="text-gray-300 text-xs">
+                                Connect your own Stripe account first — member payments go straight to you, so FiQ never holds your league&apos;s money.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => { void connectStripe(); }}
+                                disabled={connecting}
+                                className="bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-50 text-gray-950 font-bold px-4 py-2 rounded-lg text-sm transition"
+                            >
+                                {connecting ? 'Redirecting…' : 'Connect your Stripe account →'}
+                            </button>
+                            {connectError && <p className="text-red-400 text-xs">{connectError}</p>}
+                        </div>
+                    )
                 )}
             </div>
 
@@ -367,7 +417,7 @@ export default function DuesSetupForm({ syncedLeagues }: Props) {
 
             <button
                 type="submit"
-                disabled={loading || !selectedSeasons.length}
+                disabled={loading || !selectedSeasons.length || (paymentModel === 'stripe' && !stripeConnected)}
                 className="w-full bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-50 text-black font-bold py-3 rounded-xl transition text-sm">
                 {loading ? 'Creating...' : selectedSeasons.length > 1 ? `Create ${selectedSeasons.length} Trackers` : 'Create Tracker'}
             </button>

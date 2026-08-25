@@ -10,7 +10,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     if (rl.limited) return rl.response!;
     const session = await auth();
     if (!session?.user?.email) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    if (!canCreateDuesTracker(session.user.email)) {
+    if (!(await canCreateDuesTracker(session.user.email))) {
         return Response.json({ error: 'Dues collection is not yet available for your account.' }, { status: 403 });
     }
 

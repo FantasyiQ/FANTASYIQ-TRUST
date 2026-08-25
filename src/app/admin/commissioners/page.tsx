@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { prisma } from '@/lib/prisma';
+import { stripe } from '@/lib/stripe';
 import { getActivationFunnel, STAGE_LABELS } from '@/lib/commissioner-activation';
 import EditLeagueName from './EditLeagueName';
 import DeleteSubscription from './DeleteSubscription';
@@ -51,7 +52,7 @@ export default async function AdminCommissionersPage() {
             select:  {
                 id: true, tier: true, leagueSize: true, leagueName: true,
                 status: true, createdAt: true,
-                user: { select: { email: true } },
+                user: { select: { email: true, stripeConnectAccountId: true } },
             },
         }),
         prisma.subscription.groupBy({
@@ -64,6 +65,26 @@ export default async function AdminCommissionersPage() {
 
     function tierLabel(tier: string) {
         return tier.replace('COMMISSIONER_', '').replace('_', '-').replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    // Batch Stripe Connect status lookups — one call per unique account,
+    // same pattern as the payout-retry cron's stripe.accounts.retrieve() batching.
+    const connectAccountIds = [...new Set(
+        recentCommSubs.map(s => s.user.stripeConnectAccountId).filter((id): id is string => !!id),
+    )];
+    const connectStatusById = new Map<string, boolean>();
+    await Promise.all(connectAccountIds.map(async id => {
+        try {
+            const account = await stripe.accounts.retrieve(id);
+            connectStatusById.set(id, !!account.charges_enabled);
+        } catch { connectStatusById.set(id, false); }
+    }));
+
+    function connectBadge(accountId: string | null) {
+        if (!accountId) return { label: 'Not connected', cls: 'text-gray-600' };
+        return connectStatusById.get(accountId)
+            ? { label: 'Stripe connected', cls: 'text-emerald-400' }
+            : { label: 'Stripe pending', cls: 'text-amber-400' };
     }
 
     const statusColors: Record<string, string> = {
@@ -144,7 +165,9 @@ export default async function AdminCommissionersPage() {
                     <p className="text-xs text-gray-600">Last 30 records</p>
                 </div>
                 <div className="divide-y divide-gray-800">
-                    {recentCommSubs.map(s => (
+                    {recentCommSubs.map(s => {
+                        const badge = connectBadge(s.user.stripeConnectAccountId);
+                        return (
                         <div key={s.id} className="px-5 py-3 flex items-center justify-between gap-4">
                             <div className="min-w-0 flex-1">
                                 <EditLeagueName subId={s.id} current={s.leagueName} />
@@ -158,13 +181,15 @@ export default async function AdminCommissionersPage() {
                                     </p>
                                     <p className={`text-[10px] ${statusColors[s.status] ?? 'text-gray-500'}`}>{s.status}</p>
                                 </div>
+                                <span className={`text-[10px] font-medium whitespace-nowrap ${badge.cls}`}>{badge.label}</span>
                                 <span className="text-[10px] text-gray-600 tabular-nums whitespace-nowrap">
                                     {new Date(s.createdAt).toLocaleDateString()}
                                 </span>
                                 <DeleteSubscription subId={s.id} />
                             </div>
                         </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
         </div>

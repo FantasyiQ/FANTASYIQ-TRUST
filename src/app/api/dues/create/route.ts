@@ -12,9 +12,6 @@ export async function POST(request: NextRequest): Promise<Response> {
     if (!session?.user?.email) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    if (!canCreateDuesTracker(session.user.email)) {
-        return Response.json({ error: 'Dues collection is not yet available for your account.' }, { status: 403 });
-    }
 
     const body = await request.json() as {
         subscriptionId?: string;
@@ -22,9 +19,18 @@ export async function POST(request: NextRequest): Promise<Response> {
         seasons?: string[];   // multi-year: e.g. ["2025","2026","2027"]
         buyInAmount?: number;
         teamCount?: number;
+        paymentModel?: 'stripe' | 'manual';
     };
 
-    const { subscriptionId, leagueName, seasons, buyInAmount, teamCount } = body;
+    const { subscriptionId, leagueName, seasons, buyInAmount, teamCount, paymentModel } = body;
+
+    if (!(await canCreateDuesTracker(session.user.email, paymentModel))) {
+        return Response.json({
+            error: paymentModel === 'stripe'
+                ? 'Connect your Stripe account before creating a Stripe-backed dues tracker.'
+                : 'Dues collection is not yet available for your account.',
+        }, { status: 403 });
+    }
 
     // subscriptionId is optional — omitted when creating from Commissioner Hub without a plan link
     const subId = subscriptionId || null;

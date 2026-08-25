@@ -15,7 +15,7 @@ interface ProposalItem {
     member: Member;
 }
 interface Proposal { id: string; status: string; items: ProposalItem[]; }
-interface DuesData { leagueName: string; members: Member[]; proposals: Proposal[]; }
+interface DuesData { leagueName: string; members: Member[]; proposals: Proposal[]; isConnectRouted: boolean; }
 
 const STATUS_LABEL: Record<string, string> = {
     pending:            'Pending',
@@ -38,6 +38,12 @@ export default function ProposalPage() {
     const [error, setError]           = useState('');
     const [retrying, setRetrying]     = useState<Record<string, boolean>>({});
     const [retryMessages, setRetryMessages] = useState<Record<string, string>>({});
+
+    // Manual mark-paid state (Connect-routed leagues)
+    const [markPaidItem, setMarkPaidItem]   = useState<ProposalItem | null>(null);
+    const [markPaidNote, setMarkPaidNote]   = useState('');
+    const [markPaidLoading, setMarkPaidLoading] = useState(false);
+    const [markPaidError, setMarkPaidError] = useState('');
 
     const [balanceCheck, setBalanceCheck] = useState<{
         availableUsd: number; outstandingUsd: number; bufferUsd: number;
@@ -137,6 +143,28 @@ export default function ProposalPage() {
         loadData();
     }
 
+    async function handleMarkPaid() {
+        if (!markPaidItem) return;
+        setMarkPaidLoading(true);
+        setMarkPaidError('');
+        try {
+            const res = await fetch(`/api/dues/${duesId}/proposal/mark-paid`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ itemId: markPaidItem.id, note: markPaidNote.trim() || undefined }),
+            });
+            const resData = await res.json() as { ok?: boolean; error?: string };
+            if (!res.ok) { setMarkPaidError(resData.error ?? 'Failed to mark paid.'); return; }
+            setMarkPaidItem(null);
+            setMarkPaidNote('');
+            loadData();
+        } catch {
+            setMarkPaidError('Network error — please try again.');
+        } finally {
+            setMarkPaidLoading(false);
+        }
+    }
+
     function openReassign(item: ProposalItem) {
         setReassignItem(item);
         setReassignMemberId('');
@@ -206,13 +234,16 @@ export default function ProposalPage() {
 
                 {isApproved && failedItems.length === 0 && (
                     <div className="bg-green-900/20 border border-green-800/50 rounded-xl px-4 py-3 text-green-400 text-sm">
-                        This proposal has been approved. Payment links will be sent to winners.
+                        {data?.isConnectRouted
+                            ? 'This proposal has been approved. Pay each winner directly, then mark them paid below.'
+                            : 'This proposal has been approved. Payment links will be sent to winners.'}
                     </div>
                 )}
 
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl divide-y divide-gray-800">
                     {proposal.items.map((item) => {
-                        const canReassign = isApproved && item.status === 'pending';
+                        const canReassign = isApproved && (item.status === 'pending' || (data?.isConnectRouted && item.status === 'approved'));
+                        const canMarkPaid = data?.isConnectRouted && item.status === 'approved';
                         return (
                             <div key={item.id} className="px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
                                 <div>
@@ -227,6 +258,14 @@ export default function ProposalPage() {
                                 {isApproved || isPoll ? (
                                     <div className="flex items-center gap-3">
                                         <span className="text-gray-300 text-sm">{item.member.displayName}</span>
+                                        {canMarkPaid && (
+                                            <button
+                                                onClick={() => { setMarkPaidItem(item); setMarkPaidNote(''); setMarkPaidError(''); }}
+                                                className="text-xs bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/30 font-semibold px-2.5 py-1 rounded-lg transition"
+                                            >
+                                                Mark as Paid
+                                            </button>
+                                        )}
                                         {canReassign && (
                                             <button
                                                 onClick={() => openReassign(item)}
@@ -286,7 +325,7 @@ export default function ProposalPage() {
                     </div>
                 )}
 
-                {!isApproved && !isPoll && balanceCheck?.isLow && (
+                {!isApproved && !isPoll && !data?.isConnectRouted && balanceCheck?.isLow && (
                     <div className={`rounded-xl px-4 py-3 text-sm border ${
                         balanceCheck.isCritical
                             ? 'bg-red-900/20 border-red-800/50 text-red-400'
@@ -312,7 +351,7 @@ export default function ProposalPage() {
                             onClick={handleApprove}
                             disabled={saving}
                             className="flex-1 bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-50 text-black font-bold py-3 rounded-xl transition text-sm">
-                            {saving ? 'Processing...' : 'Approve & Send Payment Links'}
+                            {saving ? 'Processing...' : data?.isConnectRouted ? 'Approve Proposal' : 'Approve & Send Payment Links'}
                         </button>
                         <button
                             onClick={handleReject}
@@ -382,6 +421,64 @@ export default function ProposalPage() {
                                 disabled={!reassignReady || reassignLoading}
                                 className="flex-1 bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-40 disabled:cursor-not-allowed text-black font-bold py-2.5 rounded-xl text-sm transition">
                                 {reassignLoading ? 'Saving…' : 'Confirm Reassign'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Mark as Paid Modal (Connect-routed leagues) ─────────────── */}
+            {markPaidItem && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl">
+                        <div>
+                            <h3 className="font-bold text-white">Mark as Paid</h3>
+                            <p className="text-gray-400 text-sm mt-1">
+                                {markPaidItem.payoutSpot.label} · <span className="text-[#D4AF37] font-semibold">${markPaidItem.amount.toFixed(2)}</span> to{' '}
+                                <span className="text-white font-semibold">{markPaidItem.member.displayName}</span>
+                            </p>
+                        </div>
+
+                        <div>
+                            <label className="text-gray-500 text-xs font-semibold uppercase tracking-wide">
+                                How did you pay them? <span className="font-normal normal-case text-gray-600">(optional)</span>
+                            </label>
+                            <div className="flex gap-1.5 flex-wrap mt-1.5">
+                                {['Venmo', 'Cash App', 'Zelle', 'Cash', 'Check'].map(opt => (
+                                    <button
+                                        key={opt}
+                                        type="button"
+                                        onClick={() => setMarkPaidNote(opt)}
+                                        className={`text-xs font-medium px-2.5 py-1 rounded-lg border transition ${
+                                            markPaidNote === opt
+                                                ? 'bg-[#D4AF37]/10 border-[#D4AF37]/50 text-[#D4AF37]'
+                                                : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500'
+                                        }`}>
+                                        {opt}
+                                    </button>
+                                ))}
+                            </div>
+                            <input
+                                type="text"
+                                value={markPaidNote}
+                                onChange={e => setMarkPaidNote(e.target.value)}
+                                placeholder="Or type your own"
+                                className="w-full mt-2 bg-gray-800 border border-gray-700 focus:border-[#D4AF37]/60 rounded-lg px-3 py-2 text-white placeholder-gray-600 text-sm focus:outline-none transition"
+                            />
+                            {markPaidError && <p className="text-red-400 text-xs mt-1.5">{markPaidError}</p>}
+                        </div>
+
+                        <div className="flex gap-3 pt-1">
+                            <button
+                                onClick={() => setMarkPaidItem(null)}
+                                className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold py-2.5 rounded-xl text-sm transition border border-gray-700">
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => { void handleMarkPaid(); }}
+                                disabled={markPaidLoading}
+                                className="flex-1 bg-[#D4AF37] hover:bg-[#BF9D2F] disabled:opacity-50 text-black font-bold py-2.5 rounded-xl text-sm transition">
+                                {markPaidLoading ? 'Saving…' : 'Confirm Paid'}
                             </button>
                         </div>
                     </div>

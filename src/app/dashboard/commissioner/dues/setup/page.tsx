@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { stripe } from '@/lib/stripe';
 import DuesSetupForm from './DuesSetupForm';
 
 export default async function DuesSetupPage({
@@ -19,12 +20,23 @@ export default async function DuesSetupPage({
     const user = await prisma.user.findUnique({
         where: { email: session.user.email },
         select: {
+            stripeConnectAccountId: true,
             leagues: {
                 orderBy: { leagueName: 'asc' },
                 select: { id: true, leagueName: true, totalRosters: true, season: true, platform: true },
             },
         },
     });
+
+    // Live check — account creation alone doesn't mean onboarding is complete
+    // (same charges_enabled pattern used for winner payout accounts).
+    let stripeConnected = false;
+    if (user?.stripeConnectAccountId) {
+        try {
+            const account = await stripe.accounts.retrieve(user.stripeConnectAccountId);
+            stripeConnected = !!account.charges_enabled;
+        } catch { /* treat as not connected */ }
+    }
 
     // Deduplicate: one entry per league name (highest season wins)
     const _seen = new Map<string, NonNullable<typeof user>['leagues'][0]>();
@@ -49,7 +61,7 @@ export default async function DuesSetupPage({
                     <p className="text-gray-400 text-sm mt-1">Configure your buy-in and pot for this league.</p>
                 </div>
                 <Suspense fallback={<div className="text-gray-500 text-sm">Loading...</div>}>
-                    <DuesSetupForm syncedLeagues={syncedLeagues} />
+                    <DuesSetupForm syncedLeagues={syncedLeagues} stripeConnected={stripeConnected} />
                 </Suspense>
             </div>
         </main>

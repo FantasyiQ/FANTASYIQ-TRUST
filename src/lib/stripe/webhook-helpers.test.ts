@@ -26,12 +26,12 @@ describe('isCheckoutPaid', () => {
 // ── resolvePaymentMethod ──────────────────────────────────────────────────────
 
 describe('resolvePaymentMethod', () => {
-    test('LEAGUE_DUES resolves to stripe_direct', () => {
-        assert.equal(resolvePaymentMethod('LEAGUE_DUES'), 'stripe_direct');
+    test('LEAGUE_DUES resolves to stripe_connect_direct', () => {
+        assert.equal(resolvePaymentMethod('LEAGUE_DUES'), 'stripe_connect_direct');
     });
 
-    test('LEAGUE_DUES_ON_BEHALF resolves to stripe_on_behalf', () => {
-        assert.equal(resolvePaymentMethod('LEAGUE_DUES_ON_BEHALF'), 'stripe_on_behalf');
+    test('LEAGUE_DUES_ON_BEHALF resolves to stripe_connect_on_behalf', () => {
+        assert.equal(resolvePaymentMethod('LEAGUE_DUES_ON_BEHALF'), 'stripe_connect_on_behalf');
     });
 
     test('FUTURE_DUES resolves to stripe_future_dues', () => {

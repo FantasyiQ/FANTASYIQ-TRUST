@@ -18,6 +18,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ due
         include: {
             members: { select: { id: true, userId: true, displayName: true, teamName: true, duesStatus: true }, orderBy: { createdAt: 'asc' } },
             payoutSpots: { orderBy: { sortOrder: 'asc' } },
+            commissioner: { select: { stripeConnectAccountId: true } },
             ...(includeProposals ? {
                 proposals: {
                     orderBy: { createdAt: 'desc' },
@@ -34,5 +35,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ due
     if (!dues) return Response.json({ error: 'Not found.' }, { status: 404 });
     if (dues.commissionerId !== user.id) return Response.json({ error: 'Forbidden.' }, { status: 403 });
 
-    return Response.json(dues);
+    const { commissioner, ...rest } = dues;
+    return Response.json({ ...rest, isConnectRouted: !!commissioner.stripeConnectAccountId });
 }

@@ -28,7 +28,7 @@ export default function MemberRow({ member, duesId, buyInAmount }: Props) {
     const [showModal, setShowModal] = useState(false);
 
     const isPaid   = member.duesStatus === 'paid';
-    const isStripe = member.paymentMethod === 'stripe_direct' || member.paymentMethod === 'stripe_on_behalf';
+    const isStripe = member.paymentMethod === 'stripe_direct' || member.paymentMethod === 'stripe_on_behalf' || member.paymentMethod === 'stripe_connect_direct' || member.paymentMethod === 'stripe_connect_on_behalf';
     const isManual = member.paymentMethod === 'manual';
 
     async function payOnBehalf() {

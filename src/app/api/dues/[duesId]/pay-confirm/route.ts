@@ -62,7 +62,7 @@ export async function GET(
                             data: {
                                 duesStatus:      'paid',
                                 paidAt:          new Date(),
-                                paymentMethod:   'stripe_direct',
+                                paymentMethod:   'stripe_connect_direct',
                                 stripePaymentId: typeof cs.payment_intent === 'string' ? cs.payment_intent : null,
                                 stripeReceiptUrl: receiptUrl,
                             },

@@ -160,7 +160,7 @@ export default async function AdminRevenuePage() {
             orderBy: { createdAt: 'desc' },
         }),
         // on-behalf count (subset of selfPayCount — used for display breakdown only)
-        prisma.duesMember.count({ where: { duesStatus: 'paid', paymentMethod: 'stripe_on_behalf' } }),
+        prisma.duesMember.count({ where: { duesStatus: 'paid', paymentMethod: { in: ['stripe_on_behalf', 'stripe_connect_on_behalf'] } } }),
         // Expand latest_invoice so we can check the actual billed amount
         // Coupons are applied at invoice level, not subscription level — checking
         // s.discounts is unreliable; amount_due === 0 is the ground truth

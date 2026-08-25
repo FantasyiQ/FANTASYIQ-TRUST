@@ -661,7 +661,7 @@ export default function DuesManager({
 
             {/* Pot breakdown — Stripe vs Manual (visible to all) */}
             {duesData && paidCount > 0 && (() => {
-                const stripePaid = members.filter(m => m.duesStatus === 'paid' && (m.paymentMethod === 'stripe_direct' || m.paymentMethod === 'stripe_on_behalf')).length;
+                const stripePaid = members.filter(m => m.duesStatus === 'paid' && (m.paymentMethod === 'stripe_direct' || m.paymentMethod === 'stripe_on_behalf' || m.paymentMethod === 'stripe_connect_direct' || m.paymentMethod === 'stripe_connect_on_behalf')).length;
                 const manualPaid = members.filter(m => m.duesStatus === 'paid' && m.paymentMethod === 'manual').length;
                 const stripeTotal = stripePaid * duesData.buyInAmount;
                 const manualTotal = manualPaid * duesData.buyInAmount;
@@ -758,7 +758,7 @@ export default function DuesManager({
                     <div className="space-y-1.5">
                         {members.map(m => {
                             const isPaid    = m.duesStatus === 'paid';
-                            const isStripe  = m.paymentMethod === 'stripe_direct' || m.paymentMethod === 'stripe_on_behalf';
+                            const isStripe  = m.paymentMethod === 'stripe_direct' || m.paymentMethod === 'stripe_on_behalf' || m.paymentMethod === 'stripe_connect_direct' || m.paymentMethod === 'stripe_connect_on_behalf';
                             const isManual  = m.paymentMethod === 'manual';
                             const isToggling = togglingId === m.id;
                             return (

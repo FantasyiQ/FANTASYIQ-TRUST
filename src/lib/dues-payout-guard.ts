@@ -8,9 +8,13 @@ import { prisma } from '@/lib/prisma';
 // as the platform's overall balance happened to cover it.
 //
 // This computes what's actually safe to transfer for a given league: dues
-// collected through real Stripe payments only (paymentMethod stripe_direct /
-// stripe_on_behalf — never 'manual'), minus whatever's already been
-// transferred out via Stripe for that same league.
+// collected through the LEGACY pooled-model Stripe flow only (paymentMethod
+// stripe_direct / stripe_on_behalf — never 'manual', and deliberately never
+// stripe_connect_direct / stripe_connect_on_behalf either). Those two route
+// straight into the commissioner's own Connect account at payment time and
+// never touch FiQ's platform balance at all, so they must never be counted
+// as available for this platform-initiated transfer — that money isn't
+// FiQ's to move.
 export async function getStripeAvailableForLeaguePayout(leagueDuesId: string): Promise<number> {
     const [dues, stripePaidCount, alreadyTransferred] = await Promise.all([
         prisma.leagueDues.findUnique({

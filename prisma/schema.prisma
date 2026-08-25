@@ -27,6 +27,12 @@ model User {
     // Commissioner plans are tracked only in the subscriptions table.
     subscriptionTier SubscriptionTier @default(FREE)
     stripeCustomerId String?          @unique
+    // Commissioner's own Stripe Connect Express account. When set, dues
+    // checkout sessions route directly here (transfer_data.destination) —
+    // the commissioner holds true custody of their own league funds; FiQ's
+    // platform balance never touches it. Distinct from DuesMember's
+    // per-winner Connect account (legacy pooled-model payout flow).
+    stripeConnectAccountId String?     @unique
     sleeperUserId    String?          @unique
     espnS2           String?          // ESPN espn_s2 session cookie
     swid             String?          // ESPN SWID cookie

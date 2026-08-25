@@ -21,9 +21,12 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     const user = await prisma.user.findUnique({
         where: { email: session.user.email },
-        select: { id: true, email: true, name: true, stripeCustomerId: true },
+        select: { id: true, email: true, name: true, stripeCustomerId: true, stripeConnectAccountId: true },
     });
     if (!user) return Response.json({ error: 'User not found.' }, { status: 404 });
+    if (!user.stripeConnectAccountId) {
+        return Response.json({ error: "Connect your Stripe account before paying on a member's behalf." }, { status: 409 });
+    }
 
     const dues = await prisma.leagueDues.findUnique({
         where: { id: duesId },
@@ -56,7 +59,10 @@ export async function POST(request: NextRequest): Promise<Response> {
     const checkoutSession = await stripe.checkout.sessions.create({
         customer: customerId,
         mode: 'payment',
-        payment_intent_data: { receipt_email: user.email ?? undefined },
+        payment_intent_data: {
+            receipt_email: user.email ?? undefined,
+            transfer_data: { destination: user.stripeConnectAccountId },
+        },
         line_items: [{
             quantity: 1,
             price_data: {

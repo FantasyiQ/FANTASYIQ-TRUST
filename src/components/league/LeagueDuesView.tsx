@@ -21,10 +21,12 @@ function statusLabel(status: string) {
 
 function methodLabel(method: string | null) {
     switch (method) {
-        case 'stripe_direct':    return 'Stripe';
-        case 'stripe_on_behalf': return 'Stripe';
-        case 'manual':           return 'Manual';
-        default:                 return null;
+        case 'stripe_direct':           return 'Stripe';
+        case 'stripe_on_behalf':        return 'Stripe';
+        case 'stripe_connect_direct':   return 'Stripe';
+        case 'stripe_connect_on_behalf': return 'Stripe';
+        case 'manual':                  return 'Manual';
+        default:                        return null;
     }
 }
 

@@ -172,7 +172,11 @@ async function restoreFutureDuesObligation(paymentIntentId: string): Promise<{
 
     await prisma.futureDuesObligation.update({
         where: { id: obligation.id },
-        data:  { status: 'paid', paidAt: new Date(), paymentMethod: 'stripe_on_behalf' },
+        // paymentMethod is left untouched — it was already set correctly on
+        // the original payment and shouldn't be overwritten by a restore
+        // (this path serves both legacy pooled-model and new Connect-routed
+        // obligations, so hardcoding a value here would mislabel one of them).
+        data:  { status: 'paid', paidAt: new Date() },
     });
 
     const futureTracker = await prisma.leagueDues.findFirst({
@@ -270,7 +274,7 @@ export async function POST(request: NextRequest): Promise<Response> {
                                         data: {
                                             duesStatus:           'paid',
                                             paidAt:               new Date(),
-                                            paymentMethod:        'stripe_direct',
+                                            paymentMethod:        'stripe_connect_direct',
                                             stripePaymentId:      piId,
                                             stripePaymentIntentId: piId,
                                         },
@@ -311,7 +315,7 @@ export async function POST(request: NextRequest): Promise<Response> {
                                         data: {
                                             duesStatus:            'paid',
                                             paidAt:                new Date(),
-                                            paymentMethod:         'stripe_on_behalf',
+                                            paymentMethod:         'stripe_connect_on_behalf',
                                             stripePaymentId:       cs.id,
                                             stripePaymentIntentId: piId,
                                         },
@@ -352,7 +356,7 @@ export async function POST(request: NextRequest): Promise<Response> {
                                     data: {
                                         status:                'paid',
                                         paidAt:               new Date(),
-                                        paymentMethod:        'stripe_on_behalf',
+                                        paymentMethod:        'stripe_connect_on_behalf',
                                         stripePaymentIntentId: piId,
                                     },
                                 });
