@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { normalizePosition } from '@/lib/draft/context';
 
 export interface AvailablePlayer {
     id:               string;   // sleeperPlayerId or espnPlayerId, platform-neutral here
@@ -19,15 +20,25 @@ interface Props {
 }
 
 const POS_COLORS: Record<string, string> = {
-    QB: 'bg-red-900/40 text-red-300 border-red-700/60',
-    RB: 'bg-blue-900/40 text-blue-300 border-blue-700/60',
-    WR: 'bg-green-900/40 text-green-300 border-green-700/60',
-    TE: 'bg-orange-900/40 text-orange-300 border-orange-700/60',
-    K:  'bg-gray-800 text-gray-400 border-gray-700',
+    QB:  'bg-red-900/40 text-red-300 border-red-700/60',
+    RB:  'bg-blue-900/40 text-blue-300 border-blue-700/60',
+    WR:  'bg-green-900/40 text-green-300 border-green-700/60',
+    TE:  'bg-orange-900/40 text-orange-300 border-orange-700/60',
+    K:   'bg-gray-800 text-gray-400 border-gray-700',
+    IDP: 'bg-purple-900/40 text-purple-300 border-purple-700/60',
 };
 
+// Individual defensive positions (EDGE, DL, LB, DB, etc.) all display under a
+// single IDP badge/filter — same grouping the backend's normalizePosition()
+// already applies for allowedPositions, so a player showing up here for an
+// IDP league doesn't fall through the offense-only QB/RB/WR/TE/K/DEF set.
+function displayPosition(pos: string): string {
+    const norm = normalizePosition(pos);
+    return norm === 'IDP' ? 'IDP' : pos;
+}
+
 function posBadge(pos: string) {
-    return POS_COLORS[pos] ?? 'bg-gray-800 text-gray-400 border-gray-700';
+    return POS_COLORS[displayPosition(pos)] ?? 'bg-gray-800 text-gray-400 border-gray-700';
 }
 
 function fiqColor(score: number) {
@@ -37,12 +48,12 @@ function fiqColor(score: number) {
     return 'text-gray-400';
 }
 
-const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
+const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'IDP'];
 type SortKey = 'fiqScore' | 'name' | 'tier' | 'position';
 
 // Standard roster order, not alphabetical — QB/RB/WR/TE/K/DEF reads naturally;
-// anything unrecognized sorts after.
-const POSITION_ORDER: Record<string, number> = { QB: 0, RB: 1, WR: 2, TE: 3, K: 4, DEF: 5 };
+// anything unrecognized (including all IDP positions) sorts after.
+const POSITION_ORDER: Record<string, number> = { QB: 0, RB: 1, WR: 2, TE: 3, K: 4, DEF: 5, IDP: 6 };
 
 export default function AvailablePlayersList({ players }: Props) {
     const [search, setSearch]     = useState('');
@@ -52,13 +63,13 @@ export default function AvailablePlayersList({ players }: Props) {
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
         return players
-            .filter(p => position === 'ALL' || p.position === position)
+            .filter(p => position === 'ALL' || displayPosition(p.position) === position)
             .filter(p => !q || p.name.toLowerCase().includes(q))
             .sort((a, b) => {
                 if (sortKey === 'name')     return a.name.localeCompare(b.name);
                 if (sortKey === 'tier')     return a.tier - b.tier || b.fiqScore - a.fiqScore;
                 if (sortKey === 'position') {
-                    const posDiff = (POSITION_ORDER[a.position] ?? 99) - (POSITION_ORDER[b.position] ?? 99);
+                    const posDiff = (POSITION_ORDER[displayPosition(a.position)] ?? 99) - (POSITION_ORDER[displayPosition(b.position)] ?? 99);
                     return posDiff || b.fiqScore - a.fiqScore;
                 }
                 return b.fiqScore - a.fiqScore;

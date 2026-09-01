@@ -281,6 +281,23 @@ export async function loadDraftContext(params: {
 
     const draftedIds = new Set(picks.map(p => p.player_id));
 
+    // Belt-and-suspenders drafted check, independent of the SleeperPlayer name
+    // join below. That join is an EXACT fullName match — if RookieRankingsPlayer
+    // stores a suffix ("Rueben Bain Jr.") that Sleeper's own record omits
+    // ("Rueben Bain"), the join misses entirely and draftedIds.has(sp.playerId)
+    // never even runs (sp is undefined), silently leaving an already-drafted
+    // player marked available. Sleeper's pick metadata carries the raw name
+    // regardless of any join succeeding, so check that too.
+    const draftedNames = new Set(
+        picks
+            .map(p => {
+                const first = p.metadata?.first_name;
+                const last  = p.metadata?.last_name;
+                return first && last ? normalizeDraftName(`${first} ${last}`) : null;
+            })
+            .filter((n): n is string => n !== null),
+    );
+
     // ── Full existing roster ────────────────────────────────────────────────
     // Binding priority:
     //   1. sleeperUserId (server-authoritative, matches owner_id) — always correct
@@ -388,6 +405,7 @@ export async function loadDraftContext(params: {
             if (!allowedPositions.has(normalizePosition(r.position))) continue;
             const sp = spLookup(r.playerName, r.position);
             if (sp && draftedIds.has(sp.playerId)) continue;
+            if (draftedNames.has(normalizeDraftName(r.playerName))) continue;
             const baseFiqScore = Math.round(r.fiqScore);
             const fiqScore  = injuryAdjustedFiqScore(baseFiqScore, sp?.injuryStatus);
             const tierMatch = r.fiqTier?.match(/(\d+)/);
@@ -499,6 +517,7 @@ export async function loadDraftContext(params: {
             if (!allowedPositions.has(normalizePosition(fcv.position))) continue;
             const sp = spLookup2(fcv.playerName, fcv.position);
             if (sp && draftedIds.has(sp.playerId)) continue;
+            if (draftedNames.has(normalizeDraftName(fcv.playerName))) continue;
 
             const stats             = sp?.playerId ? statsByPlayerId.get(sp.playerId) : undefined;
             const realPtsPerGame    = stats ? computeRealPoints(stats.statsPerGame, scoringSettings) : 0;
