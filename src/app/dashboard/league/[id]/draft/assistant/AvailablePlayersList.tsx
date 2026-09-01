@@ -38,7 +38,11 @@ function fiqColor(score: number) {
 }
 
 const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
-type SortKey = 'fiqScore' | 'name' | 'tier';
+type SortKey = 'fiqScore' | 'name' | 'tier' | 'position';
+
+// Standard roster order, not alphabetical — QB/RB/WR/TE/K/DEF reads naturally;
+// anything unrecognized sorts after.
+const POSITION_ORDER: Record<string, number> = { QB: 0, RB: 1, WR: 2, TE: 3, K: 4, DEF: 5 };
 
 export default function AvailablePlayersList({ players }: Props) {
     const [search, setSearch]     = useState('');
@@ -51,8 +55,12 @@ export default function AvailablePlayersList({ players }: Props) {
             .filter(p => position === 'ALL' || p.position === position)
             .filter(p => !q || p.name.toLowerCase().includes(q))
             .sort((a, b) => {
-                if (sortKey === 'name')  return a.name.localeCompare(b.name);
-                if (sortKey === 'tier')  return a.tier - b.tier || b.fiqScore - a.fiqScore;
+                if (sortKey === 'name')     return a.name.localeCompare(b.name);
+                if (sortKey === 'tier')     return a.tier - b.tier || b.fiqScore - a.fiqScore;
+                if (sortKey === 'position') {
+                    const posDiff = (POSITION_ORDER[a.position] ?? 99) - (POSITION_ORDER[b.position] ?? 99);
+                    return posDiff || b.fiqScore - a.fiqScore;
+                }
                 return b.fiqScore - a.fiqScore;
             });
     }, [players, search, position, sortKey]);
@@ -71,6 +79,7 @@ export default function AvailablePlayersList({ players }: Props) {
                     >
                         <option value="fiqScore">Sort: FiQ Score</option>
                         <option value="tier">Sort: Tier</option>
+                        <option value="position">Sort: Position</option>
                         <option value="name">Sort: Name</option>
                     </select>
                 </div>
