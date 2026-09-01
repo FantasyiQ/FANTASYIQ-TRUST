@@ -1,7 +1,11 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { DraftRecommendation } from '@/lib/draft/scoring';
+import AvailablePlayersList, { type AvailablePlayer } from './AvailablePlayersList';
+import DraftBoardGrid, { type DraftBoardPick } from './DraftBoardGrid';
+
+const POLL_INTERVAL_MS = 15_000;
 
 interface DraftOption {
     draftId: string;
@@ -83,11 +87,14 @@ export default function DraftAssistantPanel({
 }: Props) {
     const [selectedDraftId,  setSelectedDraftId]  = useState(draftOptions[0]?.draftId ?? '');
     const [recommendations,  setRecommendations]  = useState<DraftRecommendation[] | null>(null);
+    const [availablePlayers, setAvailablePlayers] = useState<AvailablePlayer[]>([]);
+    const [picksSoFar,       setPicksSoFar]       = useState<DraftBoardPick[]>([]);
     const [meta,             setMeta]             = useState<Meta | null>(null);
     const [tradeDownNote,    setTradeDownNote]    = useState<string | null>(null);
     const [binding,          setBinding]          = useState<BindingDebug | null>(null);
     const [loading,          setLoading]          = useState(false);
     const [error,            setError]            = useState<string | null>(null);
+    const [lastUpdated,      setLastUpdated]      = useState<Date | null>(null);
 
     const fetchRecommendations = useCallback(async () => {
         if (!selectedDraftId) return;
@@ -108,15 +115,42 @@ export default function DraftAssistantPanel({
                 throw new Error(data.error ?? 'Failed to load recommendations');
             }
             setRecommendations(data.recommendations);
+            setAvailablePlayers((data.availablePlayers ?? []).map((p: AvailablePlayer & { sleeperPlayerId: string }) => ({ ...p, id: p.sleeperPlayerId })));
+            setPicksSoFar((data.picksSoFar ?? []).map((p: DraftBoardPick & { sleeperPlayerId: string }) => ({ ...p, playerId: p.sleeperPlayerId })));
             setMeta(data.meta);
             setTradeDownNote(data.tradeDownNote ?? null);
             setBinding(data.binding ?? null);
+            setLastUpdated(new Date());
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load recommendations');
         } finally {
             setLoading(false);
         }
     }, [leagueId, selectedDraftId, myRosterId]);
+
+    // Auto-refresh while the selected draft is actually live — stops once
+    // complete or if the draft isn't in progress. Manual "Get Recommendations"/
+    // "Refresh" still works on top of this for an immediate pull.
+    const selectedDraft = draftOptions.find(d => d.draftId === selectedDraftId);
+    const isLive = selectedDraft?.status === 'drafting';
+    const pollingRef = useRef(fetchRecommendations);
+    pollingRef.current = fetchRecommendations;
+
+    useEffect(() => {
+        if (!isLive) return;
+        const id = setInterval(() => { void pollingRef.current(); }, POLL_INTERVAL_MS);
+        return () => clearInterval(id);
+    }, [isLive, selectedDraftId]);
+
+    const [secondsAgo, setSecondsAgo] = useState(0);
+    useEffect(() => {
+        if (!lastUpdated) return;
+        setSecondsAgo(0);
+        const id = setInterval(() => {
+            setSecondsAgo(Math.floor((Date.now() - lastUpdated.getTime()) / 1000));
+        }, 1000);
+        return () => clearInterval(id);
+    }, [lastUpdated]);
 
     const onTheClockTeam = meta?.onTheClockRosterId
         ? rosterOptions.find(r => r.rosterId === meta.onTheClockRosterId)?.displayName
@@ -170,6 +204,15 @@ export default function DraftAssistantPanel({
                             >
                                 ↺ Refresh
                             </button>
+                        )}
+                        {isLive && (
+                            <span className="text-[10px] text-gray-600 flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                                Live — auto-updates every 15s
+                            </span>
+                        )}
+                        {lastUpdated && (
+                            <span className="text-[10px] text-gray-600">Updated {secondsAgo}s ago</span>
                         )}
                     </div>
                 </div>
@@ -329,6 +372,19 @@ export default function DraftAssistantPanel({
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center">
                     <p className="text-gray-400 text-sm">No available players found. The draft may be complete.</p>
                 </div>
+            )}
+
+            {meta && (
+                <DraftBoardGrid
+                    picksSoFar={picksSoFar}
+                    rosterOptions={rosterOptions}
+                    totalRounds={meta.totalRounds}
+                    onTheClockRosterId={meta.onTheClockRosterId}
+                />
+            )}
+
+            {availablePlayers.length > 0 && (
+                <AvailablePlayersList players={availablePlayers} />
             )}
         </div>
     );

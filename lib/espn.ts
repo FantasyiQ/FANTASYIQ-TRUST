@@ -171,7 +171,7 @@ export interface EspnNormalizedLeague {
 // Uses Node.js https directly to bypass the Fetch spec's forbidden-header
 // restriction which silently strips the Cookie header in some runtimes.
 
-function espnFetch<T>(path: string, espnS2: string, swid: string): Promise<T> {
+function espnFetch<T>(path: string, espnS2: string, swid: string, extraHeaders?: Record<string, string>): Promise<T> {
     const decodedS2 = espnS2.includes('%') ? decodeURIComponent(espnS2) : espnS2;
 
     return new Promise((resolve, reject) => {
@@ -185,6 +185,7 @@ function espnFetch<T>(path: string, espnS2: string, swid: string): Promise<T> {
                     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
                     Accept:       'application/json',
                     Referer:      'https://fantasy.espn.com/',
+                    ...extraHeaders,
                 },
             },
             (res) => {
@@ -626,4 +627,129 @@ export async function getEspnTransactions(
                 toTeamId:   item.toTeamId,
             })),
         }));
+}
+
+// ─── Live draft picks + player pool ─────────────────────────────────────────
+//
+// UNVERIFIED: ESPN's Fantasy API is private and unversioned. The mDraftDetail
+// and kona_player_info views and the field names below are based on general
+// knowledge of ESPN's API, not confirmed against a live in-progress ESPN
+// draft in this codebase — same category of uncertainty as the NFL Fantasy
+// integration in lib/nfl.ts. Every fetch here is wrapped so a shape mismatch
+// fails soft (returns an empty/partial result) rather than throwing — check
+// field names against a real draft's raw response before fully trusting this.
+
+export interface EspnDraftPick {
+    overallPickNumber: number;
+    roundId:           number;
+    roundPickNumber:   number;
+    teamId:            number;
+    playerId:          number;
+}
+
+interface EspnDraftDetailResponse {
+    draftDetail?: {
+        drafted?:    boolean;
+        inProgress?: boolean;
+        picks?:      EspnDraftPick[];
+    };
+}
+
+export async function getEspnDraftDetail(
+    leagueId: string, season: number, espnS2: string, swid: string,
+): Promise<{ drafted: boolean; inProgress: boolean; picks: EspnDraftPick[] }> {
+    const raw = await withRetry(() => espnFetch<EspnDraftDetailResponse>(
+        `/seasons/${season}/segments/0/leagues/${leagueId}?view=mDraftDetail`,
+        espnS2, swid,
+    ));
+    return {
+        drafted:    raw.draftDetail?.drafted ?? false,
+        inProgress: raw.draftDetail?.inProgress ?? false,
+        picks:      raw.draftDetail?.picks ?? [],
+    };
+}
+
+export interface EspnRawPlayerEntry {
+    id:                 number;
+    fullName:           string;
+    defaultPositionId:  number;
+    proTeamId:          number;
+    injured?:           boolean;
+    injuryStatus?:      string;
+}
+
+interface EspnPlayerInfoResponse {
+    players?: Array<{ player: EspnRawPlayerEntry }>;
+}
+
+/** Full player universe (not roster-scoped) — needed since draft picks only carry a numeric playerId, no name. */
+export async function getEspnPlayerPool(
+    leagueId: string, season: number, espnS2: string, swid: string, limit = 3000,
+): Promise<EspnRawPlayerEntry[]> {
+    const filter = JSON.stringify({
+        players: { limit, sortPercOwned: { sortAsc: false, sortPriority: 1 } },
+    });
+    const raw = await withRetry(() => espnFetch<EspnPlayerInfoResponse>(
+        `/seasons/${season}/segments/0/leagues/${leagueId}?view=kona_player_info`,
+        espnS2, swid,
+        { 'X-Fantasy-Filter': filter },
+    ));
+    return (raw.players ?? []).map(p => p.player).filter(Boolean);
+}
+
+// ESPN's numeric NFL pro-team ID scheme — widely used in the fantasy-tools
+// community, but same "not verified live in this codebase" caveat applies.
+// Only affects the cosmetic team-abbreviation display, never player identity.
+const PRO_TEAM_MAP: Record<number, string> = {
+    1: 'ATL', 2: 'BUF', 3: 'CHI', 4: 'CIN', 5: 'CLE', 6: 'DAL', 7: 'DEN', 8: 'DET',
+    9: 'GB', 10: 'TEN', 11: 'IND', 12: 'KC', 13: 'LV', 14: 'LAR', 15: 'MIA', 16: 'MIN',
+    17: 'NE', 18: 'NO', 19: 'NYG', 20: 'NYJ', 21: 'PHI', 22: 'ARI', 23: 'PIT', 24: 'LAC',
+    25: 'SF', 26: 'SEA', 27: 'TB', 28: 'WSH', 29: 'CAR', 30: 'JAX', 33: 'BAL', 34: 'HOU',
+};
+
+export interface EspnDraftBoardPick {
+    pickOverall:  number;
+    round:        number;
+    teamId:       string;
+    espnPlayerId: string;
+}
+
+export function normalizeEspnDraftPicks(picks: EspnDraftPick[]): EspnDraftBoardPick[] {
+    return picks
+        .slice()
+        .sort((a, b) => a.overallPickNumber - b.overallPickNumber)
+        .map(p => ({
+            pickOverall:  p.overallPickNumber,
+            round:        p.roundId,
+            teamId:       String(p.teamId),
+            espnPlayerId: String(p.playerId),
+        }));
+}
+
+export interface EspnAvailablePlayer {
+    espnPlayerId: string;
+    name:         string;
+    position:     string;
+    team:         string | null;
+    injuryStatus: string | null;
+}
+
+/** Shared per-player normalizer — used for both available and already-drafted players, since a draft pick only carries an ID and needs the same name/position/team resolution. */
+export function normalizeEspnPlayerEntry(p: EspnRawPlayerEntry): EspnAvailablePlayer {
+    return {
+        espnPlayerId: String(p.id),
+        name:         p.fullName,
+        position:     POSITION_MAP[p.defaultPositionId] ?? 'N/A',
+        team:         PRO_TEAM_MAP[p.proTeamId] ?? null,
+        injuryStatus: p.injuryStatus ?? null,
+    };
+}
+
+export function normalizeEspnPlayerPool(
+    raw: EspnRawPlayerEntry[],
+    draftedIds: Set<string>,
+): EspnAvailablePlayer[] {
+    return raw
+        .filter(p => !draftedIds.has(String(p.id)))
+        .map(normalizeEspnPlayerEntry);
 }

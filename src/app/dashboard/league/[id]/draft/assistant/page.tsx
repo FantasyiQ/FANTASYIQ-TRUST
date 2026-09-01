@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { getLeagueDrafts, getLeagueRosters, getLeagueUsers } from '@/lib/sleeper';
 import DraftCenterTabBar from '../DraftCenterTabBar';
 import DraftAssistantPanel from './DraftAssistantPanel';
+import EspnLiveDraftPanel from './EspnLiveDraftPanel';
 import { trackFeature } from '@/app/actions/analytics';
 
 export default async function DraftAssistantPage({
@@ -37,7 +38,25 @@ export default async function DraftAssistantPage({
 
     if (!league || league.userId !== session.user.id) notFound();
 
-    if (league.platform !== 'sleeper' || league.leagueType !== 'Dynasty') {
+    if (league.platform === 'espn') {
+        return (
+            <div className="space-y-6">
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <h1 className="text-2xl font-bold text-white">Draft War Room</h1>
+                        <p className="text-gray-500 text-sm mt-0.5">{league.leagueName}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                        <div className="text-[10px] font-bold tracking-widest text-[#D4AF37]">FantasyiQ</div>
+                    </div>
+                </div>
+                <DraftCenterTabBar leagueId={id} isDynasty={league.leagueType === 'Dynasty'} />
+                <EspnLiveDraftPanel leagueId={id} />
+            </div>
+        );
+    }
+
+    if (league.platform !== 'sleeper') {
         return (
             <div className="space-y-6">
                 <div className="flex items-start justify-between gap-4">
@@ -48,7 +67,7 @@ export default async function DraftAssistantPage({
                 </div>
                 <DraftCenterTabBar leagueId={id} isDynasty={league.leagueType === 'Dynasty'} />
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center">
-                    <p className="text-gray-400 text-sm">Live Draft Assistant is available for Sleeper Dynasty leagues only.</p>
+                    <p className="text-gray-400 text-sm">Live Draft is available for Sleeper and ESPN leagues only.</p>
                 </div>
             </div>
         );

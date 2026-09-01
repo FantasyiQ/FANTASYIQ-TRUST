@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 const ALL_TABS = [
     { key: 'strategy',  label: 'Draft Board',  path: 'strategy',  dynastyOnly: false },
     { key: 'mock',      label: 'Mock Draft',   path: 'mock',      dynastyOnly: false },
-    { key: 'assistant', label: 'Live Draft',   path: 'assistant', dynastyOnly: true  },
+    { key: 'assistant', label: 'Live Draft',   path: 'assistant', dynastyOnly: false },
     { key: 'report',    label: 'Draft Report', path: 'report',    dynastyOnly: true  },
 ] as const;
 

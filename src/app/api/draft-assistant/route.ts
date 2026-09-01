@@ -72,9 +72,30 @@ export async function GET(req: NextRequest): Promise<Response> {
     const recommendations = rankCandidates(ctx);
     const tradeDownNote   = detectTradeDown(ctx);
 
+    // ctx.availablePlayers only covers undrafted players by definition — the
+    // Draft Board grid needs names for ALREADY-picked players too, so resolve
+    // picksSoFar's bare sleeperPlayerIds against the same player table.
+    const pickedIds = ctx.picksSoFar.map(p => p.sleeperPlayerId);
+    const pickedPlayers = pickedIds.length > 0
+        ? await prisma.sleeperPlayer.findMany({
+            where:  { playerId: { in: pickedIds } },
+            select: { playerId: true, fullName: true, position: true },
+        })
+        : [];
+    const pickedPlayerById = new Map(pickedPlayers.map(p => [p.playerId, p]));
+    const picksSoFar = ctx.picksSoFar.map(p => ({
+        ...p,
+        name:     pickedPlayerById.get(p.sleeperPlayerId)?.fullName ?? null,
+        position: pickedPlayerById.get(p.sleeperPlayerId)?.position ?? null,
+    }));
+
     return Response.json({
         recommendations,
         tradeDownNote,
+        // Full pool + pick history for the Available Players list and Draft Board
+        // grid — recommendations above is a scored/truncated subset of the same data.
+        availablePlayers: ctx.availablePlayers,
+        picksSoFar,
         meta: {
             currentPick:        ctx.draftMeta.currentPickOverall,
             myNextPick:         ctx.draftMeta.myNextPickOverall,
