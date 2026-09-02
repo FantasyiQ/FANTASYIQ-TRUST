@@ -549,22 +549,16 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
 
     // ── ESPN branch: use stored standings — no Sleeper API calls ──────────────
     if (league.platform === 'espn') {
-        type EspnRosterEntry = { fullName: string; position: string };
+        type EspnPlayer = { name: string; position: string };
         type EspnTeam = {
             teamId: number; name: string;
             wins: number; losses: number; ties: number; fpts: number;
-            // Real ESPN syncs (getEspnFullSync/normalizeEspnLeague) write roster
-            // players here, not a `players` field — that field is never actually
-            // populated by any sync path, so reading it always returned an empty
-            // roster for every ESPN league's team rankings.
-            roster?: EspnRosterEntry[];
+            players?: EspnPlayer[];
         };
         const espnTeams = (league.standings as EspnTeam[] | null) ?? [];
 
         const rosterDtvList = espnTeams.map(team => {
-            const skillPlayers = (team.roster ?? [])
-                .map(p => ({ name: p.fullName, position: p.position }))
-                .filter(p => RANKED_POSITIONS.has(p.position));
+            const skillPlayers = (team.players ?? []).filter(p => RANKED_POSITIONS.has(p.position));
             const scoredPlayers = skillPlayers
                 .map(p => {
                     const entry = dtvByExactName.get(p.name.toLowerCase()) ?? dtvByNormName.get(normalizeName(p.name));
