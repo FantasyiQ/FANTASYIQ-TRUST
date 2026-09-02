@@ -147,7 +147,7 @@ function PlayerRankingsTable({
     );
 }
 
-function TeamRankingsTable({ rankings }: { rankings: TeamRankingRow[] }) {
+export function TeamRankingsTable({ rankings, valueLabel = 'Total DTV' }: { rankings: TeamRankingRow[]; valueLabel?: string }) {
     return (
         <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -157,7 +157,7 @@ function TeamRankingsTable({ rankings }: { rankings: TeamRankingRow[] }) {
                         <th className="px-3 py-3 font-medium">Owner</th>
                         <th className="px-3 py-3 font-medium">Top Player</th>
                         <th className="px-3 py-3 font-medium text-right">Players</th>
-                        <th className="px-3 py-3 font-medium text-right">Total DTV</th>
+                        <th className="px-3 py-3 font-medium text-right">{valueLabel}</th>
                         <th className="px-4 py-3 font-medium text-right">Tier</th>
                     </tr>
                 </thead>
@@ -193,7 +193,7 @@ function TeamRankingsTable({ rankings }: { rankings: TeamRankingRow[] }) {
     );
 }
 
-function PowerRankingsTable({ rankings, preseason, lastSeasonRankings }: { rankings: PowerRankingRow[]; preseason: boolean; lastSeasonRankings: boolean }) {
+export function PowerRankingsTable({ rankings, preseason, lastSeasonRankings }: { rankings: PowerRankingRow[]; preseason: boolean; lastSeasonRankings: boolean }) {
     return (
         <div className="overflow-x-auto">
             {lastSeasonRankings && (

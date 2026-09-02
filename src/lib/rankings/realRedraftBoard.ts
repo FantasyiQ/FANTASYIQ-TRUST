@@ -128,6 +128,11 @@ export interface RealRedraftPlayer {
     hasRealData:    boolean;
     projPtsPerGame: number | null;        // real projected points — only set when hasRealData is false
     hasProjData:    boolean;
+    // Value Over Replacement — the same real, season/opportunity-driven
+    // value the board is sorted by. Already computed and present on every
+    // returned player at runtime; typed here so callers (e.g. redraft
+    // team-value aggregation) can read it without re-deriving it.
+    vor:            number;
 }
 
 // Real DEF starter slots for this league — DEF has no real ADP source, so
