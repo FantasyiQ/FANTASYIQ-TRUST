@@ -117,6 +117,38 @@ function scoringTypeToPpr(scoringType: string | null): 0 | 0.5 | 1 {
     return 0;
 }
 
+function aggregateTeam(rosterPlayers: RosterPlayer[]): { breakdown: PositionalBreakdown; totalRosterValue: number } {
+    const breakdown: PositionalBreakdown = { QB: 0, RB: 0, WR: 0, TE: 0, Bench: 0 };
+    for (const p of rosterPlayers) {
+        if (p.position === 'QB')      breakdown.QB    += p.finalDtv;
+        else if (p.position === 'RB') breakdown.RB    += p.finalDtv;
+        else if (p.position === 'WR') breakdown.WR    += p.finalDtv;
+        else if (p.position === 'TE') breakdown.TE    += p.finalDtv;
+        else                          breakdown.Bench += p.finalDtv;
+    }
+    for (const k of Object.keys(breakdown) as (keyof PositionalBreakdown)[]) {
+        breakdown[k] = Math.round(breakdown[k] * 10) / 10;
+    }
+    const totalRosterValue = Math.round(rosterPlayers.reduce((s, p) => s + p.finalDtv, 0) * 10) / 10;
+    return { breakdown, totalRosterValue };
+}
+
+// Real ESPN syncs (src/app/api/espn/sync/route.ts) persist each team's roster
+// under standings[].players as { name, position, lineupSlot } — no stable
+// per-player ID, so team/age/injuryStatus are resolved by name via the same
+// resolveSleeper() lookup used for the fcRows/DTV pass above.
+interface EspnStandingsPlayer {
+    name: string;
+    position: string;
+}
+interface EspnStandingsTeam {
+    teamId: number;
+    name: string;
+    ownerId: string | null;
+    ownerName: string | null;
+    players?: EspnStandingsPlayer[];
+}
+
 // Tiers are league-relative: each team's rank within the league determines its
 // tier, so the model is format-agnostic and scales to any league size.
 // Percentile: 0.0 = top of league, 1.0 = bottom of league.
@@ -156,6 +188,8 @@ export async function GET(
             totalRosters:    true,
             assignedPlanId:   true,
             assignedPlanType: true,
+            platform:         true,
+            standings:        true,
         },
     });
     if (!league) {
@@ -171,11 +205,16 @@ export async function GET(
     const ppr             = scoringTypeToPpr(league.scoringType);
     const superflex       = leagueSettings.sfSlots > 0;
     const leagueSize      = league.totalRosters;
+    const isEspn           = league.platform === 'espn';
 
-    // 2. Fetch Sleeper rosters + members + dynasty universe in parallel
-    const [rosters, members, fcRows, sleeperAllPlayers, latestSnapshot] = await Promise.all([
-        getLeagueRosters(leagueId),
-        getLeagueUsers(leagueId),
+    // 2. Fetch dynasty universe (both platforms) + Sleeper rosters/members
+    //    (Sleeper only — an ESPN leagueId isn't a valid Sleeper league, so
+    //    skip these calls entirely rather than let them fail against it).
+    const [rosters, members] = isEspn
+        ? [[], []] as [Awaited<ReturnType<typeof getLeagueRosters>>, Awaited<ReturnType<typeof getLeagueUsers>>]
+        : await Promise.all([getLeagueRosters(leagueId), getLeagueUsers(leagueId)]);
+
+    const [fcRows, sleeperAllPlayers, latestSnapshot] = await Promise.all([
         prisma.fantasyCalcValue.findMany({
             where: { OR: [{ dynastyValue: { gt: 0 } }, { redraftValue: { gt: 0 } }] },
             select: {
@@ -202,11 +241,12 @@ export async function GET(
     // as a final fallback. See productionSignals.ts.
     const statsByPlayerId = await resolveProductionSignals(sleeperAllPlayers.map(p => p.playerId));
 
-    // 3. Resolve all player IDs appearing on any roster
+    // 3. Resolve all player IDs appearing on any roster (Sleeper only — ESPN
+    //    rosters carry no Sleeper playerId, resolved by name instead below)
     const allPlayerIds = [...new Set(
         rosters.flatMap(r => r.players ?? [])
     )];
-    const playerById = await getPlayers(allPlayerIds);
+    const playerById = isEspn ? {} : await getPlayers(allPlayerIds);
 
     // 4. Build Sleeper lookup by name+position (exact + normalized). Some real
     // players share an exact fullName (e.g. two "Justin Jefferson"s — WR/MIN and
@@ -361,73 +401,99 @@ export async function GET(
         }
     }
 
-    // 7. Build member display-name lookup keyed by user_id
+    // 7. Build member display-name lookup keyed by user_id (Sleeper only)
     const memberMap = new Map(members.map(m => [m.user_id, m]));
 
     // 8. Build each team's roster value
-    const teams: RosterTeam[] = rosters.map(roster => {
-        const member      = roster.owner_id ? memberMap.get(roster.owner_id) : undefined;
-        const displayName = member?.metadata?.team_name || member?.display_name || `Team ${roster.roster_id}`;
+    const teams: RosterTeam[] = isEspn
+        ? ((league.standings as EspnStandingsTeam[] | null) ?? []).map(team => {
+            const rosterPlayers: RosterPlayer[] = (team.players ?? [])
+                .map((p, idx) => {
+                    const nameLower = p.name.toLowerCase();
+                    const normd     = normalizeName(p.name);
+                    const entry     = dtvByName.get(nameLower) ?? dtvByName.get(normd) ?? null;
+                    const deltaInfo = deltaByName.get(nameLower) ?? deltaByName.get(normd) ?? null;
+                    const sl        = resolveSleeper(nameLower, p.position) ?? null;
 
-        const rosterPlayers: RosterPlayer[] = (roster.players ?? [])
-            .map(pid => {
-                const slim    = playerById[pid];
-                if (!slim) return null;
+                    const rawTeam  = sl?.team && sl.team !== 'FA' ? sl.team : null;
+                    const isTraded = !!(deltaInfo && deltaInfo.prevTeam !== null && deltaInfo.prevTeam !== rawTeam);
 
-                const nameLower = slim.full_name.toLowerCase();
-                const normd     = normalizeName(slim.full_name);
-                const entry     = dtvByName.get(nameLower) ?? dtvByName.get(normd) ?? null;
-                const deltaInfo = deltaByName.get(nameLower) ?? deltaByName.get(normd) ?? null;
+                    return {
+                        playerId:     `${team.teamId}-${idx}-${normd}`,
+                        name:         p.name,
+                        position:     p.position,
+                        team:         rawTeam,
+                        finalDtv:     entry?.finalDtv ?? 0,
+                        dynasty:      entry?.universe.dynasty ?? 0,
+                        redraft:      entry?.universe.redraft ?? 0,
+                        delta:        deltaInfo?.dynastyDelta ?? null,
+                        injuryStatus: entry?.universe.injuryStatus ?? sl?.injuryStatus ?? null,
+                        isNew:        deltaInfo?.isNew ?? false,
+                        isTraded,
+                    } satisfies RosterPlayer;
+                })
+                .sort((a, b) => b.finalDtv - a.finalDtv);
 
-                const rawTeam  = slim.team && slim.team !== 'FA' ? slim.team : null;
-                const isTraded = !!(deltaInfo && deltaInfo.prevTeam !== null && deltaInfo.prevTeam !== rawTeam);
+            const { breakdown, totalRosterValue } = aggregateTeam(rosterPlayers);
 
-                return {
-                    playerId:     pid,
-                    name:         slim.full_name,
-                    position:     slim.position,
-                    team:         rawTeam,
-                    finalDtv:     entry?.finalDtv ?? 0,
-                    dynasty:      entry?.universe.dynasty ?? 0,
-                    redraft:      entry?.universe.redraft ?? 0,
-                    delta:        deltaInfo?.dynastyDelta ?? null,
-                    injuryStatus: entry?.universe.injuryStatus ?? null,
-                    isNew:        deltaInfo?.isNew ?? false,
-                    isTraded,
-                } satisfies RosterPlayer;
-            })
-            .filter((p): p is RosterPlayer => p !== null)
-            .sort((a, b) => b.finalDtv - a.finalDtv);
+            return {
+                rosterId:            team.teamId,
+                ownerId:             team.ownerId,
+                displayName:         team.name || team.ownerName || `Team ${team.teamId}`,
+                rank:                0,            // assigned after sort
+                tier:                'Rebuilding', // overwritten after sort
+                totalRosterValue,
+                positionalBreakdown: breakdown,
+                players:             rosterPlayers,
+            } satisfies RosterTeam;
+        })
+        : rosters.map(roster => {
+            const member      = roster.owner_id ? memberMap.get(roster.owner_id) : undefined;
+            const displayName = member?.metadata?.team_name || member?.display_name || `Team ${roster.roster_id}`;
 
-        // Positional breakdown — QB/RB/WR/TE by position; everything else → Bench
-        const breakdown: PositionalBreakdown = { QB: 0, RB: 0, WR: 0, TE: 0, Bench: 0 };
-        for (const p of rosterPlayers) {
-            if (p.position === 'QB')      breakdown.QB    += p.finalDtv;
-            else if (p.position === 'RB') breakdown.RB    += p.finalDtv;
-            else if (p.position === 'WR') breakdown.WR    += p.finalDtv;
-            else if (p.position === 'TE') breakdown.TE    += p.finalDtv;
-            else                          breakdown.Bench += p.finalDtv;
-        }
-        // Round all values
-        for (const k of Object.keys(breakdown) as (keyof PositionalBreakdown)[]) {
-            breakdown[k] = Math.round(breakdown[k] * 10) / 10;
-        }
+            const rosterPlayers: RosterPlayer[] = (roster.players ?? [])
+                .map(pid => {
+                    const slim    = playerById[pid];
+                    if (!slim) return null;
 
-        const totalRosterValue = Math.round(
-            rosterPlayers.reduce((s, p) => s + p.finalDtv, 0) * 10
-        ) / 10;
+                    const nameLower = slim.full_name.toLowerCase();
+                    const normd     = normalizeName(slim.full_name);
+                    const entry     = dtvByName.get(nameLower) ?? dtvByName.get(normd) ?? null;
+                    const deltaInfo = deltaByName.get(nameLower) ?? deltaByName.get(normd) ?? null;
 
-        return {
-            rosterId:            roster.roster_id,
-            ownerId:             roster.owner_id,
-            displayName,
-            rank:                0,            // assigned after sort
-            tier:                'Rebuilding', // overwritten after sort
-            totalRosterValue,
-            positionalBreakdown: breakdown,
-            players:             rosterPlayers,
-        };
-    });
+                    const rawTeam  = slim.team && slim.team !== 'FA' ? slim.team : null;
+                    const isTraded = !!(deltaInfo && deltaInfo.prevTeam !== null && deltaInfo.prevTeam !== rawTeam);
+
+                    return {
+                        playerId:     pid,
+                        name:         slim.full_name,
+                        position:     slim.position,
+                        team:         rawTeam,
+                        finalDtv:     entry?.finalDtv ?? 0,
+                        dynasty:      entry?.universe.dynasty ?? 0,
+                        redraft:      entry?.universe.redraft ?? 0,
+                        delta:        deltaInfo?.dynastyDelta ?? null,
+                        injuryStatus: entry?.universe.injuryStatus ?? null,
+                        isNew:        deltaInfo?.isNew ?? false,
+                        isTraded,
+                    } satisfies RosterPlayer;
+                })
+                .filter((p): p is RosterPlayer => p !== null)
+                .sort((a, b) => b.finalDtv - a.finalDtv);
+
+            const { breakdown, totalRosterValue } = aggregateTeam(rosterPlayers);
+
+            return {
+                rosterId:            roster.roster_id,
+                ownerId:             roster.owner_id,
+                displayName,
+                rank:                0,            // assigned after sort
+                tier:                'Rebuilding', // overwritten after sort
+                totalRosterValue,
+                positionalBreakdown: breakdown,
+                players:             rosterPlayers,
+            } satisfies RosterTeam;
+        });
 
     // 9. Sort by totalRosterValue desc, assign rank and percentile-based tiers.
     //    Tiers are league-relative so they automatically adapt to any DTV scale.
