@@ -13,7 +13,6 @@ import { computeRealRedraftBoard } from '@/lib/rankings/realRedraftBoard';
 import { STANDARD_SCORING } from '@/lib/rankings/leagueScoringPoints';
 import { getRedraftTeamRankings } from '@/lib/league/getRedraftTeamRankings';
 import RedraftRankingsView from './RedraftRankingsView';
-import RedraftTeamPowerView from './RedraftTeamPowerView';
 
 export default async function RankingsPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
@@ -58,31 +57,27 @@ export default async function RankingsPage({ params }: { params: Promise<{ id: s
         ]);
 
         return (
-            <div className="space-y-6">
-                <RedraftRankingsView
-                    players={players.map(p => ({
-                        playerId:       p.playerId,
-                        name:           p.name,
-                        position:       p.position,
-                        team:           p.team,
-                        age:            p.age,
-                        preciseAge:     calculatePreciseAge(p.birthDate),
-                        adp:            p.adp,
-                        realPtsPerGame: p.realPtsPerGame,
-                        hasRealData:    p.hasRealData,
-                        projPtsPerGame: p.projPtsPerGame,
-                        hasProjData:    p.hasProjData,
-                        injuryStatus:   p.injuryStatus,
-                    }))}
-                    leagueName={league?.leagueName ?? ''}
-                    season={league?.season ?? '2026'}
-                />
-                <RedraftTeamPowerView
-                    teamRankings={redraftRankings.teamRankings}
-                    powerRankings={redraftRankings.powerRankings}
-                    lastSeasonRankings={false}
-                />
-            </div>
+            <RedraftRankingsView
+                players={players.map(p => ({
+                    playerId:       p.playerId,
+                    name:           p.name,
+                    position:       p.position,
+                    team:           p.team,
+                    age:            p.age,
+                    preciseAge:     calculatePreciseAge(p.birthDate),
+                    adp:            p.adp,
+                    realPtsPerGame: p.realPtsPerGame,
+                    hasRealData:    p.hasRealData,
+                    projPtsPerGame: p.projPtsPerGame,
+                    hasProjData:    p.hasProjData,
+                    injuryStatus:   p.injuryStatus,
+                }))}
+                leagueName={league?.leagueName ?? ''}
+                season={league?.season ?? '2026'}
+                teamRankings={redraftRankings.teamRankings}
+                powerRankings={redraftRankings.powerRankings}
+                lastSeasonRankings={false}
+            />
         );
     }
 

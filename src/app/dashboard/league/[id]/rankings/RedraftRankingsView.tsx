@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { TeamRankingsTable, PowerRankingsTable } from '@/components/league/LeagueRankingsView';
+import type { TeamRankingRow, PowerRankingRow } from '@/lib/league/getLeagueRankings';
 
 const POS_COLORS: Record<string, string> = {
     QB:  'bg-red-900/40 text-red-300 border-red-800',
@@ -19,6 +21,8 @@ const INJURY_COLORS: Record<string, string> = {
 };
 
 const POSITIONS = ['All', 'QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
+
+type Tab = 'players' | 'teams' | 'power';
 
 interface PlayerRow {
     playerId:       string;
@@ -40,13 +44,7 @@ function formatAge(age: number | null, preciseAge: number | null): string {
     return age != null ? String(age) : '—';
 }
 
-interface Props {
-    players:    PlayerRow[];
-    leagueName: string;
-    season:     string;
-}
-
-export default function RedraftRankingsView({ players, leagueName, season }: Props) {
+function PlayerRankingsTable({ players }: { players: PlayerRow[] }) {
     const [posFilter, setPosFilter] = useState('All');
     const [search, setSearch]       = useState('');
 
@@ -61,117 +59,171 @@ export default function RedraftRankingsView({ players, leagueName, season }: Pro
     }, [players, posFilter, search]);
 
     return (
+        <div>
+            <div className="px-6 py-3 border-b border-gray-800 space-y-3">
+                <p className="text-gray-500 text-xs">
+                    Values adjust for position scarcity and your league&apos;s scoring format.
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex gap-1 flex-wrap">
+                        {POSITIONS.map(pos => (
+                            <button
+                                key={pos}
+                                type="button"
+                                onClick={() => setPosFilter(pos)}
+                                className={[
+                                    'px-3 py-1 rounded-lg text-xs font-semibold transition',
+                                    posFilter === pos
+                                        ? 'bg-[#D4AF37] text-gray-950'
+                                        : 'bg-gray-800 text-gray-400 hover:text-gray-200',
+                                ].join(' ')}
+                            >
+                                {pos}
+                            </button>
+                        ))}
+                    </div>
+                    <input
+                        type="text"
+                        placeholder="Search player or team…"
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        className="ml-auto bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/50 w-48"
+                    />
+                </div>
+            </div>
+            <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[420px]">
+                    <thead>
+                        <tr className="border-b border-gray-800">
+                            <th className="text-left px-4 py-3 text-gray-500 font-medium w-12">Rank</th>
+                            <th className="text-left px-4 py-3 text-gray-500 font-medium">Player</th>
+                            <th className="text-left px-3 py-3 text-gray-500 font-medium">Pos</th>
+                            <th className="text-left px-3 py-3 text-gray-500 font-medium hidden sm:table-cell">Team</th>
+                            <th className="text-right px-3 py-3 text-gray-500 font-medium hidden sm:table-cell">Age</th>
+                            <th className="text-right px-4 py-3 text-gray-500 font-medium">Pts/Gm</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {filtered.map((p, i) => (
+                            <tr key={p.playerId} className="border-t border-gray-800/50 hover:bg-gray-800/20 transition">
+                                <td className="px-4 py-2.5 text-gray-500 font-mono text-xs">{i + 1}</td>
+                                <td className="px-4 py-2.5">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="text-white font-medium">{p.name}</span>
+                                        {p.injuryStatus && p.injuryStatus !== 'Active' && (
+                                            <span className={`text-[10px] font-bold ${INJURY_COLORS[p.injuryStatus] ?? 'text-orange-400'}`}>
+                                                {p.injuryStatus.toUpperCase()}
+                                            </span>
+                                        )}
+                                    </div>
+                                </td>
+                                <td className="px-3 py-2.5">
+                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${POS_COLORS[p.position] ?? 'bg-gray-800 text-gray-400 border-gray-700'}`}>
+                                        {p.position}
+                                    </span>
+                                </td>
+                                <td className="px-3 py-2.5 text-gray-400 hidden sm:table-cell">
+                                    {p.team ?? <span className="text-gray-700">FA</span>}
+                                </td>
+                                <td className="px-3 py-2.5 text-right text-gray-400 hidden sm:table-cell whitespace-nowrap">
+                                    {formatAge(p.age, p.preciseAge)}
+                                </td>
+                                <td className="px-4 py-2.5 text-right font-bold text-[#D4AF37]">
+                                    {p.hasRealData ? (
+                                        p.realPtsPerGame!.toFixed(1)
+                                    ) : p.hasProjData ? (
+                                        <span title="No season stats yet — ranked by projected points">
+                                            {p.projPtsPerGame!.toFixed(1)}<span className="text-[10px] font-normal text-gray-500 ml-0.5">proj</span>
+                                        </span>
+                                    ) : p.adp < 999 ? (
+                                        <span className="font-normal text-gray-500" title="No season stats or projection yet — ranked by ADP">
+                                            ADP {p.adp}
+                                        </span>
+                                    ) : (
+                                        <span className="text-gray-600">—</span>
+                                    )}
+                                </td>
+                            </tr>
+                        ))}
+                        {filtered.length === 0 && (
+                            <tr>
+                                <td colSpan={6} className="px-4 py-10 text-center text-gray-600">No players found.</td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+            <div className="px-4 py-3 border-t border-gray-800 text-xs text-gray-600">
+                Real points/game computed under your league&apos;s exact scoring settings · rookies and stat-less players ranked by real projected points, ADP as a last resort · {filtered.length} players shown
+            </div>
+        </div>
+    );
+}
+
+interface Props {
+    players:            PlayerRow[];
+    leagueName:         string;
+    season:             string;
+    teamRankings:       TeamRankingRow[];
+    powerRankings:      PowerRankingRow[];
+    lastSeasonRankings: boolean;
+}
+
+export default function RedraftRankingsView({ players, leagueName, season, teamRankings, powerRankings, lastSeasonRankings }: Props) {
+    const [tab, setTab] = useState<Tab>('players');
+    const preseason = powerRankings.every(r => r.wins === 0 && r.losses === 0);
+
+    const tabs = [
+        { key: 'players' as Tab, label: 'Players' },
+        { key: 'teams'   as Tab, label: 'Teams' },
+        { key: 'power'   as Tab, label: 'Power' },
+    ];
+
+    return (
         <div className="space-y-5">
             {/* Header */}
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">Player Rankings</h1>
+                    <h1 className="text-2xl font-bold text-white">Rankings</h1>
                     <p className="text-gray-500 text-sm mt-0.5">{leagueName} · {season}</p>
                     <p className="text-gray-500 text-sm mt-1.5 max-w-xl">
-                        These rankings use your league&apos;s scoring to calculate each player&apos;s projected points, then adjust for positional value — how quickly each position falls off — and current draft trends.
-                    </p>
-                    <p className="text-gray-500 text-sm mt-1 max-w-xl">
-                        The result is an intuitive board that reflects true fantasy value in {leagueName}, not generic rankings.
+                        Player and team values use your league&apos;s scoring to calculate real projected points, opportunity, and positional value — not long-term or dynasty value.
                     </p>
                 </div>
                 <div className="text-[10px] font-bold tracking-widest text-[#D4AF37]">FantasyiQ</div>
             </div>
 
-            {/* Filters */}
-            <div className="flex flex-wrap items-center gap-2">
-                <div className="flex gap-1 flex-wrap">
-                    {POSITIONS.map(pos => (
-                        <button
-                            key={pos}
-                            type="button"
-                            onClick={() => setPosFilter(pos)}
-                            className={[
-                                'px-3 py-1 rounded-lg text-xs font-semibold transition',
-                                posFilter === pos
-                                    ? 'bg-[#D4AF37] text-gray-950'
-                                    : 'bg-gray-800 text-gray-400 hover:text-gray-200',
-                            ].join(' ')}
-                        >
-                            {pos}
-                        </button>
-                    ))}
-                </div>
-                <input
-                    type="text"
-                    placeholder="Search player or team…"
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    className="ml-auto bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/50 w-48"
-                />
-            </div>
-
-            {/* Table */}
             <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm min-w-[420px]">
-                        <thead>
-                            <tr className="border-b border-gray-800">
-                                <th className="text-left px-4 py-3 text-gray-500 font-medium w-12">Rank</th>
-                                <th className="text-left px-4 py-3 text-gray-500 font-medium">Player</th>
-                                <th className="text-left px-3 py-3 text-gray-500 font-medium">Pos</th>
-                                <th className="text-left px-3 py-3 text-gray-500 font-medium hidden sm:table-cell">Team</th>
-                                <th className="text-right px-3 py-3 text-gray-500 font-medium hidden sm:table-cell">Age</th>
-                                <th className="text-right px-4 py-3 text-gray-500 font-medium">Pts/Gm</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filtered.map((p, i) => (
-                                <tr key={p.playerId} className="border-t border-gray-800/50 hover:bg-gray-800/20 transition">
-                                    <td className="px-4 py-2.5 text-gray-500 font-mono text-xs">{i + 1}</td>
-                                    <td className="px-4 py-2.5">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="text-white font-medium">{p.name}</span>
-                                            {p.injuryStatus && p.injuryStatus !== 'Active' && (
-                                                <span className={`text-[10px] font-bold ${INJURY_COLORS[p.injuryStatus] ?? 'text-orange-400'}`}>
-                                                    {p.injuryStatus.toUpperCase()}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="px-3 py-2.5">
-                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${POS_COLORS[p.position] ?? 'bg-gray-800 text-gray-400 border-gray-700'}`}>
-                                            {p.position}
-                                        </span>
-                                    </td>
-                                    <td className="px-3 py-2.5 text-gray-400 hidden sm:table-cell">
-                                        {p.team ?? <span className="text-gray-700">FA</span>}
-                                    </td>
-                                    <td className="px-3 py-2.5 text-right text-gray-400 hidden sm:table-cell whitespace-nowrap">
-                                        {formatAge(p.age, p.preciseAge)}
-                                    </td>
-                                    <td className="px-4 py-2.5 text-right font-bold text-[#D4AF37]">
-                                        {p.hasRealData ? (
-                                            p.realPtsPerGame!.toFixed(1)
-                                        ) : p.hasProjData ? (
-                                            <span title="No season stats yet — ranked by projected points">
-                                                {p.projPtsPerGame!.toFixed(1)}<span className="text-[10px] font-normal text-gray-500 ml-0.5">proj</span>
-                                            </span>
-                                        ) : p.adp < 999 ? (
-                                            <span className="font-normal text-gray-500" title="No season stats or projection yet — ranked by ADP">
-                                                ADP {p.adp}
-                                            </span>
-                                        ) : (
-                                            <span className="text-gray-600">—</span>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))}
-                            {filtered.length === 0 && (
-                                <tr>
-                                    <td colSpan={6} className="px-4 py-10 text-center text-gray-600">No players found.</td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
+                <div className="flex gap-4 border-b border-gray-800 px-4 pt-3">
+                    {tabs.map(t => {
+                        const active = tab === t.key;
+                        return (
+                            <button
+                                key={t.key}
+                                onClick={() => setTab(t.key)}
+                                className={
+                                    active
+                                        ? 'font-semibold text-[#D4AF37] border-b-2 border-[#D4AF37] pb-2 text-sm transition'
+                                        : 'text-gray-500 hover:text-white text-sm transition pb-2'
+                                }
+                            >
+                                {t.label}
+                            </button>
+                        );
+                    })}
                 </div>
-                <div className="px-4 py-3 border-t border-gray-800 text-xs text-gray-600">
-                    Real points/game computed under your league&apos;s exact scoring settings · rookies and stat-less players ranked by real projected points, ADP as a last resort · {filtered.length} players shown
-                </div>
+                {tab === 'players' && <PlayerRankingsTable players={players} />}
+                {tab === 'teams' && (
+                    <div>
+                        <p className="px-6 py-2 border-b border-gray-800 text-xs text-gray-500">
+                            Team totals are Value Over Replacement — real season projections, opportunity, and your league&apos;s scoring, not long-term or dynasty value.
+                        </p>
+                        <TeamRankingsTable rankings={teamRankings} valueLabel="Total VOR" />
+                    </div>
+                )}
+                {tab === 'power' && (
+                    <PowerRankingsTable rankings={powerRankings} preseason={preseason} lastSeasonRankings={lastSeasonRankings} />
+                )}
             </div>
         </div>
     );
