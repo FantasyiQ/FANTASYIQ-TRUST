@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import type { LeagueRankingsData, PlayerRankingRow, TeamRankingRow, PowerRankingRow } from '@/lib/league/getLeagueRankings';
+import { normalizePosition } from '@/lib/draft/context';
 
 type Tab = 'players' | 'teams' | 'power';
 
@@ -22,13 +23,21 @@ const ROSTER_TIER_COLORS: Record<string, string> = {
 };
 
 const POS_COLORS: Record<string, string> = {
-    QB: 'bg-red-900/40 text-red-300 border-red-800',
-    RB: 'bg-green-900/40 text-green-300 border-green-800',
-    WR: 'bg-blue-900/40 text-blue-300 border-blue-800',
-    TE: 'bg-yellow-900/40 text-yellow-300 border-yellow-800',
+    QB:  'bg-red-900/40 text-red-300 border-red-800',
+    RB:  'bg-green-900/40 text-green-300 border-green-800',
+    WR:  'bg-blue-900/40 text-blue-300 border-blue-800',
+    TE:  'bg-yellow-900/40 text-yellow-300 border-yellow-800',
+    K:   'bg-gray-800 text-gray-400 border-gray-700',
+    IDP: 'bg-purple-900/40 text-purple-300 border-purple-700/60',
 };
 
-const POS_FILTER_OPTIONS = ['All', 'QB', 'RB', 'WR', 'TE'];
+// Filter chips only ever show groups this league actually rosters (see
+// availablePositions below) — a league with no K/DEF/IDP slots shouldn't
+// offer filters that always return nothing. Individual defensive positions
+// (DL/LB/DB/etc.) group under one IDP chip, same as the Live Draft
+// Assistant's Available Players list (normalizePosition), so a player row
+// still shows their real position badge (DL/LB/DB) — only the filter groups.
+const POS_FILTER_OPTIONS = ['All', 'QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'IDP'];
 
 function formatAge(age: number | null, preciseAge: number | null): string {
     if (preciseAge != null) return preciseAge.toFixed(1);
@@ -64,9 +73,17 @@ function PlayerRankingsTable({
     valueSyncedAt: string | null;
     leagueType:  string;
 }) {
+    // Only offer filter chips for position groups this league's rankings
+    // actually contain — a league with no K/DEF/IDP roster slots shouldn't
+    // show filters that always return an empty list.
+    const availablePositions = useMemo(() => {
+        const present = new Set(rankings.map(p => normalizePosition(p.position)));
+        return POS_FILTER_OPTIONS.filter(pos => pos === 'All' || present.has(pos));
+    }, [rankings]);
+
     const filtered = useMemo(() => {
         let list = rankings;
-        if (position !== 'All') list = list.filter(p => p.position === position);
+        if (position !== 'All') list = list.filter(p => normalizePosition(p.position) === position);
         if (search.trim()) {
             const q = search.toLowerCase();
             list = list.filter(p => p.name.toLowerCase().includes(q));
@@ -87,7 +104,7 @@ function PlayerRankingsTable({
                 )}
             <div className="flex items-center justify-between flex-wrap gap-3">
                 <div className="flex gap-2 flex-wrap">
-                    {POS_FILTER_OPTIONS.map(pos => (
+                    {availablePositions.map(pos => (
                         <button key={pos} onClick={() => onPosition(pos)}
                             className={`px-3 py-1 rounded-lg text-xs font-semibold transition border ${position === pos ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : 'bg-gray-800 text-gray-500 border-gray-700 hover:border-gray-500'}`}>
                             {pos}
