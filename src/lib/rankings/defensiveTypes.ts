@@ -81,6 +81,11 @@ export type KickerProjection = {
     missedXp:          number;
     floorMultiplier?:  number;
     ceilingMultiplier?: number;
+    // Real depthChartOrder===1 (confirmed current starter), when known —
+    // used to apply a starter floor so a real starter can never be scored
+    // as if they're a worthless backup. Undefined when depth-chart data
+    // wasn't available (e.g. seed/off-season projections).
+    isStarter?:        boolean;
 };
 
 export type DefenseProjection = {

@@ -281,14 +281,32 @@ function buildKickerEntities(
 ): RankedEntity[] {
     const sf = scarcityFactor(lineup.starters.K, lineup.teams, projections.length);
 
-    const intermediates = projections.map(p =>
-        buildIntermediate(
-            projectKickerPoints(p, scoring),
+    // Starter floor: a real depthChartOrder===1 kicker is only ever compared
+    // against how OTHER real starters project, never dragged down toward the
+    // full pool (which includes backups with no real path to points). Floor
+    // is the 20th percentile of starter projections — low enough not to
+    // inflate a bad starter, high enough that no real starter lands at
+    // valueScore 0 the way a genuinely irrelevant backup should. Backups
+    // (isStarter !== true) are untouched — this creates a real cliff between
+    // "has a job" and "doesn't," matching how kickers actually get traded.
+    const starterPoints = projections
+        .filter(p => p.isStarter)
+        .map(p => projectKickerPoints(p, scoring))
+        .sort((a, b) => a - b);
+    const starterBaseline = starterPoints.length > 0
+        ? starterPoints[Math.floor(0.2 * (starterPoints.length - 1))]
+        : 0;
+
+    const intermediates = projections.map(p => {
+        let projectedPoints = projectKickerPoints(p, scoring);
+        if (p.isStarter) projectedPoints = Math.max(projectedPoints, starterBaseline);
+        return buildIntermediate(
+            projectedPoints,
             sf,
             p.floorMultiplier   ?? 0.8,
             p.ceilingMultiplier ?? 1.2,
-        )
-    );
+        );
+    });
     const valueScores = normalizeToValueScore(intermediates.map(i => i.rawValue));
 
     const combined = projections
