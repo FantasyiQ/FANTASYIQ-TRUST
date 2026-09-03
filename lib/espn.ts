@@ -36,6 +36,10 @@ export interface EspnLeagueSettings {
     teams?: EspnTeam[];
     members?: EspnMember[];
     schedule?: EspnScheduleEntry[];
+    draftDetail?: {
+        drafted?:    boolean;
+        inProgress?: boolean;
+    };
 }
 
 export interface EspnTeam {
@@ -301,7 +305,7 @@ export async function getEspnFullSync(
     leagueId: string, season: number, espnS2: string, swid: string,
 ): Promise<EspnLeagueSettings> {
     return withRetry(() => espnFetch<EspnLeagueSettings>(
-        `/seasons/${season}/segments/0/leagues/${leagueId}?view=mSettings&view=mTeam&view=mRoster&view=mMatchup&view=mMatchupScore`,
+        `/seasons/${season}/segments/0/leagues/${leagueId}?view=mSettings&view=mTeam&view=mRoster&view=mMatchup&view=mMatchupScore&view=mDraftDetail`,
         espnS2, swid,
     ));
 }
@@ -534,6 +538,17 @@ export function deriveEspnRosterPositions(settings: EspnLeagueSettings['settings
     return positions;
 }
 
+// Mirrors Sleeper's draftStatus values ('pre_draft' | 'drafting' | 'complete')
+// so the shared League Phase Engine (src/lib/leaguePhase.ts) works the same
+// way for both platforms — it was previously ESPN-blind (this field was only
+// ever written by Sleeper sync paths), which forced every ESPN league into
+// PRE_DRAFT phase permanently, regardless of actual season progress.
+export function deriveEspnDraftStatus(espn: EspnLeagueSettings): string {
+    if (espn.draftDetail?.drafted)    return 'complete';
+    if (espn.draftDetail?.inProgress) return 'drafting';
+    return 'pre_draft';
+}
+
 export function deriveEspnStatus(espn: EspnLeagueSettings): string {
     if (espn.status?.isActive) return 'in_season';
     if (espn.scoringPeriodId === 0) return 'pre_draft';
@@ -552,6 +567,7 @@ export function buildCoreEspnLeagueFields(espn: EspnLeagueSettings) {
         rosterPositions: deriveEspnRosterPositions(espn.settings),
         scoringType:     deriveEspnScoringType(espn.settings),
         status:          deriveEspnStatus(espn),
+        draftStatus:     deriveEspnDraftStatus(espn),
     };
 }
 
