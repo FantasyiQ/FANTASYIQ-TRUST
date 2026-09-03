@@ -193,6 +193,17 @@ export function buildDefenseSeedProjections(teamIds?: string[]): DefenseProjecti
 
 // ── Position normaliser ────────────────────────────────────────────────────────
 
+// Every real Sleeper/scouting position code that normalizes to each IDP
+// bucket below — the reverse of toIdpPosition(). Used to widen a
+// SleeperPlayer query so it can't silently miss a real player just because
+// one source's label for a position ("EDGE", "CB") differs from another's
+// ("LB", "DB") for that same real player.
+export const IDP_POSITION_VARIANTS: Record<'DL' | 'LB' | 'DB', string[]> = {
+    DL: ['DL', 'DE', 'DT', 'NT'],
+    LB: ['LB', 'OLB', 'ILB', 'MLB', 'EDGE'],
+    DB: ['DB', 'CB', 'S', 'SS', 'FS', 'SAF'],
+};
+
 /**
  * Maps raw Sleeper position strings to canonical IDP positions.
  * Returns null for non-IDP positions.

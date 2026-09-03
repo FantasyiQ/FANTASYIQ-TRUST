@@ -20,6 +20,7 @@
 import { prisma } from '@/lib/prisma';
 import { computeRookieFiQTier } from '@/lib/dynasty/rookieRankings';
 import { buildSleeperNameResolver } from '@/lib/sleeperNameResolver';
+import { toIdpPosition, IDP_POSITION_VARIANTS } from '@/lib/rankings/seedProjections';
 import { captureError } from '@/lib/sentry';
 
 export const maxDuration = 300;
@@ -109,10 +110,31 @@ export async function GET(request: Request): Promise<Response> {
         // Broad fetch by position, not an exact-string match against FiQ's
         // own rookie names — a name-filtered query silently misses real
         // matches whenever the two sources spell a suffix differently (see
-        // sleeperNameResolver.ts's header for the full explanation).
-        const rookiePositions = [...new Set(rookies.map(r => r.position))];
+        // sleeperNameResolver.ts's header for the full explanation). Also
+        // broader than the raw rookie position VALUES themselves: FiQ's own
+        // scouting label for a rookie ("CB", "EDGE") is often not what
+        // Sleeper stores for that same real player ("DB", "LB") — a literal
+        // `position: { in: rookiePositions } }` filter can exclude the real
+        // match from the pool entirely while a same-named but unrelated
+        // player (whose position happened to match some OTHER rookie in the
+        // batch) stays in and wins the name-only fallback. Confirmed live:
+        // this exact mechanism attached a 2026 rookie CB's Sleeper ID to a
+        // retired RB who shares his name. Expand every rookie position to
+        // every real position code that normalizes to the same IDP bucket.
+        const rookiePositions = new Set<string>();
+        for (const pos of new Set(rookies.map(r => r.position))) {
+            const idpPos = toIdpPosition(pos);
+            if (!idpPos) { rookiePositions.add(pos); continue; }
+            for (const variant of IDP_POSITION_VARIANTS[idpPos]) rookiePositions.add(variant);
+        }
+        // yearsExp: 0 — this table is exclusively this year's incoming
+        // rookie class, so the ONLY valid candidates are real rookies.
+        // Without this, a rookie can collide with a same-named veteran who
+        // also shares the normalized position (confirmed live: two real
+        // "Chris Johnson"s both resolve to DB — a rookie and an unrelated
+        // veteran — and the name+position key alone can't tell them apart).
         const sleeperRows = await prisma.sleeperPlayer.findMany({
-            where:  { position: { in: rookiePositions } },
+            where:  { position: { in: [...rookiePositions] }, yearsExp: 0 },
             select: {
                 fullName:        true,
                 position:        true,
@@ -124,7 +146,14 @@ export async function GET(request: Request): Promise<Response> {
             },
         });
 
-        const resolveSleeper = buildSleeperNameResolver(sleeperRows);
+        // Resolve by NORMALIZED position (DL/LB/DB) on both sides, not the
+        // raw label — the join key must survive "EDGE" (FiQ) vs "LB"
+        // (Sleeper) meaning the same real position.
+        const resolveSleeperRaw = buildSleeperNameResolver(
+            sleeperRows.map(p => ({ ...p, position: toIdpPosition(p.position) ?? p.position })),
+        );
+        const resolveSleeper = (name: string, position: string) =>
+            resolveSleeperRaw(name, toIdpPosition(position) ?? position);
         // Fetch season projections for all matched players in one query
         const playerIds = sleeperRows.map(sp => sp.playerId);
         const projRows  = await prisma.playerProjection.findMany({

@@ -22,7 +22,7 @@ import { resolveProductionSignals } from '@/lib/rankings/productionSignals';
 import { calculateAge, isPlausiblyActivePlayer } from '@/lib/calculateAge';
 import { buildLeagueConfig } from '@/lib/rankings/leagueConfigBuilder';
 import { buildLeagueDefensiveAndKickerRankings } from '@/lib/rankings/defensiveEngine';
-import { buildIdpSeedProjections, buildKickerSeedProjections, buildDefenseSeedProjections, toIdpPosition } from '@/lib/rankings/seedProjections';
+import { buildIdpSeedProjections, buildKickerSeedProjections, buildDefenseSeedProjections, toIdpPosition, IDP_POSITION_VARIANTS } from '@/lib/rankings/seedProjections';
 import { buildProjectionsFromSleeperStats } from '@/lib/rankings/sleeperStatsAdapter';
 import type {
     DraftContext, DraftType, RosterProfile,
@@ -40,17 +40,6 @@ function injuryAdjustedFiqScore(fiqScore: number, injuryStatus: string | null | 
     const risk = INJURY_STATUS_RISK[injuryStatus ?? ''] ?? 0;
     return Math.max(1, fiqScore - Math.round(risk * DRAFT_INJURY_ADJUSTMENT_SCALE));
 }
-
-// Every real Sleeper position code that toIdpPosition() (seedProjections.ts)
-// normalizes to each IDP bucket — the reverse of that mapping, used to widen
-// a SleeperPlayer query so it can't silently miss a real player just because
-// FiQ's own rookie scouting label ("EDGE") differs from Sleeper's stored
-// position for that same player ("LB").
-const IDP_POSITION_VARIANTS: Record<'DL' | 'LB' | 'DB', string[]> = {
-    DL: ['DL', 'DE', 'DT', 'NT'],
-    LB: ['LB', 'OLB', 'ILB', 'MLB', 'EDGE'],
-    DB: ['DB', 'CB', 'S', 'SS', 'FS', 'SAF'],
-};
 
 /** Normalizes a player name for fuzzy fallback matching.
  *  Strips Jr/Sr/II/III/IV/V suffixes, apostrophes, periods, and extra whitespace. */
@@ -418,8 +407,14 @@ export async function loadDraftContext(params: {
             if (!idpPos) { neededPositions.add(pos); continue; }
             for (const variant of IDP_POSITION_VARIANTS[idpPos]) neededPositions.add(variant);
         }
+        // yearsExp: 0 — this table is exclusively this year's incoming
+        // rookie class, so the ONLY valid candidates are real rookies.
+        // Without this, a rookie can collide with a same-named veteran who
+        // also shares the normalized position (confirmed live: two real
+        // "Chris Johnson"s both resolve to DB — a rookie and an unrelated
+        // veteran — and the name+position key alone can't tell them apart).
         const sleeperPlayers = await prisma.sleeperPlayer.findMany({
-            where:  { position: { in: [...neededPositions] } },
+            where:  { position: { in: [...neededPositions] }, yearsExp: 0 },
             select: { fullName: true, playerId: true, team: true, age: true, position: true, injuryStatus: true },
         });
 
