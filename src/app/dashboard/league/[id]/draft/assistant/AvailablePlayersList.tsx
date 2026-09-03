@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { normalizePosition } from '@/lib/draft/context';
 
 export interface AvailablePlayer {
     id:               string;   // sleeperPlayerId or espnPlayerId, platform-neutral here
@@ -25,20 +24,23 @@ const POS_COLORS: Record<string, string> = {
     WR:  'bg-green-900/40 text-green-300 border-green-700/60',
     TE:  'bg-orange-900/40 text-orange-300 border-orange-700/60',
     K:   'bg-gray-800 text-gray-400 border-gray-700',
-    IDP: 'bg-purple-900/40 text-purple-300 border-purple-700/60',
+    DEF: 'bg-gray-800 text-gray-400 border-gray-700',
+    DL:  'bg-purple-900/40 text-purple-300 border-purple-700/60',
+    LB:  'bg-violet-900/40 text-violet-300 border-violet-700/60',
+    DB:  'bg-fuchsia-900/40 text-fuchsia-300 border-fuchsia-700/60',
 };
 
-// Individual defensive positions (EDGE, DL, LB, DB, etc.) all display under a
-// single IDP badge/filter — same grouping the backend's normalizePosition()
-// already applies for allowedPositions, so a player showing up here for an
-// IDP league doesn't fall through the offense-only QB/RB/WR/TE/K/DEF set.
+// Every position comes through already as the real, specific position a
+// league actually drafts (DL/LB/DB, not a generic "IDP" bucket) — a league
+// like The Awakening picks individual defensive players by position, not a
+// whole team defense, so collapsing them into one label hid exactly the
+// distinction the draft room needs. Shown as-is; no grouping/normalizing.
 function displayPosition(pos: string): string {
-    const norm = normalizePosition(pos);
-    return norm === 'IDP' ? 'IDP' : pos;
+    return pos;
 }
 
 function posBadge(pos: string) {
-    return POS_COLORS[displayPosition(pos)] ?? 'bg-gray-800 text-gray-400 border-gray-700';
+    return POS_COLORS[pos] ?? 'bg-gray-800 text-gray-400 border-gray-700';
 }
 
 function fiqColor(score: number) {
@@ -48,12 +50,12 @@ function fiqColor(score: number) {
     return 'text-gray-400';
 }
 
-const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'IDP'];
+const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'DL', 'LB', 'DB'];
 type SortKey = 'fiqScore' | 'name' | 'tier' | 'position';
 
-// Standard roster order, not alphabetical — QB/RB/WR/TE/K/DEF reads naturally;
-// anything unrecognized (including all IDP positions) sorts after.
-const POSITION_ORDER: Record<string, number> = { QB: 0, RB: 1, WR: 2, TE: 3, K: 4, DEF: 5, IDP: 6 };
+// Standard roster order, not alphabetical — QB/RB/WR/TE/K/DEF/DL/LB/DB reads
+// naturally; anything unrecognized sorts after.
+const POSITION_ORDER: Record<string, number> = { QB: 0, RB: 1, WR: 2, TE: 3, K: 4, DEF: 5, DL: 6, LB: 7, DB: 8 };
 
 export default function AvailablePlayersList({ players }: Props) {
     const [search, setSearch]     = useState('');
