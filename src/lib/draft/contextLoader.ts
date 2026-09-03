@@ -374,8 +374,12 @@ export async function loadDraftContext(params: {
             select:  { playerName: true, position: true, fiqScore: true, fiqTier: true, opportunityScore: true, overallPick: true },
         });
 
+        // Broad fetch by position, not an exact-string match against FiQ's
+        // own rookie names — a name-filtered query silently misses real
+        // matches whenever the two sources spell a suffix differently (see
+        // the comment above draftedNames, and makeSpResolver below).
         const sleeperPlayers = await prisma.sleeperPlayer.findMany({
-            where:  { fullName: { in: rookies.map(r => r.playerName) } },
+            where:  { position: { in: [...new Set(rookies.map(r => r.position))] } },
             select: { fullName: true, playerId: true, team: true, age: true, position: true, injuryStatus: true },
         });
 
@@ -455,13 +459,17 @@ export async function loadDraftContext(params: {
                 select:  { playerName: true, position: true, dynastyValue: true, dynastyValueSf: true },
             });
 
-        const allFpdoNames = Array.from(new Set([
-            ...fcValues.map(v => v.playerName),
-            ...fcFpdo.map(v => v.playerName),
-        ]));
-
+        // Broad fetch, not an exact-string match against FantasyCalc's own
+        // playerName — a name-filtered query silently misses real matches
+        // whenever the two sources spell a suffix differently (see
+        // draftedNames above, and makeSpResolver below). This was the
+        // actual root cause of real active players like "Kenneth Walker
+        // III" / "Brian Thomas Jr." showing as FA with no team/age: the
+        // old `in: allFpdoNames` filter never even fetched their Sleeper
+        // row, since FantasyCalc's playerName carries the suffix and
+        // Sleeper's fullName doesn't.
         const sleeperPlayers = await prisma.sleeperPlayer.findMany({
-            where:  { fullName: { in: allFpdoNames }, active: true },
+            where:  { active: true },
             select: { fullName: true, playerId: true, team: true, age: true, position: true, injuryStatus: true },
         });
 

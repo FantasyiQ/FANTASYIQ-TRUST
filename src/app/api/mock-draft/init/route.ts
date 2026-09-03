@@ -39,6 +39,7 @@ import { buildLeagueDefensiveAndKickerRankings } from '@/lib/rankings/defensiveE
 import { buildIdpSeedProjections, buildKickerSeedProjections, buildDefenseSeedProjections, toIdpPosition } from '@/lib/rankings/seedProjections';
 import { buildProjectionsFromSleeperStats } from '@/lib/rankings/sleeperStatsAdapter';
 import { calculateAge, isPlausiblyActivePlayer } from '@/lib/calculateAge';
+import { buildSleeperNameResolver } from '@/lib/sleeperNameResolver';
 
 export const maxDuration = 30;
 
@@ -342,27 +343,6 @@ export async function GET(req: NextRequest): Promise<Response> {
     // ── Load player pool ───────────────────────────────────────────────────────
     let boardPlayers: MockPlayer[] = [];
 
-    // Some real players share an exact fullName (e.g. two "Justin Jefferson"s —
-    // WR/MIN and LB/CLE). Match name+position first; only fall back to a bare
-    // name match when that name is unambiguous, so we never silently attach one
-    // player's team/age/id to a different player's card.
-    function makeSleeperResolver<T extends { fullName: string; position: string }>(players: T[]) {
-        const byNamePos = new Map<string, T>();
-        const byNameCount = new Map<string, number>();
-        const byNameSingle = new Map<string, T>();
-        for (const p of players) {
-            const nameKey = p.fullName.toLowerCase();
-            byNamePos.set(`${nameKey}|${p.position}`, p);
-            byNameCount.set(nameKey, (byNameCount.get(nameKey) ?? 0) + 1);
-            byNameSingle.set(nameKey, p);
-        }
-        return (name: string, position: string): T | undefined => {
-            const nameKey = name.toLowerCase();
-            return byNamePos.get(`${nameKey}|${position}`)
-                ?? (byNameCount.get(nameKey) === 1 ? byNameSingle.get(nameKey) : undefined);
-        };
-    }
-
     if (isRookieDraft) {
         // Dynasty rookie draft: FiQ rookie rankings as the pool.
         //
@@ -393,13 +373,17 @@ export async function GET(req: NextRequest): Promise<Response> {
             select:  { playerName: true, position: true, fiqScore: true, fiqTier: true, height: true, weight: true, fortyTime: true },
         });
 
+        // Broad fetch by position, not an exact-string match against FiQ's own
+        // rookie names — a name-filtered query silently misses real matches
+        // whenever the two sources spell a suffix differently (see
+        // buildSleeperNameResolver's header).
         const sleeperPlayers = rookiesRaw.length > 0
             ? await prisma.sleeperPlayer.findMany({
-                where:  { fullName: { in: rookiesRaw.map(r => r.playerName) } },
+                where:  { position: { in: rookiePositions } },
                 select: { playerId: true, fullName: true, team: true, age: true, position: true, injuryStatus: true },
               })
             : [];
-        const resolveSleeper = makeSleeperResolver(sleeperPlayers);
+        const resolveSleeper = buildSleeperNameResolver(sleeperPlayers);
 
         // Exclude rookies already on a real roster in this league — already
         // drafted/rostered, not actually available. A rookie with no Sleeper
@@ -465,13 +449,22 @@ export async function GET(req: NextRequest): Promise<Response> {
             },
         });
 
+        // Broad fetch by position, not an exact-string match against
+        // FantasyCalc's own playerName — a name-filtered query silently
+        // misses real matches whenever the two sources spell a suffix
+        // differently (see buildSleeperNameResolver's header). This was
+        // the actual root cause of real active players like "Kenneth
+        // Walker III" / "Brian Thomas Jr." showing as FA with no
+        // team/age/image in the pool: FantasyCalc's playerName carries the
+        // suffix, Sleeper's fullName doesn't, so the old `in: [...]` filter
+        // never even fetched their Sleeper row.
         const sleeperPlayers = fcValues.length > 0
             ? await prisma.sleeperPlayer.findMany({
-                where:  { fullName: { in: fcValues.map(v => v.playerName) }, active: true },
+                where:  { position: { in: ['QB', 'RB', 'WR', 'TE'] }, active: true },
                 select: { playerId: true, fullName: true, team: true, age: true, position: true, injuryStatus: true },
               })
             : [];
-        const resolveSleeper = makeSleeperResolver(sleeperPlayers);
+        const resolveSleeper = buildSleeperNameResolver(sleeperPlayers);
 
         // League Scoring Points Engine: real per-league scoring adjustment on
         // top of the FantasyCalc market-consensus anchor — same source and

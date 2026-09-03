@@ -18,6 +18,7 @@ import { computeReportCard, type PoolPlayer, type RichRosterPlayer, type Franchi
 import { getLeagueContext } from '@/lib/trajectory/contextLoader';
 import { computeTeamTrajectoryForLeague } from '@/lib/trajectory/teamTrajectory';
 import type { LeaguePhaseResult } from '@/lib/leaguePhase';
+import { buildSleeperNameResolver } from '@/lib/sleeperNameResolver';
 
 export const maxDuration = 45;
 
@@ -75,25 +76,6 @@ export async function GET(req: NextRequest): Promise<Response> {
     // ── Player pool ────────────────────────────────────────────────────────────
     const pool: PoolPlayer[] = [];
 
-    // Some real players share an exact fullName (e.g. two "Justin Jefferson"s —
-    // WR/MIN and LB/CLE). Match name+position first; only fall back to a bare
-    // name match when that name is unambiguous, so we never silently attach one
-    // player's team/age/id to a different player's card.
-    function makeSleeperResolver<T extends { fullName: string; position: string }>(players: T[]) {
-        const byNamePos = new Map<string, T>();
-        const byNameCount = new Map<string, number>();
-        const byNameSingle = new Map<string, T>();
-        for (const p of players) {
-            byNamePos.set(`${p.fullName}|${p.position}`, p);
-            byNameCount.set(p.fullName, (byNameCount.get(p.fullName) ?? 0) + 1);
-            byNameSingle.set(p.fullName, p);
-        }
-        return (name: string, position: string): T | undefined => {
-            return byNamePos.get(`${name}|${position}`)
-                ?? (byNameCount.get(name) === 1 ? byNameSingle.get(name) : undefined);
-        };
-    }
-
     if (draftType === 'rookie') {
         const rookies = await prisma.rookieRankingsPlayer.findMany({
             where:   { season: '2026' },
@@ -101,11 +83,15 @@ export async function GET(req: NextRequest): Promise<Response> {
             select:  { playerName: true, position: true, fiqScore: true, fiqTier: true, opportunityScore: true },
         });
 
+        // Broad fetch by position, not an exact-string match against FiQ's
+        // own rookie names — a name-filtered query silently misses real
+        // matches whenever the two sources spell a suffix differently (see
+        // buildSleeperNameResolver's header).
         const sleeperPlayers = await prisma.sleeperPlayer.findMany({
-            where:  { fullName: { in: rookies.map(r => r.playerName) } },
+            where:  { position: { in: [...new Set(rookies.map(r => r.position))] } },
             select: { fullName: true, playerId: true, team: true, age: true, position: true },
         });
-        const spResolver = makeSleeperResolver(sleeperPlayers);
+        const spResolver = buildSleeperNameResolver(sleeperPlayers);
 
         for (const r of rookies) {
             const sp = spResolver(r.playerName, r.position);
@@ -138,11 +124,15 @@ export async function GET(req: NextRequest): Promise<Response> {
                 select:  { playerName: true, position: true, dynastyValue: true, dynastyValueSf: true },
             });
 
+        // Broad fetch, not an exact-string match against FantasyCalc's own
+        // playerName — a name-filtered query silently misses real matches
+        // whenever the two sources spell a suffix differently (see
+        // buildSleeperNameResolver's header).
         const sleeperPlayers = await prisma.sleeperPlayer.findMany({
-            where:  { fullName: { in: fcValues.map(v => v.playerName) }, active: true },
+            where:  { active: true },
             select: { fullName: true, playerId: true, team: true, age: true, position: true },
         });
-        const spResolver = makeSleeperResolver(sleeperPlayers);
+        const spResolver = buildSleeperNameResolver(sleeperPlayers);
 
         for (const fcv of fcValues) {
             const sp       = spResolver(fcv.playerName, fcv.position);
