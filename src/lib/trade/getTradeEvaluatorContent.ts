@@ -18,6 +18,7 @@ import { buildLeagueConfig } from '@/lib/rankings/leagueConfigBuilder';
 import { buildLeagueDefensiveAndKickerRankings } from '@/lib/rankings/defensiveEngine';
 import { buildIdpSeedProjections, buildKickerSeedProjections, buildDefenseSeedProjections, toIdpPosition } from '@/lib/rankings/seedProjections';
 import { buildProjectionsFromSleeperStats } from '@/lib/rankings/sleeperStatsAdapter';
+import { calculateAge, isPlausiblyActivePlayer } from '@/lib/calculateAge';
 
 export type TradeEvaluatorContent = {
     leagueName:          string;
@@ -79,7 +80,7 @@ export async function getTradeEvaluatorContent(id: string): Promise<TradeEvaluat
     if (league.platform === 'espn') redirect(`/dashboard/league/${id}/overview`);
 
     const safeLeagueP = getSafeSleeperLeague(league.leagueId);
-    const [allPlayers, tradedPicks, dbUser] = await Promise.all([
+    const [allPlayersRaw, tradedPicks, dbUser] = await Promise.all([
         getPlayers(),
         getTradedPicks(league.leagueId),
         prisma.user.findUnique({
@@ -96,6 +97,23 @@ export async function getTradeEvaluatorContent(id: string): Promise<TradeEvaluat
             },
         }),
     ]);
+
+    // Sleeper's free feed leaves long-retired players marked active with
+    // stale data (see feedback_stale_sleeper_player_data) — team!=FA plus a
+    // real-age cutoff catches most of it, plus a depth-chart+experience
+    // check for the rarer case where team AND birthDate are both stale.
+    // Without this, thousands of retired/inactive players pollute the IDP
+    // defensive-value pool below, collapsing many real players onto the
+    // same tied low score (confirmed live: dropped a 14-player tie down to
+    // 4 for "The Awakening" once this filter was applied, matching what
+    // getLeagueRankings.ts already does).
+    const allPlayers: typeof allPlayersRaw = {};
+    for (const [pid, player] of Object.entries(allPlayersRaw)) {
+        const age = calculateAge(player.birthDate) ?? player.age ?? null;
+        if (!isPlausiblyActivePlayer({ team: player.team, age, depthChartOrder: player.depthChartOrder, yearsExp: player.yearsExp })) continue;
+        allPlayers[pid] = player;
+    }
+
     const sleeperLeague = await safeLeagueP;
     const safeRosters   = sleeperLeague.rosters;
     const members       = sleeperLeague.users;
