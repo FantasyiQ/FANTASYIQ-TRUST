@@ -5,6 +5,8 @@ import type { Player } from '@/lib/trade-engine';
 import { checkSearchLimit, getClientIp } from '@/lib/ratelimit';
 import { normalizePlayerName } from '@/lib/playerName';
 import { computePlayerBaseValue } from '@/lib/player-universe';
+import { resolveProductionSignals } from '@/lib/rankings/productionSignals';
+import { computeRealPoints, STANDARD_SCORING } from '@/lib/rankings/leagueScoringPoints';
 
 const VALUE_CAP = 9999;
 function normaliseFc(raw: number): number {
@@ -36,6 +38,33 @@ const DEPTH_BASE: Record<string, number> = {
     QB:  22, RB:  18, WR:  18, TE:  14,
     K:    8, DEF:  8,
 };
+
+// Same conservative season-point ceilings rookie-opportunity-sync already
+// uses to normalise projected production into a 0-1 ratio — reused here so
+// an unpriced offensive player (no FantasyCalc match, most commonly a
+// rookie) gets a value shaped by their real production/projection instead
+// of the flat DEPTH_BASE default every unpriced player at a position used
+// to land on identically. DEPTH_BASE itself becomes the ratio=0.5 midpoint;
+// a player with real production at or above the position cap scales up to
+// 1.6x it, a player with none scales down to 0.4x it. Deliberately capped
+// below what a FantasyCalc-priced veteran at the same production level
+// would show — there's no market consensus for these players, so this
+// stays conservative rather than guessing they're worth as much.
+const PROJ_CAPS: Record<string, number> = {
+    QB: 280, RB: 160, WR: 160, TE: 120,
+};
+
+function computeUnpricedOffenseValue(
+    position: string,
+    signal: { statsPerGame: Record<string, number>; gamesPlayed: number } | undefined,
+): number {
+    const base = DEPTH_BASE[position] ?? 10;
+    const cap  = PROJ_CAPS[position];
+    if (!cap) return base; // K/DEF etc — no real-production scaling here, defenseValues covers those client-side
+    const seasonPoints = signal ? computeRealPoints(signal.statsPerGame, STANDARD_SCORING) * signal.gamesPlayed : 0;
+    const ratio = Math.min(1, Math.max(0, seasonPoints / cap));
+    return Math.round(base * (0.4 + 1.2 * ratio) * 10) / 10;
+}
 
 function relevanceScore(name: string, q: string): number {
     const nl = name.toLowerCase();
@@ -119,9 +148,17 @@ export async function GET(request: NextRequest): Promise<Response> {
         depthChartOrder: p.depthChartOrder, yearsExp: p.yearsExp,
     }));
 
-    // 2. Merge: real per-league value (superflex + scoring settings aware,
+    // 2. Real per-game production for anyone with no FantasyCalc match —
+    // batched once up front, only for the players that'll actually need it.
+    const unpriced = activeMatches.filter(p => resolveFcForSleeperPlayer(p) === undefined && PROJ_CAPS[p.position]);
+    const productionSignals = unpriced.length > 0
+        ? await resolveProductionSignals(unpriced.map(p => p.playerId))
+        : new Map<string, { statsPerGame: Record<string, number>; gamesPlayed: number }>();
+
+    // 3. Merge: real per-league value (superflex + scoring settings aware,
     // same computePlayerBaseValue() the rest of the app uses) wins; fall
-    // back to position-based depth default when FantasyCalc has no match.
+    // back to real-production-scaled depth default when FantasyCalc has no
+    // match (see computeUnpricedOffenseValue above).
     const merged: Player[] = activeMatches.map((p, i) => {
         const fcRow  = resolveFcForSleeperPlayer(p);
         const baseValue = fcRow !== undefined
@@ -131,7 +168,7 @@ export async function GET(request: NextRequest): Promise<Response> {
                 redraft:   normaliseFc(fcRow.redraftValue),
                 redraftSf: normaliseFc(fcRow.redraftValueSf),
             }, p.position, leagueCtx)
-            : (DEPTH_BASE[p.position] ?? 10);
+            : computeUnpricedOffenseValue(p.position, productionSignals.get(p.playerId));
         return {
             rank:            i + 1,
             id:              p.playerId, // needed client-side so IDP/K/DEF search results can be
@@ -150,7 +187,7 @@ export async function GET(request: NextRequest): Promise<Response> {
         };
     });
 
-    // 3. Sort by name relevance, then higher baseValue first
+    // 4. Sort by name relevance, then higher baseValue first
     merged.sort((a, b) => {
         const ra = relevanceScore(a.name, ql);
         const rb = relevanceScore(b.name, ql);
