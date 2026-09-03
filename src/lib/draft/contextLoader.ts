@@ -8,6 +8,8 @@ import {
     getSleeperDraft,
     getActiveDraftPicks,
     resolveDraftType,
+    getPlayers,
+    getNflState,
     type SleeperRoster,
     type SleeperDraft,
     type SleeperDraftPickEntry,
@@ -17,6 +19,11 @@ import {
     computePositionScoringFactor, combineScoringFactors, STANDARD_SCORING,
 } from '@/lib/rankings/leagueScoringPoints';
 import { resolveProductionSignals } from '@/lib/rankings/productionSignals';
+import { calculateAge, isPlausiblyActivePlayer } from '@/lib/calculateAge';
+import { buildLeagueConfig } from '@/lib/rankings/leagueConfigBuilder';
+import { buildLeagueDefensiveAndKickerRankings } from '@/lib/rankings/defensiveEngine';
+import { buildIdpSeedProjections, buildKickerSeedProjections, buildDefenseSeedProjections, toIdpPosition } from '@/lib/rankings/seedProjections';
+import { buildProjectionsFromSleeperStats } from '@/lib/rankings/sleeperStatsAdapter';
 import type {
     DraftContext, DraftType, RosterProfile,
     DraftProfile, TrajectoryWindow, HorizonYears, RiskTolerance, DraftPoolADPEntry,
@@ -596,6 +603,86 @@ export async function loadDraftContext(params: {
                 opportunityScore: null,
                 injuryStatus:    sp?.injuryStatus ?? null,
             });
+        }
+
+        // K/DEF: FantasyCalc never prices either position (dynasty trade
+        // markets don't cover them) — the pool above is built entirely from
+        // FantasyCalcValue, so real kickers and team defenses never enter it
+        // at all. That's why every kicker rendered as "FA": there was
+        // nothing real to show. Pull them directly from SleeperPlayer
+        // instead, scored by the same real defensive/kicker engine already
+        // used on Rankings and Trade Evaluator — reused as-is, not modified,
+        // so this gets the same starter-floor/rookie-projection fixes
+        // already shipped there for free.
+        if (allowedPositions.has('K') || allowedPositions.has('DEF')) {
+            try {
+                const allPlayersRaw = await getPlayers();
+                const enginePlayers: typeof allPlayersRaw = {};
+                for (const [pid, player] of Object.entries(allPlayersRaw)) {
+                    const age = calculateAge(player.birthDate) ?? null;
+                    if (!isPlausiblyActivePlayer({ team: player.team, age, depthChartOrder: player.depthChartOrder, yearsExp: player.yearsExp })) continue;
+                    enginePlayers[pid] = player;
+                }
+
+                const rawDefScoring = (dbLeague.scoringSettings as Record<string, number> | null) ?? {};
+                const { scoring: defScoring, lineup: defLineup } = buildLeagueConfig(
+                    rawDefScoring,
+                    rosterPositions,
+                    totalTeams,
+                );
+
+                const idpPlayersForSeed: { playerId: string; position: 'DL' | 'LB' | 'DB' }[] = [];
+                const kickerIdsForSeed:  string[] = [];
+                for (const [pid, player] of Object.entries(enginePlayers)) {
+                    const idpPos = toIdpPosition(player.position);
+                    if (idpPos) idpPlayersForSeed.push({ playerId: pid, position: idpPos });
+                    else if (player.position === 'K') kickerIdsForSeed.push(pid);
+                }
+
+                const nflState    = await getNflState();
+                const statsSeason = nflState.season;
+                const liveProjections = await buildProjectionsFromSleeperStats(statsSeason, enginePlayers, rawDefScoring)
+                    ?? await buildProjectionsFromSleeperStats(String(Number(statsSeason) - 1), enginePlayers, rawDefScoring);
+
+                const idpProjections     = liveProjections?.idpProjections     ?? buildIdpSeedProjections(idpPlayersForSeed);
+                const kickerProjections  = liveProjections?.kickerProjections  ?? buildKickerSeedProjections(kickerIdsForSeed);
+                const defenseProjections = liveProjections?.defenseProjections ?? buildDefenseSeedProjections();
+
+                const defRankings = buildLeagueDefensiveAndKickerRankings(
+                    defScoring, defLineup, idpProjections, kickerProjections, defenseProjections,
+                    isDynasty ? 'Dynasty' : 'Redraft',
+                    liveProjections?.offensiveTop5Avg ?? {},
+                );
+
+                const kdefEntities = [
+                    ...(allowedPositions.has('K')   ? defRankings.kickers  : []),
+                    ...(allowedPositions.has('DEF') ? defRankings.defenses : []),
+                ];
+
+                for (const entity of kdefEntities) {
+                    if (draftedIds.has(entity.id)) continue;
+                    const sp   = enginePlayers[entity.id];
+                    const name = sp?.full_name ?? entity.id;
+                    if (draftedNames.has(normalizeDraftName(name))) continue;
+                    const fiqScore = Math.max(1, Math.round(entity.valueScore));
+                    availablePlayers.push({
+                        sleeperPlayerId:  entity.id,
+                        name,
+                        position:         entity.position,
+                        team:             sp?.team ?? (entity.position === 'DEF' ? entity.id : null),
+                        age:              calculateAge(sp?.birthDate) ?? null,
+                        fiqScore,
+                        tier:             getTier(fiqScore),
+                        opportunityScore: null,
+                        injuryStatus:     null,
+                    });
+                }
+            } catch {
+                // The defensive engine is a live-stats/API-dependent add-on to
+                // an otherwise-complete pool — if it fails for any reason,
+                // skip K/DEF for this load rather than breaking the whole
+                // draft assistant.
+            }
         }
     }
 
