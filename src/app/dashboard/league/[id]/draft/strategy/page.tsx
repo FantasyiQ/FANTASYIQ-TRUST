@@ -120,12 +120,17 @@ export default async function DraftStrategyPage({
             height:           true,
             weight:           true,
             fortyTime:        true,
+            sleeperPlayerId:  true,
         },
     });
 
-    const names = rawPlayers.map(p => p.playerName);
+    // Broad fetch by position, not an exact-string match against FiQ's own
+    // rookie names — a name-filtered query silently misses real matches
+    // whenever the two sources spell a suffix differently, which is also why
+    // the stored sleeperPlayerId (below) is preferred over this name match.
+    const rawPositions = [...new Set(rawPlayers.map(p => p.position))];
     const sleeperPlayers = await prisma.sleeperPlayer.findMany({
-        where:  { fullName: { in: names } },
+        where:  { position: { in: rawPositions } },
         select: { fullName: true, playerId: true, position: true, team: true, height: true, weight: true, age: true },
     });
 
@@ -134,6 +139,7 @@ export default async function DraftStrategyPage({
         if (!sleeperByNamePos.has(sp.fullName)) sleeperByNamePos.set(sp.fullName, new Map());
         sleeperByNamePos.get(sp.fullName)!.set(sp.position ?? '', sp);
     }
+    const byPlayerId = new Map(sleeperPlayers.map(sp => [sp.playerId, sp]));
 
     const players = rawPlayers
         .filter(p => {
@@ -144,7 +150,9 @@ export default async function DraftStrategyPage({
         })
         .map(p => {
             const byPos = sleeperByNamePos.get(p.playerName);
-            const sp = byPos?.get(p.position) ?? (byPos?.size === 1 ? byPos.values().next().value : undefined);
+            const sp = (p.sleeperPlayerId ? byPlayerId.get(p.sleeperPlayerId) : undefined)
+                ?? byPos?.get(p.position)
+                ?? (byPos?.size === 1 ? byPos.values().next().value : undefined);
             return {
                 ...p,
                 playerId: sp?.playerId ?? null,

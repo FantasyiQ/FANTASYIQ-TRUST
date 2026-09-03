@@ -20,6 +20,7 @@ import {
     normalizeEspnPlayerEntry,
 } from '@/lib/espn';
 import { getTier } from './context';
+import { buildSleeperNameResolver } from '@/lib/sleeperNameResolver';
 
 export interface EspnDraftBoardPickResolved {
     pickOverall: number;
@@ -115,17 +116,27 @@ export async function loadEspnDraftContext({
         // Dynasty market value only — see file header re: not replicating
         // Sleeper's full perfFactor/injury-adjusted pipeline here.
         const available = normalizeEspnPlayerPool(playerPool, draftedIds);
-        const playerNames = available.map(p => p.name);
-        const fcValues = playerNames.length > 0
+        // Broad fetch by position, not an exact-string match against ESPN's
+        // own player names — FantasyCalc spells some players with a
+        // generational suffix ("Kenneth Walker III") that ESPN's fullName
+        // may omit (or vice versa), so a `playerName: { in: espnNames } }`
+        // filter silently drops those players' FantasyCalc row before
+        // matching even starts. Unlike the roster data synced into
+        // League.standings, getEspnPlayerPool's live kona_player_info pull
+        // carries no sleeperPlayerId, so there's no ID bridge available
+        // here — fall back to the same suffix-safe name+position resolver
+        // used elsewhere (see buildSleeperNameResolver's header).
+        const availablePositions = [...new Set(available.map(p => p.position))];
+        const fcValues = availablePositions.length > 0
             ? await prisma.fantasyCalcValue.findMany({
-                where:  { playerName: { in: playerNames } },
-                select: { playerName: true, dynastyValue: true, dynastyValueSf: true },
+                where:  { position: { in: availablePositions } },
+                select: { playerName: true, position: true, dynastyValue: true, dynastyValueSf: true },
             })
             : [];
-        const fcByName = new Map(fcValues.map(v => [v.playerName, v]));
+        const resolveFc = buildSleeperNameResolver(fcValues.map(v => ({ ...v, fullName: v.playerName })));
 
         const availablePlayers: EspnAvailablePlayerScored[] = available.map(p => {
-            const fc = fcByName.get(p.name);
+            const fc = resolveFc(p.name, p.position);
             const dynastyValue = fc ? (superflex ? fc.dynastyValueSf : fc.dynastyValue) : null;
             const fiqScore = dynastyValue != null ? Math.min(100, Math.round(dynastyValue / 90)) : 40;
             return { ...p, fiqScore, tier: getTier(fiqScore) };

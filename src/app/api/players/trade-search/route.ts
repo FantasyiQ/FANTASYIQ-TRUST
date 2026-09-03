@@ -72,7 +72,7 @@ export async function GET(request: NextRequest): Promise<Response> {
         }),
         prisma.fantasyCalcValue.findMany({
             where: { nameLower: { contains: ql } },
-            select: { nameLower: true, position: true, dynastyValue: true, dynastyValueSf: true, redraftValue: true, redraftValueSf: true },
+            select: { nameLower: true, position: true, dynastyValue: true, dynastyValueSf: true, redraftValue: true, redraftValueSf: true, sleeperPlayerId: true },
         }),
     ]);
 
@@ -87,6 +87,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     const byName          = new Map<string, FcRow>();
     const byNormNameCount = new Map<string, number>();
     const byNormName      = new Map<string, FcRow>();
+    const byPlayerId      = new Map<string, FcRow>();
     for (const r of fcRows) {
         const normd = normalizePlayerName(r.nameLower);
         byNamePos.set(`${r.nameLower}|${r.position}`, r);
@@ -95,6 +96,7 @@ export async function GET(request: NextRequest): Promise<Response> {
         byName.set(r.nameLower, r);
         byNormNameCount.set(normd, (byNormNameCount.get(normd) ?? 0) + 1);
         byNormName.set(normd, r);
+        if (r.sleeperPlayerId) byPlayerId.set(r.sleeperPlayerId, r);
     }
     function resolveFc(nameLower: string, position: string): FcRow | undefined {
         const normd = normalizePlayerName(nameLower);
@@ -102,6 +104,10 @@ export async function GET(request: NextRequest): Promise<Response> {
             ?? byNormNamePos.get(`${normd}|${position}`)
             ?? (byNameCount.get(nameLower) === 1 ? byName.get(nameLower) : undefined)
             ?? (byNormNameCount.get(normd) === 1 ? byNormName.get(normd) : undefined);
+    }
+    function resolveFcForSleeperPlayer(p: { playerId: string; fullName: string; position: string }): FcRow | undefined {
+        return byPlayerId.get(p.playerId)
+            ?? resolveFc(p.fullName.toLowerCase(), p.position);
     }
 
     // active:true / team!=FA alone miss long-retired players Sleeper's feed
@@ -117,8 +123,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     // same computePlayerBaseValue() the rest of the app uses) wins; fall
     // back to position-based depth default when FantasyCalc has no match.
     const merged: Player[] = activeMatches.map((p, i) => {
-        const nameLower = p.fullName.toLowerCase();
-        const fcRow  = resolveFc(nameLower, p.position);
+        const fcRow  = resolveFcForSleeperPlayer(p);
         const baseValue = fcRow !== undefined
             ? computePlayerBaseValue({
                 dynasty:   normaliseFc(fcRow.dynastyValue),

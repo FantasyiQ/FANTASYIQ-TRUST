@@ -433,7 +433,7 @@ export async function loadDraftContext(params: {
         // which is exactly what pushed e.g. Ja'Marr Chase (higher dynasty value)
         // above Jahmyr Gibbs/Bijan Robinson (higher redraft value, and the real
         // consensus 1-2 picks) in redraft leagues before this fix.
-        const fcValueSelect = { playerName: true, position: true, dynastyValue: true, dynastyValueSf: true, redraftValue: true, redraftValueSf: true } as const;
+        const fcValueSelect = { playerName: true, position: true, dynastyValue: true, dynastyValueSf: true, redraftValue: true, redraftValueSf: true, sleeperPlayerId: true } as const;
         const fcValues = isDynasty
             ? (superflex
                 ? await prisma.fantasyCalcValue.findMany({ where: { dynastyValueSf: { gt: 300 } }, orderBy: { dynastyValueSf: 'desc' }, take: 500, select: fcValueSelect })
@@ -470,6 +470,17 @@ export async function loadDraftContext(params: {
         const spResolver2 = makeSpResolver(sleeperPlayers);
         const spLookup2 = (name: string, position: string) => spResolver2(name, position);
 
+        // FantasyCalcValue rows carry a real, sync-time-resolved sleeperPlayerId
+        // (backfilled from the same suffix/nickname-safe matcher, stored so readers
+        // don't have to re-resolve by name every time). Prefer that direct ID lookup;
+        // only fall back to name matching for rows where it's still null (old rows
+        // not yet migrated, or genuinely unmatched players).
+        const byPlayerId2 = new Map(sleeperPlayers.map(p => [p.playerId, p]));
+        function resolveSpForFcRow2(row: { playerName: string; position: string; sleeperPlayerId: string | null }) {
+            return (row.sleeperPlayerId ? byPlayerId2.get(row.sleeperPlayerId) : undefined)
+                ?? spLookup2(row.playerName, row.position);
+        }
+
         // Pass 1: FiQ baseline pick — global rank across allowed positions by dynasty value (fcFpdo already sorted desc).
         // delta = myNextPick - fiqBaselineRank: positive = player available later than FiQ suggests.
         // Uses fcFpdo (value > 50) so the full draftable universe is ranked, not just top-300.
@@ -479,7 +490,7 @@ export async function loadDraftContext(params: {
         let fiqBaselineRank = 0;
         for (const fcv of fcFpdo) {
             if (!allowedPositions.has(normalizePosition(fcv.position))) continue;
-            const sp = spLookup2(fcv.playerName, fcv.position);
+            const sp = resolveSpForFcRow2(fcv);
             if (!sp?.playerId) continue;
             fiqBaselineRank++;
             draftPoolPlayers.push(sp.playerId);
@@ -509,7 +520,7 @@ export async function loadDraftContext(params: {
         // Pass 2a: resolve real per-game production for every player in the
         // recommendation pool and accumulate positional totals — perfFactor can't
         // be computed until every player in a position group has been seen.
-        type FcPending = { fcv: (typeof fcValues)[number]; sp: ReturnType<typeof spLookup2>; realPtsPerGame: number; gamesPlayed: number | null };
+        type FcPending = { fcv: (typeof fcValues)[number]; sp: ReturnType<typeof resolveSpForFcRow2>; realPtsPerGame: number; gamesPlayed: number | null };
         const fcPending: FcPending[] = [];
         const posPtsSum    = new Map<string, number>();
         const posPtsCount  = new Map<string, number>();
@@ -517,7 +528,7 @@ export async function loadDraftContext(params: {
 
         for (const fcv of fcValues) {
             if (!allowedPositions.has(normalizePosition(fcv.position))) continue;
-            const sp = spLookup2(fcv.playerName, fcv.position);
+            const sp = resolveSpForFcRow2(fcv);
             if (sp && draftedIds.has(sp.playerId)) continue;
             if (draftedNames.has(normalizeDraftName(fcv.playerName))) continue;
 
@@ -602,13 +613,23 @@ export async function loadDraftContext(params: {
     const rosterFcValues = rosterPositionsSet.length > 0
         ? await prisma.fantasyCalcValue.findMany({
             where:  { position: { in: rosterPositionsSet } },
-            select: { playerName: true, position: true, dynastyValue: true, dynastyValueSf: true, redraftValue: true, redraftValueSf: true },
+            select: { playerName: true, position: true, dynastyValue: true, dynastyValueSf: true, redraftValue: true, redraftValueSf: true, sleeperPlayerId: true },
         })
         : [];
     const fcResolver = makeSpResolver(rosterFcValues.map(v => ({ ...v, fullName: v.playerName })));
 
-    function toRosterProfile(p: { fullName?: string | null; position: string; age?: number | null }): RosterProfile {
-        const fc = p.fullName ? fcResolver(p.fullName, p.position) : undefined;
+    // Prefer FantasyCalcValue's real, sync-time-resolved sleeperPlayerId over a
+    // name-based lookup (see resolveSpForFcRow2 above for the same pattern in the
+    // recommendations pool) — only fall back to fcResolver's name matching for FC
+    // rows that don't have it set yet.
+    const fcByPlayerId = new Map(
+        rosterFcValues.filter((v): v is typeof v & { sleeperPlayerId: string } => v.sleeperPlayerId != null)
+            .map(v => [v.sleeperPlayerId, v]),
+    );
+
+    function toRosterProfile(p: { playerId?: string; fullName?: string | null; position: string; age?: number | null }): RosterProfile {
+        const fc = (p.playerId ? fcByPlayerId.get(p.playerId) : undefined)
+            ?? (p.fullName ? fcResolver(p.fullName, p.position) : undefined);
         const marketValue = fc
             ? (isDynasty
                 ? (superflex ? fc.dynastyValueSf : fc.dynastyValue)

@@ -116,7 +116,7 @@ export async function GET(
                 position: { in: ['QB', 'RB', 'WR', 'TE'] },
                 OR: [{ dynastyValue: { gt: 0 } }, { redraftValue: { gt: 0 } }],
             },
-            select: { playerName: true, nameLower: true, position: true, dynastyValue: true, dynastyValueSf: true, redraftValue: true, redraftValueSf: true, age: true, trend30Day: true },
+            select: { playerName: true, nameLower: true, position: true, dynastyValue: true, dynastyValueSf: true, redraftValue: true, redraftValueSf: true, age: true, trend30Day: true, sleeperPlayerId: true },
         }),
         prisma.sleeperPlayer.findMany({
             where:  { active: true, position: { in: ['QB', 'RB', 'WR', 'TE'] } },
@@ -142,6 +142,7 @@ export async function GET(
     const byName          = new Map<string, SleeperRow>();
     const byNormNameCount = new Map<string, number>();
     const byNormName      = new Map<string, SleeperRow>();
+    const byPlayerId       = new Map<string, SleeperRow>();
     for (const p of sleeperPlayers) {
         const exact = p.fullName.toLowerCase();
         const normd = normalizeName(p.fullName);
@@ -151,6 +152,7 @@ export async function GET(
         byName.set(exact, p);
         byNormNameCount.set(normd, (byNormNameCount.get(normd) ?? 0) + 1);
         byNormName.set(normd, p);
+        byPlayerId.set(p.playerId, p);
     }
     function resolveSleeper(nameLower: string, position: string): SleeperRow | undefined {
         const normd = normalizeName(nameLower);
@@ -158,6 +160,14 @@ export async function GET(
             ?? byNormNamePos.get(`${normd}|${position}`)
             ?? (byNameCount.get(nameLower) === 1 ? byName.get(nameLower) : undefined)
             ?? (byNormNameCount.get(normd) === 1 ? byNormName.get(normd) : undefined);
+    }
+    // Prefer the canonical ID resolved once at FantasyCalc sync time
+    // (src/app/api/cron/fantasycalc-sync/route.ts) — a plain lookup, no
+    // per-row name matching. Falls back to name resolution only for rows
+    // synced before that existed, or that never had a Sleeper match.
+    function resolveSleeperForFcRow(row: { nameLower: string; position: string; sleeperPlayerId: string | null }): SleeperRow | undefined {
+        return (row.sleeperPlayerId ? byPlayerId.get(row.sleeperPlayerId) : undefined)
+            ?? resolveSleeper(row.nameLower, row.position);
     }
 
     // Pass 1: resolve real per-game production under this league's scoring,
@@ -175,7 +185,7 @@ export async function GET(
 
     for (const r of fcRows) {
         if (!SKILL_POSITIONS.has(r.position)) continue;
-        const sleeper = resolveSleeper(r.nameLower, r.position) ?? null;
+        const sleeper = resolveSleeperForFcRow(r) ?? null;
         const rawTeam = sleeper?.team ?? null;
         const stats           = sleeper?.playerId ? statsByPlayerId.get(sleeper.playerId) : undefined;
         const statsPerGame     = stats?.statsPerGame ?? null;

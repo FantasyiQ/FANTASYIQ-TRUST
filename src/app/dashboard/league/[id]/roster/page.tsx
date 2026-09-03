@@ -67,21 +67,45 @@ async function EspnRosterPage({
     const players = myTeam.players ?? [];
 
     // Try to match player names to Sleeper DB for DTV values
-    const allNames = players.map(p => p.name.toLowerCase());
-    const fcRows = await prisma.fantasyCalcValue.findMany({
-        where:  { OR: [{ dynastyValue: { gt: 0 } }, { redraftValue: { gt: 0 } }] },
-        select: { playerName: true, nameLower: true, position: true, redraftValue: true, redraftValueSf: true },
-    });
-
     function normName(n: string) {
         return n.toLowerCase().replace(/\s+\b(jr\.?|sr\.?|ii|iii|iv|v)\s*$/i, '').replace(/\./g, '').replace(/\s+/g, ' ').trim();
     }
 
+    const allNames = players.map(p => p.name.toLowerCase());
+    // ESPN doesn't give us a Sleeper playerId directly, so build a small
+    // name → Sleeper playerId bridge for just this roster (exact + suffix-
+    // stripped, e.g. "Kenneth Walker III" → "Kenneth Walker"), then prefer
+    // FantasyCalcValue's stored sleeperPlayerId over matching name text
+    // straight against FantasyCalc's own (sometimes differently-suffixed)
+    // playerName/nameLower.
+    const nameCandidates = Array.from(new Set([...allNames, ...allNames.map(normName)]));
+    const [fcRows, sleeperMatches] = await Promise.all([
+        prisma.fantasyCalcValue.findMany({
+            where:  { OR: [{ dynastyValue: { gt: 0 } }, { redraftValue: { gt: 0 } }] },
+            select: { playerName: true, nameLower: true, position: true, redraftValue: true, redraftValueSf: true, sleeperPlayerId: true },
+        }),
+        nameCandidates.length > 0
+            ? prisma.sleeperPlayer.findMany({
+                  where:  { OR: nameCandidates.map(n => ({ fullName: { equals: n, mode: 'insensitive' } })) },
+                  select: { playerId: true, fullName: true },
+              })
+            : Promise.resolve([]),
+    ]);
+
     const dtvByName = new Map<string, number>();
+    const dtvByPlayerId = new Map<string, number>();
     for (const r of fcRows) {
         const val = Math.round((r.redraftValue ?? 0) / 99.99);
         dtvByName.set(r.nameLower, val);
         dtvByName.set(normName(r.nameLower), val);
+        if (r.sleeperPlayerId) dtvByPlayerId.set(r.sleeperPlayerId, val);
+    }
+
+    const sleeperIdByName = new Map<string, string>();
+    for (const sp of sleeperMatches) {
+        const exact = sp.fullName.toLowerCase();
+        sleeperIdByName.set(exact, sp.playerId);
+        sleeperIdByName.set(normName(exact), sp.playerId);
     }
 
     const STARTER_SLOTS = new Set(['QB', 'RB', 'WR', 'TE', 'FLEX', 'K', 'DEF', 'BN']);
@@ -136,8 +160,10 @@ async function EspnRosterPage({
                         </thead>
                         <tbody>
                             {rows.map((p, i) => {
-                                const nameLow = p.name.toLowerCase();
-                                const dtv     = dtvByName.get(nameLow) ?? dtvByName.get(normName(nameLow)) ?? 0;
+                                const nameLow   = p.name.toLowerCase();
+                                const sleeperId = sleeperIdByName.get(nameLow) ?? sleeperIdByName.get(normName(nameLow));
+                                const dtv       = (sleeperId ? dtvByPlayerId.get(sleeperId) : undefined)
+                                    ?? dtvByName.get(nameLow) ?? dtvByName.get(normName(nameLow)) ?? 0;
                                 const isStarter = p.lineupSlot && p.lineupSlot !== 'BN' && p.lineupSlot !== 'IR';
                                 return (
                                     <tr key={`${p.name}-${i}`} className="border-t border-gray-800/40 hover:bg-gray-800/20 transition">
@@ -398,7 +424,8 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
             where:  { OR: [{ dynastyValue: { gt: 0 } }, { redraftValue: { gt: 0 } }] },
             select: { playerName: true, nameLower: true, position: true,
                       dynastyValue: true, dynastyValueSf: true,
-                      redraftValue: true, redraftValueSf: true },
+                      redraftValue: true, redraftValueSf: true,
+                      sleeperPlayerId: true },
         }),
         prisma.sleeperPlayer.findMany({
             where:  { playerId: { in: allPids } },
@@ -418,6 +445,7 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
     const byName          = new Map<string, SleeperInfo>();
     const byNormNameCount = new Map<string, number>();
     const byNormName      = new Map<string, SleeperInfo>();
+    const byPlayerId      = new Map<string, SleeperInfo>();
     const sleeperById    = new Map(sleeperPlayers.map(p => [p.playerId, p]));
     for (const p of sleeperPlayers) {
         const val: SleeperInfo = { playerId: p.playerId, team: p.team, injuryStatus: p.injuryStatus, birthDate: p.birthDate, age: p.age };
@@ -429,6 +457,7 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
         byName.set(exact, val);
         byNormNameCount.set(normd, (byNormNameCount.get(normd) ?? 0) + 1);
         byNormName.set(normd, val);
+        byPlayerId.set(p.playerId, val);
     }
     function resolveSleeper(nameLower: string, position: string): SleeperInfo | undefined {
         const normd = normalizeName(nameLower);
@@ -436,6 +465,13 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
             ?? byNormNamePos.get(`${normd}|${position}`)
             ?? (byNameCount.get(nameLower) === 1 ? byName.get(nameLower) : undefined)
             ?? (byNormNameCount.get(normd) === 1 ? byNormName.get(normd) : undefined);
+    }
+    // Prefer the canonical ID resolved once at FantasyCalc sync time — a plain
+    // lookup, no per-row name matching. Falls back to name resolution only for
+    // rows synced before that existed, or that never had a Sleeper match.
+    function resolveSleeperForFcRow(row: { nameLower: string; position: string; sleeperPlayerId: string | null }): SleeperInfo | undefined {
+        return (row.sleeperPlayerId ? byPlayerId.get(row.sleeperPlayerId) : undefined)
+            ?? resolveSleeper(row.nameLower, row.position);
     }
 
     // Pass 1: resolve real per-game production (skill positions only) and
@@ -451,7 +487,7 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
     const posPtsSum = new Map<string, number>(), posPtsCount = new Map<string, number>(), posStdPtsSum = new Map<string, number>();
 
     for (const r of fcRows) {
-        const sl    = resolveSleeper(r.nameLower, r.position) ?? null;
+        const sl    = resolveSleeperForFcRow(r) ?? null;
         const team  = (sl?.team && sl.team !== 'FA') ? sl.team : null;
         const age   = calculateAge(sl?.birthDate) ?? sl?.age ?? 0;
 

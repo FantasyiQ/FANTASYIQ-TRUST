@@ -80,7 +80,7 @@ export async function GET(req: NextRequest): Promise<Response> {
         const rookies = await prisma.rookieRankingsPlayer.findMany({
             where:   { season: '2026' },
             orderBy: { fiqScore: 'desc' },
-            select:  { playerName: true, position: true, fiqScore: true, fiqTier: true, opportunityScore: true },
+            select:  { playerName: true, position: true, fiqScore: true, fiqTier: true, opportunityScore: true, sleeperPlayerId: true },
         });
 
         // Broad fetch by position, not an exact-string match against FiQ's
@@ -92,9 +92,14 @@ export async function GET(req: NextRequest): Promise<Response> {
             select: { fullName: true, playerId: true, team: true, age: true, position: true },
         });
         const spResolver = buildSleeperNameResolver(sleeperPlayers);
+        const spByPlayerId = new Map(sleeperPlayers.map(p => [p.playerId, p]));
 
         for (const r of rookies) {
-            const sp = spResolver(r.playerName, r.position);
+            // Prefer the stored sleeperPlayerId (set at sync time) over a
+            // name-based lookup — a name match can miss when the source's
+            // spelling differs (e.g. a suffix Sleeper's fullName omits).
+            const sp = (r.sleeperPlayerId ? spByPlayerId.get(r.sleeperPlayerId) : undefined)
+                ?? spResolver(r.playerName, r.position);
             const fiqScore  = Math.round(r.fiqScore);
             const tierMatch = r.fiqTier?.match(/(\d+)/);
             const tier      = tierMatch ? parseInt(tierMatch[1], 10) : getTier(fiqScore);
@@ -115,13 +120,13 @@ export async function GET(req: NextRequest): Promise<Response> {
                 where:   { dynastyValueSf: { gt: 300 } },
                 orderBy: { dynastyValueSf: 'desc' },
                 take:    500,
-                select:  { playerName: true, position: true, dynastyValue: true, dynastyValueSf: true },
+                select:  { playerName: true, position: true, dynastyValue: true, dynastyValueSf: true, sleeperPlayerId: true },
             })
             : await prisma.fantasyCalcValue.findMany({
                 where:   { dynastyValue: { gt: 300 } },
                 orderBy: { dynastyValue: 'desc' },
                 take:    500,
-                select:  { playerName: true, position: true, dynastyValue: true, dynastyValueSf: true },
+                select:  { playerName: true, position: true, dynastyValue: true, dynastyValueSf: true, sleeperPlayerId: true },
             });
 
         // Broad fetch, not an exact-string match against FantasyCalc's own
@@ -133,9 +138,14 @@ export async function GET(req: NextRequest): Promise<Response> {
             select: { fullName: true, playerId: true, team: true, age: true, position: true },
         });
         const spResolver = buildSleeperNameResolver(sleeperPlayers);
+        const spByPlayerId = new Map(sleeperPlayers.map(p => [p.playerId, p]));
 
         for (const fcv of fcValues) {
-            const sp       = spResolver(fcv.playerName, fcv.position);
+            // Prefer the stored sleeperPlayerId (set at sync time) over a
+            // name-based lookup — a name match can miss when the source's
+            // spelling differs (e.g. a suffix Sleeper's fullName omits).
+            const sp = (fcv.sleeperPlayerId ? spByPlayerId.get(fcv.sleeperPlayerId) : undefined)
+                ?? spResolver(fcv.playerName, fcv.position);
             const dynastyValue = superflex ? fcv.dynastyValueSf : fcv.dynastyValue;
             const fiqScore = Math.min(100, Math.round(dynastyValue / 90));
             pool.push({

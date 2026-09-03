@@ -18,11 +18,11 @@ export async function GET(request: NextRequest): Promise<Response> {
                 position: { in: ['QB', 'RB', 'WR', 'TE'] },
                 OR: [{ dynastyValue: { gt: 0 } }, { redraftValue: { gt: 0 } }],
             },
-            select: { nameLower: true, playerName: true, position: true, dynastyValue: true, dynastyValueSf: true, redraftValue: true, redraftValueSf: true },
+            select: { nameLower: true, playerName: true, position: true, dynastyValue: true, dynastyValueSf: true, redraftValue: true, redraftValueSf: true, sleeperPlayerId: true },
         }),
         prisma.sleeperPlayer.findMany({
             where:  { active: true },
-            select: { fullName: true, team: true, injuryStatus: true, position: true },
+            select: { playerId: true, fullName: true, team: true, injuryStatus: true, position: true },
         }),
         // Most recent snapshot batch: get the latest takenAt, then fetch all rows from that batch
         prisma.fantasyCalcSnapshot.findFirst({
@@ -54,16 +54,22 @@ export async function GET(request: NextRequest): Promise<Response> {
     const byNamePos   = new Map<string, SleeperInfo>();
     const byNameCount = new Map<string, number>();
     const byName      = new Map<string, SleeperInfo>();
+    const byPlayerId  = new Map<string, SleeperInfo>();
     for (const p of sleeperPlayers) {
         const exact = p.fullName.toLowerCase();
         const val: SleeperInfo = { team: p.team, injuryStatus: p.injuryStatus };
         byNamePos.set(`${exact}|${p.position}`, val);
         byNameCount.set(exact, (byNameCount.get(exact) ?? 0) + 1);
         byName.set(exact, val);
+        byPlayerId.set(p.playerId, val);
     }
     function resolveSleeperByName(nameLower: string, position: string): SleeperInfo | undefined {
         return byNamePos.get(`${nameLower}|${position}`)
             ?? (byNameCount.get(nameLower) === 1 ? byName.get(nameLower) : undefined);
+    }
+    function resolveSleeperForFcRow(row: { nameLower: string; position: string; sleeperPlayerId: string | null }): SleeperInfo | undefined {
+        return (row.sleeperPlayerId ? byPlayerId.get(row.sleeperPlayerId) : undefined)
+            ?? resolveSleeperByName(row.nameLower, row.position);
     }
 
     // Build maps
@@ -75,7 +81,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     // Check all current players for changes
     for (const curr of currentRows) {
         const prev = snapshotMap.get(curr.nameLower);
-        const sl   = resolveSleeperByName(curr.nameLower, curr.position);
+        const sl   = resolveSleeperForFcRow(curr);
         const currentTeam = (sl?.team && sl.team !== 'FA') ? sl.team : null;
 
         if (!prev) {

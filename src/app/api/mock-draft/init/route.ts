@@ -370,7 +370,7 @@ export async function GET(req: NextRequest): Promise<Response> {
         const rookiesRaw = await prisma.rookieRankingsPlayer.findMany({
             where:   { season: rookieDraftSeason, position: { in: rookiePositions } },
             orderBy: { fiqScore: 'desc' },
-            select:  { playerName: true, position: true, fiqScore: true, fiqTier: true, height: true, weight: true, fortyTime: true },
+            select:  { playerName: true, position: true, fiqScore: true, fiqTier: true, height: true, weight: true, fortyTime: true, sleeperPlayerId: true },
         });
 
         // Broad fetch by position, not an exact-string match against FiQ's own
@@ -384,6 +384,14 @@ export async function GET(req: NextRequest): Promise<Response> {
               })
             : [];
         const resolveSleeper = buildSleeperNameResolver(sleeperPlayers);
+        // Prefer the stored sleeperPlayerId (resolved once at sync time by the
+        // same suffix/nickname-safe matcher) over re-resolving by name here;
+        // fall back to the name resolver only when the ID is null.
+        const sleeperById = new Map(sleeperPlayers.map(p => [p.playerId, p]));
+        function resolveSleeperForRookie(r: { playerName: string; position: string; sleeperPlayerId: string | null }) {
+            return (r.sleeperPlayerId ? sleeperById.get(r.sleeperPlayerId) : undefined)
+                ?? resolveSleeper(r.playerName, r.position);
+        }
 
         // Exclude rookies already on a real roster in this league — already
         // drafted/rostered, not actually available. A rookie with no Sleeper
@@ -391,13 +399,13 @@ export async function GET(req: NextRequest): Promise<Response> {
         // rather than guessed at.
         const existingPlayerIdSet = new Set(existingPlayerIds);
         const rookies = rookiesRaw.filter(r => {
-            const sp = resolveSleeper(r.playerName, r.position);
+            const sp = resolveSleeperForRookie(r);
             return !sp || !existingPlayerIdSet.has(sp.playerId);
         });
 
         boardPlayers = rookies
             .map((r, i) => {
-                const sp        = resolveSleeper(r.playerName, r.position);
+                const sp        = resolveSleeperForRookie(r);
                 const mult      = IDP_PLAYER_POSITIONS.includes(r.position)
                     ? idpMult
                     : (DYNASTY_POS_MULT[r.position] ?? 1.0);
@@ -446,6 +454,7 @@ export async function GET(req: NextRequest): Promise<Response> {
                 playerName: true, position: true,
                 dynastyValue: true, dynastyValueSf: true,
                 redraftValue: true, redraftValueSf: true,
+                sleeperPlayerId: true,
             },
         });
 
@@ -465,6 +474,14 @@ export async function GET(req: NextRequest): Promise<Response> {
               })
             : [];
         const resolveSleeper = buildSleeperNameResolver(sleeperPlayers);
+        // Prefer the stored sleeperPlayerId (resolved once at sync time by the
+        // same suffix/nickname-safe matcher) over re-resolving by name here;
+        // fall back to the name resolver only when the ID is null.
+        const sleeperById = new Map(sleeperPlayers.map(p => [p.playerId, p]));
+        function resolveSleeperForFc(v: { playerName: string; position: string; sleeperPlayerId: string | null }) {
+            return (v.sleeperPlayerId ? sleeperById.get(v.sleeperPlayerId) : undefined)
+                ?? resolveSleeper(v.playerName, v.position);
+        }
 
         // League Scoring Points Engine: real per-league scoring adjustment on
         // top of the FantasyCalc market-consensus anchor — same source and
@@ -490,7 +507,7 @@ export async function GET(req: NextRequest): Promise<Response> {
         const posPtsSum = new Map<string, number>(), posPtsCount = new Map<string, number>(), posStdPtsSum = new Map<string, number>();
 
         for (const v of fcValues) {
-            const sp     = resolveSleeper(v.playerName, v.position);
+            const sp     = resolveSleeperForFc(v);
             const stats  = sp?.playerId ? statsByPlayerId.get(sp.playerId) : undefined;
             const realPtsPerGame     = stats ? computeRealPoints(stats.statsPerGame, scoringSettings) : 0;
             const standardPtsPerGame = stats ? computeRealPoints(stats.statsPerGame, STANDARD_SCORING) : 0;

@@ -157,16 +157,29 @@ export async function getLeagueContext(
     const fcData = names.length > 0
         ? await prisma.fantasyCalcValue.findMany({
             where:  { nameLower: { in: names } },
-            select: { nameLower: true, position: true, dynastyValue: true, dynastyValueSf: true, redraftValue: true, redraftValueSf: true, age: true },
+            select: { nameLower: true, position: true, dynastyValue: true, dynastyValueSf: true, redraftValue: true, redraftValueSf: true, age: true, sleeperPlayerId: true },
         })
         : [];
     void fcRecords;
 
     // Two-level map: nameLower → position → dynasty record (handle name collisions)
     const fcByNamePos = new Map<string, Map<string, typeof fcData[0]>>();
+    // sleeperPlayerId → dynasty record (preferred — avoids fragile name matching,
+    // e.g. FantasyCalc's "Kenneth Walker III" vs Sleeper's suffix-less fullName)
+    const fcByPlayerId = new Map<string, typeof fcData[0]>();
     for (const rec of fcData) {
         if (!fcByNamePos.has(rec.nameLower)) fcByNamePos.set(rec.nameLower, new Map());
         fcByNamePos.get(rec.nameLower)!.set(rec.position, rec);
+        if (rec.sleeperPlayerId) fcByPlayerId.set(rec.sleeperPlayerId, rec);
+    }
+
+    // Resolve a FantasyCalc record for a given Sleeper player: prefer the stored
+    // sleeperPlayerId, fall back to name+position matching only when it's null.
+    function resolveFcRecord(pid: string, nameLower: string, position: string): typeof fcData[0] | undefined {
+        const byId = fcByPlayerId.get(pid);
+        if (byId) return byId;
+        const byPos = fcByNamePos.get(nameLower);
+        return byPos?.get(position) ?? (byPos?.size === 1 ? byPos.values().next().value : undefined);
     }
 
     const seasonNum    = parseInt(season, 10) || new Date().getFullYear();
@@ -183,8 +196,7 @@ export async function getLeagueContext(
                 if (!sp) return null;
 
                 const nameLower = sp.fullName.toLowerCase().trim();
-                const byPos     = fcByNamePos.get(nameLower);
-                const fcRec    = byPos?.get(sp.position) ?? (byPos?.size === 1 ? byPos.values().next().value : undefined);
+                const fcRec     = resolveFcRecord(pid, nameLower, sp.position);
 
                 let dynastyValue = 0;
                 if (fcRec) {

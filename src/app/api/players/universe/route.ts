@@ -39,6 +39,7 @@ export async function GET(request: NextRequest): Promise<Response> {
                 redraftValueSf: true,
                 age:            true,
                 trend30Day:     true,
+                sleeperPlayerId: true,
             },
         }),
         prisma.sleeperPlayer.findMany({
@@ -69,6 +70,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     const byName          = new Map<string, SleeperRow>();
     const byNormNameCount = new Map<string, number>();
     const byNormName      = new Map<string, SleeperRow>();
+    const byPlayerId       = new Map<string, SleeperRow>();
 
     for (const p of sleeperPlayers) {
         const exact = p.fullName.toLowerCase();
@@ -79,6 +81,7 @@ export async function GET(request: NextRequest): Promise<Response> {
         byName.set(exact, p);
         byNormNameCount.set(normd, (byNormNameCount.get(normd) ?? 0) + 1);
         byNormName.set(normd, p);
+        byPlayerId.set(p.playerId, p);
     }
     function resolveSleeper(nameLower: string, position: string): SleeperRow | undefined {
         const normd = normalizeName(nameLower);
@@ -87,11 +90,19 @@ export async function GET(request: NextRequest): Promise<Response> {
             ?? (byNameCount.get(nameLower) === 1 ? byName.get(nameLower) : undefined)
             ?? (byNormNameCount.get(normd) === 1 ? byNormName.get(normd) : undefined);
     }
+    // Prefer the stored Sleeper match from sync time — it's set from a richer,
+    // curated cross-reference (handles suffixes like "Kenneth Walker III" that
+    // FantasyCalc includes but Sleeper's own fullName omits). Only fall back to
+    // live name matching when no stored id exists (e.g. older/unsynced rows).
+    function resolveSleeperForFcRow(row: { nameLower: string; position: string; sleeperPlayerId: string | null }): SleeperRow | undefined {
+        return (row.sleeperPlayerId ? byPlayerId.get(row.sleeperPlayerId) : undefined)
+            ?? resolveSleeper(row.nameLower, row.position);
+    }
 
     const players: UniversePlayer[] = fcRows
         .filter(r => SKILL_POSITIONS.has(r.position))
         .map(r => {
-            const sleeper = resolveSleeper(r.nameLower, r.position) ?? null;
+            const sleeper = resolveSleeperForFcRow(r) ?? null;
 
             const rawTeam = sleeper?.team ?? null;
             const team    = (rawTeam && rawTeam !== 'FA') ? rawTeam : null;

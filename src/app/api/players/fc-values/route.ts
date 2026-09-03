@@ -28,13 +28,14 @@ export async function GET(request: NextRequest): Promise<Response> {
                 team:           true,
                 age:            true,
                 trend30Day:     true,
+                sleeperPlayerId: true,
             },
         }),
         // Fetch all active Sleeper players — team updates daily from Sleeper API,
         // so it's authoritative for trades/signings. Also provides injury status.
         prisma.sleeperPlayer.findMany({
             where:  { active: true },
-            select: { fullName: true, injuryStatus: true, team: true, position: true },
+            select: { playerId: true, fullName: true, injuryStatus: true, team: true, position: true },
         }),
     ]);
 
@@ -48,6 +49,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     const byName          = new Map<string, SleeperInfo>();
     const byNormNameCount = new Map<string, number>();
     const byNormName      = new Map<string, SleeperInfo>();
+    const byPlayerId       = new Map<string, SleeperInfo>();
 
     for (const p of sleeperPlayers) {
         const exact = p.fullName.toLowerCase();
@@ -61,6 +63,7 @@ export async function GET(request: NextRequest): Promise<Response> {
         byName.set(exact, val);
         byNormNameCount.set(normd, (byNormNameCount.get(normd) ?? 0) + 1);
         byNormName.set(normd, val);
+        byPlayerId.set(p.playerId, val);
     }
     function resolveSleeper(nameLower: string, position: string): SleeperInfo | undefined {
         const normd = normalizeName(nameLower);
@@ -68,6 +71,14 @@ export async function GET(request: NextRequest): Promise<Response> {
             ?? byNormNamePos.get(`${normd}|${position}`)
             ?? (byNameCount.get(nameLower) === 1 ? byName.get(nameLower) : undefined)
             ?? (byNormNameCount.get(normd) === 1 ? byNormName.get(normd) : undefined);
+    }
+    // Prefer the stored Sleeper match from sync time — it's set from a richer,
+    // curated cross-reference (handles suffixes like "Kenneth Walker III" that
+    // FantasyCalc includes but Sleeper's own fullName omits). Only fall back to
+    // live name matching when no stored id exists (e.g. older/unsynced rows).
+    function resolveSleeperForFcRow(row: { nameLower: string; position: string; sleeperPlayerId: string | null }): SleeperInfo | undefined {
+        return (row.sleeperPlayerId ? byPlayerId.get(row.sleeperPlayerId) : undefined)
+            ?? resolveSleeper(row.nameLower, row.position);
     }
 
     // Build set of normalized names for the warn pass below
@@ -95,7 +106,7 @@ export async function GET(request: NextRequest): Promise<Response> {
 
     for (const r of rows) {
         const exact = r.nameLower;
-        const sl    = resolveSleeper(r.nameLower, r.position);
+        const sl    = resolveSleeperForFcRow(r);
 
         const injuryStatus = sl?.injuryStatus ?? null;
         const sleeperTeam  = sl?.team ?? null;

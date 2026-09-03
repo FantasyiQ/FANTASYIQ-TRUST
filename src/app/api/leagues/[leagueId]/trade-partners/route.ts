@@ -185,6 +185,7 @@ export async function GET(
                 playerName: true, nameLower: true, position: true,
                 dynastyValue: true, dynastyValueSf: true,
                 redraftValue: true, redraftValueSf: true,
+                sleeperPlayerId: true,
             },
         }),
         prisma.sleeperPlayer.findMany({
@@ -218,6 +219,7 @@ export async function GET(
     const byName          = new Map<string, SleeperInfo>();
     const byNormNameCount = new Map<string, number>();
     const byNormName      = new Map<string, SleeperInfo>();
+    const byPlayerId       = new Map<string, SleeperInfo>();
     for (const p of sleeperAllPlayers) {
         const val: SleeperInfo = { playerId: p.playerId, team: p.team, injuryStatus: p.injuryStatus, birthDate: p.birthDate, age: p.age };
         const exact = p.fullName.toLowerCase();
@@ -228,6 +230,7 @@ export async function GET(
         byName.set(exact, val);
         byNormNameCount.set(normd, (byNormNameCount.get(normd) ?? 0) + 1);
         byNormName.set(normd, val);
+        byPlayerId.set(p.playerId, val);
     }
     function resolveSleeper(nameLower: string, position: string): SleeperInfo | undefined {
         const normd = normalizeName(nameLower);
@@ -235,6 +238,14 @@ export async function GET(
             ?? byNormNamePos.get(`${normd}|${position}`)
             ?? (byNameCount.get(nameLower) === 1 ? byName.get(nameLower) : undefined)
             ?? (byNormNameCount.get(normd) === 1 ? byNormName.get(normd) : undefined);
+    }
+    // Prefer the canonical ID resolved once at FantasyCalc sync time
+    // (src/app/api/cron/fantasycalc-sync/route.ts) — a plain lookup, no
+    // per-row name matching. Falls back to name resolution only for rows
+    // synced before that existed, or that never had a Sleeper match.
+    function resolveSleeperForFcRow(row: { nameLower: string; position: string; sleeperPlayerId: string | null }): SleeperInfo | undefined {
+        return (row.sleeperPlayerId ? byPlayerId.get(row.sleeperPlayerId) : undefined)
+            ?? resolveSleeper(row.nameLower, row.position);
     }
 
     // 5. Build DTV map keyed by lowercase name
@@ -251,7 +262,7 @@ export async function GET(
     const posPtsSum = new Map<string, number>(), posPtsCount = new Map<string, number>(), posStdPtsSum = new Map<string, number>();
 
     for (const r of fcRows) {
-        const sl      = resolveSleeper(r.nameLower, r.position) ?? null;
+        const sl      = resolveSleeperForFcRow(r) ?? null;
         const rawTeam = sl?.team ?? null;
         const team    = (rawTeam && rawTeam !== 'FA') ? rawTeam : null;
         const age     = calculateAge(sl?.birthDate) ?? sl?.age ?? 0;
