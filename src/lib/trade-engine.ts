@@ -199,7 +199,9 @@ export function calcDtv(
     settings: LeagueSettings = DEFAULT_LEAGUE_SETTINGS,
 ): DtvResult {
     const intel         = getPlayerIntel(player.name, player.position, player.team, player.age, leagueType);
-    const isPick        = player.position === 'PICK';
+    // FAAB gets the exact same treatment as a pick — baseValue passthrough,
+    // no age/injury/position/perf multipliers (see getFaabAsset above).
+    const isPick        = player.position === 'PICK' || player.position === 'FAAB';
     const posMultiplier = isPick ? 1 : computeScarcity(player.position, settings);
     const injuryFactor  = isPick ? 1 : calcInjuryFactor(player.injuryStatus);
     // League Scoring Points Engine: real per-league scoring adjustment. _factors
@@ -390,4 +392,50 @@ export function getDraftPicks(leagueSize: number, draftRounds = 5, seasons?: str
     }
 
     return picks;
+}
+
+// ── FAAB (Free Agent Acquisition Budget) as a tradeable asset ──────────────────
+//
+// Sleeper-only for now — see feedback/project memory for why ESPN isn't
+// included yet. FAAB has no external market price the way players do
+// (FantasyCalc) — the closest real analog already in this file is how a
+// draft pick's baseValue comes from a fixed formula (ROUND_ANCHORS), not a
+// market lookup. This reuses that same anchor table rather than inventing a
+// separate value scale.
+//
+// Commissioner-specified model: FAAB as a flat PERCENTAGE of the league's
+// total budget maps to a draft round, the same bracket regardless of league
+// size (an earlier team-count-scarcity-adjusted version was explicitly
+// replaced with this simpler one):
+//   ≥40%      → Round 1
+//   25% – 40% → Round 2
+//   12% – 25% → Round 3
+//   6%  – 12% → Round 4
+//   3%  – 6%  → Round 5
+//   <3%       → below round 5, same minimal-value floor getDraftPicks() uses
+// That round's ROUND_ANCHORS midpoint becomes the FAAB asset's baseValue, so
+// it sits on the exact same 0-100ish scale every player and pick already
+// uses — no new value scale invented, no team-count or season-phase input.
+const FAAB_ROUND_PCT_THRESHOLDS: [number, number][] = [
+    [0.40, 1], [0.25, 2], [0.12, 3], [0.06, 4], [0.03, 5],
+];
+
+export function getFaabAsset(amount: number, faabBudget: number): Player | null {
+    if (amount <= 0 || faabBudget <= 0) return null;
+
+    const pctOfBudget = amount / faabBudget;
+    const round = FAAB_ROUND_PCT_THRESHOLDS.find(([threshold]) => pctOfBudget >= threshold)?.[1] ?? 6;
+
+    const [hi, lo] = ROUND_ANCHORS[round - 1] ?? [6, 3]; // beyond round 5 — same minimal-value floor as picks
+    const baseValue = Math.round(((hi + lo) / 2) * 10) / 10;
+
+    return {
+        rank:      500,
+        name:      `$${amount} FAAB`,
+        position:  'FAAB',
+        team:      '',
+        age:       23,
+        baseValue,
+        image:     null, // no dedicated FAAB icon asset — UI falls back to a text/badge treatment, same as it does for any Player with no image
+    };
 }

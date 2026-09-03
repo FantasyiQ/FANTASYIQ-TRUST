@@ -102,13 +102,18 @@ interface Props {
      * evaluator shows DTV values only.
      */
     defenseValues?:       DefenseValues;
+    /** League-wide FAAB total (Sleeper waiver_budget) — null/absent on any
+     *  league that doesn't use FAAB waivers, hides the FAAB input entirely. */
+    faabBudget?:          number | null;
+    /** Remaining FAAB per roster, keyed by rosterId as a string. */
+    faabRemaining?:       Record<string, number> | null;
     phaseResult?:         LeaguePhaseResult;
 }
 
 export default function LeagueTradeEvaluator({
     leagueId, leagueName, scoringType, totalRosters, draftRounds = 5, draftOrderProjected = false,
     leagueType, rosterPositions = [], scoringSettings = {}, myTeamData, otherTeamsData = [],
-    defenseValues, phaseResult,
+    defenseValues, faabBudget = null, faabRemaining = null, phaseResult,
 }: Props) {
     const ppr           = scoringTypeToPpr(scoringType);
     const leagueSize    = nearestLeagueSize(totalRosters);
@@ -205,6 +210,8 @@ export default function LeagueTradeEvaluator({
                 myTeam={myTeam}
                 otherTeams={otherTeams}
                 defenseValues={defenseValues}
+                faabBudget={faabBudget}
+                faabRemaining={faabRemaining}
                 phaseResult={phaseResult}
         />
     );

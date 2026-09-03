@@ -216,6 +216,11 @@ model League {
     draftType        String?   // "auction" | "snake" | "linear" (Sleeper draft type)
     playoffWeekStart Int?      // week number when playoffs begin (from Sleeper or manual)
     champWeek        Int?      // week number of championship game (derived or manual)
+    // FAAB (Free Agent Acquisition Budget) — Sleeper only for now (waiver_type
+    // === 2). null on any league that doesn't use FAAB waivers; every consumer
+    // treats null as "hide this feature", never as $0.
+    faabBudget       Int?      // league-wide total FAAB budget (Sleeper settings.waiver_budget)
+    faabRemaining    Json?     // { [rosterId: string]: number } remaining budget per team
     lastSyncedAt     DateTime?
     // Sync health (Engine 1 — Sync Failure Auto-Recovery)
     syncStatus       String    @default("ok")   // "ok" | "failing" | "failed"

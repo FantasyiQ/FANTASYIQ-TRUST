@@ -107,6 +107,7 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
             standings:       true,
             platform:        true,
             scoringSettings: true,
+            faabRemaining:   true,
         },
     });
 
@@ -331,7 +332,7 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
                     <OptimizedLineups optimizations={optimizations} offSeason={offSeason} />
 
                     {/* ── Waiver Wire Intelligence ────────────────────────────── */}
-                    <WaiverWireTargets analyses={waiverAnalyses} offSeason={offSeason} />
+                    <WaiverWireTargets analyses={waiverAnalyses} offSeason={offSeason} faabRemaining={league.faabRemaining as Record<string, number> | null} />
 
                     {/* ── Trade Insights ──────────────────────────────────────── */}
                     <TradeInsights insights={tradeInsights} offSeason={offSeason} />

@@ -58,7 +58,7 @@ async function syncLeague(
             await prisma.league.update({
                 where: { id: dbLeague.id },
                 data: {
-                    ...buildCoreSleeperLeagueFields(sleeperLeague),
+                    ...buildCoreSleeperLeagueFields(sleeperLeague, rosters),
                     standings,
                     draftStartTime,
                     draftStatus,

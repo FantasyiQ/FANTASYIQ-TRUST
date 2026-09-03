@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { getDraftPicks, evaluateTrade, calcDtv, DEFAULT_LEAGUE_SETTINGS, isIdpPosition } from '@/lib/trade-engine';
+import { getDraftPicks, getFaabAsset, evaluateTrade, calcDtv, DEFAULT_LEAGUE_SETTINGS, isIdpPosition } from '@/lib/trade-engine';
 import type { Player, PprFormat, LeagueType, DtvResult, LeagueSettings } from '@/lib/trade-engine';
 import type { UniversePlayer, UniverseResponse, UniverseMeta, DeltaEntry, DeltaResponse } from '@/lib/player-universe';
 import { computePlayerBaseValue, playerVolatility } from '@/lib/player-universe';
@@ -48,6 +48,7 @@ const POS_COLORS: Record<string, string> = {
     K:    'bg-gray-800 text-gray-400 border-gray-700',
     DEF:  'bg-purple-900/40 text-purple-300 border-purple-800',
     PICK: 'bg-indigo-900/40 text-indigo-300 border-indigo-700',
+    FAAB: 'bg-emerald-900/40 text-emerald-300 border-emerald-800',
 };
 
 function verdictColor(v: string) {
@@ -88,6 +89,7 @@ function FactorBar({ label, value, max = 1.30 }: { label: string; value: number;
 function PlayerPill({ result, onRemove, leagueSize, useBucketedPicks = false }: { result: DtvResult; onRemove: () => void; leagueType: LeagueType; leagueSize: number; useBucketedPicks?: boolean }) {
     const displayAge = result.birthDate ? calculateAge(result.birthDate) : result.age || null;
     const isPick = result.position === 'PICK';
+    const isFaab = result.position === 'FAAB';
     return (
         <div className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 space-y-2">
             <div className="flex items-center justify-between gap-3">
@@ -132,7 +134,7 @@ function PlayerPill({ result, onRemove, leagueSize, useBucketedPicks = false }: 
                             )}
                         </div>
                         <p className="text-gray-500 text-xs">
-                            {isPick ? `${result.team} Draft` : `${result.team}${displayAge ? ` · Age ${displayAge}` : ''}`}
+                            {isPick ? `${result.team} Draft` : isFaab ? 'Waiver Budget' : `${result.team}${displayAge ? ` · Age ${displayAge}` : ''}`}
                         </p>
                     </div>
                 </div>
@@ -366,6 +368,49 @@ function RosterQuickPick({ players, picks = [], excluded, ppr, leagueType, leagu
     );
 }
 
+// FAAB isn't a searchable list like players/picks — it's a single continuous
+// dollar amount, capped at this specific team's real remaining budget when
+// known (falls back to the league's full budget when the team's own
+// remaining figure isn't available, e.g. the opposing side before a team is
+// selected). Only rendered when the league actually uses FAAB waivers
+// (faabBudget non-null) — see getFaabAsset in trade-engine.ts for the
+// dollar-amount → trade-value conversion.
+function FaabInput({ faabBudget, remaining, onAdd }: { faabBudget: number; remaining: number | null; onAdd: (p: Player) => void }) {
+    const [amount, setAmount] = useState('');
+    const max = Math.max(0, remaining ?? faabBudget);
+
+    const handleAdd = () => {
+        const n = Math.floor(Number(amount));
+        if (!n || n <= 0) return;
+        const asset = getFaabAsset(Math.min(n, max), faabBudget);
+        if (asset) onAdd(asset);
+        setAmount('');
+    };
+
+    return (
+        <div className="flex items-center gap-2">
+            <input
+                type="number"
+                min={1}
+                max={max}
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
+                placeholder={`FAAB $ (max $${max})`}
+                className="flex-1 min-w-0 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#D4AF37]/60"
+            />
+            <button
+                type="button"
+                onClick={handleAdd}
+                disabled={max <= 0}
+                className="shrink-0 px-3 py-2 rounded-xl bg-gray-800 border border-gray-700 text-gray-300 text-sm hover:border-gray-500 transition disabled:opacity-40"
+            >
+                Add FAAB
+            </button>
+        </div>
+    );
+}
+
 function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEAGUE_SETTINGS, players, allPicks = [], leagueSize = 12, useBucketedPicks = false }: {
     onAdd:              (p: Player) => void;
     excluded:           string[];
@@ -524,6 +569,12 @@ interface TradeEvaluatorProps {
      * values instead of DTV. Offensive positions are never affected.
      */
     defenseValues?:         DefenseValues;
+    /** League-wide FAAB total (Sleeper waiver_budget) — null/absent hides the
+     *  FAAB input entirely, including for leagues that don't use FAAB waivers. */
+    faabBudget?:            number | null;
+    /** Remaining FAAB per roster, keyed by rosterId as a string (Sleeper
+     *  waiver_budget minus waiver_budget_used). Caps how much a team can offer. */
+    faabRemaining?:         Record<string, number> | null;
     phaseResult?:           LeaguePhaseResult;
     /** Full raw league scoring_settings dict (League Scoring Points Engine) —
      *  distinct from initialLeagueSettings, which only carries a few
@@ -547,6 +598,8 @@ export default function TradeEvaluator({
     myTeam,
     otherTeams            = [],
     defenseValues         = {},
+    faabBudget            = null,
+    faabRemaining         = null,
     phaseResult,
     rawScoringSettings,
 }: TradeEvaluatorProps = {}) {
@@ -765,7 +818,7 @@ export default function TradeEvaluator({
         if (!result || deltaEntries.length === 0) return null;
         const avgDelta = (players: Player[]) => {
             const vals = players
-                .filter(p => p.position !== 'PICK')
+                .filter(p => p.position !== 'PICK' && p.position !== 'FAAB')
                 .map(p => deltaMap.get(p.name.toLowerCase())?.dynasty.delta ?? 0);
             return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
         };
@@ -916,6 +969,13 @@ export default function TradeEvaluator({
                         />
                     )}
                     <PlayerSearch onAdd={p => setSideA(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} settings={leagueSettings} players={allPlayers} allPicks={searchablePicks} leagueSize={leagueSize} useBucketedPicks={effectiveUseBucketed} />
+                    {faabBudget != null && (
+                        <FaabInput
+                            faabBudget={faabBudget}
+                            remaining={myTeam ? faabRemaining?.[String(myTeam.rosterId)] ?? null : null}
+                            onAdd={p => setSideA(prev => prev.length < 5 ? [...prev, p] : prev)}
+                        />
+                    )}
                     <div className="space-y-2">
                         {result?.sideA.map(r => (
                             <PlayerPill key={r.name} result={r} leagueType={leagueType} leagueSize={leagueSize} useBucketedPicks={effectiveUseBucketed} onRemove={() => setSideA(prev => prev.filter(p => p.name !== r.name))} />
@@ -959,6 +1019,13 @@ export default function TradeEvaluator({
                         />
                     )}
                     <PlayerSearch onAdd={p => setSideB(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} settings={leagueSettings} players={allPlayers} allPicks={searchablePicks} leagueSize={leagueSize} useBucketedPicks={effectiveUseBucketed} />
+                    {faabBudget != null && (
+                        <FaabInput
+                            faabBudget={faabBudget}
+                            remaining={selectedTeam ? faabRemaining?.[String(selectedTeam.rosterId)] ?? null : null}
+                            onAdd={p => setSideB(prev => prev.length < 5 ? [...prev, p] : prev)}
+                        />
+                    )}
                     <div className="space-y-2">
                         {result?.sideB.map(r => (
                             <PlayerPill key={r.name} result={r} leagueType={leagueType} leagueSize={leagueSize} useBucketedPicks={effectiveUseBucketed} onRemove={() => setSideB(prev => prev.filter(p => p.name !== r.name))} />

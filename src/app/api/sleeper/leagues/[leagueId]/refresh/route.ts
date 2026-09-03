@@ -66,7 +66,7 @@ export async function POST(
         const updated = await prisma.league.update({
             where: { id: leagueId },
             data: {
-                ...buildCoreSleeperLeagueFields(sleeperLeague),
+                ...buildCoreSleeperLeagueFields(sleeperLeague, rosters),
                 leagueName:      sleeperLeague.name,
                 season:          sleeperLeague.season,
                 totalRosters:    sleeperLeague.total_rosters,

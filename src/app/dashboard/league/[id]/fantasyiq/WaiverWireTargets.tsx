@@ -93,7 +93,7 @@ function TargetTable({ targets }: { targets: WaiverTarget[] }) {
 
 // ── Team card ─────────────────────────────────────────────────────────────────
 
-function TeamCard({ analysis }: { analysis: TeamWaiverAnalysis }) {
+function TeamCard({ analysis, faabRemaining }: { analysis: TeamWaiverAnalysis; faabRemaining: number | null }) {
     const [open, setOpen] = useState(false);
 
     return (
@@ -111,6 +111,11 @@ function TeamCard({ analysis }: { analysis: TeamWaiverAnalysis }) {
                         <div className="font-semibold text-white text-sm truncate">{analysis.teamName}</div>
                         {analysis.username && (
                             <div className="text-gray-600 text-[11px]">@{analysis.username}</div>
+                        )}
+                        {faabRemaining != null && (
+                            <div className="text-emerald-400 text-[11px] font-medium mt-0.5">
+                                ${faabRemaining} FAAB remaining
+                            </div>
                         )}
                     </div>
                     {analysis.isAlreadyOptimal ? (
@@ -181,11 +186,14 @@ function OffSeasonPreview() {
 // ── Root component ────────────────────────────────────────────────────────────
 
 interface Props {
-    analyses:  TeamWaiverAnalysis[];
-    offSeason: boolean;
+    analyses:      TeamWaiverAnalysis[];
+    offSeason:     boolean;
+    /** Remaining FAAB per roster, keyed by rosterId as a string — null/absent
+     *  on any league that doesn't use FAAB waivers, hides the display entirely. */
+    faabRemaining?: Record<string, number> | null;
 }
 
-export default function WaiverWireTargets({ analyses, offSeason }: Props) {
+export default function WaiverWireTargets({ analyses, offSeason, faabRemaining = null }: Props) {
     // Sort: most gain available first
     const sorted = [...analyses].sort((a, b) => b.totalGainAvailable - a.totalGainAvailable);
 
@@ -207,7 +215,7 @@ export default function WaiverWireTargets({ analyses, offSeason }: Props) {
             ) : (
                 <div className="space-y-2">
                     {sorted.map(a => (
-                        <TeamCard key={a.rosterId} analysis={a} />
+                        <TeamCard key={a.rosterId} analysis={a} faabRemaining={faabRemaining?.[String(a.rosterId)] ?? null} />
                     ))}
                 </div>
             )}

@@ -36,6 +36,11 @@ export type TradeEvaluatorContent = {
      * ranking engine. Empty when the league has no IDP/K/DEF positions.
      */
     defenseValues:       Record<string, number>;
+    /** League-wide FAAB total (Sleeper waiver_budget) — null on any league
+     *  that doesn't use FAAB waivers. Hides the FAAB input entirely. */
+    faabBudget:          number | null;
+    /** Remaining FAAB per roster, keyed by rosterId as a string. */
+    faabRemaining:       Record<string, number> | null;
     myTeamData?: {
         rosterId:   number;
         teamName:   string;
@@ -64,6 +69,8 @@ export async function getTradeEvaluatorContent(id: string): Promise<TradeEvaluat
             playoffWeekStart: true, champWeek: true,
             assignedPlanId:   true,
             assignedPlanType: true,
+            faabBudget:       true,
+            faabRemaining:    true,
         },
     });
     if (!league || league.userId !== session.user.id) notFound();
@@ -282,6 +289,8 @@ export async function getTradeEvaluatorContent(id: string): Promise<TradeEvaluat
         mySleeperUserId:     mySleeperUserId ?? null,
         phaseResult,
         defenseValues,
+        faabBudget:    league.faabBudget,
+        faabRemaining: (league.faabRemaining as Record<string, number> | null) ?? null,
         myTeamData,
         otherTeamsData,
     };

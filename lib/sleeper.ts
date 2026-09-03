@@ -1,3 +1,5 @@
+import { Prisma } from '@prisma/client';
+
 const BASE = 'https://api.sleeper.app/v1';
 
 export interface SleeperUser {
@@ -24,6 +26,8 @@ export interface SleeperLeague {
         commissioner_id?: string;        // Sleeper user_id of the league commissioner
         taxi_slots?: number;             // number of taxi squad spots (dynasty leagues)
         reserve_slots?: number;          // number of IR slots
+        waiver_budget?: number;          // total FAAB budget, only meaningful when waiver_type === 2
+        waiver_type?: number;            // 0/1 = priority-based waivers, 2 = FAAB
     };
     scoring_settings: {
         rec?:              number;   // PPR value (0 / 0.5 / 1)
@@ -70,6 +74,7 @@ export interface SleeperRoster {
         fpts_against_decimal?: number;
         ppts?: number;
         ppts_decimal?: number;
+        waiver_budget_used?: number;   // dollars spent so far this season, only meaningful under FAAB
     };
 }
 
@@ -449,13 +454,27 @@ export function deriveScoringType(league: SleeperLeague): string {
  * any new sync path reaches for this instead of re-deriving the field list
  * from scratch.
  */
-export function buildCoreSleeperLeagueFields(sleeperLeague: SleeperLeague) {
+export function buildCoreSleeperLeagueFields(sleeperLeague: SleeperLeague, rosters?: SleeperRoster[]) {
+    // FAAB — only meaningful when this league actually uses dollar-budget
+    // waivers (waiver_type === 2, not priority-based). null on any other
+    // league; every consumer treats null as "hide this feature", never $0.
+    const isFaab     = sleeperLeague.settings?.waiver_type === 2;
+    const faabBudget = isFaab ? (sleeperLeague.settings?.waiver_budget ?? null) : null;
+    const faabRemaining = isFaab && rosters
+        ? (Object.fromEntries(rosters.map(r => [
+            String(r.roster_id),
+            (sleeperLeague.settings?.waiver_budget ?? 0) - (r.settings?.waiver_budget_used ?? 0),
+          ])) as unknown as Prisma.InputJsonValue)
+        : Prisma.JsonNull;
+
     return {
         scoringSettings: sleeperLeague.scoring_settings ?? {},
         rosterPositions: sleeperLeague.roster_positions,
         scoringType:     deriveScoringType(sleeperLeague),
         leagueType:      sleeperLeague.settings?.type === 2 ? 'Dynasty' : 'Redraft',
         status:          sleeperLeague.status,
+        faabBudget,
+        faabRemaining,
     };
 }
 

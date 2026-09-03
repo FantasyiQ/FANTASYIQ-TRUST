@@ -16,6 +16,8 @@ export default function TradeEvaluator({ content, leagueId }: { content: TradeEv
             myTeamData={content.myTeamData}
             otherTeamsData={content.otherTeamsData}
             defenseValues={content.defenseValues}
+            faabBudget={content.faabBudget}
+            faabRemaining={content.faabRemaining}
             phaseResult={content.phaseResult}
         />
     );

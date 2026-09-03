@@ -63,6 +63,7 @@ export default async function FantasyiQHubPage({ params }: { params: Promise<{ i
             draftType:        true,
             assignedPlanType: true,
             scoringSettings:  true,
+            faabRemaining:    true,
         },
     });
 
@@ -279,7 +280,7 @@ export default async function FantasyiQHubPage({ params }: { params: Promise<{ i
                 totalRosters={league.totalRosters}
                 platform={league.platform ?? undefined}
                 lineups={<OptimizedLineups optimizations={optimizations} offSeason={offSeason} />}
-                waiver={<WaiverWireTargets  analyses={waiverAnalyses}     offSeason={offSeason} />}
+                waiver={<WaiverWireTargets  analyses={waiverAnalyses}     offSeason={offSeason} faabRemaining={league.faabRemaining as Record<string, number> | null} />}
                 roster={<RosterIntelligencePanel intelligence={rosterIntelligence} offSeason={offSeason} />}
             />
         </>
