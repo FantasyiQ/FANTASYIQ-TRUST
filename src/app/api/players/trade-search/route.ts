@@ -134,6 +134,11 @@ export async function GET(request: NextRequest): Promise<Response> {
             : (DEPTH_BASE[p.position] ?? 10);
         return {
             rank:            i + 1,
+            id:              p.playerId, // needed client-side so IDP/K/DEF search results can be
+                                          // overridden with their real defensive-engine value instead
+                                          // of the generic DEPTH_BASE fallback above — FantasyCalc
+                                          // doesn't cover IDP at all, so every one of them would
+                                          // otherwise land on the exact same flat baseValue.
             name:            p.fullName,
             position:        p.position,
             team:            p.team,

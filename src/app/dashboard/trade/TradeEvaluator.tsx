@@ -411,7 +411,15 @@ function FaabInput({ faabBudget, remaining, onAdd }: { faabBudget: number; remai
     );
 }
 
-function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEAGUE_SETTINGS, players, allPicks = [], leagueSize = 12, useBucketedPicks = false }: {
+// IDP/K/DEF positions — FantasyCalc doesn't track any of them, so the search
+// API's fallback value (DEPTH_BASE default) is the same generic number for
+// every one of them regardless of real talent. Real per-player values for
+// these already exist (the defensive ranking engine, computed once
+// server-side and passed down as defenseValues) — apply them here the same
+// way patchPlayer() already does for roster players.
+const IDP_KDEF_POSITIONS = new Set(['DL','LB','DB','DE','DT','NT','OLB','ILB','MLB','EDGE','CB','S','SS','FS','NB','SAF','K','DEF']);
+
+function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEAGUE_SETTINGS, players, allPicks = [], leagueSize = 12, useBucketedPicks = false, defenseValues = {} }: {
     onAdd:              (p: Player) => void;
     excluded:           string[];
     ppr:                PprFormat;
@@ -421,6 +429,7 @@ function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEA
     allPicks?:          Player[];
     leagueSize?:        number;
     useBucketedPicks?:  boolean;
+    defenseValues?:     DefenseValues;
 }) {
     const [query, setQuery]     = useState('');
     const [results, setResults] = useState<Player[]>([]);
@@ -467,7 +476,15 @@ function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEA
             const playerData = await res.json() as Player[];
             const playerMatches = playerData
                 .filter(p => !excluded.includes(p.name))
-                .map(p => playersByName.get(p.name) ?? p);
+                .map(p => {
+                    const authoritative = playersByName.get(p.name);
+                    if (authoritative) return authoritative;
+                    if (IDP_KDEF_POSITIONS.has(p.position) && p.id) {
+                        const defScore = defenseValues[p.id];
+                        if (defScore !== undefined) return { ...p, baseValue: defScore };
+                    }
+                    return p;
+                });
 
             // Picks first if query looks like a pick
             const looksLikePick = /\d\.\d|\b20\d{2}\b|\b(early|mid|late)\b/i.test(q) ||
@@ -478,7 +495,7 @@ function PlayerSearch({ onAdd, excluded, ppr, leagueType, settings = DEFAULT_LEA
             );
         } catch { /* ignore */ }
         finally { setLoading(false); }
-    }, [excluded, allPicks, playersByName, leagueType, settings, ppr, leagueSize]);
+    }, [excluded, allPicks, playersByName, leagueType, settings, ppr, leagueSize, defenseValues]);
 
     function handleInput(e: React.ChangeEvent<HTMLInputElement>) {
         const val = e.target.value;
@@ -968,7 +985,7 @@ export default function TradeEvaluator({
                             useBucketedPicks={effectiveUseBucketed}
                         />
                     )}
-                    <PlayerSearch onAdd={p => setSideA(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} settings={leagueSettings} players={allPlayers} allPicks={searchablePicks} leagueSize={leagueSize} useBucketedPicks={effectiveUseBucketed} />
+                    <PlayerSearch onAdd={p => setSideA(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} settings={leagueSettings} players={allPlayers} allPicks={searchablePicks} leagueSize={leagueSize} useBucketedPicks={effectiveUseBucketed} defenseValues={defenseValues} />
                     {faabBudget != null && (
                         <FaabInput
                             faabBudget={faabBudget}
@@ -1018,7 +1035,7 @@ export default function TradeEvaluator({
                             useBucketedPicks={effectiveUseBucketed}
                         />
                     )}
-                    <PlayerSearch onAdd={p => setSideB(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} settings={leagueSettings} players={allPlayers} allPicks={searchablePicks} leagueSize={leagueSize} useBucketedPicks={effectiveUseBucketed} />
+                    <PlayerSearch onAdd={p => setSideB(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} settings={leagueSettings} players={allPlayers} allPicks={searchablePicks} leagueSize={leagueSize} useBucketedPicks={effectiveUseBucketed} defenseValues={defenseValues} />
                     {faabBudget != null && (
                         <FaabInput
                             faabBudget={faabBudget}
@@ -1070,7 +1087,7 @@ export default function TradeEvaluator({
                                 useBucketedPicks={effectiveUseBucketed}
                             />
                         )}
-                        <PlayerSearch onAdd={p => setSideC(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} settings={leagueSettings} players={allPlayers} allPicks={searchablePicks} leagueSize={leagueSize} useBucketedPicks={effectiveUseBucketed} />
+                        <PlayerSearch onAdd={p => setSideC(prev => prev.length < 5 ? [...prev, p] : prev)} excluded={allExcluded} ppr={ppr} leagueType={leagueType} settings={leagueSettings} players={allPlayers} allPicks={searchablePicks} leagueSize={leagueSize} useBucketedPicks={effectiveUseBucketed} defenseValues={defenseValues} />
                         <div className="space-y-2">
                             {sideC.map(p => {
                                 const r = calcDtv(p, ppr, leagueType, undefined, leagueSettings);
