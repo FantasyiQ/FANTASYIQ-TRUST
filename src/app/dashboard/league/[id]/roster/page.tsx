@@ -262,10 +262,28 @@ function scoringTypeToPpr(s: string | null): 0 | 0.5 | 1 {
 
 // ── Position group order ──────────────────────────────────────────────────────
 
-const POS_ORDER: Record<string, number> = { QB: 0, RB: 1, WR: 2, TE: 3, K: 4, DEF: 5 };
+const POS_ORDER: Record<string, number> = { QB: 0, RB: 1, WR: 2, TE: 3, K: 4, DEF: 5, DL: 6, EDGE: 7, LB: 8, DB: 9 };
 
 function posGroup(pos: string): number {
     return POS_ORDER[pos] ?? 99;
+}
+
+// A player's raw Sleeper position can be any granular defensive label
+// (NT/DT/DE, CB/S/SS/FS, etc). Without normalizing this before it's used as
+// the sort/group key, IDP players with different raw labels never land next
+// to each other — the position-group sort falls back to a shared "unknown"
+// bucket for all of them, DTV order scatters them, and the adjacent-row
+// section grouping below then splits every DTV-adjacent pair with a
+// different raw label into its own separate "1 player" section instead of
+// one real DL/LB/DB group. Group into exactly 4 real badges: DL, EDGE (kept
+// separate, not folded into DL or LB), LB, DB.
+function normalizeIdpDisplay(pos: string): string {
+    const p = pos.toUpperCase();
+    if (['NT', 'DT', 'DE', 'DL'].includes(p)) return 'DL';
+    if (p === 'EDGE') return 'EDGE';
+    if (['LB', 'OLB', 'ILB', 'MLB'].includes(p)) return 'LB';
+    if (['DB', 'CB', 'S', 'SS', 'FS', 'SAF'].includes(p)) return 'DB';
+    return pos;
 }
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -286,12 +304,16 @@ interface RosterRow {
 // ── Styling ───────────────────────────────────────────────────────────────────
 
 const POS_COLORS: Record<string, string> = {
-    QB:  'bg-red-900/40 text-red-300 border-red-800',
-    RB:  'bg-green-900/40 text-green-300 border-green-800',
-    WR:  'bg-blue-900/40 text-blue-300 border-blue-800',
-    TE:  'bg-yellow-900/40 text-yellow-300 border-yellow-800',
-    K:   'bg-purple-900/40 text-purple-300 border-purple-800',
-    DEF: 'bg-gray-800 text-gray-300 border-gray-700',
+    QB:   'bg-red-900/40 text-red-300 border-red-800',
+    RB:   'bg-green-900/40 text-green-300 border-green-800',
+    WR:   'bg-blue-900/40 text-blue-300 border-blue-800',
+    TE:   'bg-yellow-900/40 text-yellow-300 border-yellow-800',
+    K:    'bg-purple-900/40 text-purple-300 border-purple-800',
+    DEF:  'bg-gray-800 text-gray-300 border-gray-700',
+    DL:   'bg-purple-900/40 text-purple-300 border-purple-800',
+    EDGE: 'bg-fuchsia-900/40 text-fuchsia-300 border-fuchsia-800',
+    LB:   'bg-violet-900/40 text-violet-300 border-violet-800',
+    DB:   'bg-indigo-900/40 text-indigo-300 border-indigo-800',
 };
 
 const STATUS_STYLES: Record<SlotStatus, string> = {
@@ -573,7 +595,7 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
         else if (starterSet.has(pid)) status = 'Starter';
         else                          status = 'Bench';
 
-        return { playerId: pid, name, position: pos, team, age, dtv, injuryStatus: inj, status };
+        return { playerId: pid, name, position: normalizeIdpDisplay(pos), team, age, dtv, injuryStatus: inj, status };
     }).sort((a, b) => {
         const pg = posGroup(a.position) - posGroup(b.position);
         if (pg !== 0) return pg;
