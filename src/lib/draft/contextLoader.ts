@@ -41,6 +41,17 @@ function injuryAdjustedFiqScore(fiqScore: number, injuryStatus: string | null | 
     return Math.max(1, fiqScore - Math.round(risk * DRAFT_INJURY_ADJUSTMENT_SCALE));
 }
 
+// Every real Sleeper position code that toIdpPosition() (seedProjections.ts)
+// normalizes to each IDP bucket — the reverse of that mapping, used to widen
+// a SleeperPlayer query so it can't silently miss a real player just because
+// FiQ's own rookie scouting label ("EDGE") differs from Sleeper's stored
+// position for that same player ("LB").
+const IDP_POSITION_VARIANTS: Record<'DL' | 'LB' | 'DB', string[]> = {
+    DL: ['DL', 'DE', 'DT', 'NT'],
+    LB: ['LB', 'OLB', 'ILB', 'MLB', 'EDGE'],
+    DB: ['DB', 'CB', 'S', 'SS', 'FS', 'SAF'],
+};
+
 /** Normalizes a player name for fuzzy fallback matching.
  *  Strips Jr/Sr/II/III/IV/V suffixes, apostrophes, periods, and extra whitespace. */
 function normalizeDraftName(name: string): string {
@@ -286,7 +297,16 @@ export async function loadDraftContext(params: {
         sleeperPlayerId: p.player_id,
     }));
 
-    const draftedIds = new Set(picks.map(p => p.player_id));
+    // Not just picks from THIS draft — a player manually added to any team's
+    // roster (e.g. a compensatory pick assigned outside the normal draft-pick
+    // flow) never appears in `picks[]` at all, so a drafted check based only
+    // on picks silently keeps recommending someone who's already rostered.
+    // Sleeper's live roster.players is the real "who can't be picked anymore"
+    // truth regardless of how they got there.
+    const rosteredIds = new Set(
+        rosters.flatMap(r => (r.players ?? []).filter((id): id is string => Boolean(id) && id !== '0')),
+    );
+    const draftedIds = new Set([...picks.map(p => p.player_id), ...rosteredIds]);
 
     // Belt-and-suspenders drafted check, independent of the SleeperPlayer name
     // join below. That join is an EXACT fullName match — if RookieRankingsPlayer
@@ -384,14 +404,32 @@ export async function loadDraftContext(params: {
         // Broad fetch by position, not an exact-string match against FiQ's
         // own rookie names — a name-filtered query silently misses real
         // matches whenever the two sources spell a suffix differently (see
-        // the comment above draftedNames, and makeSpResolver below).
+        // the comment above draftedNames, and makeSpResolver below). Also
+        // broader than the raw rookie position VALUES themselves: FiQ's own
+        // scouting-style label for a rookie (e.g. "EDGE") often isn't the
+        // same string Sleeper stores for that same real player ("LB") — a
+        // literal `position: { in: rookiePositions } }` filter can silently
+        // fetch zero real Sleeper rows for that rookie, leaving team/age
+        // unresolved (shows as "FA"). Expand each rookie position to every
+        // real Sleeper position code that normalizes to the same IDP bucket.
+        const neededPositions = new Set<string>();
+        for (const pos of new Set(rookies.map(r => r.position))) {
+            const idpPos = toIdpPosition(pos);
+            if (!idpPos) { neededPositions.add(pos); continue; }
+            for (const variant of IDP_POSITION_VARIANTS[idpPos]) neededPositions.add(variant);
+        }
         const sleeperPlayers = await prisma.sleeperPlayer.findMany({
-            where:  { position: { in: [...new Set(rookies.map(r => r.position))] } },
+            where:  { position: { in: [...neededPositions] } },
             select: { fullName: true, playerId: true, team: true, age: true, position: true, injuryStatus: true },
         });
 
-        const spResolver = makeSpResolver(sleeperPlayers);
-        const spLookup = (name: string, position: string) => spResolver(name, position);
+        // Resolve by NORMALIZED position (DL/LB/DB) on both sides, not the
+        // raw label — the join key must survive "EDGE" (FiQ) vs "LB"
+        // (Sleeper) meaning the same real position.
+        const spResolver = makeSpResolver(
+            sleeperPlayers.map(p => ({ ...p, position: toIdpPosition(p.position) ?? p.position })),
+        );
+        const spLookup = (name: string, position: string) => spResolver(name, toIdpPosition(position) ?? position);
 
         // Pass 1: FiQ baseline pick — global rank across allowed positions by fiqScore (already sorted desc).
         // delta = myNextPick - fiqBaselineRank: positive = player available later than FiQ suggests.
@@ -424,7 +462,12 @@ export async function loadDraftContext(params: {
             availablePlayers.push({
                 sleeperPlayerId:  sp?.playerId ?? '',
                 name:             r.playerName,
-                position:         r.position,
+                // Real DL/LB/DB, not FiQ's raw scouting label ("EDGE" etc)
+                // — matches the position taxonomy every other surface
+                // (Rankings, Mock Draft, the startup Live Draft branch)
+                // already uses, so the same player shows the same position
+                // everywhere instead of an app-wide-unrecognized value.
+                position:         toIdpPosition(r.position) ?? r.position,
                 team:             sp?.team ?? null,
                 age:              sp?.age ?? null,
                 fiqScore,
