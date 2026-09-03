@@ -343,10 +343,11 @@ function seededRandom(seed: number): number {
 }
 
 function buildRookieIdpStats(
-    allPlayers:  Record<string, SlimPlayer>,
-    veteranIds:  Set<string>,
-    adpEntries:  SleeperAdpEntry[],
-    posAvgs:     Record<'DL' | 'LB' | 'DB', Record<string, number>>,
+    allPlayers:      Record<string, SlimPlayer>,
+    veteranIds:      Set<string>,
+    adpEntries:      SleeperAdpEntry[],
+    posAvgs:         Record<'DL' | 'LB' | 'DB', Record<string, number>>,
+    starterPosAvgs:  Partial<Record<'DL' | 'LB' | 'DB', Record<string, number>>>,
 ): RawIdpStats[] {
     const adpMap = new Map(adpEntries.map(e => [e.id, e.adp]));
 
@@ -365,6 +366,35 @@ function buildRookieIdpStats(
         if (veteranIds.has(playerId)) continue;
         const idpPos = toIdpPosition(player.position);
         if (!idpPos) continue;
+
+        // A player with no current-season stats but a confirmed #1 depth-chart
+        // slot has already won the job — that's a stronger, more current signal
+        // than the ADP proxy below (which is derived from LAST season's real
+        // production and has no way to reflect this). Use the real per-game
+        // rate of OTHER confirmed starters at the position directly, skipping
+        // the ADP-percentile boost entirely, so a rookie/new starter isn't
+        // scored as if they're an unproven backup. Falls through to the
+        // existing ADP-proxy path below when no real starter sample exists yet.
+        const starterAvg = starterPosAvgs[idpPos];
+        if (player.depthChartOrder === 1 && starterAvg) {
+            rookies.push({
+                playerId,
+                position:          idpPos,
+                gamesPlayed:       17,
+                soloTackles:       starterAvg['tackle_solo']   ?? 0,
+                assists:           starterAvg['tackle_ast']    ?? 0,
+                sacks:             starterAvg['sack']          ?? 0,
+                tfl:               starterAvg['tackle_loss']   ?? 0,
+                interceptions:     starterAvg['int']           ?? 0,
+                forcedFumbles:     starterAvg['fumble_force']  ?? 0,
+                fumbleRecoveries:  starterAvg['fumble_rec']    ?? 0,
+                passesDefended:    starterAvg['pass_defended'] ?? 0,
+                defensiveTds:      starterAvg['def_td']        ?? 0,
+                safeties:          starterAvg['safe']          ?? 0,
+                qbHits:            starterAvg['qb_hit']        ?? 0,
+            });
+            continue;
+        }
 
         const rank    = adpMap.get(playerId);
         const maxRank = posMaxRank[idpPos] || 100;
@@ -399,9 +429,10 @@ function buildRookieIdpStats(
 }
 
 function buildRookieKickerStats(
-    allPlayers:  Record<string, SlimPlayer>,
-    veteranIds:  Set<string>,
-    adpEntries:  SleeperAdpEntry[],
+    allPlayers:        Record<string, SlimPlayer>,
+    veteranIds:        Set<string>,
+    adpEntries:        SleeperAdpEntry[],
+    starterAvgPerGame: Record<'fg_0_39' | 'fg_40_49' | 'fg_50_plus' | 'xp' | 'missedFg' | 'missedXp', number> | null,
 ): RawKickerStats[] {
     const adpMap  = new Map(adpEntries.map(e => [e.id, e.adp]));
     const maxRank = Math.max(0, ...adpEntries.filter(e => e.position === 'K').map(e => e.adp));
@@ -413,6 +444,24 @@ function buildRookieKickerStats(
 
     for (const [playerId, player] of Object.entries(allPlayers)) {
         if (veteranIds.has(playerId) || player.position !== 'K') continue;
+
+        // Same reasoning as buildRookieIdpStats above: a confirmed #1 kicker
+        // with no current-season stats has already won the job — use real
+        // confirmed starters' per-game rate directly rather than the ADP
+        // proxy (built from last season's stats, blind to this year's job).
+        if (player.depthChartOrder === 1 && starterAvgPerGame) {
+            rookies.push({
+                playerId,
+                gamesPlayed: 17,
+                fg_0_39:     starterAvgPerGame.fg_0_39    * 17,
+                fg_40_49:    starterAvgPerGame.fg_40_49   * 17,
+                fg_50_plus:  starterAvgPerGame.fg_50_plus * 17,
+                xp:          starterAvgPerGame.xp         * 17,
+                missedFg:    starterAvgPerGame.missedFg   * 17,
+                missedXp:    starterAvgPerGame.missedXp   * 17,
+            });
+            continue;
+        }
 
         const rank    = adpMap.get(playerId);
         const adpPct  = rank !== undefined ? 1 - (rank - 1) / Math.max(maxRank - 1, 1) : 0.5;
@@ -465,6 +514,38 @@ function computePositionalAvgPerGame(
             avg,
         ];
     }));
+}
+
+// Real per-game rate of confirmed #1-depth-chart players only, by IDP
+// position — the baseline a rookie/new starter with no career stats gets
+// compared against, instead of the ADP proxy (see buildRookieIdpStats).
+// Omits a position entirely when no real starter sample exists yet.
+function computeStarterPosAvgs(
+    veteranStats: RawIdpStats[],
+    allPlayers:   Record<string, SlimPlayer>,
+): Partial<Record<'DL' | 'LB' | 'DB', Record<string, number>>> {
+    const starterStats = veteranStats.filter(s => allPlayers[s.playerId]?.depthChartOrder === 1);
+    const result: Partial<Record<'DL' | 'LB' | 'DB', Record<string, number>>> = {};
+    for (const pos of ['DL', 'LB', 'DB'] as const) {
+        if (starterStats.some(s => s.position === pos)) {
+            result[pos] = computePositionalAvgPerGame(starterStats, pos);
+        }
+    }
+    return result;
+}
+
+// Same idea for kickers — real per-game rate of confirmed #1 kickers only.
+function computeStarterAvgPerGameKicker(
+    veteranStats: RawKickerStats[],
+    allPlayers:   Record<string, SlimPlayer>,
+): Record<'fg_0_39' | 'fg_40_49' | 'fg_50_plus' | 'xp' | 'missedFg' | 'missedXp', number> | null {
+    const starters = veteranStats.filter(s => allPlayers[s.playerId]?.depthChartOrder === 1);
+    if (starters.length === 0) return null;
+    const keys = ['fg_0_39', 'fg_40_49', 'fg_50_plus', 'xp', 'missedFg', 'missedXp'] as const;
+    return Object.fromEntries(keys.map(k => [
+        k,
+        starters.reduce((sum, s) => sum + (s[k] ?? 0) / Math.max(s.gamesPlayed, 1), 0) / starters.length,
+    ])) as Record<'fg_0_39' | 'fg_40_49' | 'fg_50_plus' | 'xp' | 'missedFg' | 'missedXp', number>;
 }
 
 // ── Offensive top-5 projected points ──────────────────────────────────────────
@@ -549,9 +630,11 @@ export async function buildProjectionsFromSleeperStats(
         LB: computePositionalAvgPerGame(veteranIdpStats, 'LB'),
         DB: computePositionalAvgPerGame(veteranIdpStats, 'DB'),
     };
+    const starterPosAvgs         = computeStarterPosAvgs(veteranIdpStats, allPlayers);
+    const starterKickerAvgPerGame = computeStarterAvgPerGameKicker(veteranKickerStats, allPlayers);
 
-    const rookieIdpStats    = buildRookieIdpStats(allPlayers, veteranIds, adpEntries, posAvgs);
-    const rookieKickerStats = buildRookieKickerStats(allPlayers, veteranIds, adpEntries);
+    const rookieIdpStats    = buildRookieIdpStats(allPlayers, veteranIds, adpEntries, posAvgs, starterPosAvgs);
+    const rookieKickerStats = buildRookieKickerStats(allPlayers, veteranIds, adpEntries, starterKickerAvgPerGame);
 
     // ── Build final projections ────────────────────────────────────────────────
     const allIdpStats    = [...veteranIdpStats,    ...rookieIdpStats];
