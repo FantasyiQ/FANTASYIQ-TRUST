@@ -605,16 +605,18 @@ export async function loadDraftContext(params: {
             });
         }
 
-        // K/DEF: FantasyCalc never prices either position (dynasty trade
-        // markets don't cover them) — the pool above is built entirely from
-        // FantasyCalcValue, so real kickers and team defenses never enter it
-        // at all. That's why every kicker rendered as "FA": there was
-        // nothing real to show. Pull them directly from SleeperPlayer
-        // instead, scored by the same real defensive/kicker engine already
-        // used on Rankings and Trade Evaluator — reused as-is, not modified,
-        // so this gets the same starter-floor/rookie-projection fixes
-        // already shipped there for free.
-        if (allowedPositions.has('K') || allowedPositions.has('DEF')) {
+        // K/DEF/IDP: FantasyCalc never prices any of these positions (dynasty
+        // trade markets don't cover them) — the pool above is built entirely
+        // from FantasyCalcValue, so real kickers, team defenses, and IDP
+        // players (DL/LB/DB) never enter it at all. That's why every kicker
+        // rendered as "FA": there was nothing real to show, and the same gap
+        // applies to any league that rosters IDP positions. Pull them
+        // directly from SleeperPlayer instead, scored by the same real
+        // defensive/kicker engine already used on Rankings and Trade
+        // Evaluator — reused as-is, not modified, so this gets the same
+        // starter-floor/rookie-projection fixes already shipped there for
+        // free.
+        if (allowedPositions.has('K') || allowedPositions.has('DEF') || allowedPositions.has('IDP')) {
             try {
                 const allPlayersRaw = await getPlayers();
                 const enginePlayers: typeof allPlayersRaw = {};
@@ -657,6 +659,7 @@ export async function loadDraftContext(params: {
                 const kdefEntities = [
                     ...(allowedPositions.has('K')   ? defRankings.kickers  : []),
                     ...(allowedPositions.has('DEF') ? defRankings.defenses : []),
+                    ...(allowedPositions.has('IDP') ? defRankings.idp      : []),
                 ];
 
                 for (const entity of kdefEntities) {
