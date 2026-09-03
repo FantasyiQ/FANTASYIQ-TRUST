@@ -18,9 +18,17 @@ import {
     normalizeEspnDraftPicks,
     normalizeEspnPlayerPool,
     normalizeEspnPlayerEntry,
+    translateEspnScoring,
+    deriveEspnRosterPositions,
 } from '@/lib/espn';
 import { getTier } from './context';
 import { buildSleeperNameResolver } from '@/lib/sleeperNameResolver';
+import { getPlayers, getNflState } from '@/lib/sleeper';
+import { calculateAge, isPlausiblyActivePlayer } from '@/lib/calculateAge';
+import { buildLeagueConfig } from '@/lib/rankings/leagueConfigBuilder';
+import { buildLeagueDefensiveAndKickerRankings } from '@/lib/rankings/defensiveEngine';
+import { buildIdpSeedProjections, buildKickerSeedProjections, buildDefenseSeedProjections, toIdpPosition } from '@/lib/rankings/seedProjections';
+import { buildProjectionsFromSleeperStats } from '@/lib/rankings/sleeperStatsAdapter';
 
 export interface EspnDraftBoardPickResolved {
     pickOverall: number;
@@ -135,10 +143,81 @@ export async function loadEspnDraftContext({
             : [];
         const resolveFc = buildSleeperNameResolver(fcValues.map(v => ({ ...v, fullName: v.playerName })));
 
+        // K/DEF/IDP: FantasyCalc doesn't price any of these positions at all
+        // (zero rows), so every kicker/defense/IDP player above falls
+        // through to the flat fiqScore=40 default — every one of them
+        // scored identically regardless of real talent. Same real
+        // defensive/kicker engine already used for Sleeper leagues (Rankings,
+        // Trade Evaluator, Live Draft Assistant), reused as-is here — scored
+        // with translateEspnScoring/deriveEspnRosterPositions, the same
+        // already-shipped ESPN→Sleeper-format translation every ESPN sync
+        // path uses (buildCoreEspnLeagueFields), not a new unverified
+        // assumption about ESPN's data shape.
+        const defScoreEntries: { fullName: string; position: string; valueScore: number }[] = [];
+        const kdefPositions = new Set(['K', 'DEF', 'DL', 'LB', 'DB']);
+        if (available.some(p => kdefPositions.has(p.position))) {
+            try {
+                const rawDefScoring   = translateEspnScoring(settings.settings);
+                const espnRosterPositions = deriveEspnRosterPositions(settings.settings);
+
+                const allPlayersRaw = await getPlayers();
+                const enginePlayers: typeof allPlayersRaw = {};
+                for (const [pid, player] of Object.entries(allPlayersRaw)) {
+                    const age = calculateAge(player.birthDate) ?? null;
+                    if (!isPlausiblyActivePlayer({ team: player.team, age, depthChartOrder: player.depthChartOrder, yearsExp: player.yearsExp })) continue;
+                    enginePlayers[pid] = player;
+                }
+
+                const { scoring: defScoring, lineup: defLineup } = buildLeagueConfig(
+                    rawDefScoring,
+                    espnRosterPositions,
+                    totalTeams,
+                );
+
+                const idpPlayersForSeed: { playerId: string; position: 'DL' | 'LB' | 'DB' }[] = [];
+                const kickerIdsForSeed:  string[] = [];
+                for (const [pid, player] of Object.entries(enginePlayers)) {
+                    const idpPos = toIdpPosition(player.position);
+                    if (idpPos) idpPlayersForSeed.push({ playerId: pid, position: idpPos });
+                    else if (player.position === 'K') kickerIdsForSeed.push(pid);
+                }
+
+                const nflState    = await getNflState();
+                const statsSeason = nflState.season;
+                const liveProjections = await buildProjectionsFromSleeperStats(statsSeason, enginePlayers, rawDefScoring)
+                    ?? await buildProjectionsFromSleeperStats(String(Number(statsSeason) - 1), enginePlayers, rawDefScoring);
+
+                const idpProjections     = liveProjections?.idpProjections     ?? buildIdpSeedProjections(idpPlayersForSeed);
+                const kickerProjections  = liveProjections?.kickerProjections  ?? buildKickerSeedProjections(kickerIdsForSeed);
+                const defenseProjections = liveProjections?.defenseProjections ?? buildDefenseSeedProjections();
+
+                const defRankings = buildLeagueDefensiveAndKickerRankings(
+                    defScoring, defLineup, idpProjections, kickerProjections, defenseProjections,
+                    'Dynasty', // ESPN loader doesn't distinguish dynasty/redraft (see file header) — Dynasty applies a small age multiplier, immaterial to K/DEF
+                    liveProjections?.offensiveTop5Avg ?? {},
+                );
+
+                for (const entity of [...defRankings.kickers, ...defRankings.defenses, ...defRankings.idp]) {
+                    const sp = enginePlayers[entity.id];
+                    if (!sp) continue;
+                    defScoreEntries.push({ fullName: sp.full_name, position: entity.position, valueScore: entity.valueScore });
+                }
+            } catch {
+                // Non-critical add-on — K/DEF/IDP just keep the flat default
+                // below if this fails for any reason.
+            }
+        }
+        const resolveDefScore = buildSleeperNameResolver(defScoreEntries);
+
         const availablePlayers: EspnAvailablePlayerScored[] = available.map(p => {
             const fc = resolveFc(p.name, p.position);
             const dynastyValue = fc ? (superflex ? fc.dynastyValueSf : fc.dynastyValue) : null;
-            const fiqScore = dynastyValue != null ? Math.min(100, Math.round(dynastyValue / 90)) : 40;
+            const defScore = dynastyValue == null && kdefPositions.has(p.position)
+                ? resolveDefScore(p.name, p.position)?.valueScore
+                : undefined;
+            const fiqScore = dynastyValue != null ? Math.min(100, Math.round(dynastyValue / 90))
+                : defScore != null ? Math.max(1, Math.round(defScore))
+                : 40;
             return { ...p, fiqScore, tier: getTier(fiqScore) };
         }).sort((a, b) => b.fiqScore - a.fiqScore);
 
