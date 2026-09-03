@@ -228,6 +228,13 @@ export async function getTradeEvaluatorContent(id: string): Promise<TradeEvaluat
         : undefined;
     const otherTeamsData = teamTradeData.filter(t => t.rosterId !== myTeamData?.rosterId);
 
+    // Fetched once up front — reused below both for picking the right stats
+    // season and for phase/week resolution further down.
+    let nflState: Awaited<ReturnType<typeof getNflState>> | null = null;
+    try {
+        nflState = await getNflState();
+    } catch { /* keep null, fall back to current calendar year below */ }
+
     // ── Defensive ranking engine ───────────────────────────────────────────────
     // Build league config from Sleeper data, run the defensive engine with
     // seed projections (NFL population averages), and return value scores
@@ -258,7 +265,14 @@ export async function getTradeEvaluatorContent(id: string): Promise<TradeEvaluat
             }
         }
 
-        const liveProjections    = await buildProjectionsFromSleeperStats('2025', allPlayers, rawScoringSettings);
+        // Current season's real stats when available (Week 1 onward), falling
+        // back to last season's — same pattern getLeagueRankings.ts already
+        // uses. Was hardcoded to '2025', which silently freezes every
+        // defensive/kicker value on last year's data once the new season's
+        // real games start producing stats.
+        const statsSeason        = nflState?.season ?? String(new Date().getFullYear());
+        const liveProjections    = await buildProjectionsFromSleeperStats(statsSeason, allPlayers, rawScoringSettings)
+            ?? await buildProjectionsFromSleeperStats(String(Number(statsSeason) - 1), allPlayers, rawScoringSettings);
         const idpProjections     = liveProjections?.idpProjections     ?? buildIdpSeedProjections(idpPlayers);
         const kickerProjections  = liveProjections?.kickerProjections  ?? buildKickerSeedProjections(kickerIds);
         const defenseProjections = liveProjections?.defenseProjections ?? buildDefenseSeedProjections();
@@ -280,11 +294,7 @@ export async function getTradeEvaluatorContent(id: string): Promise<TradeEvaluat
     }
 
     // ── Phase resolution ──────────────────────────────────────────────────────
-    let currentWeek = 0;
-    try {
-        const nflState = await getNflState();
-        currentWeek = nflState.week ?? 0;
-    } catch { /* keep 0 */ }
+    const currentWeek = nflState?.week ?? 0;
 
     const phaseResult = getLeaguePhaseResult({
         season:           league.season ?? sleeperLeague.season ?? String(new Date().getFullYear()),
