@@ -219,11 +219,32 @@ function buildIdpEntities(
 
         const sf = scarcityFactor(posStarters, lineup.teams, group.length);
 
-        entitiesByPosition[pos] = group.map(p => {
+        // Age-adjusted projected points for everyone in this position group,
+        // computed up front so the starter floor below (same reasoning as
+        // buildKickerEntities) can be derived from the real distribution.
+        const withPoints = group.map(p => {
             let projectedPoints = projectIdpPoints(p, scoring);
             if (leagueType === 'Dynasty' && p.age) {
                 projectedPoints *= dynastyAgeMultiplier(p.age, pos);
             }
+            return { proj: p, projectedPoints };
+        });
+
+        // Starter floor: a confirmed depthChartOrder===1 player is only ever
+        // compared against how OTHER real starters at the position project,
+        // never dragged down toward the full pool (which includes backups
+        // with no real path to snaps). Floor is the 20th percentile of
+        // starter projections. Backups are untouched.
+        const starterPoints = withPoints
+            .filter(w => w.proj.isStarter)
+            .map(w => w.projectedPoints)
+            .sort((a, b) => a - b);
+        const starterBaseline = starterPoints.length > 0
+            ? starterPoints[Math.floor(0.2 * (starterPoints.length - 1))]
+            : 0;
+
+        entitiesByPosition[pos] = withPoints.map(({ proj: p, projectedPoints }) => {
+            if (p.isStarter) projectedPoints = Math.max(projectedPoints, starterBaseline);
             return {
                 proj:  p,
                 inter: buildIntermediate(

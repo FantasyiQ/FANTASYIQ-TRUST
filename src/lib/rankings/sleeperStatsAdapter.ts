@@ -640,15 +640,17 @@ export async function buildProjectionsFromSleeperStats(
     const allIdpStats    = [...veteranIdpStats,    ...rookieIdpStats];
     const allKickerStats = [...veteranKickerStats, ...rookieKickerStats];
 
-    // Tag each kicker with real depth-chart starter status so the engine can
-    // apply a starter floor — a confirmed #1 kicker should never be scored
-    // as if they're a worthless backup, regardless of how thin their
-    // production signal is.
+    // Tag each kicker/IDP player with real depth-chart starter status so the
+    // engine can apply a starter floor — a confirmed #1 player should never
+    // be scored as if they're a worthless backup, regardless of how thin
+    // their production signal is.
     const kickerProjections = buildKickerProjections(allKickerStats, adpEntries)
+        .map(p => ({ ...p, isStarter: allPlayers[p.playerId]?.depthChartOrder === 1 }));
+    const idpProjections = buildIdpProjections(allIdpStats, adpEntries)
         .map(p => ({ ...p, isStarter: allPlayers[p.playerId]?.depthChartOrder === 1 }));
 
     return {
-        idpProjections:     buildIdpProjections(allIdpStats,    adpEntries),
+        idpProjections,
         kickerProjections,
         defenseProjections: buildDefenseProjections(veteranDefStats, adpEntries),
         offensiveTop5Avg:   buildOffensiveTop5Avg(statsMap, allPlayers, scoringSettings),

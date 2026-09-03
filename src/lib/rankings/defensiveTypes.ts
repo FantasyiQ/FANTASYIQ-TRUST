@@ -69,6 +69,9 @@ export type IdpProjection = {
     qbHits?:           number;
     floorMultiplier?:  number;
     ceilingMultiplier?: number;
+    // Real depthChartOrder===1 (confirmed current starter), when known — see
+    // KickerProjection.isStarter below, same purpose for DL/LB/DB.
+    isStarter?:        boolean;
 };
 
 export type KickerProjection = {
