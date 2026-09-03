@@ -428,36 +428,30 @@ export async function loadDraftContext(params: {
         }
     } else {
         // Recommendations pool: high-quality players worth drafting (value > 300).
-        const fcValues = superflex
-            ? await prisma.fantasyCalcValue.findMany({
-                where:   { dynastyValueSf: { gt: 300 } },
-                orderBy: { dynastyValueSf: 'desc' },
-                take:    500,
-                select:  { playerName: true, position: true, dynastyValue: true, dynastyValueSf: true },
-            })
-            : await prisma.fantasyCalcValue.findMany({
-                where:   { dynastyValue: { gt: 300 } },
-                orderBy: { dynastyValue: 'desc' },
-                take:    500,
-                select:  { playerName: true, position: true, dynastyValue: true, dynastyValueSf: true },
-            });
+        // Redraft leagues must rank off FantasyCalc's redraft value, not dynasty —
+        // dynasty value bakes in age/long-term upside a redrafter never drafts for,
+        // which is exactly what pushed e.g. Ja'Marr Chase (higher dynasty value)
+        // above Jahmyr Gibbs/Bijan Robinson (higher redraft value, and the real
+        // consensus 1-2 picks) in redraft leagues before this fix.
+        const fcValueSelect = { playerName: true, position: true, dynastyValue: true, dynastyValueSf: true, redraftValue: true, redraftValueSf: true } as const;
+        const fcValues = isDynasty
+            ? (superflex
+                ? await prisma.fantasyCalcValue.findMany({ where: { dynastyValueSf: { gt: 300 } }, orderBy: { dynastyValueSf: 'desc' }, take: 500, select: fcValueSelect })
+                : await prisma.fantasyCalcValue.findMany({ where: { dynastyValue: { gt: 300 } }, orderBy: { dynastyValue: 'desc' }, take: 500, select: fcValueSelect }))
+            : (superflex
+                ? await prisma.fantasyCalcValue.findMany({ where: { redraftValueSf: { gt: 300 } }, orderBy: { redraftValueSf: 'desc' }, take: 500, select: fcValueSelect })
+                : await prisma.fantasyCalcValue.findMany({ where: { redraftValue: { gt: 300 } }, orderBy: { redraftValue: 'desc' }, take: 500, select: fcValueSelect }));
 
         // FPDO pool: wider net (value > 50) so positional ranks reflect the full draftable universe.
         // Without this, a TE with value 250 is excluded and players like Max Klare inflate to TE5
         // when they're actually TE12+ — producing misleadingly large FPDO deltas.
-        const fcFpdo = superflex
-            ? await prisma.fantasyCalcValue.findMany({
-                where:   { dynastyValueSf: { gt: 50 } },
-                orderBy: { dynastyValueSf: 'desc' },
-                take:    1000,
-                select:  { playerName: true, position: true, dynastyValue: true, dynastyValueSf: true },
-            })
-            : await prisma.fantasyCalcValue.findMany({
-                where:   { dynastyValue: { gt: 50 } },
-                orderBy: { dynastyValue: 'desc' },
-                take:    1000,
-                select:  { playerName: true, position: true, dynastyValue: true, dynastyValueSf: true },
-            });
+        const fcFpdo = isDynasty
+            ? (superflex
+                ? await prisma.fantasyCalcValue.findMany({ where: { dynastyValueSf: { gt: 50 } }, orderBy: { dynastyValueSf: 'desc' }, take: 1000, select: fcValueSelect })
+                : await prisma.fantasyCalcValue.findMany({ where: { dynastyValue: { gt: 50 } }, orderBy: { dynastyValue: 'desc' }, take: 1000, select: fcValueSelect }))
+            : (superflex
+                ? await prisma.fantasyCalcValue.findMany({ where: { redraftValueSf: { gt: 50 } }, orderBy: { redraftValueSf: 'desc' }, take: 1000, select: fcValueSelect })
+                : await prisma.fantasyCalcValue.findMany({ where: { redraftValue: { gt: 50 } }, orderBy: { redraftValue: 'desc' }, take: 1000, select: fcValueSelect }));
 
         // Broad fetch, not an exact-string match against FantasyCalc's own
         // playerName — a name-filtered query silently misses real matches
@@ -559,7 +553,9 @@ export async function loadDraftContext(params: {
         // Pass 2b: available players = undrafted, allowed positions only, fiqScore
         // adjusted by the combined perfFactor.
         for (const { fcv, sp, realPtsPerGame, gamesPlayed } of fcPending) {
-            const dynastyValue = superflex ? fcv.dynastyValueSf : fcv.dynastyValue;
+            const marketValue = isDynasty
+                ? (superflex ? fcv.dynastyValueSf : fcv.dynastyValue)
+                : (superflex ? fcv.redraftValueSf : fcv.redraftValue);
 
             const individualFactor = gamesPlayed
                 ? computePerfFactor(realPtsPerGame, posAvgPtsPerGame.get(fcv.position) ?? 0, gamesPlayed)
@@ -567,14 +563,14 @@ export async function loadDraftContext(params: {
             const positionFactor = posScoringFactor.get(fcv.position) ?? 1.0;
             const perfFactor     = combineScoringFactors(individualFactor, positionFactor);
 
-            // Additive, bounded nudge rather than a multiplier on dynastyValue directly —
-            // dynastyValue/90 already saturates at 100 for most elite players (dynastyValue
+            // Additive, bounded nudge rather than a multiplier on marketValue directly —
+            // marketValue/90 already saturates at 100 for most elite players (value
             // caps at 9999), so multiplying by perfFactor (up to 1.4375x) would collapse
             // the entire top of the pool to identical scores, exactly where the draft
             // assistant's ranking matters most. A capped additive nudge (matches how
             // scoreCandidate() layers needBoost/oppBoost onto fiqScore) preserves real
             // differentiation while still reflecting the league's real scoring shift.
-            const baseFiqScore   = Math.min(100, Math.round(dynastyValue / 90));
+            const baseFiqScore   = Math.min(100, Math.round(marketValue / 90));
             const perfAdjustment = Math.round((perfFactor - 1) * 20);
             const preInjuryScore = Math.min(100, Math.max(1, baseFiqScore + perfAdjustment));
             const fiqScore       = injuryAdjustedFiqScore(preInjuryScore, sp?.injuryStatus);
@@ -593,24 +589,32 @@ export async function loadDraftContext(params: {
     }
 
     // ── TeamMode (roster snapshot) ──────────────────────────────────────────
-    const rosterNames = [
-        ...existingPlayers.map(p => p.fullName),
-        ...myPickPlayers.map(p => p.fullName),
-    ].filter((n): n is string => Boolean(n));
-
-    const rosterFcValues = rosterNames.length > 0
+    // Broad fetch by position, not an exact-string match against Sleeper's
+    // own fullName — FantasyCalc spells some players with a generational
+    // suffix ("Kenneth Walker III") that Sleeper's fullName omits, so a
+    // `playerName: { in: rosterNames } }` filter silently misses those
+    // players' FantasyCalc row (see buildSleeperNameResolver's header for
+    // the same pattern in the other direction).
+    const rosterPositionsSet = [...new Set([
+        ...existingPlayers.map(p => p.position),
+        ...myPickPlayers.map(p => p.position),
+    ])];
+    const rosterFcValues = rosterPositionsSet.length > 0
         ? await prisma.fantasyCalcValue.findMany({
-            where:  { playerName: { in: rosterNames } },
-            select: { playerName: true, dynastyValue: true, dynastyValueSf: true },
+            where:  { position: { in: rosterPositionsSet } },
+            select: { playerName: true, position: true, dynastyValue: true, dynastyValueSf: true, redraftValue: true, redraftValueSf: true },
         })
         : [];
-
-    const fcByName = new Map(rosterFcValues.map(v => [v.playerName, v]));
+    const fcResolver = makeSpResolver(rosterFcValues.map(v => ({ ...v, fullName: v.playerName })));
 
     function toRosterProfile(p: { fullName?: string | null; position: string; age?: number | null }): RosterProfile {
-        const fc       = p.fullName ? fcByName.get(p.fullName) : undefined;
-        const dynastyValue = fc ? (superflex ? fc.dynastyValueSf : fc.dynastyValue) : null;
-        const fiqScore = dynastyValue != null ? Math.min(100, Math.round(dynastyValue / 90)) : null;
+        const fc = p.fullName ? fcResolver(p.fullName, p.position) : undefined;
+        const marketValue = fc
+            ? (isDynasty
+                ? (superflex ? fc.dynastyValueSf : fc.dynastyValue)
+                : (superflex ? fc.redraftValueSf : fc.redraftValue))
+            : null;
+        const fiqScore = marketValue != null ? Math.min(100, Math.round(marketValue / 90)) : null;
         return { position: normalizePosition(p.position), age: p.age ?? null, fiqScore };
     }
 
