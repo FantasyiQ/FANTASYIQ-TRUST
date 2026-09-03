@@ -403,6 +403,11 @@ export interface SlimPlayer {
     birthDate?: string | null;
     depthChartOrder?: number | null;
     yearsExp?: number | null;
+    // Real NFL Draft capital — from Sleeper's own draft_pick data, never
+    // fantasy/dynasty rookie draft position. null for UDFA.
+    draftRound?: number | null;
+    draftPick?: number | null;   // pick number within the round
+    overallPick?: number | null; // pick number across the whole draft
 }
 
 /**
@@ -420,6 +425,7 @@ export async function getPlayers(ids?: string[]): Promise<Record<string, SlimPla
             result[r.playerId] = {
                 full_name: r.fullName, position: r.position, team: r.team, age: r.age ?? undefined,
                 birthDate: r.birthDate, depthChartOrder: r.depthChartOrder, yearsExp: r.yearsExp,
+                draftRound: r.draftRound, draftPick: r.draftPick, overallPick: r.overallPick,
             };
         }
         return result;

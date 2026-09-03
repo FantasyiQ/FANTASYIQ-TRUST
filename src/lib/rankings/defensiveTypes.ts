@@ -72,6 +72,11 @@ export type IdpProjection = {
     // Real depthChartOrder===1 (confirmed current starter), when known — see
     // KickerProjection.isStarter below, same purpose for DL/LB/DB.
     isStarter?:        boolean;
+    // Bounded upside bump from real NFL Draft capital (see
+    // computeDraftCapitalBump in seedProjections.ts) — 0 for non-rookies
+    // and UDFAs. Added to the final valueScore, not blended into the
+    // production-based projection itself.
+    draftCapitalBump?: number;
 };
 
 export type KickerProjection = {
@@ -89,6 +94,8 @@ export type KickerProjection = {
     // as if they're a worthless backup. Undefined when depth-chart data
     // wasn't available (e.g. seed/off-season projections).
     isStarter?:        boolean;
+    // See IdpProjection.draftCapitalBump above — same purpose.
+    draftCapitalBump?: number;
 };
 
 export type DefenseProjection = {

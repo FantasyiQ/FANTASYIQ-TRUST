@@ -9,7 +9,7 @@
 // Fallback:  returns null on any API failure → caller uses seed projections
 
 import { buildIdpProjections, buildKickerProjections, buildDefenseProjections } from './projectionBuilder';
-import { toIdpPosition } from './seedProjections';
+import { toIdpPosition, computeDraftCapitalBump } from './seedProjections';
 import type {
     RawIdpStats,
     RawKickerStats,
@@ -640,14 +640,27 @@ export async function buildProjectionsFromSleeperStats(
     const allIdpStats    = [...veteranIdpStats,    ...rookieIdpStats];
     const allKickerStats = [...veteranKickerStats, ...rookieKickerStats];
 
-    // Tag each kicker/IDP player with real depth-chart starter status so the
-    // engine can apply a starter floor — a confirmed #1 player should never
-    // be scored as if they're a worthless backup, regardless of how thin
-    // their production signal is.
+    // Tag each kicker/IDP player with real depth-chart starter status (for
+    // the starter floor) and real NFL Draft capital (for the rookie upside
+    // bump) — both read directly off the same allPlayers record.
     const kickerProjections = buildKickerProjections(allKickerStats, adpEntries)
-        .map(p => ({ ...p, isStarter: allPlayers[p.playerId]?.depthChartOrder === 1 }));
+        .map(p => {
+            const sp = allPlayers[p.playerId];
+            return {
+                ...p,
+                isStarter:        sp?.depthChartOrder === 1,
+                draftCapitalBump: computeDraftCapitalBump(sp?.yearsExp, sp?.draftRound, sp?.draftPick, sp?.overallPick),
+            };
+        });
     const idpProjections = buildIdpProjections(allIdpStats, adpEntries)
-        .map(p => ({ ...p, isStarter: allPlayers[p.playerId]?.depthChartOrder === 1 }));
+        .map(p => {
+            const sp = allPlayers[p.playerId];
+            return {
+                ...p,
+                isStarter:        sp?.depthChartOrder === 1,
+                draftCapitalBump: computeDraftCapitalBump(sp?.yearsExp, sp?.draftRound, sp?.draftPick, sp?.overallPick),
+            };
+        });
 
     return {
         idpProjections,

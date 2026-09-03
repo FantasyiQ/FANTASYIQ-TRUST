@@ -265,10 +265,18 @@ function buildIdpEntities(
         const posMax = posCaps[pos] ?? IDP_POS_MAX_FALLBACK[pos] ?? 65;
         const valueScores = normalizeToValueScore(group.map(e => e.inter.rawValue));
 
-        // Sort by valueScore desc, assign positional rank
-        const sorted = group
-            .map((e, i) => ({ ...e, valueScore: valueScores[i] }))
-            .sort((a, b) => b.valueScore - a.valueScore);
+        // Scale 0–100 percentile into position-appropriate range, then add
+        // the rookie draft-capital bump (0 for non-rookies) — real NFL draft
+        // capital reflects long-term upside a backup rookie's current
+        // role/production can't show yet. Bump is applied BEFORE the final
+        // sort/rank so both stay consistent with each other.
+        const withBump = group.map((e, i) => {
+            const scaled = (valueScores[i] / 100) * posMax;
+            const bumped = Math.min(100, Math.max(0, scaled + (e.proj.draftCapitalBump ?? 0)));
+            return { ...e, valueScore: bumped };
+        });
+
+        const sorted = withBump.sort((a, b) => b.valueScore - a.valueScore);
 
         sorted.forEach((e, rank) => {
             allEntities.push({
@@ -279,8 +287,7 @@ function buildIdpEntities(
                 ceiling:         e.inter.ceiling,
                 volatility:      e.inter.volatility,
                 scarcityFactor:  e.inter.scarcity,
-                // Scale 0–100 percentile into position-appropriate range
-                valueScore:      Math.round((e.valueScore / 100) * posMax * 10) / 10,
+                valueScore:      Math.round(e.valueScore * 10) / 10,
                 rank:            rank + 1,
             });
         });
@@ -330,11 +337,17 @@ function buildKickerEntities(
     });
     const valueScores = normalizeToValueScore(intermediates.map(i => i.rawValue));
 
+    // Rookie draft-capital bump applied before the final sort/rank (see
+    // buildIdpEntities above) so both stay consistent with each other.
     const combined = projections
-        .map((p, idx) => ({ p, inter: intermediates[idx], vs: valueScores[idx] }))
-        .sort((a, b) => b.vs - a.vs);
+        .map((p, idx) => {
+            const scaled = (valueScores[idx] / 100) * 45; // K max 45
+            const bumped = Math.min(100, Math.max(0, scaled + (p.draftCapitalBump ?? 0)));
+            return { p, inter: intermediates[idx], valueScore: bumped };
+        })
+        .sort((a, b) => b.valueScore - a.valueScore);
 
-    return combined.map(({ p, inter, vs }, rank) => ({
+    return combined.map(({ p, inter, valueScore }, rank) => ({
         id:              p.playerId,
         position:        'K' as const,
         projectedPoints: inter.projectedPoints,
@@ -342,7 +355,7 @@ function buildKickerEntities(
         ceiling:         inter.ceiling,
         volatility:      inter.volatility,
         scarcityFactor:  inter.scarcity,
-        valueScore:      Math.round((vs / 100) * 45 * 10) / 10,  // K max 45
+        valueScore:      Math.round(valueScore * 10) / 10,
         rank:            rank + 1,
     }));
 }

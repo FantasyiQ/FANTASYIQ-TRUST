@@ -13,6 +13,56 @@
 
 import type { IdpProjection, KickerProjection, DefenseProjection } from './defensiveTypes';
 
+// ── Rookie draft-capital bump ───────────────────────────────────────────────
+//
+// Real NFL Draft capital (Sleeper's own draftRound/draftPick/overallPick —
+// never fantasy/dynasty rookie draft position, which is league-dependent and
+// circular for this purpose) as a bounded upside bump on top of whatever a
+// rookie's real production/role already earns them. A backup rookie's
+// current role tells you almost nothing about their long-term dynasty value;
+// how early real NFL teams picked them does. Only applies to true rookies
+// (yearsExp === 0) — a veteran's draft slot from years ago says nothing
+// about their value today.
+function interpolate(x: number, xLo: number, xHi: number, yAtLo: number, yAtHi: number): number {
+    const t = xHi === xLo ? 0 : Math.min(1, Math.max(0, (x - xLo) / (xHi - xLo)));
+    return yAtLo + t * (yAtHi - yAtLo);
+}
+
+export function computeDraftCapitalBump(
+    yearsExp:    number | null | undefined,
+    draftRound:  number | null | undefined,
+    draftPick:   number | null | undefined,
+    overallPick: number | null | undefined,
+): number {
+    if (yearsExp !== 0) return 0;       // not a current rookie
+    if (!draftRound) return 0;          // UDFA — Tier 8, no bump
+
+    if (overallPick != null && overallPick <= 10) {
+        // Tier 1: top-10 overall — +26 (pick 10) to +32 (pick 1)
+        return Math.round(interpolate(overallPick, 1, 10, 32, 26));
+    }
+    if (draftRound === 1) {
+        // Tier 2: Round 1 non-top-10 — +22 (pick 11) to +18 (pick 32)
+        const pick = overallPick ?? 20;
+        return Math.round(interpolate(pick, 11, 32, 22, 18));
+    }
+
+    // Rounds 2+: interpolate by pick-within-round (a round is ~32 picks) —
+    // more robust than overall pick, which shifts with comp-pick counts.
+    const pickInRound = draftPick ?? 16;
+    const roundRanges: Record<number, [number, number]> = {
+        2: [16, 12],
+        3: [10, 8],
+        4: [7, 5],
+        5: [4, 3],
+        6: [2, 1],
+        7: [2, 1],
+    };
+    const range = roundRanges[draftRound];
+    if (!range) return 0; // shouldn't happen — real NFL draft is 7 rounds
+    return Math.round(interpolate(pickInRound, 1, 32, range[0], range[1]));
+}
+
 const MIN_POOL = 32;
 
 // ── NFL population averages (17-game full season) ─────────────────────────────
