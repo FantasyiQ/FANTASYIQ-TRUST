@@ -33,11 +33,29 @@ const POS_STYLES: Record<string, string> = {
     DEF:        'bg-slate-700 text-slate-300',
     FLEX:       'bg-yellow-900/70 text-yellow-300',
     SUPER_FLEX: 'bg-yellow-900/70 text-yellow-300',
+    DL:         'bg-purple-900/70 text-purple-300',
+    EDGE:       'bg-fuchsia-900/70 text-fuchsia-300',
+    LB:         'bg-violet-900/70 text-violet-300',
+    DB:         'bg-indigo-900/70 text-indigo-300',
     BN:         'bg-gray-800 text-gray-500',
     IR:         'bg-red-900/40 text-red-400',
 };
 
-const POS_ORDER: Record<string, number> = { QB: 0, RB: 1, WR: 2, TE: 3, K: 4, DEF: 5 };
+const POS_ORDER: Record<string, number> = { QB: 0, RB: 1, WR: 2, TE: 3, K: 4, DEF: 5, DL: 6, EDGE: 7, LB: 8, DB: 9 };
+
+// A bench player's raw position can be any of Sleeper's granular defensive
+// labels (NT/DT/DE, CB/S/SS/FS, etc). This league drafts individual IDP
+// players, not a generic "IDP" bucket, so group them into exactly 4 real
+// position badges: DL, EDGE (kept separate, not folded into DL or LB), LB,
+// DB. Offense/K/DEF pass through unchanged.
+function normalizeIdpDisplay(pos: string): string {
+    const p = pos.toUpperCase();
+    if (['NT', 'DT', 'DE', 'DL'].includes(p)) return 'DL';
+    if (p === 'EDGE') return 'EDGE';
+    if (['LB', 'OLB', 'ILB', 'MLB'].includes(p)) return 'LB';
+    if (['DB', 'CB', 'S', 'SS', 'FS', 'SAF'].includes(p)) return 'DB';
+    return pos;
+}
 
 function PosBadge({ pos }: { pos: string }) {
     const style = POS_STYLES[pos] ?? 'bg-gray-800 text-gray-400';
@@ -65,7 +83,7 @@ function PlayerRow({ playerId, slotPos, players }: {
     }
     return (
         <div className="flex items-center gap-2 py-1.5">
-            <PosBadge pos={slotPos} />
+            <PosBadge pos={normalizeIdpDisplay(slotPos)} />
             <span className="text-white text-sm font-medium flex-1 min-w-0 truncate">{player.full_name}</span>
             <span className="text-gray-600 text-xs shrink-0">{player.team}</span>
         </div>
@@ -79,8 +97,8 @@ function TeamCard({ team, players, defaultOpen }: {
 }) {
     const [open, setOpen] = useState(defaultOpen);
     const sortedBench = [...team.bench].sort((a, b) => {
-        const pa = players[a]?.position ?? 'ZZ';
-        const pb = players[b]?.position ?? 'ZZ';
+        const pa = normalizeIdpDisplay(players[a]?.position ?? 'ZZ');
+        const pb = normalizeIdpDisplay(players[b]?.position ?? 'ZZ');
         return (POS_ORDER[pa] ?? 99) - (POS_ORDER[pb] ?? 99);
     });
 
