@@ -6,6 +6,7 @@ import {
     normalizeEspnLeague,
     buildCoreEspnLeagueFields,
 } from '@/lib/espn';
+import { buildSleeperNameResolver } from '@/lib/sleeperNameResolver';
 
 // POST /api/espn/sync-history
 // Body: { leagueId: string; seasons: number[] }
@@ -34,6 +35,16 @@ export async function POST(request: NextRequest): Promise<Response> {
         return Response.json({ error: 'Max 10 seasons at once.' }, { status: 400 });
     }
 
+    // Resolve each ESPN roster player to their canonical Sleeper playerId
+    // once, at sync time — shared across every season in this batch. NOT
+    // filtered to active-only: these are historical rosters, and many of
+    // their players are now retired/inactive in Sleeper's own data — an
+    // active-only filter would systematically fail to resolve them.
+    const sleeperPlayers = await prisma.sleeperPlayer.findMany({
+        select: { fullName: true, position: true, playerId: true },
+    });
+    const resolveSleeper = buildSleeperNameResolver(sleeperPlayers);
+
     const results: { season: number; ok: boolean; error?: string }[] = [];
 
     for (const season of seasons) {
@@ -57,7 +68,10 @@ export async function POST(request: NextRequest): Promise<Response> {
                         wins: t.wins, losses: t.losses, ties: t.ties,
                         fpts: t.pointsFor, fptsAgainst: t.pointsAgainst,
                         rosterSize: t.roster.length,
-                        players: t.roster.map(p => ({ name: p.fullName, position: p.position })),
+                        players: t.roster.map(p => ({
+                            name: p.fullName, position: p.position,
+                            sleeperPlayerId: resolveSleeper(p.fullName, p.position)?.playerId ?? null,
+                        })),
                     })),
                     lastSyncedAt: new Date(),
                     isHistorical: true,
@@ -72,7 +86,10 @@ export async function POST(request: NextRequest): Promise<Response> {
                         wins: t.wins, losses: t.losses, ties: t.ties,
                         fpts: t.pointsFor, fptsAgainst: t.pointsAgainst,
                         rosterSize: t.roster.length,
-                        players: t.roster.map(p => ({ name: p.fullName, position: p.position })),
+                        players: t.roster.map(p => ({
+                            name: p.fullName, position: p.position,
+                            sleeperPlayerId: resolveSleeper(p.fullName, p.position)?.playerId ?? null,
+                        })),
                     })),
                     lastSyncedAt: new Date(),
                 },

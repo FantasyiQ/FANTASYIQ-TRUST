@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { captureError } from '@/lib/sentry';
 import { normalizePlayerName as normalizeName } from '@/lib/playerName';
+import { buildSleeperNameResolver } from '@/lib/sleeperNameResolver';
 import { withCronLog } from '@/lib/cron-logger';
 
 export const maxDuration = 300;
@@ -61,39 +62,18 @@ export async function GET(request: Request): Promise<Response> {
             }),
             prisma.sleeperPlayer.findMany({
                 where:  { active: true },
-                select: { fullName: true, team: true, injuryStatus: true, position: true },
+                select: { playerId: true, fullName: true, team: true, injuryStatus: true, position: true },
             }),
         ]);
 
         // Some real players share an exact fullName (e.g. two "Justin Jefferson"s —
-        // WR/MIN and LB/CLE). Resolve by name+position first (exact, then normalized
-        // name); only fall back to a bare name match when that name is unambiguous,
-        // so we never silently attach one player's team/injury onto another's row.
-        type SleeperInfo = { team: string; injuryStatus: string | null };
-        const byNamePos     = new Map<string, SleeperInfo>();
-        const byNormNamePos = new Map<string, SleeperInfo>();
-        const byNameCount     = new Map<string, number>();
-        const byName          = new Map<string, SleeperInfo>();
-        const byNormNameCount = new Map<string, number>();
-        const byNormName      = new Map<string, SleeperInfo>();
-        for (const p of sleeperPlayers) {
-            const exact = p.fullName.toLowerCase();
-            const normd = normalizeName(p.fullName);
-            const val: SleeperInfo = { team: p.team, injuryStatus: p.injuryStatus };
-            byNamePos.set(`${exact}|${p.position}`, val);
-            byNormNamePos.set(`${normd}|${p.position}`, val);
-            byNameCount.set(exact, (byNameCount.get(exact) ?? 0) + 1);
-            byName.set(exact, val);
-            byNormNameCount.set(normd, (byNormNameCount.get(normd) ?? 0) + 1);
-            byNormName.set(normd, val);
-        }
-        function resolveSleeper(nameLower: string, position: string): SleeperInfo | undefined {
-            const normd = normalizeName(nameLower);
-            return byNamePos.get(`${nameLower}|${position}`)
-                ?? byNormNamePos.get(`${normd}|${position}`)
-                ?? (byNameCount.get(nameLower) === 1 ? byName.get(nameLower) : undefined)
-                ?? (byNormNameCount.get(normd) === 1 ? byNormName.get(normd) : undefined);
-        }
+        // WR/MIN and LB/CLE), and FantasyCalc spells some players with a suffix
+        // ("Kenneth Walker III") Sleeper's own fullName omits. The shared
+        // resolver handles both — resolved once here, reused for both the
+        // snapshot enrichment below and the canonical sleeperPlayerId written
+        // onto FantasyCalcValue in step 2, so every future read is a plain ID
+        // lookup instead of re-matching by name at read time.
+        const resolveSleeper = buildSleeperNameResolver(sleeperPlayers);
 
         const snapshotRows = currentRows.map(r => {
             const sl = resolveSleeper(r.nameLower, r.position) ?? null;
@@ -159,7 +139,8 @@ export async function GET(request: Request): Promise<Response> {
                 const normdLower     = normalizeName(nameLower);
                 const redraftValue   = redraftMap.get(nameLower)   ?? 0;
                 const redraftValueSf = redraftSfMap.get(nameLower) ?? 0;
-    
+                const sleeperPlayerId = resolveSleeper(nameLower, p.position)?.playerId ?? null;
+
                 // If the canonical name has punctuation (e.g. "d.j. moore"), delete any
                 // stale de-punctuated duplicate (e.g. "dj moore") so it can't shadow the
                 // real entry in name-matching lookups.
@@ -183,6 +164,7 @@ export async function GET(request: Request): Promise<Response> {
                         redraftValue,
                         redraftValueSf,
                         trend30Day:     null,
+                        sleeperPlayerId,
                     },
                     update: {
                         fcId:           p.playerID,
@@ -195,6 +177,7 @@ export async function GET(request: Request): Promise<Response> {
                         redraftValue,
                         redraftValueSf,
                         trend30Day:     null,
+                        sleeperPlayerId,
                     },
                 }).catch(() => null);
             }));

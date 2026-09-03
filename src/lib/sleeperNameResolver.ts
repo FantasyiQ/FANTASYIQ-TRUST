@@ -15,6 +15,13 @@
 // exact-string `fullName: { in: [...] }` list built from the external
 // source's own names — that pre-filter silently drops the real match before
 // this resolver ever sees it, for the exact same suffix-mismatch reason.
+//
+// Team defenses need one more fallback: ESPN names them "<Nickname> D/ST"
+// (e.g. "Cowboys D/ST"), but Sleeper — the canonical source — names them by
+// full team name ("Dallas Cowboys"). Every real NFL nickname is one word, so
+// matching on the last word of Sleeper's own DEF names is a safe, general
+// fallback — gated to position === 'DEF' only, so it can never attach a
+// team-defense row to a non-DEF player.
 
 import { normalizePlayerName } from '@/lib/playerName';
 
@@ -27,6 +34,7 @@ export function buildSleeperNameResolver<T extends { fullName: string; position:
     const byName          = new Map<string, T>();
     const byNormNameCount = new Map<string, number>();
     const byNormName      = new Map<string, T>();
+    const byDefNickname    = new Map<string, T>();
 
     for (const p of players) {
         const exact = p.fullName.toLowerCase();
@@ -37,14 +45,21 @@ export function buildSleeperNameResolver<T extends { fullName: string; position:
         byName.set(exact, p);
         byNormNameCount.set(normd, (byNormNameCount.get(normd) ?? 0) + 1);
         byNormName.set(normd, p);
+        if (p.position === 'DEF') {
+            const nickname = normalizePlayerName(p.fullName.split(' ').pop() ?? p.fullName);
+            byDefNickname.set(nickname, p);
+        }
     }
 
     return (name: string, position: string): T | undefined => {
         const exact = name.toLowerCase();
         const normd = normalizePlayerName(name);
-        return byNamePos.get(`${exact}|${position}`)
+        const direct = byNamePos.get(`${exact}|${position}`)
             ?? byNormNamePos.get(`${normd}|${position}`)
             ?? (byNameCount.get(exact) === 1 ? byName.get(exact) : undefined)
             ?? (byNormNameCount.get(normd) === 1 ? byNormName.get(normd) : undefined);
+        if (direct || position !== 'DEF') return direct;
+        const nickname = normalizePlayerName(name.replace(/\s*(D\/ST|DST|DEF)\s*$/i, ''));
+        return byDefNickname.get(nickname);
     };
 }

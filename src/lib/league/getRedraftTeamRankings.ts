@@ -16,8 +16,8 @@
 
 import { prisma } from '@/lib/prisma';
 import { getLeagueRosters, getLeagueUsers, getPlayers } from '@/lib/sleeper';
-import { normalizePlayerName as normalizeName } from '@/lib/playerName';
 import { computeRealRedraftBoard } from '@/lib/rankings/realRedraftBoard';
+import { buildSleeperNameResolver } from '@/lib/sleeperNameResolver';
 import type { TeamRankingRow, PowerRankingRow } from './getLeagueRankings';
 
 interface EspnRosterPlayer {
@@ -79,22 +79,10 @@ export async function getRedraftTeamRankings(leagueDbId: string): Promise<Redraf
     // High limit — this is a server-side team-value aggregation over every
     // rostered player, not the paginated top-N board the UI shows.
     const board = await computeRealRedraftBoard(scoringSettings, rosterPositions, totalTeams, 1000);
-    const vorByPlayerId = new Map(board.map(p => [p.playerId, p]));
-    const vorByName     = new Map(board.map(p => [normalizeName(p.name), p]));
-
-    // ESPN team defenses are named "<Nickname> D/ST" (e.g. "Cowboys D/ST"),
-    // but Sleeper — the source computeRealRedraftBoard draws from — names
-    // them by full team name ("Dallas Cowboys"), so a direct name match
-    // always misses for DEF. Every real NFL nickname is one word, so
-    // matching on the board's own last word is a safe, general fallback —
-    // not specific to any one league's data.
-    const vorByDefNickname = new Map(
-        board.filter(p => p.position === 'DEF').map(p => [normalizeName(p.name.split(' ').pop() ?? p.name), p]),
-    );
-    function resolveDefByNickname(name: string) {
-        const nickname = name.replace(/\s*(D\/ST|DST|DEF)\s*$/i, '').trim();
-        return vorByDefNickname.get(normalizeName(nickname));
-    }
+    // fullName alias satisfies buildSleeperNameResolver's shape — also gets
+    // ESPN's "<Nickname> D/ST" vs. Sleeper-style full-team-name DEF matching
+    // for free, instead of a locally duplicated copy of that fallback.
+    const resolveVor = buildSleeperNameResolver(board.map(p => ({ ...p, fullName: p.name })));
 
     // Only count positions this league actually rosters — matches
     // getLeagueRankings.ts's RANKED_POSITIONS convention for Dynasty.
@@ -109,9 +97,7 @@ export async function getRedraftTeamRankings(leagueDbId: string): Promise<Redraf
         const scored = rosterPlayers
             .filter(p => RANKED.has(p.position))
             .map(p => {
-                const hit = (p.playerId && vorByPlayerId.get(p.playerId))
-                    || vorByName.get(normalizeName(p.name))
-                    || (p.position === 'DEF' ? resolveDefByNickname(p.name) : undefined);
+                const hit = resolveVor(p.name, p.position);
                 return { name: p.name, position: p.position, vor: hit ? Math.round(hit.vor * 10) / 10 : 0 };
             })
             .sort((a, b) => b.vor - a.vor);

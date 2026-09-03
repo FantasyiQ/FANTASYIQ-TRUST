@@ -19,6 +19,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { computeRookieFiQTier } from '@/lib/dynasty/rookieRankings';
+import { buildSleeperNameResolver } from '@/lib/sleeperNameResolver';
 import { captureError } from '@/lib/sentry';
 
 export const maxDuration = 300;
@@ -105,10 +106,13 @@ export async function GET(request: Request): Promise<Response> {
             return Response.json({ ok: true, updated: 0, message: `No rookies found for season ${SEASON}` });
         }
     
-        // Fetch matching Sleeper players in one query
-        const names = rookies.map(r => r.playerName);
+        // Broad fetch by position, not an exact-string match against FiQ's
+        // own rookie names — a name-filtered query silently misses real
+        // matches whenever the two sources spell a suffix differently (see
+        // sleeperNameResolver.ts's header for the full explanation).
+        const rookiePositions = [...new Set(rookies.map(r => r.position))];
         const sleeperRows = await prisma.sleeperPlayer.findMany({
-            where:  { fullName: { in: names } },
+            where:  { position: { in: rookiePositions } },
             select: {
                 fullName:        true,
                 position:        true,
@@ -120,23 +124,7 @@ export async function GET(request: Request): Promise<Response> {
             },
         });
 
-        // Some real players share an exact fullName (e.g. two "Justin Jefferson"s —
-        // WR/MIN and LB/CLE). Match name+position first; only fall back to a bare
-        // name match when that name is unambiguous, so a rookie never inherits a
-        // different player's depth chart / injury / playerId.
-        type SleeperRow = typeof sleeperRows[number];
-        const byNamePos = new Map<string, SleeperRow>();
-        const byNameCount = new Map<string, number>();
-        const byNameSingle = new Map<string, SleeperRow>();
-        for (const sp of sleeperRows) {
-            byNamePos.set(`${sp.fullName}|${sp.position}`, sp);
-            byNameCount.set(sp.fullName, (byNameCount.get(sp.fullName) ?? 0) + 1);
-            byNameSingle.set(sp.fullName, sp);
-        }
-        function resolveSleeper(name: string, position: string): SleeperRow | undefined {
-            return byNamePos.get(`${name}|${position}`)
-                ?? (byNameCount.get(name) === 1 ? byNameSingle.get(name) : undefined);
-        }
+        const resolveSleeper = buildSleeperNameResolver(sleeperRows);
         // Fetch season projections for all matched players in one query
         const playerIds = sleeperRows.map(sp => sp.playerId);
         const projRows  = await prisma.playerProjection.findMany({
@@ -212,7 +200,7 @@ export async function GET(request: Request): Promise<Response> {
 
             ops.push(prisma.rookieRankingsPlayer.update({
                 where: { id: rookie.id },
-                data:  { baseFiQScore: base, opportunityScore, fiqScore: adjustedFiQ, fiqTier: newTier },
+                data:  { baseFiQScore: base, opportunityScore, fiqScore: adjustedFiQ, fiqTier: newTier, sleeperPlayerId: sp.playerId },
             }));
 
             updated++;

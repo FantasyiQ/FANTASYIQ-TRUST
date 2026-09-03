@@ -741,9 +741,16 @@ model FantasyCalcValue {
     redraftValue   Int      // KTC 1QB redraft (0–9999)
     redraftValueSf Int      @default(0)  // KTC superflex redraft
     trend30Day     Int?
+    // Canonical Sleeper player ID, resolved once at sync time (fantasycalc-sync
+    // cron) instead of re-matched by name at every read site. Nullable — not
+    // every FantasyCalc row will have a Sleeper match (e.g. very recent rookies
+    // not yet synced). Not a hard FK: SleeperPlayer is itself an external-sync
+    // table, so enforcing referential integrity here would be too brittle.
+    sleeperPlayerId String?
     updatedAt    DateTime @updatedAt @default(now())
 
     @@index([nameLower])
+    @@index([sleeperPlayerId])
 }
 
 // Weekly snapshot of power rankings per league, written by the power-rankings cron.
@@ -1239,11 +1246,18 @@ model RookieRankingsPlayer {
     fortyTime        Float?               // combine 40-yard dash time (e.g. 4.46); for display only
     fiqScore         Float    // adjusted FiQ Score = (baseFiQScore × 0.75) + (opportunityScore × 0.25)
     fiqTier          String   // derived from adjusted fiqScore: "Tier 1"–"Tier 5"
+    // Canonical Sleeper player ID, resolved once at sync time
+    // (rookie-opportunity-sync cron) instead of re-matched by name at every
+    // read site. Nullable — a rookie not yet in Sleeper's own player database
+    // (e.g. pre-draft-class seed) will have no match yet. Not a hard FK: see
+    // FantasyCalcValue.sleeperPlayerId for the same reasoning.
+    sleeperPlayerId String?
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
     @@unique([season, playerName])
     @@index([season, position])
+    @@index([sleeperPlayerId])
     @@map("rookie_rankings_players")
 }
 

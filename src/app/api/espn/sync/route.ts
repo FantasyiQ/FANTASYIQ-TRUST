@@ -9,6 +9,7 @@ import {
     normalizeEspnLeague,
     buildCoreEspnLeagueFields,
 } from '@/lib/espn';
+import { buildSleeperNameResolver } from '@/lib/sleeperNameResolver';
 
 // POST /api/espn/sync — full sync: settings + teams + rosters + matchups
 export async function POST(request: NextRequest): Promise<Response> {
@@ -33,6 +34,18 @@ export async function POST(request: NextRequest): Promise<Response> {
         // Current week matchups only (reduces noise in stored data)
         const currentWeekMatchups = data.matchups.filter(m => m.week === data.currentWeek);
 
+        // Resolve each ESPN roster player to their canonical Sleeper playerId
+        // once, at sync time — every downstream read (Rankings, Roster
+        // Values, etc.) can then use a plain ID lookup instead of re-matching
+        // by name. Current-season rosters only, so active-only is safe here
+        // (see sync-history/route.ts for the historical-roster case, where
+        // it isn't).
+        const sleeperPlayers = await prisma.sleeperPlayer.findMany({
+            where:  { active: true },
+            select: { fullName: true, position: true, playerId: true },
+        });
+        const resolveSleeper = buildSleeperNameResolver(sleeperPlayers);
+
         const leagueRecord = {
             ...buildCoreEspnLeagueFields(rawData),
             leagueId,
@@ -51,7 +64,10 @@ export async function POST(request: NextRequest): Promise<Response> {
                 fpts:         t.pointsFor,
                 fptsAgainst:  t.pointsAgainst,
                 rosterSize:   t.roster.length,
-                players:      t.roster.map(p => ({ name: p.fullName, position: p.position, lineupSlot: p.lineupSlot })),
+                players:      t.roster.map(p => ({
+                    name: p.fullName, position: p.position, lineupSlot: p.lineupSlot,
+                    sleeperPlayerId: resolveSleeper(p.fullName, p.position)?.playerId ?? null,
+                })),
             })),
             currentMatchup: currentWeekMatchups.length > 0 ? JSON.parse(JSON.stringify({
                 week:     data.currentWeek,
