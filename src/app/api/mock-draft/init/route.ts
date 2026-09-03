@@ -511,7 +511,14 @@ export async function GET(req: NextRequest): Promise<Response> {
             posScoringFactor.set(pos, computePositionScoringFactor(posAvgPtsPerGame.get(pos) ?? 0, posStdAvgPtsPerGame.get(pos) ?? 0));
         }
 
-        const VALUE_CAP = isDynasty ? 9999 : 5000;
+        // FantasyCalc's dynastyValue and redraftValue share the same 0-9999
+        // scale (confirmed: both max out at 9999) — a 5000 cap for redraft
+        // was wrong and clamped every player above it (104 real players, incl.
+        // merely-good ones like Brock Bowers/Trey McBride) to the same max
+        // baseScore of 100 as the true top of the board (Gibbs/Bijan/Chase),
+        // erasing all real differentiation and letting a Redraft mock draft's
+        // CPU bots randomly draft a TE 1st or 2nd overall.
+        const VALUE_CAP = 9999;
 
         boardPlayers = pendingFc.map(({ v, sp, realPtsPerGame, gamesPlayed }, i) => {
             const rawVal = isDynasty
