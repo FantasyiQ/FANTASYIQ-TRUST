@@ -3,19 +3,23 @@
  */
 import { prisma } from '@/lib/prisma';
 import { computeRealProjectedPoints } from '@/lib/rankings/leagueScoringPoints';
+import { getNflState } from '@/lib/sleeper';
 
 // ── NFL Week ──────────────────────────────────────────────────────────────────
 
-export function currentNflWeek(): { season: number; week: number } {
-    const now    = new Date();
-    const year   = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
-    const sep1   = new Date(year, 8, 1);
-    // First Thursday of September = season opener
-    const firstThu = new Date(sep1);
-    firstThu.setDate(sep1.getDate() + ((4 - sep1.getDay() + 7) % 7));
-    const msPerWeek = 7 * 24 * 60 * 60 * 1000;
-    const week = Math.max(1, Math.min(18, Math.floor((now.getTime() - firstThu.getTime()) / msPerWeek) + 1));
-    return { season: year, week };
+/**
+ * Real current NFL week/season, from Sleeper's own live state — the same
+ * source every other feature in the app uses (start-sit, projections,
+ * rankings, sleeper-sync, etc). Previously hand-computed from a "first
+ * Thursday of September = opener" assumption, which is wrong (the real
+ * rule is Thursday after Labor Day) and drifted a full week off in 2026 —
+ * DFS silently resolved contests/lineups against the wrong week, so a
+ * user's real Week 1 lineup and leaderboard were invisible under a
+ * technically-true "Locked" badge for the wrong contest.
+ */
+export async function currentNflWeek(): Promise<{ season: number; week: number }> {
+    const state = await getNflState();
+    return { season: Number(state.season), week: state.week };
 }
 
 // ── Roster slots ─────────────────────────────────────────────────────────────

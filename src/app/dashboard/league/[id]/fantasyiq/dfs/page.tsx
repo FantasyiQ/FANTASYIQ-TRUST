@@ -32,7 +32,7 @@ export default async function DFSChallengePage({
 
     if (!league || league.userId !== userId) notFound();
 
-    const { week, season } = currentNflWeek();
+    const { week, season } = await currentNflWeek();
     const contestSeason    = parseInt(league.season, 10) || season;
 
     // Find or create contest; backfill lockAt if missing

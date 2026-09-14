@@ -28,7 +28,7 @@ export async function GET(request: NextRequest): Promise<Response> {
 
     try {
     
-        const { week: currentWeek, season: currentSeason } = currentNflWeek();
+        const { week: currentWeek, season: currentSeason } = await currentNflWeek();
         const now = new Date();
 
         // Load all non-FINAL contests

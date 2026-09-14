@@ -32,7 +32,7 @@ export async function GET(request: NextRequest): Promise<Response> {
         return Response.json({ error: 'Not found' }, { status: 404 });
     }
 
-    const { week, season } = currentNflWeek();
+    const { week, season } = await currentNflWeek();
     // Respect the league's own season (e.g. "2025") rather than derived year
     const contestSeason = parseInt(league.season, 10) || season;
 
