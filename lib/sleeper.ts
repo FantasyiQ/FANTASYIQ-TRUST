@@ -114,6 +114,23 @@ export async function getNflState(): Promise<SleeperNflState> {
 }
 
 /**
+ * Real, actual per-player stats for one specific week (not season-
+ * cumulative, not a projection) — the same raw stat-key vocabulary
+ * scoring_settings uses (pass_yd, rec, fgm_40_49, pts_allow_0_6, etc), so any
+ * league's real scoring settings can score it directly via a dot product
+ * (see computeRealPoints in leagueScoringPoints.ts). Sleeper's real feed
+ * already resolves which points-allowed bucket applied for a DEF (one-hot),
+ * so no probability-distribution EV math is needed here the way the
+ * defensive projection engine needs for a game that hasn't happened yet.
+ * Empty object for a player with no stats yet this week (game not started/
+ * still in progress at fetch time, bye, etc) — callers should fall back to
+ * a projection for those, not treat empty as a real zero.
+ */
+export async function getWeekRealStats(season: string, week: number): Promise<Record<string, Record<string, number>>> {
+    return sleeperFetch<Record<string, Record<string, number>>>(`/stats/nfl/regular/${season}/${week}`, 30);
+}
+
+/**
  * Returns the earliest kickoff timestamp (ms) for each NFL team in a given week.
  * Falls back to Sunday 1pm ET if the schedule can't be fetched.
  * Shape: { [teamAbbrev: string]: epochMs }

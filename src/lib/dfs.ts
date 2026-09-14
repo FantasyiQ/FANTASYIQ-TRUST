@@ -2,8 +2,8 @@
  * DFS Challenge utilities — server-only (imports prisma).
  */
 import { prisma } from '@/lib/prisma';
-import { computeRealProjectedPoints } from '@/lib/rankings/leagueScoringPoints';
-import { getNflState } from '@/lib/sleeper';
+import { computeRealProjectedPoints, computeRealPoints } from '@/lib/rankings/leagueScoringPoints';
+import { getNflState, getWeekRealStats } from '@/lib/sleeper';
 
 // ── NFL Week ──────────────────────────────────────────────────────────────────
 
@@ -59,11 +59,17 @@ export function scoringField(
 export type DFSEntry = { slot: string; playerId: string };
 
 /**
- * Per-player projected/actual points for a lineup, scored under the source
- * league's real scoring_settings (via the League Scoring Points Engine).
- * 0 for any player without a projection row (bye week, etc). Shared by
- * scoreLineup() (total) and any UI that needs the per-player breakdown
- * (e.g. the leaderboard) rather than just a lump sum.
+ * Per-player points for a lineup, scored under the source league's real
+ * scoring_settings (via the League Scoring Points Engine). Prefers REAL,
+ * actual stats for any player whose game has started/finished this week —
+ * PlayerProjection is a pre-kickoff estimate only and is never overwritten
+ * with real results, so using it alone for an already-played week silently
+ * shows a frozen guess instead of what actually happened (confirmed live:
+ * a real Week 1 Josh Allen game of 35.66 real pts_ppr showed as a stale
+ * projected 21.2). Falls back to the projection only for players with no
+ * real-stats entry yet this week (bye, game hasn't started). 0 for a
+ * player with neither. Shared by scoreLineup() (total) and any UI that
+ * needs the per-player breakdown (e.g. the leaderboard).
  */
 export async function scorePlayersInLineup(
     entries:         DFSEntry[],
@@ -74,15 +80,33 @@ export async function scorePlayersInLineup(
 ): Promise<Map<string, number>> {
     const playerIds = entries.map(e => e.playerId);
 
-    const rows = await prisma.playerProjection.findMany({
-        where:  { playerId: { in: playerIds }, season: String(season), week },
-        select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true, rawProjection: true },
-    });
+    const [projRows, realStats] = await Promise.all([
+        prisma.playerProjection.findMany({
+            where:  { playerId: { in: playerIds }, season: String(season), week },
+            select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true, rawProjection: true },
+        }),
+        getWeekRealStats(String(season), week).catch(() => ({} as Record<string, Record<string, number>>)),
+    ]);
 
-    return new Map(rows.map(r => [
-        r.playerId,
-        computeRealProjectedPoints(r.rawProjection as Record<string, number> | null, scoringSettings, r, scoringType ?? null),
-    ]));
+    const result = new Map<string, number>();
+    for (const r of projRows) {
+        result.set(r.playerId, computeRealProjectedPoints(r.rawProjection as Record<string, number> | null, scoringSettings, r, scoringType ?? null));
+    }
+    // Real stats win wherever present — overwrite, don't merge with the projection.
+    // Same null-scoringSettings fallback as computeRealProjectedPoints: use
+    // Sleeper's own pre-aggregated pts_* field for the league's scoring type
+    // rather than a dot product with no weights to apply.
+    for (const playerId of playerIds) {
+        const raw = realStats[playerId];
+        if (!raw) continue;
+        const points = scoringSettings
+            ? computeRealPoints(raw, scoringSettings)
+            : scoringType === 'ppr'      ? (raw.pts_ppr ?? 0)
+            : scoringType === 'half_ppr' ? (raw.pts_half_ppr ?? 0)
+            : (raw.pts_std ?? 0);
+        result.set(playerId, points);
+    }
+    return result;
 }
 
 /**
