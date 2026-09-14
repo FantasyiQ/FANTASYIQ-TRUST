@@ -15,14 +15,28 @@ interface LeaderboardRow {
     user:        { id: string; name: string | null };
 }
 
-interface DFSLeaderboardProps {
-    lineups:    LeaderboardRow[];
-    myUserId?:  string;
-    status:     string;
-    isLocked?:  boolean;
+interface PlayerInfo {
+    playerId: string;
+    fullName: string;
+    position: string;
+    team:     string | null;
 }
 
-export default function DFSLeaderboard({ lineups, myUserId, status, isLocked = false }: DFSLeaderboardProps) {
+interface DFSLeaderboardProps {
+    lineups:        LeaderboardRow[];
+    myUserId?:      string;
+    status:         string;
+    isLocked?:      boolean;
+    // Every player appearing in any lineup on this page, resolved once
+    // server-side — entriesJson only ever stored {slot, playerId}, so
+    // without this the expanded view had nothing but the raw ID to show.
+    players?:        Record<string, PlayerInfo>;
+    pointsByPlayer?: Record<string, number>;
+}
+
+export default function DFSLeaderboard({
+    lineups, myUserId, status, isLocked = false, players = {}, pointsByPlayer = {},
+}: DFSLeaderboardProps) {
     const [expanded, setExpanded] = useState<string | null>(null);
 
     if (lineups.length === 0) {
@@ -87,12 +101,23 @@ export default function DFSLeaderboard({ lineups, myUserId, status, isLocked = f
                         {/* Expanded lineup — hidden for others until locked */}
                         {isOpen && (isLocked || isMe) && entries.length > 0 && (
                             <div className="px-4 pb-3 border-t border-gray-800 pt-2 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1">
-                                {entries.map((e, i) => (
-                                    <div key={i} className="flex items-center gap-2 text-xs">
-                                        <span className="text-[9px] text-gray-500 uppercase w-12 shrink-0">{e.slot}</span>
-                                        <span className="text-gray-300 truncate">{e.playerId}</span>
-                                    </div>
-                                ))}
+                                {entries.map((e, i) => {
+                                    const p = players[e.playerId];
+                                    return (
+                                        <div key={i} className="flex items-center gap-2 text-xs">
+                                            <span className="text-[9px] text-gray-500 uppercase w-12 shrink-0">{e.slot}</span>
+                                            <span className="text-gray-300 truncate flex-1">
+                                                {p ? p.fullName : e.playerId}
+                                                {p && <span className="text-gray-600 ml-1">{p.position}</span>}
+                                            </span>
+                                            {isLocked && (
+                                                <span className="text-gray-500 font-semibold shrink-0 tabular-nums">
+                                                    {(pointsByPlayer[e.playerId] ?? 0).toFixed(1)}
+                                                </span>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>

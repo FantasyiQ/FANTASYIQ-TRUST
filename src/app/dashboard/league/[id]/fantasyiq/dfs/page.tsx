@@ -4,7 +4,7 @@ export const maxDuration = 30;
 import { redirect, notFound } from 'next/navigation';
 import { auth }   from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { currentNflWeek, getDFSSlots } from '@/lib/dfs';
+import { currentNflWeek, getDFSSlots, scorePlayersInLineup } from '@/lib/dfs';
 import { getWeekLockTime, getNflSchedule } from '@/lib/sleeper';
 import LineupBuilder  from '@/components/dfs/LineupBuilder';
 import DFSLeaderboard from '@/components/dfs/DFSLeaderboard';
@@ -27,6 +27,7 @@ export default async function DFSChallengePage({
         select: {
             id: true, userId: true, platform: true, leagueId: true,
             leagueName: true, season: true, rosterPositions: true, scoringType: true, draftType: true,
+            scoringSettings: true,
         },
     });
 
@@ -85,6 +86,31 @@ export default async function DFSChallengePage({
             user: { select: { id: true, name: true } },
         },
     });
+
+    // The leaderboard/lineup views only ever stored {slot, playerId} — never
+    // a resolved name, so the UI had nothing to show but the raw ID. Resolve
+    // every player appearing anywhere on this page in one batch, plus each
+    // player's own real scored points (not just the lineup's lump total) so
+    // "expand a lineup" actually shows who's in it and what they scored.
+    const allEntries: DFSEntry[] = [
+        ...(userLineup?.entriesJson as DFSEntry[] | undefined ?? []),
+        ...leaderboard.flatMap(row => row.entriesJson as DFSEntry[]),
+    ];
+    const allPlayerIds = [...new Set(allEntries.map(e => e.playerId))];
+    const [playerRows, pointsByPlayer] = await Promise.all([
+        allPlayerIds.length > 0
+            ? prisma.sleeperPlayer.findMany({
+                where:  { playerId: { in: allPlayerIds } },
+                select: { playerId: true, fullName: true, position: true, team: true },
+            })
+            : Promise.resolve([]),
+        scorePlayersInLineup(
+            allEntries, contestSeason, week, league.scoringType,
+            league.scoringSettings as Record<string, number> | null,
+        ),
+    ]);
+    const playersById = Object.fromEntries(playerRows.map(p => [p.playerId, p]));
+    const pointsById   = Object.fromEntries(pointsByPlayer);
 
     const dfsSlots = getDFSSlots(league.rosterPositions as string[]);
 
@@ -169,12 +195,21 @@ export default async function DFSChallengePage({
                                                 {(userLineup.totalPoints).toFixed(1)} pts
                                             </span>
                                         </div>
-                                        {(userLineup.entriesJson as DFSEntry[]).map((e, i) => (
-                                            <div key={i} className="flex items-center gap-3 text-xs border-b border-gray-800 pb-1.5">
-                                                <span className="text-[9px] text-gray-500 uppercase w-12 shrink-0">{e.slot}</span>
-                                                <span className="text-gray-300">{e.playerId}</span>
-                                            </div>
-                                        ))}
+                                        {(userLineup.entriesJson as DFSEntry[]).map((e, i) => {
+                                            const p = playersById[e.playerId];
+                                            return (
+                                                <div key={i} className="flex items-center gap-3 text-xs border-b border-gray-800 pb-1.5">
+                                                    <span className="text-[9px] text-gray-500 uppercase w-12 shrink-0">{e.slot}</span>
+                                                    <span className="text-gray-300 flex-1 truncate">
+                                                        {p ? p.fullName : e.playerId}
+                                                        {p && <span className="text-gray-600 ml-1.5">{p.position} · {p.team ?? '—'}</span>}
+                                                    </span>
+                                                    <span className="text-gray-400 font-semibold shrink-0">
+                                                        {(pointsById[e.playerId] ?? 0).toFixed(1)}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
                                     </>
                                 ) : (
                                     <p className="text-gray-600 text-sm">You didn&apos;t submit a lineup this week.</p>
@@ -197,6 +232,8 @@ export default async function DFSChallengePage({
                             myUserId={userId}
                             status={contest.status}
                             isLocked={isLocked}
+                            players={playersById}
+                            pointsByPlayer={pointsById}
                         />
                     </section>
                 </div>

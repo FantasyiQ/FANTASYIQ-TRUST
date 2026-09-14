@@ -59,6 +59,33 @@ export function scoringField(
 export type DFSEntry = { slot: string; playerId: string };
 
 /**
+ * Per-player projected/actual points for a lineup, scored under the source
+ * league's real scoring_settings (via the League Scoring Points Engine).
+ * 0 for any player without a projection row (bye week, etc). Shared by
+ * scoreLineup() (total) and any UI that needs the per-player breakdown
+ * (e.g. the leaderboard) rather than just a lump sum.
+ */
+export async function scorePlayersInLineup(
+    entries:         DFSEntry[],
+    season:          number,
+    week:            number,
+    scoringType:     string | null | undefined,
+    scoringSettings: Record<string, number> | null,
+): Promise<Map<string, number>> {
+    const playerIds = entries.map(e => e.playerId);
+
+    const rows = await prisma.playerProjection.findMany({
+        where:  { playerId: { in: playerIds }, season: String(season), week },
+        select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true, rawProjection: true },
+    });
+
+    return new Map(rows.map(r => [
+        r.playerId,
+        computeRealProjectedPoints(r.rawProjection as Record<string, number> | null, scoringSettings, r, scoringType ?? null),
+    ]));
+}
+
+/**
  * Sum projected/actual points for a lineup from PlayerProjection table,
  * scored under the source league's real scoring_settings (via the League
  * Scoring Points Engine) rather than a generic ppr/std/half_ppr bucket —
@@ -73,17 +100,7 @@ export async function scoreLineup(
     scoringType:     string | null | undefined,
     scoringSettings: Record<string, number> | null,
 ): Promise<number> {
-    const playerIds = entries.map(e => e.playerId);
-
-    const rows = await prisma.playerProjection.findMany({
-        where:  { playerId: { in: playerIds }, season: String(season), week },
-        select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true, rawProjection: true },
-    });
-
-    const byPlayer = new Map(rows.map(r => [
-        r.playerId,
-        computeRealProjectedPoints(r.rawProjection as Record<string, number> | null, scoringSettings, r, scoringType ?? null),
-    ]));
+    const byPlayer = await scorePlayersInLineup(entries, season, week, scoringType, scoringSettings);
     return entries.reduce((sum, e) => sum + (byPlayer.get(e.playerId) ?? 0), 0);
 }
 
