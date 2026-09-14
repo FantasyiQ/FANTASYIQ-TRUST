@@ -192,7 +192,7 @@ export default async function DFSChallengePage({
                                         <div className="flex items-center justify-between mb-3">
                                             <span className="text-xs text-gray-500">Your score</span>
                                             <span className="text-2xl font-black text-[#D4AF37] tabular-nums">
-                                                {(userLineup.totalPoints).toFixed(1)} pts
+                                                {(userLineup.totalPoints).toFixed(2)} pts
                                             </span>
                                         </div>
                                         {(userLineup.entriesJson as DFSEntry[]).map((e, i) => {
@@ -205,7 +205,7 @@ export default async function DFSChallengePage({
                                                         {p && <span className="text-gray-600 ml-1.5">{p.position} · {p.team ?? '—'}</span>}
                                                     </span>
                                                     <span className="text-gray-400 font-semibold shrink-0">
-                                                        {(pointsById[e.playerId] ?? 0).toFixed(1)}
+                                                        {(pointsById[e.playerId] ?? 0).toFixed(2)}
                                                     </span>
                                                 </div>
                                             );

@@ -86,7 +86,7 @@ export default function DFSLeaderboard({
                                 {!isLocked ? (
                                     <span className="text-gray-500 text-xs">Locked 🔒</span>
                                 ) : (
-                                    `${row.totalPoints.toFixed(1)} pts`
+                                    `${row.totalPoints.toFixed(2)} pts`
                                 )}
                             </span>
 
@@ -112,7 +112,7 @@ export default function DFSLeaderboard({
                                             </span>
                                             {isLocked && (
                                                 <span className="text-gray-500 font-semibold shrink-0 tabular-nums">
-                                                    {(pointsByPlayer[e.playerId] ?? 0).toFixed(1)}
+                                                    {(pointsByPlayer[e.playerId] ?? 0).toFixed(2)}
                                                 </span>
                                             )}
                                         </div>

@@ -246,7 +246,7 @@ export default function LineupBuilder({
                                 {/* Points */}
                                 {pts !== null && (
                                     <span className="text-xs font-bold text-[#D4AF37] shrink-0 ml-auto">
-                                        {pts.toFixed(1)} pts
+                                        {pts.toFixed(2)} pts
                                     </span>
                                 )}
 
@@ -313,7 +313,7 @@ export default function LineupBuilder({
                                                     </div>
                                                     {ppts > 0 && (
                                                         <span className="text-xs text-[#D4AF37] font-bold shrink-0 ml-3">
-                                                            {ppts.toFixed(1)} pts
+                                                            {ppts.toFixed(2)} pts
                                                         </span>
                                                     )}
                                                 </button>
@@ -332,7 +332,7 @@ export default function LineupBuilder({
                 <div>
                     <div className="text-[10px] text-gray-500 uppercase tracking-wider">Projected Total</div>
                     <div className="text-2xl font-black text-[#D4AF37] tabular-nums">
-                        {totalProj.toFixed(1)}
+                        {totalProj.toFixed(2)}
                         <span className="text-xs font-normal text-gray-500 ml-1">pts</span>
                     </div>
                 </div>
