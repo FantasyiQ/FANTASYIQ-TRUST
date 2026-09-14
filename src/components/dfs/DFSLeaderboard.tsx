@@ -30,12 +30,13 @@ interface DFSLeaderboardProps {
     // Every player appearing in any lineup on this page, resolved once
     // server-side — entriesJson only ever stored {slot, playerId}, so
     // without this the expanded view had nothing but the raw ID to show.
-    players?:        Record<string, PlayerInfo>;
-    pointsByPlayer?: Record<string, number>;
+    players?:         Record<string, PlayerInfo>;
+    pointsByPlayer?:  Record<string, number>;
+    opponentByTeam?:  Record<string, string>;
 }
 
 export default function DFSLeaderboard({
-    lineups, myUserId, status, isLocked = false, players = {}, pointsByPlayer = {},
+    lineups, myUserId, status, isLocked = false, players = {}, pointsByPlayer = {}, opponentByTeam = {},
 }: DFSLeaderboardProps) {
     const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -102,13 +103,18 @@ export default function DFSLeaderboard({
                         {isOpen && (isLocked || isMe) && entries.length > 0 && (
                             <div className="px-4 pb-3 border-t border-gray-800 pt-2 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1">
                                 {entries.map((e, i) => {
-                                    const p = players[e.playerId];
+                                    const p   = players[e.playerId];
+                                    const opp = p?.team ? opponentByTeam[p.team] : undefined;
                                     return (
                                         <div key={i} className="flex items-center gap-2 text-xs">
                                             <span className="text-[9px] text-gray-500 uppercase w-12 shrink-0">{e.slot}</span>
                                             <span className="text-gray-300 truncate flex-1">
                                                 {p ? p.fullName : e.playerId}
-                                                {p && <span className="text-gray-600 ml-1">{p.position}</span>}
+                                                {p && (
+                                                    <span className="text-gray-600 ml-1">
+                                                        {p.position} · {p.team ?? '—'}{opp && ` vs ${opp}`}
+                                                    </span>
+                                                )}
                                             </span>
                                             {isLocked && (
                                                 <span className="text-gray-500 font-semibold shrink-0 tabular-nums">

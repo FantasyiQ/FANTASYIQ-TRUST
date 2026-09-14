@@ -5,7 +5,7 @@ import { redirect, notFound } from 'next/navigation';
 import { auth }   from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { currentNflWeek, getDFSSlots, scorePlayersInLineup } from '@/lib/dfs';
-import { getWeekLockTime, getNflSchedule } from '@/lib/sleeper';
+import { getWeekLockTime, getNflSchedule, getWeekOpponents } from '@/lib/sleeper';
 import LineupBuilder  from '@/components/dfs/LineupBuilder';
 import DFSLeaderboard from '@/components/dfs/DFSLeaderboard';
 
@@ -122,7 +122,10 @@ export default async function DFSChallengePage({
     const isLocked = !isCurrentWeek || contest.status !== 'OPEN' || (!!contest.lockAt && now >= contest.lockAt);
 
     // Per-player game schedule: team → epoch ms of kickoff
-    const gameSchedule = await getNflSchedule(String(contestSeason), week);
+    const [gameSchedule, opponentByTeam] = await Promise.all([
+        getNflSchedule(String(contestSeason), week),
+        getWeekOpponents(String(contestSeason), week),
+    ]);
 
     const userLineup = await prisma.dFSLineup.findUnique({
         where:  { contestId_userId: { contestId: contest.id, userId } },
@@ -237,6 +240,7 @@ export default async function DFSChallengePage({
                                     leagueId={league.id}
                                     initialEntries={userLineup?.entriesJson as DFSEntry[] | undefined}
                                     gameSchedule={gameSchedule}
+                                    opponentByTeam={opponentByTeam}
                                 />
                             </div>
                         ) : (
@@ -250,13 +254,18 @@ export default async function DFSChallengePage({
                                             </span>
                                         </div>
                                         {(userLineup.entriesJson as DFSEntry[]).map((e, i) => {
-                                            const p = playersById[e.playerId];
+                                            const p   = playersById[e.playerId];
+                                            const opp = p?.team ? opponentByTeam[p.team] : undefined;
                                             return (
                                                 <div key={i} className="flex items-center gap-3 text-xs border-b border-gray-800 pb-1.5">
                                                     <span className="text-[9px] text-gray-500 uppercase w-12 shrink-0">{e.slot}</span>
                                                     <span className="text-gray-300 flex-1 truncate">
                                                         {p ? p.fullName : e.playerId}
-                                                        {p && <span className="text-gray-600 ml-1.5">{p.position} · {p.team ?? '—'}</span>}
+                                                        {p && (
+                                                            <span className="text-gray-600 ml-1.5">
+                                                                {p.position} · {p.team ?? '—'}{opp && ` vs ${opp}`}
+                                                            </span>
+                                                        )}
                                                     </span>
                                                     <span className="text-gray-400 font-semibold shrink-0">
                                                         {(pointsById[e.playerId] ?? 0).toFixed(2)}
@@ -288,6 +297,7 @@ export default async function DFSChallengePage({
                             isLocked={isLocked}
                             players={playersById}
                             pointsByPlayer={pointsById}
+                            opponentByTeam={opponentByTeam}
                         />
                     </section>
                 </div>

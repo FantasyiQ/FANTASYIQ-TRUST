@@ -27,6 +27,7 @@ interface LineupBuilderProps {
     leagueId:     string;
     initialEntries?: { slot: string; playerId: string }[];
     gameSchedule?: Record<string, number>; // team → epoch ms of kickoff
+    opponentByTeam?: Record<string, string>; // team → opponent abbrev
     onSaved?: () => void;
 }
 
@@ -47,7 +48,7 @@ function projPoints(player: SleeperPlayer): number {
 }
 
 export default function LineupBuilder({
-    contestId, slots, season, week, leagueId, initialEntries, gameSchedule, onSaved,
+    contestId, slots, season, week, leagueId, initialEntries, gameSchedule, opponentByTeam = {}, onSaved,
 }: LineupBuilderProps) {
     // Build initial state
     const buildInitial = useCallback((): LineupEntry[] => {
@@ -232,6 +233,9 @@ export default function LineupBuilder({
                                         </div>
                                         <div className="text-[10px] text-gray-500">
                                             {entry.player.position} · {entry.player.team ?? '—'}
+                                            {entry.player.team && opponentByTeam[entry.player.team] && (
+                                                <span> vs {opponentByTeam[entry.player.team]}</span>
+                                            )}
                                             {entry.player.injuryStatus && entry.player.injuryStatus !== 'Active' && (
                                                 <span className="ml-1.5 text-red-400">{entry.player.injuryStatus}</span>
                                             )}
@@ -306,6 +310,9 @@ export default function LineupBuilder({
                                                         </div>
                                                         <div className="text-[10px] text-gray-500">
                                                             {player.position} · {player.team ?? '—'}
+                                                            {player.team && opponentByTeam[player.team] && (
+                                                                <span> vs {opponentByTeam[player.team]}</span>
+                                                            )}
                                                             {player.injuryStatus && player.injuryStatus !== 'Active' && (
                                                                 <span className="ml-1 text-red-400">{player.injuryStatus}</span>
                                                             )}

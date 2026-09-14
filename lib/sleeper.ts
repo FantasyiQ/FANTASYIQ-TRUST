@@ -130,27 +130,82 @@ export async function getWeekRealStats(season: string, week: number): Promise<Re
     return sleeperFetch<Record<string, Record<string, number>>>(`/stats/nfl/regular/${season}/${week}`, 30);
 }
 
+// ESPN's team abbreviation differs from Sleeper's canonical one for exactly
+// one team — everything else (all other 31) matches exactly (confirmed live
+// against a real week's scoreboard). Every other part of this app (player
+// team, roster data, etc) uses Sleeper's convention, so normalize here.
+const ESPN_TO_SLEEPER_TEAM: Record<string, string> = { WSH: 'WAS' };
+
+interface EspnGame {
+    team:      string;   // Sleeper-normalized abbreviation
+    opponent:  string;   // Sleeper-normalized abbreviation
+    kickoffMs: number;
+}
+
+/**
+ * Real NFL schedule for a given week, sourced from ESPN's public scoreboard
+ * (no auth required). The schedule endpoint this file previously called
+ * (Sleeper's undocumented /v1/schedule/nfl/regular/{season}/{week}) is not
+ * part of Sleeper's public API and returns a hard 404 as of 2026-09 —
+ * confirmed live, so game-lock timing and opponent info had been silently
+ * empty this whole time. ESPN's site API is the same real, freely-
+ * accessible source used elsewhere for scoreboard data.
+ */
+async function fetchEspnWeekGames(season: string, week: number): Promise<EspnGame[]> {
+    try {
+        const url  = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=2&year=${season}&week=${week}`;
+        const resp = await fetch(url, { cache: 'no-store' });
+        if (!resp.ok) throw new Error(`ESPN scoreboard ${resp.status}`);
+        const data = await resp.json() as {
+            events?: Array<{
+                date?: string;
+                competitions?: Array<{
+                    competitors?: Array<{ team?: { abbreviation?: string } }>;
+                }>;
+            }>;
+        };
+        const out: EspnGame[] = [];
+        for (const event of data.events ?? []) {
+            const kickoffMs = event.date ? new Date(event.date).getTime() : NaN;
+            if (!Number.isFinite(kickoffMs)) continue;
+            const competitors = event.competitions?.[0]?.competitors ?? [];
+            const abbrevs = competitors
+                .map(c => c.team?.abbreviation)
+                .filter((a): a is string => Boolean(a))
+                .map(a => ESPN_TO_SLEEPER_TEAM[a] ?? a);
+            if (abbrevs.length !== 2) continue;
+            out.push({ team: abbrevs[0], opponent: abbrevs[1], kickoffMs });
+            out.push({ team: abbrevs[1], opponent: abbrevs[0], kickoffMs });
+        }
+        return out;
+    } catch {
+        return [];
+    }
+}
+
 /**
  * Returns the earliest kickoff timestamp (ms) for each NFL team in a given week.
  * Falls back to Sunday 1pm ET if the schedule can't be fetched.
  * Shape: { [teamAbbrev: string]: epochMs }
  */
 export async function getNflSchedule(season: string, week: number): Promise<Record<string, number>> {
-    try {
-        const url  = `https://api.sleeper.app/v1/schedule/nfl/regular/${season}/${week}`;
-        const resp = await fetch(url, { cache: 'no-store' });
-        if (!resp.ok) throw new Error(`Sleeper schedule ${resp.status}`);
-        const games = await resp.json() as Array<{ date?: number; home_team?: string; away_team?: string }>;
-        const out: Record<string, number> = {};
-        for (const g of games) {
-            if (!g.date) continue;
-            if (g.home_team) out[g.home_team] = Math.min(out[g.home_team] ?? Infinity, g.date);
-            if (g.away_team) out[g.away_team] = Math.min(out[g.away_team] ?? Infinity, g.date);
-        }
-        return out;
-    } catch {
-        return {};
+    const games = await fetchEspnWeekGames(season, week);
+    const out: Record<string, number> = {};
+    for (const g of games) {
+        out[g.team] = Math.min(out[g.team] ?? Infinity, g.kickoffMs);
     }
+    return out;
+}
+
+/**
+ * Returns each NFL team's opponent for a given week.
+ * Shape: { [teamAbbrev: string]: opponentAbbrev }
+ */
+export async function getWeekOpponents(season: string, week: number): Promise<Record<string, string>> {
+    const games = await fetchEspnWeekGames(season, week);
+    const out: Record<string, string> = {};
+    for (const g of games) out[g.team] = g.opponent;
+    return out;
 }
 
 /**
