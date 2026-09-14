@@ -11,12 +11,39 @@ import DFSLeaderboard from '@/components/dfs/DFSLeaderboard';
 
 type DFSEntry = { slot: string; playerId: string };
 
+// Past weeks' contests/lineups are never deleted (see page body) — this is
+// just a plain link row, no client JS needed, so past scores stay reachable
+// once the current week moves on instead of only ever showing "now".
+function WeekNav({ leagueId, currentWeek, viewWeek }: { leagueId: string; currentWeek: number; viewWeek: number }) {
+    const weeks = Array.from({ length: currentWeek }, (_, i) => i + 1);
+    return (
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            {weeks.map(w => (
+                <a
+                    key={w}
+                    href={`/dashboard/league/${leagueId}/fantasyiq/dfs?week=${w}`}
+                    className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-lg border transition ${
+                        w === viewWeek
+                            ? 'bg-[#D4AF37]/15 border-[#D4AF37]/50 text-[#D4AF37]'
+                            : 'bg-gray-800 border-gray-700 text-gray-500 hover:border-gray-500'
+                    }`}
+                >
+                    {w === 18 ? 'Pro Bowl' : `Wk ${w}`}
+                </a>
+            ))}
+        </div>
+    );
+}
+
 export default async function DFSChallengePage({
     params,
+    searchParams,
 }: {
-    params: Promise<{ id: string }>;
+    params:       Promise<{ id: string }>;
+    searchParams: Promise<{ week?: string }>;
 }) {
     const { id } = await params;
+    const { week: weekParam } = await searchParams;
 
     const session = await auth();
     if (!session?.user?.id) redirect('/sign-in');
@@ -33,10 +60,22 @@ export default async function DFSChallengePage({
 
     if (!league || league.userId !== userId) notFound();
 
-    const { week, season } = await currentNflWeek();
-    const contestSeason    = parseInt(league.season, 10) || season;
+    const { week: currentWeek, season } = await currentNflWeek();
+    const contestSeason = parseInt(league.season, 10) || season;
 
-    // Find or create contest; backfill lockAt if missing
+    // Past weeks' contests/lineups are never deleted — only gated on which
+    // week the page is currently viewing. Clamp so a stale/bad ?week= link
+    // can't request a not-yet-played future week.
+    const requestedWeek = weekParam ? parseInt(weekParam, 10) : currentWeek;
+    const viewWeek = Number.isFinite(requestedWeek)
+        ? Math.min(currentWeek, Math.max(1, requestedWeek))
+        : currentWeek;
+    const isCurrentWeek = viewWeek === currentWeek;
+    const week = viewWeek;
+
+    // Find or create contest — only ever CREATE for the current week; a past
+    // week either already has a real contest or never ran one, and backdating
+    // a placeholder for it would be meaningless.
     let contest = await prisma.dFSContest.findUnique({
         where: {
             platform_externalLeagueId_season_week: {
@@ -48,26 +87,39 @@ export default async function DFSChallengePage({
         },
     });
 
-    if (!contest) {
-        const lockAt = await getWeekLockTime(String(contestSeason), week);
-        contest = await prisma.dFSContest.create({
-            data: {
-                platform:         league.platform,
-                externalLeagueId: league.leagueId,
-                sourceLeagueId:   league.id,
-                season:           contestSeason,
-                week,
-                status:           'OPEN',
-                lockAt,
-            },
-        });
-    } else if (!contest.lockAt) {
-        const lockAt = await getWeekLockTime(String(contestSeason), week);
-        contest = await prisma.dFSContest.update({ where: { id: contest.id }, data: { lockAt } });
+    if (isCurrentWeek) {
+        if (!contest) {
+            const lockAt = await getWeekLockTime(String(contestSeason), week);
+            contest = await prisma.dFSContest.create({
+                data: {
+                    platform:         league.platform,
+                    externalLeagueId: league.leagueId,
+                    sourceLeagueId:   league.id,
+                    season:           contestSeason,
+                    week,
+                    status:           'OPEN',
+                    lockAt,
+                },
+            });
+        } else if (!contest.lockAt) {
+            const lockAt = await getWeekLockTime(String(contestSeason), week);
+            contest = await prisma.dFSContest.update({ where: { id: contest.id }, data: { lockAt } });
+        }
     }
 
-    const now      = new Date();
-    const isLocked = contest.status !== 'OPEN' || (!!contest.lockAt && now >= contest.lockAt);
+    if (!contest) {
+        return (
+            <div className="space-y-6">
+                <WeekNav leagueId={id} currentWeek={currentWeek} viewWeek={viewWeek} />
+                <p className="text-gray-600 text-sm">No DFS contest was run for Week {viewWeek}.</p>
+            </div>
+        );
+    }
+
+    const now = new Date();
+    // A past week is always treated as read-only/locked regardless of its
+    // stored status — you can look back at what happened, not edit history.
+    const isLocked = !isCurrentWeek || contest.status !== 'OPEN' || (!!contest.lockAt && now >= contest.lockAt);
 
     // Per-player game schedule: team → epoch ms of kickoff
     const gameSchedule = await getNflSchedule(String(contestSeason), week);
@@ -137,6 +189,8 @@ export default async function DFSChallengePage({
 
             {/* DFS content */}
             <div className="space-y-8">
+                <WeekNav leagueId={id} currentWeek={currentWeek} viewWeek={viewWeek} />
+
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
                         <h2 className="text-xl font-bold text-white">
@@ -145,19 +199,19 @@ export default async function DFSChallengePage({
                         <p className="text-xs text-gray-500 mt-0.5">{league.leagueName}</p>
                     </div>
                     <div className={`text-xs font-bold px-3 py-1.5 rounded-xl border ${
-                        contest.status === 'OPEN'
-                            ? 'bg-emerald-900/20 text-emerald-400 border-emerald-800'
-                            : contest.status === 'LOCKED'
-                                ? 'bg-amber-900/20 text-amber-400 border-amber-800'
-                                : 'bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/30'
+                        !isCurrentWeek || contest.status === 'FINAL'
+                            ? 'bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/30'
+                            : contest.status === 'OPEN'
+                                ? 'bg-emerald-900/20 text-emerald-400 border-emerald-800'
+                                : 'bg-amber-900/20 text-amber-400 border-amber-800'
                     }`}>
-                        {STATUS_LABELS[contest.status] ?? contest.status}
+                        {isCurrentWeek ? (STATUS_LABELS[contest.status] ?? contest.status) : 'Final'}
                     </div>
                 </div>
 
                 <div className="rounded-xl border border-gray-800 bg-gray-900/50 px-4 py-3 text-xs text-gray-500 leading-relaxed">
                     Free, no prizes. One lineup per week per member. Uses your league&apos;s scoring settings and roster template.
-                    {contest.status !== 'FINAL' && (
+                    {isCurrentWeek && contest.status !== 'FINAL' && (
                         <span className="ml-1">Each player locks individually when their game kicks off — swap freely until then.</span>
                     )}
                 </div>
@@ -166,14 +220,14 @@ export default async function DFSChallengePage({
                     <section className="space-y-3">
                         <h3 className="text-sm font-bold text-white uppercase tracking-wider">
                             {userLineup ? 'Your Lineup' : 'Build Your Lineup'}
-                            {userLineup && contest.status !== 'FINAL' && (
+                            {userLineup && isCurrentWeek && contest.status !== 'FINAL' && (
                                 <span className="ml-2 text-[10px] text-gray-500 font-normal normal-case">
                                     (swap players until their game starts)
                                 </span>
                             )}
                         </h3>
 
-                        {contest.status !== 'FINAL' ? (
+                        {isCurrentWeek && contest.status !== 'FINAL' ? (
                             <div className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
                                 <LineupBuilder
                                     contestId={contest.id}
