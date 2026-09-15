@@ -76,6 +76,32 @@ export function computeRealPoints(
     return points;
 }
 
+// Sleeper's algorithmic weekly projections for IDP (DL/LB/DB) are shallow
+// and slow to reflect real role changes — a new starter, an injury-driven
+// snap-count jump — unlike QB/RB/WR/TE, which have much richer inputs.
+// This is IDP-specific: offensive projections don't get this treatment.
+const IDP_BLEND_WEIGHT_PER_WEEK = 0.2;
+const IDP_BLEND_WEIGHT_MAX      = 0.5;
+
+/**
+ * Blends an IDP player's algorithmic weekly projection with their trailing
+ * real per-game production. Weight scales with how many trailing weeks of
+ * real data exist (20% per week, capped at 50%) so a single fluky game
+ * (a garbage-time pick-six) can never fully override the algorithmic
+ * number, but a real, sustained role change gets real say.
+ */
+export function blendIdpProjectionWithRecentStats(
+    algoProj:          number,
+    trailingWeekStats: Record<string, number>[],
+    scoringSettings:   Record<string, number>,
+): number {
+    if (trailingWeekStats.length === 0) return algoProj;
+    const realPointsPerWeek = trailingWeekStats.map(stats => computeRealPoints(stats, scoringSettings));
+    const trailingAvg = realPointsPerWeek.reduce((s, v) => s + v, 0) / realPointsPerWeek.length;
+    const weight = Math.min(IDP_BLEND_WEIGHT_MAX, IDP_BLEND_WEIGHT_PER_WEEK * trailingWeekStats.length);
+    return algoProj * (1 - weight) + trailingAvg * weight;
+}
+
 /**
  * Blends one season's real per-game production toward the position average,
  * weighted by sample size — a single season (even a full one) is regressed

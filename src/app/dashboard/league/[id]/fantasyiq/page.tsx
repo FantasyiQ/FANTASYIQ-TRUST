@@ -29,7 +29,8 @@ import OptimizedLineups       from './OptimizedLineups';
 import WaiverWireTargets      from './WaiverWireTargets';
 import RosterIntelligencePanel from './RosterIntelligence';
 import HubContent             from './HubContent';
-import { computeRealProjectedPoints, computeRealPoints } from '@/lib/rankings/leagueScoringPoints';
+import { computeRealProjectedPoints, computeRealPoints, blendIdpProjectionWithRecentStats } from '@/lib/rankings/leagueScoringPoints';
+import { toIdpPosition } from '@/lib/rankings/seedProjections';
 
 interface SleeperMatchupFull {
     matchup_id:     number | null;
@@ -160,11 +161,49 @@ export default async function FantasyiQHubPage({ params }: { params: Promise<{ i
             // if they just had a huge real week. Fall back to their real
             // output from the most recently completed week when available.
             const unprojectedRosteredIds = [...allPlayerIds].filter(pid => !projByPlayer.has(pid));
+            const trailingStatsByWeek = new Map<number, Record<string, Record<string, number>>>();
             if (unprojectedRosteredIds.length > 0 && week > 1 && hubScoringSettings) {
                 const priorWeekStats = await getWeekRealStats(season, week - 1);
+                trailingStatsByWeek.set(week - 1, priorWeekStats);
                 for (const pid of unprojectedRosteredIds) {
                     const stats = priorWeekStats[pid];
                     if (stats) projByPlayer.set(pid, computeRealPoints(stats, hubScoringSettings));
+                }
+            }
+
+            // IDP-only: Sleeper's DL/LB/DB projections are shallow and slow to
+            // reflect real role changes, so blend in trailing real production
+            // even when a projection already exists (not just when missing).
+            if (week > 1 && hubScoringSettings) {
+                const positionById = new Map(allPlayers.map(p => [p.playerId, p.position]));
+                // Every player with a projection value right now — rostered or
+                // free agent — so a free-agent IDP breakout shows real value
+                // in Waiver Targets too, not just on your own roster.
+                const idpTargetIds = [...projByPlayer.keys()].filter(
+                    pid => toIdpPosition(positionById.get(pid) ?? '') !== null
+                );
+                if (idpTargetIds.length > 0) {
+                    const TRAILING_WEEKS = 3;
+                    const weeksNeeded = Array.from(
+                        { length: Math.min(TRAILING_WEEKS, week - 1) },
+                        (_, i) => week - 1 - i,
+                    );
+                    await Promise.all(
+                        weeksNeeded
+                            .filter(w => !trailingStatsByWeek.has(w))
+                            .map(async w => trailingStatsByWeek.set(w, await getWeekRealStats(season, w))),
+                    );
+                    for (const pid of idpTargetIds) {
+                        const trailingStats = weeksNeeded
+                            .map(w => trailingStatsByWeek.get(w)?.[pid])
+                            .filter((s): s is Record<string, number> => !!s);
+                        if (trailingStats.length === 0) continue;
+                        const currentProj = projByPlayer.get(pid) ?? 0;
+                        projByPlayer.set(
+                            pid,
+                            blendIdpProjectionWithRecentStats(currentProj, trailingStats, hubScoringSettings),
+                        );
+                    }
                 }
             }
 
