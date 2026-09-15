@@ -3,7 +3,7 @@ export const maxDuration = 60;
 
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { getNflState, getLeagueUsers, getWeekRealStats } from '@/lib/sleeper';
+import { getNflState, getLeagueUsers } from '@/lib/sleeper';
 import {
     assembleTeamProjection,
     buildOpponentDefRankMap,
@@ -16,8 +16,8 @@ import {
     computeModifiers,
     positionVolatility,
     type RosterSlot,
-    type PlayerRecord,
     type PlayerProjectionRow,
+    type TeamProjection,
     type MatchupProjection,
     type TeamLineupOptimization,
     type TeamWaiverAnalysis,
@@ -30,8 +30,7 @@ import OptimizedLineups from '@/app/dashboard/league/[id]/fantasyiq/OptimizedLin
 import WaiverWireTargets from '@/app/dashboard/league/[id]/fantasyiq/WaiverWireTargets';
 import TradeInsights from '@/app/dashboard/league/[id]/fantasyiq/TradeInsights';
 import RosterIntelligencePanel from '@/app/dashboard/league/[id]/fantasyiq/RosterIntelligence';
-import { computeRealProjectedPoints, computeRealPoints, blendIdpProjectionWithRecentStats } from '@/lib/rankings/leagueScoringPoints';
-import { toIdpPosition } from '@/lib/rankings/seedProjections';
+import { buildWeeklyProjections } from '@/lib/rankings/weeklyProjections';
 
 interface SleeperMatchupFull {
     matchup_id:     number | null;
@@ -109,6 +108,7 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
             platform:        true,
             scoringSettings: true,
             faabRemaining:   true,
+            currentMatchup:  true,
         },
     });
 
@@ -174,93 +174,12 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
 
             const publicScoringSettings = league.scoringSettings as Record<string, number> | null;
 
-            const allProjections = await prisma.playerProjection.findMany({
-                where:  { season, week },
-                select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true, rawProjection: true },
+            const { projByPlayer, playerInfo } = await buildWeeklyProjections({
+                season, week,
+                scoringSettings:   publicScoringSettings,
+                scoringType:       league.scoringType,
+                rosteredPlayerIds: allPlayerIds,
             });
-            const allProjectedIds = allProjections.map(p => p.playerId);
-
-            // Every real rostered player needs metadata (position/team/injury),
-            // not just the ones a projection happens to exist for — a missing
-            // projection row (common for backup/emerging IDP players) must
-            // never silently turn a real player into position 'UNK' and
-            // vanish from lineup optimization entirely.
-            const knownPlayerIds = [...new Set([...allPlayerIds, ...allProjectedIds])];
-            const allPlayers = await prisma.sleeperPlayer.findMany({
-                where:  { playerId: { in: knownPlayerIds } },
-                select: { playerId: true, fullName: true, position: true, team: true, injuryStatus: true },
-            });
-
-            const projByPlayer = new Map(allProjections.map(p => [
-                p.playerId,
-                computeRealProjectedPoints(
-                    p.rawProjection as Record<string, number> | null,
-                    publicScoringSettings,
-                    p,
-                    league.scoringType,
-                ),
-            ]));
-
-            // A rostered player with no projection row for this week defaults
-            // to baseProj=0 — worse than literally any projected scrub, even
-            // if they just had a huge real week. Fall back to their real
-            // output from the most recently completed week when available.
-            const unprojectedRosteredIds = [...allPlayerIds].filter(pid => !projByPlayer.has(pid));
-            const trailingStatsByWeek = new Map<number, Record<string, Record<string, number>>>();
-            if (unprojectedRosteredIds.length > 0 && week > 1 && publicScoringSettings) {
-                const priorWeekStats = await getWeekRealStats(season, week - 1);
-                trailingStatsByWeek.set(week - 1, priorWeekStats);
-                for (const pid of unprojectedRosteredIds) {
-                    const stats = priorWeekStats[pid];
-                    if (stats) projByPlayer.set(pid, computeRealPoints(stats, publicScoringSettings));
-                }
-            }
-
-            // IDP-only: Sleeper's DL/LB/DB projections are shallow and slow to
-            // reflect real role changes, so blend in trailing real production
-            // even when a projection already exists (not just when missing).
-            if (week > 1 && publicScoringSettings) {
-                const positionById = new Map(allPlayers.map(p => [p.playerId, p.position]));
-                // Every player with a projection value right now — rostered or
-                // free agent — so a free-agent IDP breakout shows real value
-                // in Waiver Targets too, not just on your own roster.
-                const idpTargetIds = [...projByPlayer.keys()].filter(
-                    pid => toIdpPosition(positionById.get(pid) ?? '') !== null
-                );
-                if (idpTargetIds.length > 0) {
-                    const TRAILING_WEEKS = 3;
-                    const weeksNeeded = Array.from(
-                        { length: Math.min(TRAILING_WEEKS, week - 1) },
-                        (_, i) => week - 1 - i,
-                    );
-                    await Promise.all(
-                        weeksNeeded
-                            .filter(w => !trailingStatsByWeek.has(w))
-                            .map(async w => trailingStatsByWeek.set(w, await getWeekRealStats(season, w))),
-                    );
-                    for (const pid of idpTargetIds) {
-                        const trailingStats = weeksNeeded
-                            .map(w => trailingStatsByWeek.get(w)?.[pid])
-                            .filter((s): s is Record<string, number> => !!s);
-                        if (trailingStats.length === 0) continue;
-                        const currentProj = projByPlayer.get(pid) ?? 0;
-                        projByPlayer.set(
-                            pid,
-                            blendIdpProjectionWithRecentStats(currentProj, trailingStats, publicScoringSettings),
-                        );
-                    }
-                }
-            }
-
-            const playerInfo   = new Map<string, PlayerRecord>(
-                allPlayers.map(p => [p.playerId, {
-                    playerId:     p.playerId,
-                    name:         p.fullName,
-                    position:     p.position,
-                    team:         p.team,
-                    injuryStatus: p.injuryStatus,
-                }])
-            );
 
             const standingsFpts = standings.map(s => ({ rosterId: s.rosterId, fpts: s.fpts ?? 0 }));
             const defRankMap    = buildOpponentDefRankMap(standingsFpts);
@@ -361,8 +280,145 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
             tradeInsights      = computeTradeInsights(allTeams, lineupRules);
             rosterIntelligence = computeRosterIntelligence(allTeams, optimizations, waiverAnalyses, tradeInsights);
         }
+    } else if (league.platform === 'espn') {
+        // ESPN requires per-user session cookies to call live, so — unlike
+        // Sleeper's public API — this reads the cache the sync cron already
+        // refreshes regularly, rather than calling ESPN directly from a page
+        // render. Every roster player carries a pre-resolved sleeperPlayerId
+        // (resolved at sync time), so everything downstream — projections,
+        // the optimizer, IDP blending — is 100% platform-agnostic already.
+        interface EspnStandingPlayer {
+            name: string; position: string; lineupSlot: string; sleeperPlayerId: string | null;
+        }
+        interface EspnStandingTeam {
+            teamId: number; name: string; ownerName: string | null;
+            fpts: number; players: EspnStandingPlayer[];
+        }
+        interface EspnCachedMatchup {
+            homeTeamId: number; awayTeamId: number | null;
+        }
+        interface EspnCurrentMatchup {
+            week: number;
+            matchups: EspnCachedMatchup[];
+        }
+
+        const espnStandings  = (league.standings as EspnStandingTeam[] | null) ?? [];
+        const currentMatchup = league.currentMatchup as EspnCurrentMatchup | null;
+
+        if (!currentMatchup || espnStandings.length === 0) {
+            offSeason = true;
+        } else {
+            week = currentMatchup.week;
+
+            const allPlayerIds = new Set<string>();
+            for (const t of espnStandings) {
+                for (const p of t.players) {
+                    if (p.sleeperPlayerId) allPlayerIds.add(p.sleeperPlayerId);
+                }
+            }
+
+            const publicScoringSettings = league.scoringSettings as Record<string, number> | null;
+
+            const { projByPlayer, playerInfo } = await buildWeeklyProjections({
+                season, week,
+                scoringSettings:   publicScoringSettings,
+                scoringType:       league.scoringType,
+                rosteredPlayerIds: allPlayerIds,
+            });
+
+            const totalTeams     = league.totalRosters;
+            const neutralDefRank = Math.ceil(totalTeams / 2);
+            const standingsFpts  = espnStandings.map(t => ({ rosterId: t.teamId, fpts: t.fpts ?? 0 }));
+            const defRankMap     = buildOpponentDefRankMap(standingsFpts);
+            const teamById       = new Map(espnStandings.map(t => [t.teamId, t]));
+
+            const BENCH_SLOTS = new Set(['BN', 'IR']);
+            const buildEspnTeam = (team: EspnStandingTeam, opponentDefRank: number): TeamProjection => {
+                const resolved = team.players.filter(p => p.sleeperPlayerId);
+                const slot: RosterSlot = {
+                    rosterId: team.teamId,
+                    teamName: team.name,
+                    username: team.ownerName ?? undefined,
+                    avatar:   null,
+                    starters: resolved.filter(p => !BENCH_SLOTS.has(p.lineupSlot)).map(p => p.sleeperPlayerId!),
+                    players:  resolved.map(p => p.sleeperPlayerId!),
+                    livePts:  0,
+                    playerPts: {},
+                };
+                return assembleTeamProjection(slot, projByPlayer, playerInfo, opponentDefRank, totalTeams);
+            };
+
+            // Real opponent defRank from the cached matchup pairing where
+            // available; a bye/unpaired team (or a sync gap) still gets
+            // evaluated with a neutral defRank rather than being dropped.
+            const allTeams: TeamProjection[] = [];
+            const pairedIds = new Set<number>();
+            for (const m of currentMatchup.matchups) {
+                const home = teamById.get(m.homeTeamId);
+                const away = m.awayTeamId !== null ? teamById.get(m.awayTeamId) : undefined;
+                if (home) {
+                    pairedIds.add(home.teamId);
+                    allTeams.push(buildEspnTeam(home, away ? (defRankMap.get(away.teamId) ?? neutralDefRank) : neutralDefRank));
+                }
+                if (away) {
+                    pairedIds.add(away.teamId);
+                    allTeams.push(buildEspnTeam(away, home ? (defRankMap.get(home.teamId) ?? neutralDefRank) : neutralDefRank));
+                }
+            }
+            for (const t of espnStandings) {
+                if (!pairedIds.has(t.teamId)) allTeams.push(buildEspnTeam(t, neutralDefRank));
+            }
+
+            const lineupRules = parseLineupRules(league.rosterPositions as string[]);
+            const freeAgentRows: PlayerProjectionRow[] = [];
+            for (const [pid, proj] of projByPlayer) {
+                if (allPlayerIds.has(pid)) continue;
+                const info = playerInfo.get(pid);
+                if (!info) continue;
+                const mods        = computeModifiers(info.injuryStatus, neutralDefRank, totalTeams);
+                const fiqProj     = Math.round(proj * (1 + mods.total) * 100) / 100;
+                const baseRounded = Math.round(proj * 100) / 100;
+                freeAgentRows.push({
+                    playerId:      pid,
+                    name:          info.name,
+                    position:      info.position,
+                    team:          info.team,
+                    isStarter:     false,
+                    injuryStatus:  info.injuryStatus,
+                    livePts:       0,
+                    baseProj:      baseRounded,
+                    rosProj:       baseRounded,
+                    fantasyIqProj: fiqProj,
+                    projTotal:     fiqProj,
+                    volatility:    positionVolatility(info.position),
+                    modifiers:     mods,
+                });
+            }
+
+            for (const team of allTeams) {
+                optimizations.push({
+                    rosterId: team.rosterId,
+                    teamName: team.teamName,
+                    username: team.username,
+                    result:   optimizeLineup(team.players, lineupRules),
+                });
+                waiverAnalyses.push(
+                    computeWaiverTargets(
+                        team.rosterId,
+                        team.teamName,
+                        team.username,
+                        team.players,
+                        freeAgentRows,
+                        lineupRules,
+                    )
+                );
+            }
+
+            tradeInsights      = computeTradeInsights(allTeams, lineupRules);
+            rosterIntelligence = computeRosterIntelligence(allTeams, optimizations, waiverAnalyses, tradeInsights);
+        }
     } else {
-        offSeason = true; // ESPN not yet supported
+        offSeason = true;
     }
 
     return (

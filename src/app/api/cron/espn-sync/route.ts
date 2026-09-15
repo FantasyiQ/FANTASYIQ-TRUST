@@ -3,6 +3,7 @@ import { getEspnFullSync, normalizeEspnLeague, buildCoreEspnLeagueFields } from 
 import { shouldSkipLeague, withRetry, recordSyncFailure, recordSyncRecovered } from '@/lib/sync-recovery';
 import { captureError } from '@/lib/sentry';
 import { withCronLog } from '@/lib/cron-logger';
+import { buildSleeperNameResolver } from '@/lib/sleeperNameResolver';
 
 export const maxDuration = 300;
 
@@ -30,7 +31,18 @@ export async function GET(request: Request): Promise<Response> {
     
         let synced  = 0;
         let skipped = 0;
-    
+
+        // Resolve each ESPN roster player to their canonical Sleeper playerId
+        // at sync time — same as the manual /api/espn/sync route — so every
+        // downstream read (Rankings, Roster Values, the FantasyIQ Hub) can
+        // use a plain ID lookup instead of re-matching by name. Built once
+        // per cron run, not per league.
+        const sleeperPlayers = await prisma.sleeperPlayer.findMany({
+            where:  { active: true },
+            select: { fullName: true, position: true, playerId: true },
+        });
+        const resolveSleeper = buildSleeperNameResolver(sleeperPlayers);
+
         for (const user of users) {
             if (!user.espnS2 || !user.swid) continue;
     
@@ -55,7 +67,10 @@ export async function GET(request: Request): Promise<Response> {
                                     wins: t.wins, losses: t.losses,
                                     ties: t.ties, fpts: t.pointsFor, fptsAgainst: t.pointsAgainst,
                                     rosterSize: t.roster.length,
-                                    players: t.roster.map(p => ({ name: p.fullName, position: p.position, lineupSlot: p.lineupSlot })),
+                                    players: t.roster.map(p => ({
+                                        name: p.fullName, position: p.position, lineupSlot: p.lineupSlot,
+                                        sleeperPlayerId: resolveSleeper(p.fullName, p.position)?.playerId ?? null,
+                                    })),
                                 })),
                                 currentMatchup: currentWeekMatchups.length > 0
                                     ? JSON.parse(JSON.stringify({ week: data.currentWeek, matchups: currentWeekMatchups }))
