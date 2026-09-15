@@ -243,8 +243,8 @@ export function PowerRankingsTable({ rankings, preseason, lastSeasonRankings }: 
                                 <div className="text-gray-600 text-xs">{r.teamName}</div>
                             </td>
                             <td className="px-3 py-2.5 text-right text-gray-300">{r.wins}–{r.losses}</td>
-                            <td className="px-3 py-2.5 text-right text-gray-400">{(r.pf ?? 0).toFixed(1)}</td>
-                            <td className="px-3 py-2.5 text-right text-gray-500">{(r.pa ?? 0).toFixed(1)}</td>
+                            <td className="px-3 py-2.5 text-right text-gray-400">{(r.pf ?? 0).toFixed(2)}</td>
+                            <td className="px-3 py-2.5 text-right text-gray-500">{(r.pa ?? 0).toFixed(2)}</td>
                             <td className="px-4 py-2.5 text-right font-bold text-white">{r.powerScore}</td>
                         </tr>
                     ))}

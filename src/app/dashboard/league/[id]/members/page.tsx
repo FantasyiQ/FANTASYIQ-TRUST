@@ -112,7 +112,7 @@ async function EspnMembersView({
                             </div>
                             <div className="text-right shrink-0 space-y-0.5">
                                 <Record w={team.wins} l={team.losses} t={team.ties} />
-                                <p className="text-gray-600 text-xs">{team.fpts.toFixed(1)} pts</p>
+                                <p className="text-gray-600 text-xs">{team.fpts.toFixed(2)} pts</p>
                             </div>
                         </div>
                     );
