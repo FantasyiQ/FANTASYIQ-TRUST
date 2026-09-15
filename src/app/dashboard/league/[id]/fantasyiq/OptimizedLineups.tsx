@@ -44,6 +44,10 @@ function SlotLabel({ slot }: { slot: string }) {
         WRRB_FLEX:  'text-teal-400',
         K:          'text-gray-400',
         DEF:        'text-yellow-400',
+        DL:         'text-rose-400',
+        LB:         'text-cyan-400',
+        DB:         'text-lime-400',
+        IDP_FLEX:   'text-fuchsia-400',
     };
     return (
         <span className={`text-[10px] font-bold tracking-wide w-14 shrink-0 ${colors[slot] ?? 'text-gray-500'}`}>

@@ -17,6 +17,8 @@
 //   Weather            — no external API; neutral (0)
 //   Vegas Implied Total — no odds API; neutral (0)
 
+import { toIdpPosition } from './rankings/seedProjections';
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface PlayerModifiers {
@@ -290,6 +292,10 @@ export interface LineupRules {
     WRRB_FLEX:  number;       // WR/RB eligible
     K:          number;
     DEF:        number;
+    DL:         number;       // IDP: DE/DT/NT
+    LB:         number;       // IDP: OLB/ILB/MLB/EDGE
+    DB:         number;       // IDP: CB/S/SS/FS/SAF
+    IDP_FLEX:   number;       // DL/LB/DB eligible
 }
 
 export interface OptimizedSlot {
@@ -315,6 +321,7 @@ export function parseLineupRules(rosterPositions: string[]): LineupRules {
         QB: 0, RB: 0, WR: 0, TE: 0,
         FLEX: 0, SUPER_FLEX: 0, REC_FLEX: 0, WRRB_FLEX: 0,
         K: 0, DEF: 0,
+        DL: 0, LB: 0, DB: 0, IDP_FLEX: 0,
     };
     const SKIP = new Set(['BN', 'IR']);
     for (const pos of rosterPositions) {
@@ -341,12 +348,23 @@ export function optimizeLineup(
             .filter(p => p.position.toUpperCase() === pos)
             .sort((a, b) => b.fantasyIqProj - a.fantasyIqProj);
 
+    // IDP positions come through as the player's real Sleeper position
+    // (CB, S, DE, OLB, ...), not the normalized DL/LB/DB bucket the league's
+    // roster slots use — same normalization the defensive engine relies on.
+    const byIdpPos = (pos: 'DL' | 'LB' | 'DB') =>
+        eligible
+            .filter(p => toIdpPosition(p.position) === pos)
+            .sort((a, b) => b.fantasyIqProj - a.fantasyIqProj);
+
     const QBs  = byPos('QB');
     const RBs  = byPos('RB');
     const WRs  = byPos('WR');
     const TEs  = byPos('TE');
     const Ks   = byPos('K');
     const DEFs = byPos('DEF');
+    const DLs  = byIdpPos('DL');
+    const LBs  = byIdpPos('LB');
+    const DBs  = byIdpPos('DB');
 
     const used  = new Set<string>();
     const slots: OptimizedSlot[] = [];
@@ -374,6 +392,15 @@ export function optimizeLineup(
     take(TEs,  rules.TE,  'TE');
     take(Ks,   rules.K,   'K');
     take(DEFs, rules.DEF, 'DEF');
+    take(DLs,  rules.DL,  'DL');
+    take(LBs,  rules.LB,  'LB');
+    take(DBs,  rules.DB,  'DB');
+
+    // IDP_FLEX: DL/LB/DB
+    const idpFlexPool = [...DLs, ...LBs, ...DBs]
+        .filter(p => !used.has(p.playerId))
+        .sort((a, b) => b.fantasyIqProj - a.fantasyIqProj);
+    take(idpFlexPool, rules.IDP_FLEX, 'IDP_FLEX');
 
     // FLEX: RB/WR/TE
     const flexPool = [...RBs, ...WRs, ...TEs]
