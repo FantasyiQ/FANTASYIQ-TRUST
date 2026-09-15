@@ -250,7 +250,7 @@ function OffSeasonPreview() {
                 against league averages, tracks bench depth, and recommends your best path forward.
             </p>
             <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/30 px-4 py-1.5">
-                <span className="text-[11px] font-bold text-[#D4AF37]">Active Week 1 · September</span>
+                <span className="text-[11px] font-bold text-[#D4AF37]">Updates weekly once your season is live</span>
             </div>
         </div>
     );
