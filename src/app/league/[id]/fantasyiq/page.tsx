@@ -3,7 +3,7 @@ export const maxDuration = 60;
 
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { getNflState, getLeagueUsers } from '@/lib/sleeper';
+import { getNflState, getLeagueUsers, getWeekRealStats } from '@/lib/sleeper';
 import {
     assembleTeamProjection,
     buildOpponentDefRankMap,
@@ -30,7 +30,7 @@ import OptimizedLineups from '@/app/dashboard/league/[id]/fantasyiq/OptimizedLin
 import WaiverWireTargets from '@/app/dashboard/league/[id]/fantasyiq/WaiverWireTargets';
 import TradeInsights from '@/app/dashboard/league/[id]/fantasyiq/TradeInsights';
 import RosterIntelligencePanel from '@/app/dashboard/league/[id]/fantasyiq/RosterIntelligence';
-import { computeRealProjectedPoints } from '@/lib/rankings/leagueScoringPoints';
+import { computeRealProjectedPoints, computeRealPoints } from '@/lib/rankings/leagueScoringPoints';
 
 interface SleeperMatchupFull {
     matchup_id:     number | null;
@@ -178,8 +178,15 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
                 select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true, rawProjection: true },
             });
             const allProjectedIds = allProjections.map(p => p.playerId);
+
+            // Every real rostered player needs metadata (position/team/injury),
+            // not just the ones a projection happens to exist for — a missing
+            // projection row (common for backup/emerging IDP players) must
+            // never silently turn a real player into position 'UNK' and
+            // vanish from lineup optimization entirely.
+            const knownPlayerIds = [...new Set([...allPlayerIds, ...allProjectedIds])];
             const allPlayers = await prisma.sleeperPlayer.findMany({
-                where:  { playerId: { in: allProjectedIds } },
+                where:  { playerId: { in: knownPlayerIds } },
                 select: { playerId: true, fullName: true, position: true, team: true, injuryStatus: true },
             });
 
@@ -192,6 +199,20 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
                     league.scoringType,
                 ),
             ]));
+
+            // A rostered player with no projection row for this week defaults
+            // to baseProj=0 — worse than literally any projected scrub, even
+            // if they just had a huge real week. Fall back to their real
+            // output from the most recently completed week when available.
+            const unprojectedRosteredIds = [...allPlayerIds].filter(pid => !projByPlayer.has(pid));
+            if (unprojectedRosteredIds.length > 0 && week > 1 && publicScoringSettings) {
+                const priorWeekStats = await getWeekRealStats(season, week - 1);
+                for (const pid of unprojectedRosteredIds) {
+                    const stats = priorWeekStats[pid];
+                    if (stats) projByPlayer.set(pid, computeRealPoints(stats, publicScoringSettings));
+                }
+            }
+
             const playerInfo   = new Map<string, PlayerRecord>(
                 allPlayers.map(p => [p.playerId, {
                     playerId:     p.playerId,

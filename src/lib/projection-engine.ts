@@ -343,9 +343,16 @@ export function optimizeLineup(
 ): LineupOptimizationResult {
     const eligible = players.filter(p => p.position !== 'UNK');
 
+    // A player who's Out/IR/PUP can't take the field, no matter what a stale
+    // projection says — excluded from what the optimizer can newly select,
+    // but kept in `eligible` so a currently-started Out/IR/PUP player still
+    // surfaces as a real "bench them" recommendation instead of vanishing.
+    const UNAVAILABLE_STATUS = new Set(['Out', 'IR', 'PUP']);
+    const isSelectable = (p: PlayerProjectionRow) => !UNAVAILABLE_STATUS.has(p.injuryStatus ?? '');
+
     const byPos = (pos: string) =>
         eligible
-            .filter(p => p.position.toUpperCase() === pos)
+            .filter(p => p.position.toUpperCase() === pos && isSelectable(p))
             .sort((a, b) => b.fantasyIqProj - a.fantasyIqProj);
 
     // IDP positions come through as the player's real Sleeper position
@@ -353,7 +360,7 @@ export function optimizeLineup(
     // roster slots use — same normalization the defensive engine relies on.
     const byIdpPos = (pos: 'DL' | 'LB' | 'DB') =>
         eligible
-            .filter(p => toIdpPosition(p.position) === pos)
+            .filter(p => toIdpPosition(p.position) === pos && isSelectable(p))
             .sort((a, b) => b.fantasyIqProj - a.fantasyIqProj);
 
     const QBs  = byPos('QB');

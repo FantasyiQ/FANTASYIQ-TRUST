@@ -4,7 +4,7 @@ export const maxDuration = 60;
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getNflState, getLeagueUsers } from '@/lib/sleeper';
+import { getNflState, getLeagueUsers, getWeekRealStats } from '@/lib/sleeper';
 import {
     assembleTeamProjection,
     buildOpponentDefRankMap,
@@ -29,7 +29,7 @@ import OptimizedLineups       from './OptimizedLineups';
 import WaiverWireTargets      from './WaiverWireTargets';
 import RosterIntelligencePanel from './RosterIntelligence';
 import HubContent             from './HubContent';
-import { computeRealProjectedPoints } from '@/lib/rankings/leagueScoringPoints';
+import { computeRealProjectedPoints, computeRealPoints } from '@/lib/rankings/leagueScoringPoints';
 
 interface SleeperMatchupFull {
     matchup_id:     number | null;
@@ -133,8 +133,15 @@ export default async function FantasyiQHubPage({ params }: { params: Promise<{ i
                 select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true, rawProjection: true },
             });
             const allProjectedIds = allProjections.map(p => p.playerId);
+
+            // Every real rostered player needs metadata (position/team/injury),
+            // not just the ones a projection happens to exist for — a missing
+            // projection row (common for backup/emerging IDP players) must
+            // never silently turn a real player into position 'UNK' and
+            // vanish from lineup optimization entirely.
+            const knownPlayerIds = [...new Set([...allPlayerIds, ...allProjectedIds])];
             const allPlayers = await prisma.sleeperPlayer.findMany({
-                where:  { playerId: { in: allProjectedIds } },
+                where:  { playerId: { in: knownPlayerIds } },
                 select: { playerId: true, fullName: true, position: true, team: true, injuryStatus: true },
             });
 
@@ -147,6 +154,20 @@ export default async function FantasyiQHubPage({ params }: { params: Promise<{ i
                     league.scoringType,
                 ),
             ]));
+
+            // A rostered player with no projection row for this week defaults
+            // to baseProj=0 — worse than literally any projected scrub, even
+            // if they just had a huge real week. Fall back to their real
+            // output from the most recently completed week when available.
+            const unprojectedRosteredIds = [...allPlayerIds].filter(pid => !projByPlayer.has(pid));
+            if (unprojectedRosteredIds.length > 0 && week > 1 && hubScoringSettings) {
+                const priorWeekStats = await getWeekRealStats(season, week - 1);
+                for (const pid of unprojectedRosteredIds) {
+                    const stats = priorWeekStats[pid];
+                    if (stats) projByPlayer.set(pid, computeRealPoints(stats, hubScoringSettings));
+                }
+            }
+
             const playerInfo   = new Map<string, PlayerRecord>(
                 allPlayers.map(p => [p.playerId, {
                     playerId:     p.playerId,
