@@ -385,22 +385,11 @@ export function optimizeLineup(
         }
     }
 
-    // Fixed slots first
+    // Fixed offensive slots first
     take(QBs,  rules.QB,  'QB');
     take(RBs,  rules.RB,  'RB');
     take(WRs,  rules.WR,  'WR');
     take(TEs,  rules.TE,  'TE');
-    take(Ks,   rules.K,   'K');
-    take(DEFs, rules.DEF, 'DEF');
-    take(DLs,  rules.DL,  'DL');
-    take(LBs,  rules.LB,  'LB');
-    take(DBs,  rules.DB,  'DB');
-
-    // IDP_FLEX: DL/LB/DB
-    const idpFlexPool = [...DLs, ...LBs, ...DBs]
-        .filter(p => !used.has(p.playerId))
-        .sort((a, b) => b.fantasyIqProj - a.fantasyIqProj);
-    take(idpFlexPool, rules.IDP_FLEX, 'IDP_FLEX');
 
     // FLEX: RB/WR/TE
     const flexPool = [...RBs, ...WRs, ...TEs]
@@ -425,6 +414,19 @@ export function optimizeLineup(
         .filter(p => !used.has(p.playerId))
         .sort((a, b) => b.fantasyIqProj - a.fantasyIqProj);
     take(wrrbPool, rules.WRRB_FLEX, 'WRRB_FLEX');
+
+    // Then kicker/defense/IDP
+    take(Ks,   rules.K,   'K');
+    take(DEFs, rules.DEF, 'DEF');
+    take(DLs,  rules.DL,  'DL');
+    take(LBs,  rules.LB,  'LB');
+    take(DBs,  rules.DB,  'DB');
+
+    // IDP_FLEX: DL/LB/DB
+    const idpFlexPool = [...DLs, ...LBs, ...DBs]
+        .filter(p => !used.has(p.playerId))
+        .sort((a, b) => b.fantasyIqProj - a.fantasyIqProj);
+    take(idpFlexPool, rules.IDP_FLEX, 'IDP_FLEX');
 
     // Anything not in the optimized lineup
     const remaining = eligible.filter(p => !used.has(p.playerId))
