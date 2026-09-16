@@ -16,7 +16,7 @@ import type { LeaguePhaseResult } from '@/lib/leaguePhase';
 import { getNflState } from '@/lib/sleeper';
 import { buildLeagueConfig } from '@/lib/rankings/leagueConfigBuilder';
 import { buildLeagueDefensiveAndKickerRankings } from '@/lib/rankings/defensiveEngine';
-import { buildIdpSeedProjections, buildKickerSeedProjections, buildDefenseSeedProjections, toIdpPosition } from '@/lib/rankings/seedProjections';
+import { buildIdpSeedProjections, buildKickerSeedProjections, buildDefenseSeedProjections, toIdpPosition, applyRookieDraftCapitalFallback } from '@/lib/rankings/seedProjections';
 import { buildProjectionsFromSleeperStats } from '@/lib/rankings/sleeperStatsAdapter';
 import { calculateAge, isPlausiblyActivePlayer } from '@/lib/calculateAge';
 
@@ -252,6 +252,20 @@ export async function getTradeEvaluatorContent(id: string): Promise<TradeEvaluat
         lineup.starters.IDP > 0 || lineup.starters.K > 0 || lineup.starters.DEF > 0;
 
     if (anyDefensiveSlots) {
+        // FiQ's own scouting data sometimes knows a rookie's real NFL Draft
+        // slot before Sleeper's own draftRound/draftPick/overallPick fields
+        // get backfilled — without this, a legitimately-drafted rookie IDP
+        // (e.g. a real Round 2 pick) reads as an undrafted free agent and
+        // gets valued near replacement level regardless of his real grade.
+        const rookieCapital = await prisma.rookieRankingsPlayer.findMany({
+            where:  { season: process.env.ROOKIE_RANKINGS_SEASON ?? '2026', sleeperPlayerId: { not: null } },
+            select: { sleeperPlayerId: true, overallPick: true },
+        });
+        applyRookieDraftCapitalFallback(
+            allPlayers,
+            new Map(rookieCapital.map(r => [r.sleeperPlayerId!, r.overallPick])),
+        );
+
         // Bucket roster players by their defensive position using the players map.
         const idpPlayers: { playerId: string; position: 'DL' | 'LB' | 'DB' }[] = [];
         const kickerIds:  string[] = [];

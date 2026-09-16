@@ -63,6 +63,34 @@ export function computeDraftCapitalBump(
     return Math.round(interpolate(pickInRound, 1, 32, range[0], range[1]));
 }
 
+/**
+ * FiQ's own scouting data (RookieRankingsPlayer.overallPick, imported from
+ * real 2026 NFL Draft results) sometimes has a rookie's real draft slot
+ * before Sleeper's own SleeperPlayer.draftRound/draftPick/overallPick
+ * fields get backfilled — confirmed live for a real Round 2 pick (Jake
+ * Golday, overall #51) whose SleeperPlayer draft fields were all still
+ * null. Without this, computeDraftCapitalBump() silently treats a real
+ * drafted player as an undrafted free agent ("Tier 8, no bump") purely
+ * because Sleeper hasn't caught up, tanking his defensive-engine value to
+ * near replacement level despite a legitimate scouting grade. Mutates in
+ * place, filling ONLY players missing Sleeper's own draftRound.
+ */
+export function applyRookieDraftCapitalFallback(
+    players: Record<string, { yearsExp?: number | null; draftRound?: number | null; draftPick?: number | null; overallPick?: number | null }>,
+    rookieOverallPickBySleeperId: Map<string, number>,
+): void {
+    for (const [pid, p] of Object.entries(players)) {
+        if (p.yearsExp !== 0 || p.draftRound != null) continue;
+        const overallPick = rookieOverallPickBySleeperId.get(pid);
+        if (overallPick == null) continue;
+        // Same round-size approximation computeDraftCapitalBump's own
+        // comment already accepts ("a round is ~32 picks").
+        p.draftRound  = Math.max(1, Math.ceil(overallPick / 32));
+        p.draftPick   = ((overallPick - 1) % 32) + 1;
+        p.overallPick = overallPick;
+    }
+}
+
 const MIN_POOL = 32;
 
 // ── NFL population averages (17-game full season) ─────────────────────────────

@@ -22,7 +22,7 @@ import { resolveProductionSignals } from '@/lib/rankings/productionSignals';
 import { calculateAge, isPlausiblyActivePlayer } from '@/lib/calculateAge';
 import { buildLeagueConfig } from '@/lib/rankings/leagueConfigBuilder';
 import { buildLeagueDefensiveAndKickerRankings } from '@/lib/rankings/defensiveEngine';
-import { buildIdpSeedProjections, buildKickerSeedProjections, buildDefenseSeedProjections, toIdpPosition, IDP_POSITION_VARIANTS } from '@/lib/rankings/seedProjections';
+import { buildIdpSeedProjections, buildKickerSeedProjections, buildDefenseSeedProjections, toIdpPosition, IDP_POSITION_VARIANTS, applyRookieDraftCapitalFallback } from '@/lib/rankings/seedProjections';
 import { buildProjectionsFromSleeperStats } from '@/lib/rankings/sleeperStatsAdapter';
 import type {
     DraftContext, DraftType, RosterProfile,
@@ -663,6 +663,19 @@ export async function loadDraftContext(params: {
                     if (!isPlausiblyActivePlayer({ team: player.team, age, depthChartOrder: player.depthChartOrder, yearsExp: player.yearsExp })) continue;
                     enginePlayers[pid] = player;
                 }
+
+                // FiQ's own scouting data sometimes knows a rookie's real NFL
+                // Draft slot before Sleeper's own draft fields get backfilled
+                // — without this, a legitimately-drafted rookie IDP reads as
+                // an undrafted free agent and values near replacement level.
+                const rookieCapital = await prisma.rookieRankingsPlayer.findMany({
+                    where:  { season: process.env.ROOKIE_RANKINGS_SEASON ?? '2026', sleeperPlayerId: { not: null } },
+                    select: { sleeperPlayerId: true, overallPick: true },
+                });
+                applyRookieDraftCapitalFallback(
+                    enginePlayers,
+                    new Map(rookieCapital.map(r => [r.sleeperPlayerId!, r.overallPick])),
+                );
 
                 const rawDefScoring = (dbLeague.scoringSettings as Record<string, number> | null) ?? {};
                 const { scoring: defScoring, lineup: defLineup } = buildLeagueConfig(
