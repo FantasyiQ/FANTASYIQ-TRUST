@@ -25,14 +25,15 @@ interface EspnRosterPlayer {
     position: string;
 }
 interface EspnStandingsTeam {
-    teamId:    number;
-    name:      string;
-    ownerName: string | null;
-    wins:      number;
-    losses:    number;
-    ties:      number;
-    fpts:      number;
-    players?:  EspnRosterPlayer[];
+    teamId:      number;
+    name:        string;
+    ownerName:   string | null;
+    wins:        number;
+    losses:      number;
+    ties:        number;
+    fpts:        number;
+    fptsAgainst: number;
+    players?:    EspnRosterPlayer[];
 }
 
 export interface RedraftLeagueRankings {
@@ -127,12 +128,13 @@ export async function getRedraftTeamRankings(leagueDbId: string): Promise<Redraf
         ));
 
         const maxPf = Math.max(...teams.map(t => t.fpts), 1);
+        const maxPa = Math.max(...teams.map(t => t.fptsAgainst ?? 0), 0);
         powerRows = teams
             .map(t => ({
                 rank: 0, rosterId: t.teamId, teamName: t.name || `Team ${t.teamId}`,
                 ownerName: t.ownerName ?? t.name ?? `Team ${t.teamId}`,
-                wins: t.wins, losses: t.losses, pf: t.fpts, pa: 0,
-                powerScore: computePowerScore(t.wins, t.losses, t.fpts, 0, maxPf, 0),
+                wins: t.wins, losses: t.losses, pf: t.fpts, pa: t.fptsAgainst ?? 0,
+                powerScore: computePowerScore(t.wins, t.losses, t.fpts, t.fptsAgainst ?? 0, maxPf, maxPa),
             }))
             .sort((a, b) => b.powerScore - a.powerScore || b.pf - a.pf)
             .map((r, i) => ({ ...r, rank: i + 1 }));
