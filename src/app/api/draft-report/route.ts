@@ -23,7 +23,7 @@ import { buildSleeperNameResolver } from '@/lib/sleeperNameResolver';
 import { IDP_POSITION_VARIANTS, toIdpPosition, buildIdpSeedProjections, buildKickerSeedProjections, buildDefenseSeedProjections } from '@/lib/rankings/seedProjections';
 import { buildLeagueConfig } from '@/lib/rankings/leagueConfigBuilder';
 import { buildLeagueDefensiveAndKickerRankings } from '@/lib/rankings/defensiveEngine';
-import { calculateAge, isPlausiblyActivePlayer } from '@/lib/calculateAge';
+import { calculateAge, calculatePreciseAge, isPlausiblyActivePlayer } from '@/lib/calculateAge';
 
 export const maxDuration = 45;
 
@@ -199,13 +199,13 @@ export async function GET(req: NextRequest): Promise<Response> {
         existingPlayerIds.length > 0
             ? prisma.sleeperPlayer.findMany({
                 where:  { playerId: { in: existingPlayerIds } },
-                select: { playerId: true, position: true, fullName: true, age: true },
+                select: { playerId: true, position: true, fullName: true, age: true, birthDate: true },
             })
             : Promise.resolve([]),
         myPickPlayerIds.length > 0
             ? prisma.sleeperPlayer.findMany({
                 where:  { playerId: { in: myPickPlayerIds } },
-                select: { playerId: true, position: true, fullName: true, age: true },
+                select: { playerId: true, position: true, fullName: true, age: true, birthDate: true },
             })
             : Promise.resolve([]),
     ]);
@@ -377,11 +377,12 @@ export async function GET(req: NextRequest): Promise<Response> {
             const dynastyValue = fc ? (superflex ? fc.dynastyValueSf : fc.dynastyValue) : null;
             const kdefFiq  = kdefFiqById.get(p.playerId);
             return {
-                position:   normalizePosition(p.position),
-                age:        p.age ?? null,
-                fiqScore:   kdefFiq ?? (dynastyValue != null ? Math.min(100, Math.round(dynastyValue / 90)) : 50),
-                rawValue:   dynastyValue ?? 0,
-                playerName: p.fullName ?? null,
+                position:    normalizePosition(p.position),
+                age:         p.age ?? null,
+                preciseAge:  calculatePreciseAge(p.birthDate),
+                fiqScore:    kdefFiq ?? (dynastyValue != null ? Math.min(100, Math.round(dynastyValue / 90)) : 50),
+                rawValue:    dynastyValue ?? 0,
+                playerName:  p.fullName ?? null,
                 isDraftPick: false,
             };
         }),
@@ -391,11 +392,12 @@ export async function GET(req: NextRequest): Promise<Response> {
             const dynastyValue   = fc ? (superflex ? fc.dynastyValueSf : fc.dynastyValue) : null;
             const kdefFiq        = kdefFiqById.get(p.playerId);
             return {
-                position:   normalizePosition(p.position),
-                age:        p.age ?? null,
-                fiqScore:   kdefFiq ?? poolPlayer?.fiqScore ?? 50,
-                rawValue:   dynastyValue ?? (poolPlayer ? poolPlayer.fiqScore * 90 : 0),
-                playerName: p.fullName ?? null,
+                position:    normalizePosition(p.position),
+                age:         p.age ?? null,
+                preciseAge:  calculatePreciseAge(p.birthDate),
+                fiqScore:    kdefFiq ?? poolPlayer?.fiqScore ?? 50,
+                rawValue:    dynastyValue ?? (poolPlayer ? poolPlayer.fiqScore * 90 : 0),
+                playerName:  p.fullName ?? null,
                 isDraftPick: true,
             };
         }),

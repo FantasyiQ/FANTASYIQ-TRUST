@@ -82,6 +82,7 @@ export interface PositionCoreScore {
     position: string;
     grade:    'A' | 'B' | 'C' | 'D' | 'F';
     avgFiq:   number;
+    avgAge:   number | null;   // v3.5: mean of preciseAge across the position group
     count:    number;
     label:    string;
     reason?:  string;   // unified verdict "why" (e.g. "strong starters, thin depth")
@@ -138,6 +139,7 @@ export interface FranchiseState {
     coreStrength:        PositionCoreScore[];
     positionStability:   { stable: string[]; fragile: string[]; critical: string[] };
     ageCurve:            { young: number; prime: number; aging: number };
+    rosterAvgAge:        number | null;   // v3.5: mean preciseAge across the whole roster
     winProbabilityDelta: number;
     dynastyOutlook:      string;
     accomplishments:     string[];   // v3.4 "What You Accomplished" bullets
@@ -478,6 +480,7 @@ function computeLeagueAvgTiers(
 export interface RichRosterPlayer {
     position:    string;
     age:         number | null;
+    preciseAge?: number | null; // v3.5: decimal age (e.g. 26.2) for avg-age display
     fiqScore:    number;
     rawValue?:   number;        // v3.4: dynasty value (for DTV delta)
     playerName?: string | null; // v3.4: for pre-pick positional state lookup
@@ -503,6 +506,10 @@ function computeCoreStrength(
         const group = players.filter(p => normalizePosition(p.position) === pos);
         const count = group.length;
         const avg   = count ? Math.round(group.reduce((s, p) => s + p.fiqScore, 0) / count) : 0;
+        const agesKnown = group.map(p => p.preciseAge ?? p.age).filter((a): a is number => a != null);
+        const avgAge = agesKnown.length > 0
+            ? Math.round((agesKnown.reduce((s, a) => s + a, 0) / agesKnown.length) * 10) / 10
+            : null;
         // Quality from ABSOLUTE FiQ; depth from count vs a depth target.
         const strength: StrengthClass = count === 0 ? 'weak'
             : avg >= CORE_STRONG_FIQ ? 'strong'
@@ -511,7 +518,7 @@ function computeCoreStrength(
         const depth: DepthClass = count === 0 ? 'empty' : count >= target ? 'deep' : 'thin';
         const lab = resolveLabel(depth, strength);
         const cs: PositionCoreScore = {
-            position: pos, grade: labelToGrade(lab), avgFiq: avg, count,
+            position: pos, grade: labelToGrade(lab), avgFiq: avg, avgAge, count,
             label: `${pos} · ${lab}`, reason: coreReason(lab, pos),
         };
         return { cs, lab };
@@ -899,6 +906,15 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
     const positionStability = computePositionStability(rosterRich, coreStrength);
     const ageCurve          = computeAgeCurve(rosterRich);
 
+    // v3.5: whole-roster mean age, decimal precision (e.g. 26.2, not "26") —
+    // every rostered player with a known DOB, not just the skill-position
+    // subset ageCurve buckets (team DEF has no age and is naturally excluded
+    // by the null filter, not a special case).
+    const rosterAges = rosterRich.map(p => p.preciseAge ?? p.age).filter((a): a is number => a != null);
+    const rosterAvgAge = rosterAges.length > 0
+        ? Math.round((rosterAges.reduce((s, a) => s + a, 0) / rosterAges.length) * 10) / 10
+        : null;
+
     // v3.3 trajectory: if engine returns PLATEAU (or no data), override with
     // age-curve rules to guarantee meaningful distribution across the league.
     const rawTrajWindow = (trajectoryData?.window ?? traj) as TrajectoryWindow;
@@ -967,6 +983,7 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
         coreStrength,
         positionStability,
         ageCurve,
+        rosterAvgAge,
         winProbabilityDelta: winProbDelta,
         dynastyOutlook,
         accomplishments,

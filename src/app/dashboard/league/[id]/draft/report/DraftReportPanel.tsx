@@ -527,7 +527,9 @@ export default function DraftReportPanel({
                                         <div key={cs.position} className="text-center">
                                             <p className="text-gray-500 text-xs mb-1">{cs.label}</p>
                                             <p className={`text-2xl font-black ${coreGradeColor(cs.grade)}`}>{cs.grade}</p>
-                                            <p className="text-gray-600 text-[10px]">FiQ {cs.avgFiq} · {cs.count} players</p>
+                                            <p className="text-gray-600 text-[10px]">
+                                                FiQ {cs.avgFiq} · {cs.count} players{cs.avgAge != null && ` · Avg Age ${cs.avgAge.toFixed(1)}`}
+                                            </p>
                                             {cs.reason && <p className="text-gray-500 text-[10px] mt-1 leading-tight">{cs.reason}</p>}
                                         </div>
                                     ))}
@@ -563,7 +565,14 @@ export default function DraftReportPanel({
                                     )}
                                 </div>
                                 <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-2">
-                                    <p className="text-[10px] font-bold tracking-widest text-gray-500 uppercase">Age Curve</p>
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-[10px] font-bold tracking-widest text-gray-500 uppercase">Age Curve</p>
+                                        {f.rosterAvgAge != null && (
+                                            <span className="text-[11px] text-gray-400">
+                                                Roster Avg: <span className="font-bold text-white">{f.rosterAvgAge.toFixed(1)}</span>
+                                            </span>
+                                        )}
+                                    </div>
                                     {[
                                         { label: 'Young Core',  count: f.ageCurve.young, color: 'text-emerald-400' },
                                         { label: 'Prime Core',  count: f.ageCurve.prime, color: 'text-blue-400'    },
