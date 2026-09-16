@@ -270,9 +270,30 @@ function buildIdpEntities(
         // capital reflects long-term upside a backup rookie's current
         // role/production can't show yet. Bump is applied BEFORE the final
         // sort/rank so both stay consistent with each other.
+        const scaledByIdx = group.map((e, i) => (valueScores[i] / 100) * posMax);
+
+        // A rookie's bump can lift him toward the ceiling faster than his
+        // thin real production alone would justify, but it must never let
+        // him outrank the position's actual best PROVEN (non-rookie) player
+        // — posMax alone doesn't guarantee that, since it's a theoretical
+        // demand-based ceiling most real players (even elite ones) don't
+        // reach. Confirmed live: capping at posMax still let two rookies
+        // outrank Brian Branch (a real starting DB) since his own scaled
+        // score sat well below posMax. provenCeiling is the real number to
+        // beat: the best scaled score among players with no bump applied.
+        const provenScaled = group
+            .map((e, i) => ({ bump: e.proj.draftCapitalBump ?? 0, scaled: scaledByIdx[i] }))
+            .filter(x => x.bump <= 0)
+            .map(x => x.scaled);
+        const provenCeiling = provenScaled.length > 0 ? Math.max(...provenScaled) : posMax;
+
         const withBump = group.map((e, i) => {
-            const scaled = (valueScores[i] / 100) * posMax;
-            const bumped = Math.min(100, Math.max(0, scaled + (e.proj.draftCapitalBump ?? 0)));
+            const scaled = scaledByIdx[i];
+            const bump   = e.proj.draftCapitalBump ?? 0;
+            // Never cap a rookie below his own raw scaled score — only the
+            // bump's ability to push him past proven players is limited.
+            const ceiling = bump > 0 ? Math.max(scaled, provenCeiling) : posMax;
+            const bumped  = Math.min(ceiling, Math.max(0, scaled + bump));
             return { ...e, valueScore: bumped };
         });
 
@@ -337,12 +358,24 @@ function buildKickerEntities(
     });
     const valueScores = normalizeToValueScore(intermediates.map(i => i.rawValue));
 
-    // Rookie draft-capital bump applied before the final sort/rank (see
-    // buildIdpEntities above) so both stay consistent with each other.
+    // Rookie draft-capital bump applied before the final sort/rank, capped
+    // against the best PROVEN (non-rookie) kicker's actual score rather than
+    // the flat K_MAX ceiling — see buildIdpEntities' provenCeiling comment
+    // for why that distinction matters.
+    const K_MAX = 45;
+    const scaledByIdx = projections.map((p, idx) => (valueScores[idx] / 100) * K_MAX);
+    const provenScaledK = projections
+        .map((p, idx) => ({ bump: p.draftCapitalBump ?? 0, scaled: scaledByIdx[idx] }))
+        .filter(x => x.bump <= 0)
+        .map(x => x.scaled);
+    const provenCeilingK = provenScaledK.length > 0 ? Math.max(...provenScaledK) : K_MAX;
+
     const combined = projections
         .map((p, idx) => {
-            const scaled = (valueScores[idx] / 100) * 45; // K max 45
-            const bumped = Math.min(100, Math.max(0, scaled + (p.draftCapitalBump ?? 0)));
+            const scaled  = scaledByIdx[idx];
+            const bump    = p.draftCapitalBump ?? 0;
+            const ceiling = bump > 0 ? Math.max(scaled, provenCeilingK) : K_MAX;
+            const bumped  = Math.min(ceiling, Math.max(0, scaled + bump));
             return { p, inter: intermediates[idx], valueScore: bumped };
         })
         .sort((a, b) => b.valueScore - a.valueScore);
