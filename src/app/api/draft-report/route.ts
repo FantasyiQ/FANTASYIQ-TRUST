@@ -19,6 +19,7 @@ import { getLeagueContext } from '@/lib/trajectory/contextLoader';
 import { computeTeamTrajectoryForLeague } from '@/lib/trajectory/teamTrajectory';
 import type { LeaguePhaseResult } from '@/lib/leaguePhase';
 import { buildSleeperNameResolver } from '@/lib/sleeperNameResolver';
+import { IDP_POSITION_VARIANTS } from '@/lib/rankings/seedProjections';
 
 export const maxDuration = 45;
 
@@ -87,8 +88,34 @@ export async function GET(req: NextRequest): Promise<Response> {
         // own rookie names — a name-filtered query silently misses real
         // matches whenever the two sources spell a suffix differently (see
         // buildSleeperNameResolver's header).
+        //
+        // FiQ's own scouting position labels (e.g. "CB") don't always match
+        // Sleeper's canonical IDP bucket (e.g. "DB") for the same real
+        // player — widen via IDP_POSITION_VARIANTS, and always include every
+        // stored sleeperPlayerId directly, so the position filter can never
+        // cause a rookie's already-correct ID to go unfetched and silently
+        // fall through to a same-named unrelated player (a real bug: Chris
+        // Johnson the 2026 rookie CB was missed and either dropped or
+        // resolved to the retired RB/an unrelated DB of the same name).
+        const rookiePositions = [...new Set(rookies.map(r => r.position))];
+        const widenedPositions = new Set(rookiePositions);
+        for (const pos of rookiePositions) {
+            for (const [bucket, variants] of Object.entries(IDP_POSITION_VARIANTS)) {
+                if ((variants as string[]).includes(pos)) {
+                    widenedPositions.add(bucket);
+                    for (const v of variants) widenedPositions.add(v);
+                }
+            }
+        }
+        const storedRookieSleeperIds = rookies.map(r => r.sleeperPlayerId).filter((v): v is string => !!v);
+
         const sleeperPlayers = await prisma.sleeperPlayer.findMany({
-            where:  { position: { in: [...new Set(rookies.map(r => r.position))] } },
+            where: {
+                OR: [
+                    { position: { in: [...widenedPositions] } },
+                    { playerId: { in: storedRookieSleeperIds } },
+                ],
+            },
             select: { fullName: true, playerId: true, team: true, age: true, position: true },
         });
         const spResolver = buildSleeperNameResolver(sleeperPlayers);
