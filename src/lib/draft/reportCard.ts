@@ -907,10 +907,21 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
         trajectoryData?.overallScore ?? null,
     );
 
-    // v3.4: "What You Accomplished" bullets
+    // v3.5: "What You Accomplished" bullets — last remaining spot still using
+    // "T1/T2" tier codes after the pick note/badge cleanup. Reuses the same
+    // pickEquivalentLabel() vocabulary as the rest of the report instead of
+    // introducing a second, inconsistent way to describe the same players.
     const accomplishments: string[] = [];
-    const eliteAdded = picks.filter(p => p.tier <= 2).length;
-    if (eliteAdded > 0)       accomplishments.push(`Added ${eliteAdded} T${eliteAdded === 1 && picks.find(p => p.tier === 1) ? '1' : '1/T2'} playmaker${eliteAdded > 1 ? 's' : ''}`);
+    const eliteAdded = picks.filter(p => p.tier <= 2);
+    if (eliteAdded.length > 0) {
+        const eliteRanks = eliteAdded.map(p => p.poolRank).filter((r): r is number => r != null);
+        const bestLabel  = eliteRanks.length > 0 ? pickEquivalentLabel(Math.min(...eliteRanks)) : 'blue-chip';
+        accomplishments.push(
+            eliteAdded.length === 1
+                ? `Added a ${bestLabel} playmaker`
+                : `Added ${eliteAdded.length} blue-chip-caliber playmakers, led by a ${bestLabel}`
+        );
+    }
     const gapsFilled = picks.filter(p => p.needFit >= 4).map(p => p.position);
     const uniqueGaps = [...new Set(gapsFilled)];
     if (uniqueGaps.length > 0) accomplishments.push(`Addressed ${uniqueGaps.join(' and ')} depth`);
