@@ -24,8 +24,24 @@ import type {
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const REGRESSION_WEIGHT  = 0.7;  // individual rate weight
-const MEAN_WEIGHT        = 0.3;  // positional mean weight
+const REGRESSION_WEIGHT  = 0.7;  // individual rate weight, at full sample confidence
+// A 1-game sample was getting the same 0.7 trust as a full season — a real
+// rookie debut (1 sack + a pick-six in his only game) projected to ~17
+// sacks and ~17 INTs for the year, outranking literally every real player
+// at the position. Games-played now scales confidence the same way
+// leagueScoringPoints.ts's blendTowardPositionAverage() already does for
+// offense: 0 games -> fully the positional mean, ramping linearly to full
+// REGRESSION_WEIGHT trust by FULL_SAMPLE_GAMES. Applies to every player,
+// not just rookies — the same fixed-blend flaw can hit a veteran with a
+// fluky small in-season sample too, just less visibly since they don't
+// also get the rookie draft-capital bump stacked on top.
+const FULL_SAMPLE_GAMES  = 4;
+function sampleWeightedBlend(individualRate: number, positionAvg: number, gamesPlayed: number): number {
+    const sampleWeight     = Math.min(1, gamesPlayed / FULL_SAMPLE_GAMES);
+    const individualWeight = REGRESSION_WEIGHT * sampleWeight;
+    const meanWeight       = 1 - individualWeight;
+    return individualWeight * individualRate + meanWeight * positionAvg;
+}
 const ADP_WEIGHT_MIN     = 0.8;
 const ADP_WEIGHT_RANGE   = 0.4;  // max − min = 0.4
 const PROJ_SEASON_GAMES  = 17;
@@ -177,7 +193,7 @@ export function buildIdpProjections(
 
             const adjusted: Record<IdpStatKey, number> = Object.fromEntries(
                 IDP_STAT_KEYS.map(k => {
-                    const smoothed = REGRESSION_WEIGHT * pg[k] + MEAN_WEIGHT * posAvg[k];
+                    const smoothed = sampleWeightedBlend(pg[k], posAvg[k], raw.gamesPlayed);
                     return [k, smoothed * weight * PROJ_SEASON_GAMES];
                 })
             ) as Record<IdpStatKey, number>;
@@ -276,7 +292,7 @@ export function buildKickerProjections(
 
         const adjusted: Record<KickerStatKey, number> = Object.fromEntries(
             KICKER_STAT_KEYS.map(k => {
-                const smoothed = REGRESSION_WEIGHT * pg[k] + MEAN_WEIGHT * posAvg[k];
+                const smoothed = sampleWeightedBlend(pg[k], posAvg[k], raw.gamesPlayed);
                 return [k, smoothed * weight * PROJ_SEASON_GAMES];
             })
         ) as Record<KickerStatKey, number>;
@@ -419,7 +435,7 @@ export function buildDefenseProjections(
 
         const adjusted: Record<DefStatKey, number> = Object.fromEntries(
             DEF_STAT_KEYS.map(k => {
-                const smoothed = REGRESSION_WEIGHT * pg[k] + MEAN_WEIGHT * posAvg[k];
+                const smoothed = sampleWeightedBlend(pg[k], posAvg[k], raw.gamesPlayed);
                 return [k, smoothed * weight * PROJ_SEASON_GAMES];
             })
         ) as Record<DefStatKey, number>;
