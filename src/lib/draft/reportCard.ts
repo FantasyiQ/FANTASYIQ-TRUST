@@ -23,7 +23,7 @@ const LABEL_SEVERITY: Record<NeedsLabel, number> = { Need: 0, Shallow: 1, 'Top-h
 // NOT read "Strength" just because the rest of the league is also mediocre.
 const CORE_STRONG_FIQ = 62;
 const CORE_WEAK_FIQ   = 35;
-const CORE_DEPTH_TARGET: Record<string, number> = { QB: 2, RB: 4, WR: 6, TE: 2 };
+const CORE_DEPTH_TARGET: Record<string, number> = { QB: 2, RB: 4, WR: 6, TE: 2, K: 1, DEF: 1, IDP: 3 };
 
 function coreReason(label: NeedsLabel, pos: string): string {
     switch (label) {
@@ -486,10 +486,20 @@ export interface RichRosterPlayer {
 
 const AGE_YOUNG: Record<string, number> = { QB: 25, RB: 23, WR: 24, TE: 24 };
 const AGE_AGING: Record<string, number> = { QB: 32, RB: 28, WR: 30, TE: 30 };
-const AGE_TARGET: Record<string, number> = { QB: 2, RB: 4, WR: 6, TE: 2 };
+const AGE_TARGET: Record<string, number> = { QB: 2, RB: 4, WR: 6, TE: 2, K: 1, DEF: 1, IDP: 3 };
 
-function computeCoreStrength(players: RichRosterPlayer[]): PositionCoreScore[] {
-    const entries = ['QB', 'RB', 'WR', 'TE'].map(pos => {
+// v3.5: K/DEF/IDP are only added when the caller confirms the league
+// actually rosters that position (via `positions`) — a league without a
+// DEF slot, say, has no business getting a "DEF core strength" card at
+// all. `depthTargetOverrides` lets the caller supply a league-real depth
+// target (e.g. an IDP-heavy league's actual starter count) instead of the
+// generic default.
+function computeCoreStrength(
+    players: RichRosterPlayer[],
+    positions: string[] = ['QB', 'RB', 'WR', 'TE'],
+    depthTargetOverrides: Record<string, number> = {},
+): PositionCoreScore[] {
+    const entries = positions.map(pos => {
         const group = players.filter(p => normalizePosition(p.position) === pos);
         const count = group.length;
         const avg   = count ? Math.round(group.reduce((s, p) => s + p.fiqScore, 0) / count) : 0;
@@ -497,7 +507,7 @@ function computeCoreStrength(players: RichRosterPlayer[]): PositionCoreScore[] {
         const strength: StrengthClass = count === 0 ? 'weak'
             : avg >= CORE_STRONG_FIQ ? 'strong'
             : avg <  CORE_WEAK_FIQ   ? 'weak' : 'average';
-        const target = CORE_DEPTH_TARGET[pos] ?? 2;
+        const target = depthTargetOverrides[pos] ?? CORE_DEPTH_TARGET[pos] ?? 2;
         const depth: DepthClass = count === 0 ? 'empty' : count >= target ? 'deep' : 'thin';
         const lab = resolveLabel(depth, strength);
         const cs: PositionCoreScore = {
@@ -656,6 +666,10 @@ export interface ReportCardInput {
     pool:            PoolPlayer[];     // full draft pool sorted by fiqScore desc (rank = index+1)
     rosterFull:      { position: string }[];
     rosterRich:      RichRosterPlayer[];
+    // Core Strength positions beyond QB/RB/WR/TE (always included) — pass
+    // 'K'/'DEF'/'IDP' only when this specific league actually rosters them.
+    extraCorePositions?:    string[];
+    coreDepthTargetOverrides?: Record<string, number>;
     draftProfile:    DraftProfile;
     totalTeams:      number;
     totalRounds:     number;
@@ -672,6 +686,7 @@ export interface ReportCardInput {
 export function computeReportCard(input: ReportCardInput): DraftReportCard {
     const {
         myPicks, allPicks, pool, rosterFull, rosterRich,
+        extraCorePositions = [], coreDepthTargetOverrides = {},
         draftProfile, totalTeams, totalRounds, trajectoryData,
     } = input;
 
@@ -876,7 +891,11 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
         : null;
 
     // Franchise state
-    const coreStrength      = computeCoreStrength(rosterRich);
+    const coreStrength      = computeCoreStrength(
+        rosterRich,
+        ['QB', 'RB', 'WR', 'TE', ...extraCorePositions],
+        coreDepthTargetOverrides,
+    );
     const positionStability = computePositionStability(rosterRich, coreStrength);
     const ageCurve          = computeAgeCurve(rosterRich);
 

@@ -11,6 +11,7 @@ import {
     getActiveDraftPicks,
     getLeagueRosters,
     resolveDraftType,
+    getPlayers,
 } from '@/lib/sleeper';
 import { normalizePosition, getTier, computeTeamMode } from '@/lib/draft/context';
 import type { DraftProfile, TrajectoryWindow, RosterProfile } from '@/lib/draft/context';
@@ -19,7 +20,10 @@ import { getLeagueContext } from '@/lib/trajectory/contextLoader';
 import { computeTeamTrajectoryForLeague } from '@/lib/trajectory/teamTrajectory';
 import type { LeaguePhaseResult } from '@/lib/leaguePhase';
 import { buildSleeperNameResolver } from '@/lib/sleeperNameResolver';
-import { IDP_POSITION_VARIANTS } from '@/lib/rankings/seedProjections';
+import { IDP_POSITION_VARIANTS, toIdpPosition, buildIdpSeedProjections, buildKickerSeedProjections, buildDefenseSeedProjections } from '@/lib/rankings/seedProjections';
+import { buildLeagueConfig } from '@/lib/rankings/leagueConfigBuilder';
+import { buildLeagueDefensiveAndKickerRankings } from '@/lib/rankings/defensiveEngine';
+import { calculateAge, isPlausiblyActivePlayer } from '@/lib/calculateAge';
 
 export const maxDuration = 45;
 
@@ -38,7 +42,7 @@ export async function GET(req: NextRequest): Promise<Response> {
 
     const league = await prisma.league.findUnique({
         where:  { id: leagueId },
-        select: { userId: true, leagueId: true, leagueType: true, rosterPositions: true, scoringType: true, assignedPlanId: true, assignedPlanType: true },
+        select: { userId: true, leagueId: true, leagueType: true, rosterPositions: true, scoringType: true, scoringSettings: true, assignedPlanId: true, assignedPlanType: true, totalRosters: true },
     });
 
     if (!league || league.userId !== session.user.id) {
@@ -301,6 +305,66 @@ export async function GET(req: NextRequest): Promise<Response> {
 
     const draftProfile: DraftProfile = { teamMode, trajectoryWindow, horizonYears, riskTolerance };
 
+    // ── Real K/DEF/IDP valuation (for franchise core strength) ────────────────
+    // FantasyCalc never prices K/DEF/IDP (dynasty trade markets don't cover
+    // them) — rosterRich below is built from FantasyCalcValue, so any real
+    // kicker/defense/IDP on the roster would otherwise fall back to a flat,
+    // meaningless neutral score regardless of who they actually are. Pull
+    // real scores from the same defensive/kicker engine already used on
+    // Rankings, Trade Evaluator, and the Live Draft Assistant — reused as-is,
+    // gated to leagues that actually roster these positions.
+    const IDP_SLOTS = new Set(['DL', 'LB', 'DB', 'IDP_FLEX']);
+    const hasIDP    = rosterPositions.some(pos => IDP_SLOTS.has(pos));
+    const hasKicker = rosterPositions.includes('K');
+    const hasDEF    = rosterPositions.includes('DEF');
+
+    const kdefFiqById = new Map<string, number>();
+    if (hasIDP || hasKicker || hasDEF) {
+        try {
+            const myRosterPlayerIds = new Set([...existingPlayerIds, ...myPickPlayerIds]);
+            const allPlayersRaw = await getPlayers();
+            const enginePlayers: typeof allPlayersRaw = {};
+            for (const [pid, player] of Object.entries(allPlayersRaw)) {
+                const age = calculateAge(player.birthDate) ?? null;
+                if (!isPlausiblyActivePlayer({ team: player.team, age, depthChartOrder: player.depthChartOrder, yearsExp: player.yearsExp })) continue;
+                enginePlayers[pid] = player;
+            }
+
+            const rawDefScoring = (league.scoringSettings as Record<string, number> | null) ?? {};
+            const { scoring: defScoring, lineup: defLineup } = buildLeagueConfig(
+                rawDefScoring, rosterPositions, totalTeams,
+            );
+
+            const idpPlayersForSeed: { playerId: string; position: 'DL' | 'LB' | 'DB' }[] = [];
+            const kickerIdsForSeed:  string[] = [];
+            for (const [pid, player] of Object.entries(enginePlayers)) {
+                const idpPos = toIdpPosition(player.position);
+                if (idpPos) idpPlayersForSeed.push({ playerId: pid, position: idpPos });
+                else if (player.position === 'K') kickerIdsForSeed.push(pid);
+            }
+
+            const idpProjections     = buildIdpSeedProjections(idpPlayersForSeed);
+            const kickerProjections  = buildKickerSeedProjections(kickerIdsForSeed);
+            const defenseProjections = buildDefenseSeedProjections();
+
+            const defRankings = buildLeagueDefensiveAndKickerRankings(
+                defScoring, defLineup, idpProjections, kickerProjections, defenseProjections,
+                isDynasty ? 'Dynasty' : 'Redraft',
+                {},
+            );
+
+            for (const entity of [...defRankings.kickers, ...defRankings.defenses, ...defRankings.idp]) {
+                if (myRosterPlayerIds.has(entity.id)) {
+                    kdefFiqById.set(entity.id, Math.max(1, Math.round(entity.valueScore)));
+                }
+            }
+        } catch (err) {
+            // Non-fatal: core strength falls back to the neutral default for
+            // K/DEF/IDP rather than failing the whole report.
+            captureError(err, { route: 'draft-report', step: 'kdef-valuation', leagueId });
+        }
+    }
+
     // ── Post-draft full roster (for franchise core strength) ─────────────────
     const allRosterIds = [
         ...existingPlayerIds,
@@ -311,10 +375,11 @@ export async function GET(req: NextRequest): Promise<Response> {
         ...existingPlayers.map(p => {
             const fc       = p.fullName ? fcByName.get(p.fullName) : undefined;
             const dynastyValue = fc ? (superflex ? fc.dynastyValueSf : fc.dynastyValue) : null;
+            const kdefFiq  = kdefFiqById.get(p.playerId);
             return {
                 position:   normalizePosition(p.position),
                 age:        p.age ?? null,
-                fiqScore:   dynastyValue != null ? Math.min(100, Math.round(dynastyValue / 90)) : 50,
+                fiqScore:   kdefFiq ?? (dynastyValue != null ? Math.min(100, Math.round(dynastyValue / 90)) : 50),
                 rawValue:   dynastyValue ?? 0,
                 playerName: p.fullName ?? null,
                 isDraftPick: false,
@@ -324,10 +389,11 @@ export async function GET(req: NextRequest): Promise<Response> {
             const poolPlayer = pool.find(pp => pp.sleeperPlayerId === p.playerId);
             const fc         = p.fullName ? fcByName.get(p.fullName) : undefined;
             const dynastyValue   = fc ? (superflex ? fc.dynastyValueSf : fc.dynastyValue) : null;
+            const kdefFiq        = kdefFiqById.get(p.playerId);
             return {
                 position:   normalizePosition(p.position),
                 age:        p.age ?? null,
-                fiqScore:   poolPlayer?.fiqScore ?? 50,
+                fiqScore:   kdefFiq ?? poolPlayer?.fiqScore ?? 50,
                 rawValue:   dynastyValue ?? (poolPlayer ? poolPlayer.fiqScore * 90 : 0),
                 playerName: p.fullName ?? null,
                 isDraftPick: true,
@@ -353,12 +419,27 @@ export async function GET(req: NextRequest): Promise<Response> {
         playerId:    p.player_id,
     }));
 
+    const extraCorePositions: string[] = [
+        ...(hasKicker ? ['K']   : []),
+        ...(hasDEF    ? ['DEF'] : []),
+        ...(hasIDP    ? ['IDP'] : []),
+    ];
+    // Real starter-slot counts for this league, not a generic guess — an
+    // 11-IDP-slot league and a 1-IDP-flex league shouldn't share a depth bar.
+    const coreDepthTargetOverrides: Record<string, number> = {
+        K:   rosterPositions.filter(p => p === 'K').length || 1,
+        DEF: rosterPositions.filter(p => p === 'DEF').length || 1,
+        IDP: rosterPositions.filter(p => IDP_SLOTS.has(p)).length || 1,
+    };
+
     const reportCard = computeReportCard({
         myPicks:      myPickInputs,
         allPicks:     allPickInputs,
         pool,
         rosterFull,
         rosterRich,
+        extraCorePositions,
+        coreDepthTargetOverrides,
         draftProfile,
         totalTeams,
         totalRounds,
