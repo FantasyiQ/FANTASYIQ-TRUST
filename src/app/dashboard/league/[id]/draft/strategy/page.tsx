@@ -16,6 +16,7 @@ import { getLeaguePhaseResult } from '@/lib/leaguePhase';
 import type { LeaguePhaseResult } from '@/lib/leaguePhase';
 import { getLeagueContext } from '@/lib/trajectory/contextLoader';
 import { computeTeamTrajectoryForLeague } from '@/lib/trajectory/teamTrajectory';
+import { IDP_POSITION_VARIANTS } from '@/lib/rankings/seedProjections';
 
 export default async function DraftStrategyPage({
     params,
@@ -128,9 +129,34 @@ export default async function DraftStrategyPage({
     // rookie names — a name-filtered query silently misses real matches
     // whenever the two sources spell a suffix differently, which is also why
     // the stored sleeperPlayerId (below) is preferred over this name match.
+    //
+    // FiQ's own scouting position labels (e.g. "CB") don't always match
+    // Sleeper's canonical IDP bucket (e.g. "DB") for the same real player —
+    // widen via IDP_POSITION_VARIANTS so the position-filtered fetch below
+    // can't silently miss a real IDP player just because the two sources
+    // label the same position differently (this caused a real name-collision
+    // bug: a rookie's correct sleeperPlayerId never got fetched at all, so
+    // the code fell through to name-only matching and grabbed a same-named
+    // veteran/retired player instead).
     const rawPositions = [...new Set(rawPlayers.map(p => p.position))];
+    const widenedPositions = new Set(rawPositions);
+    for (const pos of rawPositions) {
+        for (const [bucket, variants] of Object.entries(IDP_POSITION_VARIANTS)) {
+            if ((variants as string[]).includes(pos)) {
+                widenedPositions.add(bucket);
+                for (const v of variants) widenedPositions.add(v);
+            }
+        }
+    }
+    const storedSleeperIds = rawPlayers.map(p => p.sleeperPlayerId).filter((v): v is string => !!v);
+
     const sleeperPlayers = await prisma.sleeperPlayer.findMany({
-        where:  { position: { in: rawPositions } },
+        where: {
+            OR: [
+                { position: { in: [...widenedPositions] } },
+                { playerId: { in: storedSleeperIds } },
+            ],
+        },
         select: { fullName: true, playerId: true, position: true, team: true, height: true, weight: true, age: true },
     });
 
