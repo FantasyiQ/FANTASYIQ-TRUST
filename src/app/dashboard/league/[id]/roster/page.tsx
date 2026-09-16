@@ -616,6 +616,13 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
     const taxiDtv    = Math.round(rows.filter(r => r.status === 'Taxi').reduce((s, r) => s + r.dtv, 0) * 10) / 10;
     const irDtv      = Math.round(rows.filter(r => r.status === 'IR').reduce((s, r) => s + r.dtv, 0) * 10) / 10;
 
+    // Exact decimal average, e.g. 26.2 and 26.8 -> 26.5, not a rounded whole year.
+    function avgAge(group: RosterRow[]): number | null {
+        const ages = group.map(r => r.age).filter((a): a is number => a != null);
+        return ages.length > 0 ? Math.round((ages.reduce((s, a) => s + a, 0) / ages.length) * 10) / 10 : null;
+    }
+    const rosterAvgAge = avgAge(rows);
+
     // Group rows by position for section headers
     const grouped: { pos: string; rows: RosterRow[] }[] = [];
     for (const row of rows) {
@@ -636,7 +643,7 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
             </div>
 
             {/* Slot summary cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
                 {[
                     { label: 'Starters', used: starterCount, total: slots.starters, color: 'text-[#D4AF37]' },
                     { label: 'Bench',    used: benchCount,   total: slots.bench,    color: 'text-gray-300'  },
@@ -653,6 +660,11 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
                     <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Total DTV</p>
                     <p className="text-2xl font-bold text-white">{totalDtv}</p>
                     <p className="text-gray-600 text-xs mt-0.5">{rows.length} players</p>
+                </div>
+                <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
+                    <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Avg Age</p>
+                    <p className="text-2xl font-bold text-white">{rosterAvgAge != null ? rosterAvgAge.toFixed(1) : '—'}</p>
+                    <p className="text-gray-600 text-xs mt-0.5">whole roster</p>
                 </div>
             </div>
 
@@ -679,7 +691,10 @@ export default async function MyRosterPage({ params }: { params: Promise<{ id: s
                                                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${POS_COLORS[pos] ?? 'bg-gray-800 text-gray-400 border-gray-700'}`}>
                                                     {pos}
                                                 </span>
-                                                <span className="text-gray-500 text-xs">{posRows.length} player{posRows.length !== 1 ? 's' : ''}</span>
+                                                <span className="text-gray-500 text-xs">
+                                                    {posRows.length} player{posRows.length !== 1 ? 's' : ''}
+                                                    {avgAge(posRows) != null && ` · Avg Age ${avgAge(posRows)!.toFixed(1)}`}
+                                                </span>
                                             </div>
                                         </td>
                                     </tr>
