@@ -5,6 +5,7 @@ import { getLeagueById } from '@/lib/db/leagues';
 import { prisma } from '@/lib/prisma';
 import LeagueHeader from '@/components/league/LeagueHeader';
 import LeagueTabs from '@/components/league/LeagueTabs';
+import ScrollToTopOnNavigate from './ScrollToTopOnNavigate';
 
 export default async function LeagueLayout({
     children,
@@ -54,6 +55,7 @@ export default async function LeagueLayout({
 
     return (
         <main className="min-h-screen bg-gray-950 text-white pt-24 pb-16 px-6">
+            <ScrollToTopOnNavigate />
             <div className="flex flex-col gap-6 max-w-5xl mx-auto">
                 <LeagueHeader leagueId={id} />
                 <LeagueTabs leagueId={id} isCommissioner={league.isCommissioner} isDynasty={league.isDynasty} />
