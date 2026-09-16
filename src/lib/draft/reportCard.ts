@@ -57,6 +57,7 @@ export interface PickAlignment {
     bpaFiqAtPick:    number | null;   // fiqScore of best available player at this pick
     vop:             number;          // value over pick slot
     vopFit:          number;          // 0–5, bounded score version of vop — counts toward the grade
+    poolRank:        number | null;   // player's overall rank in this year's full draft pool
     tierFit:         number;          // 0–5
     modeFit:         number;          // 0–5
     trajectoryFit:   number;          // 0–5
@@ -343,6 +344,23 @@ function opportunityFitScore(
     return 2;
 }
 
+// Fans think in draft-round terms ("a 2nd-round talent"), not FiQ's internal
+// 5-bucket tier codes ("T2") — same real prospect, but "ranked 19th, drafted
+// 39th" reads instantly while "T2 pick" requires knowing what a tier means.
+// Boundaries match standard 32-picks-per-round NFL draft convention (the
+// same universal scale scouts use — "a 5th-round grade" — independent of any
+// specific fantasy league's own team count).
+export function pickEquivalentLabel(poolRank: number | null): string {
+    if (poolRank == null) return 'top prospect';
+    if (poolRank <= 5)   return 'top-5 prospect';
+    if (poolRank <= 12)  return 'early 1st-round prospect';
+    if (poolRank <= 32)  return '1st-round prospect';
+    if (poolRank <= 64)  return '2nd-round prospect';
+    if (poolRank <= 96)  return '3rd-round prospect';
+    if (poolRank <= 128) return '4th-round prospect';
+    return 'Day 3 prospect';
+}
+
 // ── Grade note generator v3.3 ─────────────────────────────────────────────────
 //
 // v3.3 rules for BPA note suppression:
@@ -362,6 +380,7 @@ function gradeNote(pick: Omit<PickAlignment, 'gradeNote' | 'grade' | 'prospectId
     const t1Available = pick.bpaTierAtPick === 1 && pick.tier > 1;
     const fiqGap      = pick.bpaFiqAtPick != null ? (pick.bpaFiqAtPick - pick.fiqScore) : null;
     const tightDecision = fiqGap != null && fiqGap <= 10;
+    const label = pickEquivalentLabel(pick.poolRank);
 
     // A clear value steal always leads the note — this is exactly the signal
     // a low mode/trajectory/opportunity fit (common for an uncertain-role
@@ -369,19 +388,20 @@ function gradeNote(pick: Omit<PickAlignment, 'gradeNote' | 'grade' | 'prospectId
     // biggest fact about the pick.
     if (pick.vop >= 20) parts.push(`+${Math.round(pick.vop)} VOP — clear value steal at this slot`);
 
-    // Tier fit messaging
+    // Tier fit messaging — described in draft-round terms fans recognize
+    // ("2nd-round prospect"), not FiQ's internal tier codes ("T2").
     if (tierFit === 5) {
-        parts.push(`Matched BPA at T${pick.tier}`);
+        parts.push(`Matched BPA value for a ${label}`);
     } else if (t1Available) {
         if (tightDecision && modeFit >= 3 && trajectoryFit >= 3) {
             // Close decision — show the note constructively
-            parts.push(`T${pick.tier} pick; T1 was close in value and fits your build`);
+            parts.push(`${label} value; the top prospect on the board was close and this fits your build`);
         } else {
             // T1 exists but doesn't fully fit context — softer framing
-            parts.push(`T${pick.tier} pick that fits your mode and trajectory`);
+            parts.push(`${label} value that fits your mode and trajectory`);
         }
     } else if (tierFit <= 2 && pick.bpaTierAtPick != null && pick.bpaTierAtPick < pick.tier) {
-        parts.push(`T${pick.tier} pick; T${pick.bpaTierAtPick} was available — consider your build direction`);
+        parts.push(`${label} value; a stronger prospect was still on the board — consider your build direction`);
     }
 
     // Positive signals
@@ -390,7 +410,7 @@ function gradeNote(pick: Omit<PickAlignment, 'gradeNote' | 'grade' | 'prospectId
     if (opportunityFit === 2 && pick.opportunityScore != null && pick.opportunityScore >= 70)
         parts.push('High-role profile, but rebuild window prefers ceiling over year-1 role');
     if (trajectoryFit >= 4 && pick.age != null && pick.age <= 23)
-        parts.push(`Age ${pick.age} — young T${pick.tier} aligns with your trajectory`);
+        parts.push(`Age ${pick.age} — a young ${label} aligns with your trajectory`);
     if (needFit >= 4) parts.push(`Strengthens ${pick.position} depth`);
     if (pick.vop > 5 && pick.vop < 20) parts.push(`+${Math.round(pick.vop)} VOP — strong value at this slot`);
 
@@ -716,16 +736,23 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
         const deficit = Math.max(0, (TARGET[pos] ?? 0) - (preDraftCounts[pos] ?? 0));
         const fills   = deficit > 0;
 
-        // VOP — blends class-adjusted tier value with pool ADP delta (30%)
-        const expectedVal  = 90 - (mp.pickOverall / totalPicksInDraft) * 50;
-        const tierVal      = TIER_VALUES[player.tier] ?? 40;
-        const tierVop      = tierVal - expectedVal;
-        const poolRank     = poolRankBySlId.get(mp.sleeperPlayerId);
-        const poolADPDelta = poolRank != null ? mp.pickOverall - poolRank : null;
-        const vop          = Math.round(
-            poolADPDelta != null
-                ? 0.7 * tierVop + 0.3 * poolADPDelta
-                : tierVop
+        // v3.5: VOP is now the player's precise overall-rank delta from his
+        // actual pick slot (pickOverall - poolRank) — "ranked 19th, taken
+        // 39th" = +20 VOP, the exact fan-legible signal a value pick is
+        // measured by. This used to be a 70/30 blend favoring a coarse
+        // 5-bucket tier-value-vs-expected-pick-value estimate, which could
+        // show NEGATIVE value for an elite-class Tier 2 player taken early
+        // (the discretized tier value doesn't distinguish rank 16 from rank
+        // 32), completely burying a real, precise value edge. Falls back to
+        // the tier-based estimate only on the rare player missing a pool
+        // rank (shouldn't normally happen — every pooled player has one).
+        const poolRank    = poolRankBySlId.get(mp.sleeperPlayerId);
+        const expectedVal = 90 - (mp.pickOverall / totalPicksInDraft) * 50;
+        const tierVal     = TIER_VALUES[player.tier] ?? 40;
+        const vop         = Math.round(
+            poolRank != null
+                ? mp.pickOverall - poolRank
+                : tierVal - expectedVal
         );
 
         // Alignment components
@@ -753,6 +780,7 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
             bpaFiqAtPick,
             vop,
             vopFit:          vf,
+            poolRank:        poolRank ?? null,
             tierFit:         tf,
             modeFit:         mf,
             trajectoryFit:   trj,

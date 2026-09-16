@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import type { DraftReportCard, PickAlignment, PickGrade, ClassStrength, DraftIdentityLabel } from '@/lib/draft/reportCard';
+import { pickEquivalentLabel } from '@/lib/draft/reportCard';
 
 interface DraftOption {
     draftId: string;
@@ -96,6 +97,20 @@ function tierBadge(tier: number) {
     return 'bg-gray-800 text-gray-500 border-gray-700';
 }
 
+// Fans think in draft-round terms, not FiQ's internal tier codes — same
+// boundaries as pickEquivalentLabel() in reportCard.ts, condensed for a
+// compact badge.
+function pickEquivBadgeLabel(poolRank: number | null) {
+    if (poolRank == null) return '—';
+    if (poolRank <= 5)   return 'Top 5';
+    if (poolRank <= 12)  return 'E1';
+    if (poolRank <= 32)  return '1st';
+    if (poolRank <= 64)  return '2nd';
+    if (poolRank <= 96)  return '3rd';
+    if (poolRank <= 128) return '4th';
+    return 'Day 3';
+}
+
 function scoreBar(value: number, max = 5) {
     const pct = (value / max) * 100;
     const color = value >= 4 ? 'bg-green-500' : value >= 3 ? 'bg-blue-500' : value >= 2 ? 'bg-yellow-500' : 'bg-red-500';
@@ -135,7 +150,12 @@ function PickCard({ pick, idx }: { pick: PickAlignment; idx: number }) {
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${posBadge(pick.position)}`}>{pick.position}</span>
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${tierBadge(pick.tier)}`}>T{pick.tier}</span>
+                            <span
+                                className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${tierBadge(pick.tier)}`}
+                                title={pickEquivalentLabel(pick.poolRank)}
+                            >
+                                {pickEquivBadgeLabel(pick.poolRank)}
+                            </span>
                             <span className="text-white font-semibold text-sm">{pick.playerName}</span>
                             {pick.team && <span className="text-gray-500 text-xs">{pick.team}</span>}
                             {pick.age && <span className="text-gray-600 text-xs">Age {pick.age}</span>}
