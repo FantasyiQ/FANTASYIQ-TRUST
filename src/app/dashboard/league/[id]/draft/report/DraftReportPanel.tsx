@@ -81,6 +81,14 @@ const CLASS_COLOR: Record<ClassStrength, string> = {
     strong:  'text-emerald-400',
 };
 
+// Fans think in draft-round terms, not FiQ's internal tier codes — same
+// vocabulary as pickEquivalentLabel() elsewhere in this report. The five
+// tier buckets already correspond to a round-quality gradient internally
+// (see TIER_VALUES in reportCard.ts), so this is a display-only relabel.
+const TIER_ROUND_LABEL: Record<'T1' | 'T2' | 'T3' | 'T4' | 'T5', string> = {
+    T1: '1st Rd', T2: '2nd Rd', T3: '3rd Rd', T4: '4th Rd', T5: 'Day 3',
+};
+
 const POS_COLORS: Record<string, string> = {
     QB: 'bg-red-900/40 text-red-300 border-red-700/60',
     RB: 'bg-blue-900/40 text-blue-300 border-blue-700/60',
@@ -241,7 +249,7 @@ function PickCard({ pick, idx }: { pick: PickAlignment; idx: number }) {
     );
 }
 
-function TierBar({ label, count, avg, max }: { label: string; count: number; avg: number; max: number }) {
+function TierBar({ tierKey, label, count, avg, max }: { tierKey: string; label: string; count: number; avg: number; max: number }) {
     const pct = max > 0 ? (count / max) * 100 : 0;
     const avgPct = max > 0 ? (avg / max) * 100 : 0;
     const colors: Record<string, string> = {
@@ -249,9 +257,9 @@ function TierBar({ label, count, avg, max }: { label: string; count: number; avg
     };
     return (
         <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-400 w-6 shrink-0">{label}</span>
+            <span className="text-xs text-gray-400 w-16 shrink-0">{label}</span>
             <div className="flex-1 h-2 bg-gray-800 rounded-full relative overflow-visible">
-                <div className={`h-full rounded-full ${colors[label] ?? 'bg-gray-500'}`} style={{ width: `${pct}%` }} />
+                <div className={`h-full rounded-full ${colors[tierKey] ?? 'bg-gray-500'}`} style={{ width: `${pct}%` }} />
                 {/* League avg marker */}
                 <div
                     className="absolute top-1/2 -translate-y-1/2 w-0.5 h-4 bg-gray-500 rounded"
@@ -404,7 +412,7 @@ export default function DraftReportPanel({
                                     )}
                                 </div>
                                 <div className="flex items-center gap-3 mt-1 flex-wrap">
-                                    <span className="text-gray-500 text-xs">Avg alignment: {report.avgScore}/25</span>
+                                    <span className="text-gray-500 text-xs">Avg alignment: {report.avgScore}/30</span>
                                     <span className={`text-xs font-semibold ${report.totalVop >= 0 ? 'text-green-400' : 'text-orange-400'}`}>
                                         Total VOP: {report.totalVop >= 0 ? '+' : ''}{report.totalVop}
                                     </span>
@@ -454,7 +462,8 @@ export default function DraftReportPanel({
                             {(['T1', 'T2', 'T3', 'T4', 'T5'] as const).map(t => (
                                 <TierBar
                                     key={t}
-                                    label={t}
+                                    tierKey={t}
+                                    label={TIER_ROUND_LABEL[t]}
                                     count={report.tierDistribution[t] ?? 0}
                                     avg={report.tierDistribution.leagueAvg[t] ?? 0}
                                     max={tierMax + 0.5}
