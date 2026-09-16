@@ -563,7 +563,7 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
         type EspnPlayer = { name: string; position: string };
         type EspnTeam = {
             teamId: number; name: string;
-            wins: number; losses: number; ties: number; fpts: number;
+            wins: number; losses: number; ties: number; fpts: number; fptsAgainst: number;
             players?: EspnPlayer[];
         };
         const espnTeams = (league.standings as EspnTeam[] | null) ?? [];
@@ -597,6 +597,7 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
 
         const rosterDtvById = new Map(rosterDtvList.map(e => [e.team.teamId, e.totalDtv]));
         const maxPf  = Math.max(...espnTeams.map(t => t.fpts), 1);
+        const maxPa  = Math.max(...espnTeams.map(t => t.fptsAgainst ?? 0), 0);
         const maxDtv = Math.max(...rosterDtvList.map(e => e.totalDtv), 1);
 
         const powerRankings: PowerRankingRow[] = espnTeams
@@ -607,8 +608,8 @@ export async function getLeagueRankings(id: string): Promise<LeagueRankingsData>
                 wins:       team.wins,
                 losses:     team.losses,
                 pf:         team.fpts,
-                pa:         0,
-                powerScore: computePowerScore(team.wins, team.losses, team.fpts, 0, maxPf, 0),
+                pa:         team.fptsAgainst ?? 0,
+                powerScore: computePowerScore(team.wins, team.losses, team.fpts, team.fptsAgainst ?? 0, maxPf, maxPa),
             }))
             .sort((a, b) => b.powerScore - a.powerScore || b.pf - a.pf)
             .map((r, i) => ({ ...r, rank: i + 1 }));
