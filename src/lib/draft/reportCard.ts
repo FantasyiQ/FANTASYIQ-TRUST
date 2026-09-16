@@ -56,12 +56,13 @@ export interface PickAlignment {
     bpaTierAtPick:   number | null;
     bpaFiqAtPick:    number | null;   // fiqScore of best available player at this pick
     vop:             number;          // value over pick slot
+    vopFit:          number;          // 0–5, bounded score version of vop — counts toward the grade
     tierFit:         number;          // 0–5
     modeFit:         number;          // 0–5
     trajectoryFit:   number;          // 0–5
     needFit:         number;          // 0–5
     opportunityFit:  number;          // 0–5
-    totalScore:      number;          // 0–25
+    totalScore:      number;          // 0–30
     grade:           PickGrade;
     gradeNote:       string;
     // v3.4 enrichments
@@ -176,13 +177,14 @@ export interface PoolPlayer {
 
 // ── Grade helpers ─────────────────────────────────────────────────────────────
 
-// v3.3: wider bands, less punitive — makes grades feel fun and readable
+// v3.5: bands rescaled for the added vopFit component (max total 25 -> 30) —
+// same proportions as the v3.3 bands (score/25), just against the new max.
 function gradeFromScore(score: number): PickGrade {
-    if (score >= 22) return 'A+';
-    if (score >= 19) return 'A';
-    if (score >= 16) return 'B';
-    if (score >= 12) return 'C';
-    if (score >= 8)  return 'D';
+    if (score >= 26) return 'A+';
+    if (score >= 23) return 'A';
+    if (score >= 19) return 'B';
+    if (score >= 14) return 'C';
+    if (score >= 9)  return 'D';
     return 'F';
 }
 
@@ -232,6 +234,21 @@ function tierFitScore(playerTier: number, bpaTier: number): number {
     if (gap === 1) return 3;
     if (gap === 2) return 2;
     return 1;
+}
+
+// v3.5: the grade was over-indexed on tier/mode/trajectory/need/opportunity
+// fit and never actually counted VOP (value over pick slot) toward the
+// letter grade itself — only as a footnote sentence. That let a real steal
+// (a Tier 2 / top-40-overall prospect still on the board in round 5) land a
+// mediocre grade just because a low-opportunity IDP profile scored poorly
+// on mode/trajectory fit, even though the pure value of the pick was huge.
+// This turns VOP into a real, bounded (0-5) component of the total score.
+function vopFitScore(vop: number): number {
+    if (vop >= 20) return 5;   // clear steal
+    if (vop >= 10) return 4;
+    if (vop >= 0)  return 3;   // fair value or better for the slot
+    if (vop >= -10) return 2;
+    return 1;                  // notable reach
 }
 
 function modeFitScore(
@@ -339,12 +356,18 @@ function opportunityFitScore(
 
 function gradeNote(pick: Omit<PickAlignment, 'gradeNote' | 'grade' | 'prospectIdentity' | 'rosterContextNote' | 'dtvNote' | 'pickCommentary'>): string {
     const parts: string[] = [];
-    const { tierFit, modeFit, trajectoryFit, needFit, opportunityFit } = pick;
-    const top = Math.max(tierFit, modeFit, trajectoryFit);
+    const { tierFit, modeFit, trajectoryFit, needFit, opportunityFit, vopFit } = pick;
+    const top = Math.max(tierFit, modeFit, trajectoryFit, vopFit);
 
     const t1Available = pick.bpaTierAtPick === 1 && pick.tier > 1;
     const fiqGap      = pick.bpaFiqAtPick != null ? (pick.bpaFiqAtPick - pick.fiqScore) : null;
     const tightDecision = fiqGap != null && fiqGap <= 10;
+
+    // A clear value steal always leads the note — this is exactly the signal
+    // a low mode/trajectory/opportunity fit (common for an uncertain-role
+    // IDP prospect, say) would otherwise bury even though it's the single
+    // biggest fact about the pick.
+    if (pick.vop >= 20) parts.push(`+${Math.round(pick.vop)} VOP — clear value steal at this slot`);
 
     // Tier fit messaging
     if (tierFit === 5) {
@@ -369,7 +392,7 @@ function gradeNote(pick: Omit<PickAlignment, 'gradeNote' | 'grade' | 'prospectId
     if (trajectoryFit >= 4 && pick.age != null && pick.age <= 23)
         parts.push(`Age ${pick.age} — young T${pick.tier} aligns with your trajectory`);
     if (needFit >= 4) parts.push(`Strengthens ${pick.position} depth`);
-    if (pick.vop > 5) parts.push(`+${Math.round(pick.vop)} VOP — strong value at this slot`);
+    if (pick.vop > 5 && pick.vop < 20) parts.push(`+${Math.round(pick.vop)} VOP — strong value at this slot`);
 
     if (parts.length === 0) {
         if (top >= 4) parts.push('Good pick for your build');
@@ -498,7 +521,9 @@ function computeAgeCurve(players: RichRosterPlayer[]): { young: number; prime: n
     return { young, prime, aging };
 }
 
-// v3.3: clamp to [0%, +10%] unless draft was catastrophic (avgScore < 8/25)
+// v3.5: clamp to [0%, +10%] unless draft was catastrophic (avgScore < 9/30 —
+// below the D cutoff, same relationship as the old 8/25 threshold before the
+// vopFit component widened the max total from 25 to 30).
 function computeWinProbDelta(picks: PickAlignment[], totalTeams: number, avgScore: number): number {
     if (picks.length === 0) return 0;
     const totalVop = picks.reduce((s, p) => s + p.vop, 0);
@@ -506,7 +531,7 @@ function computeWinProbDelta(picks: PickAlignment[], totalTeams: number, avgScor
     const raw      = (avgVop / 100) * 20 * (12 / Math.max(8, totalTeams));
     const rounded  = Math.round(raw * 10) / 10;
     // Only allow negative impact if alignment was catastrophic
-    if (avgScore < 8) return rounded;
+    if (avgScore < 9) return rounded;
     return Math.min(10, Math.max(0, rounded));
 }
 
@@ -568,23 +593,25 @@ function generateDynastyOutlook(
 
 // ── Draft Identity v3.3 ───────────────────────────────────────────────────────
 
+// v3.5: thresholds rescaled for the added vopFit component (max avgScore
+// 25 -> 30) — same proportions as before (19/25 -> 23/30, 15/25 -> 18/30).
 function draftIdentity(profile: DraftProfile, avgScore: number, classStrength: ClassStrength): string {
     const mode = resolveEffectiveMode(profile);
     const traj = profile.trajectoryWindow;
 
-    if (mode === 'WIN_NOW' && (traj === 'WIN_NOW' || traj === 'PLATEAU') && avgScore >= 19)
+    if (mode === 'WIN_NOW' && (traj === 'WIN_NOW' || traj === 'PLATEAU') && avgScore >= 23)
         return 'You drafted aggressively for your contention window — the pieces fit.';
-    if (mode === 'WIN_NOW' && avgScore >= 15)
+    if (mode === 'WIN_NOW' && avgScore >= 18)
         return 'You drafted with a WIN‑NOW lean and added immediate contributors.';
-    if (mode === 'REBUILD' && (traj === 'REBUILD' || traj === 'ASCENDING') && avgScore >= 19)
+    if (mode === 'REBUILD' && (traj === 'REBUILD' || traj === 'ASCENDING') && avgScore >= 23)
         return 'You drafted ceiling-first — patience and upside over short-term production.';
-    if (mode === 'REBUILD' && avgScore >= 15)
+    if (mode === 'REBUILD' && avgScore >= 18)
         return 'You prioritized future value and stacked the talent pipeline.';
-    if (avgScore >= 19 && classStrength === 'strong')
+    if (avgScore >= 23 && classStrength === 'strong')
         return 'You navigated a deep class and extracted real value at every slot.';
-    if (avgScore >= 19)
+    if (avgScore >= 23)
         return 'You drafted with sharp alignment — value and need working together.';
-    if (avgScore >= 15)
+    if (avgScore >= 18)
         return 'You built a balanced roster with a clear direction.';
     return 'Your draft addressed multiple needs — a few adjustments would sharpen the alignment.';
 }
@@ -707,7 +734,8 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
         const trj = trajectoryFitScore(player.tier, player.opportunityScore, player.age, traj, draftProfile.horizonYears, fills);
         const nf  = needFitScore(deficit, fills);
         const of_ = opportunityFitScore(player.opportunityScore, traj);
-        const total = tf + mf + trj + nf + of_;
+        const vf  = vopFitScore(vop);
+        const total = tf + mf + trj + nf + of_ + vf;
 
         const alignmentNoNote = {
             pickOverall:     mp.pickOverall,
@@ -724,6 +752,7 @@ export function computeReportCard(input: ReportCardInput): DraftReportCard {
             bpaTierAtPick,
             bpaFiqAtPick,
             vop,
+            vopFit:          vf,
             tierFit:         tf,
             modeFit:         mf,
             trajectoryFit:   trj,

@@ -45,9 +45,11 @@ export function computeDraftStoryline(input: DraftStorylineInput): string {
             ? 'a thin class'
             : 'this class';
 
-    const quality = avgScore >= 19
+    // v3.5: rescaled for the added vopFit component (max avgScore 25 -> 30) —
+    // same proportions as before (19/25 -> 23/30, 15/25 -> 18/30).
+    const quality = avgScore >= 23
         ? 'nearly every pick aligned with your build'
-        : avgScore >= 15
+        : avgScore >= 18
             ? 'most picks hit their mark'
             : 'you still found pieces that open new options going forward';
 

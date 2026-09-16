@@ -117,7 +117,7 @@ function coreGradeColor(grade: string) {
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
 function PickCard({ pick, idx }: { pick: PickAlignment; idx: number }) {
-    const [open, setOpen] = useState(false);
+    const [open, setOpen] = useState(true);
     return (
         <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
             <button
@@ -146,6 +146,13 @@ function PickCard({ pick, idx }: { pick: PickAlignment; idx: number }) {
                     <div className={`shrink-0 text-center px-2.5 py-1 rounded border font-bold text-sm ${GRADE_BG[pick.grade]}`}>
                         {pick.grade}
                     </div>
+                    {/* Expand/collapse arrow */}
+                    <svg
+                        className={`w-4 h-4 text-gray-600 shrink-0 mt-1 transition-transform ${open ? 'rotate-180' : ''}`}
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                    >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
                 </div>
             </button>
 
@@ -178,8 +185,9 @@ function PickCard({ pick, idx }: { pick: PickAlignment; idx: number }) {
                     )}
 
                     {/* Alignment breakdown */}
-                    <div className="grid grid-cols-5 gap-2">
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                         {[
+                            { label: 'Value (VOP)', value: pick.vopFit },
                             { label: 'Tier Fit', value: pick.tierFit },
                             { label: 'Mode Fit', value: pick.modeFit },
                             { label: 'Traj. Fit', value: pick.trajectoryFit },
@@ -440,7 +448,7 @@ export default function DraftReportPanel({
                     {report.picks.length > 0 && (
                         <div className="space-y-3">
                             <p className="text-[10px] font-bold tracking-widest text-gray-500 uppercase">
-                                Pick-by-Pick Alignment — tap to expand
+                                Pick-by-Pick Alignment
                             </p>
                             {report.picks.map((pick, i) => (
                                 <PickCard key={pick.sleeperPlayerId || pick.playerName} pick={pick} idx={i} />
