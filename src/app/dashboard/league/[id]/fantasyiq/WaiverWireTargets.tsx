@@ -40,7 +40,7 @@ function TargetTable({ targets }: { targets: WaiverTarget[] }) {
                     <tr className="border-b border-gray-800 text-gray-600 text-[10px] uppercase tracking-wider">
                         <th className="pb-1.5">#</th>
                         <th className="pb-1.5">Free Agent</th>
-                        <th className="pb-1.5 text-right">FIQ Proj</th>
+                        <th className="pb-1.5 text-right"><span className="normal-case">FiQ</span> Proj</th>
                         <th className="pb-1.5 text-right">Gain</th>
                         <th className="pb-1.5">Replaces</th>
                     </tr>

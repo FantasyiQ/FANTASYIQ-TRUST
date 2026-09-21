@@ -67,7 +67,7 @@ function PlayerTable({ players, scoringType }: { players: PlayerProjectionRow[];
                         <th className="pb-1.5 text-right">Live</th>
                         <th className="pb-1.5 text-right">{label} Proj</th>
                         <th className="pb-1.5 text-right">ROG</th>
-                        <th className="pb-1.5 text-right">FIQ</th>
+                        <th className="pb-1.5 text-right"><span className="normal-case">FiQ</span></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -162,7 +162,7 @@ function TeamCard({
                 <div className="text-3xl font-bold text-white tabular-nums">{pts(team.teamLive)}</div>
                 <div className="text-[11px] text-gray-500 mt-0.5 space-y-0.5">
                     <div>Sleeper proj: <span className="text-gray-300 font-medium">{pts(team.teamProjFinal)}</span></div>
-                    <div>FIQ proj: <span className="text-[#D4AF37] font-semibold">{pts(team.teamProjEnhanced)}</span></div>
+                    <div>FiQ proj: <span className="text-[#D4AF37] font-semibold">{pts(team.teamProjEnhanced)}</span></div>
                 </div>
             </div>
 
@@ -223,7 +223,7 @@ function Legend() {
                 <strong className="text-gray-300">Live</strong> = current fantasy points.{' '}
                 <strong className="text-gray-300">Proj</strong> = Sleeper&apos;s pre-game projection.{' '}
                 <strong className="text-gray-300">ROG</strong> = rest-of-game projection (Proj − Live, floor 0).{' '}
-                <strong className="text-[#D4AF37]">FIQ</strong> = FantasyiQ enhanced projection — applies injury,
+                <strong className="text-[#D4AF37]">FiQ</strong> = FantasyiQ enhanced projection — applies injury,
                 opponent defensive rank, and positional volatility modifiers to the Sleeper baseline.{' '}
                 Win probability is computed via a normal distribution using each team&apos;s positional variance.
             </p>
