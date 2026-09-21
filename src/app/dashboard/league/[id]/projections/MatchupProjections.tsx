@@ -126,6 +126,34 @@ function WinProbBar({ probA, nameA, nameB }: { probA: number; nameA: string; nam
     );
 }
 
+// ── Points-needed-to-win callout ────────────────────────────────────────────────
+
+function PointsNeededBar({ teamA, teamB }: { teamA: TeamProjection; teamB: TeamProjection }) {
+    // Nothing meaningful to say before any starter has actually taken the
+    // field, or when the live score is exactly tied.
+    if (teamA.teamLive === 0 && teamB.teamLive === 0) return null;
+    const diff = teamA.teamLive - teamB.teamLive;
+    if (diff === 0) return null;
+
+    const leading  = diff > 0 ? teamA : teamB;
+    const trailing = diff > 0 ? teamB : teamA;
+    const deficit  = Math.abs(diff);
+
+    return (
+        <div className="rounded-xl bg-gray-900 border border-gray-800 px-4 py-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px]">
+            <span className="text-gray-400">
+                <span className="font-semibold text-white">{trailing.teamName}</span> trails by{' '}
+                <span className="font-mono font-semibold text-red-400">{pts(deficit)}</span>
+            </span>
+            <span className="text-gray-500">
+                {trailing.teamRemaining > 0
+                    ? <>{pts(trailing.teamRemaining)} left on their board · {pts(leading.teamRemaining)} on {leading.teamName}&apos;s</>
+                    : 'No players left to close the gap'}
+            </span>
+        </div>
+    );
+}
+
 // ── Team summary card ─────────────────────────────────────────────────────────
 
 function TeamCard({
@@ -209,6 +237,9 @@ function MatchupCard({ matchup, scoringType }: { matchup: MatchupProjection; sco
                 nameA={matchup.teamA.teamName}
                 nameB={matchup.teamB.teamName}
             />
+
+            {/* Live points-needed-to-win callout */}
+            <PointsNeededBar teamA={matchup.teamA} teamB={matchup.teamB} />
         </div>
     );
 }
@@ -225,7 +256,9 @@ function Legend() {
                 <strong className="text-gray-300">ROG</strong> = rest-of-game projection (Proj − Live, floor 0).{' '}
                 <strong className="text-[#D4AF37]">FiQ</strong> = FantasyiQ enhanced projection — applies injury,
                 opponent defensive rank, and positional volatility modifiers to the Sleeper baseline.{' '}
-                Win probability is computed via a normal distribution using each team&apos;s positional variance.
+                Win probability is computed via a normal distribution using each team&apos;s positional variance.{' '}
+                The trailing-team callout compares live score against real ROG still on each team&apos;s board — it
+                goes to 0 once a player&apos;s actual game is final, so it always reflects what&apos;s genuinely still in play.
             </p>
         </div>
     );

@@ -56,6 +56,7 @@ export interface TeamProjection {
     teamLive:         number;  // SUM(livePts) of starters
     teamProjFinal:    number;  // Sleeper-based projected final (live + ROG)
     teamProjEnhanced: number;  // FantasyiQ projected final (live + enhanced ROG)
+    teamRemaining:    number;  // SUM(rosProj) of starters — real points still live on the board (0 once a player's game is final)
     teamVariance:     number;  // SUM(volatility²) for starters — used in win prob
     startingPlayers:  number;  // count of started players
     players:          PlayerProjectionRow[];
@@ -173,6 +174,12 @@ export function buildTeamProjection(
     // FantasyiQ projected final: same but using enhanced projection
     const teamProjEnhanced = starters.reduce((s, p) => s + p.projTotal, 0);
 
+    // Real points still live on the board — 0 for any starter whose game
+    // has already gone final (rosProj already reflects that), so this is
+    // the honest "how much is left to fight for" number, not a leftover
+    // pre-game guess.
+    const teamRemaining = starters.reduce((s, p) => s + p.rosProj, 0);
+
     // Variance: sum of squared volatility for starters (drives win probability spread)
     const teamVariance = starters.reduce((s, p) => s + p.volatility * p.volatility * Math.max(p.rosProj, p.fantasyIqProj - p.livePts, 0), 0);
 
@@ -184,6 +191,7 @@ export function buildTeamProjection(
         teamLive:         Math.round(teamLive * 100) / 100,
         teamProjFinal:    Math.round(teamProjFinal * 100) / 100,
         teamProjEnhanced: Math.round(teamProjEnhanced * 100) / 100,
+        teamRemaining:    Math.round(teamRemaining * 100) / 100,
         teamVariance,
         startingPlayers:  starters.length,
         players,
