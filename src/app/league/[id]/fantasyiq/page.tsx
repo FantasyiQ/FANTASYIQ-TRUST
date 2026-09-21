@@ -184,6 +184,8 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
             const standingsFpts = standings.map(s => ({ rosterId: s.rosterId, fpts: s.fpts ?? 0 }));
             const defRankMap    = buildOpponentDefRankMap(standingsFpts);
             const totalTeams    = league.totalRosters;
+            const BENCH_SLOTS_SLEEPER = new Set(['BN', 'IR']);
+            const starterSlotArr = ((league.rosterPositions as string[]) ?? []).filter(p => !BENCH_SLOTS_SLEEPER.has(p));
 
             const pairs = new Map<number, SleeperMatchupFull[]>();
             for (const m of rawMatchups) {
@@ -196,16 +198,26 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
                 const [rawA, rawB] = pair;
                 if (!rawA || !rawB) continue;
 
-                const makeSlot = (raw: SleeperMatchupFull): RosterSlot => ({
-                    rosterId:  raw.roster_id,
-                    teamName:  teamDisplayName(raw.roster_id),
-                    username:  teamUsername(raw.roster_id),
-                    avatar:    teamAvatar(raw.roster_id),
-                    starters:  (raw.starters ?? []).filter(pid => pid !== '0'),
-                    players:   raw.players ?? [],
-                    livePts:   raw.custom_points ?? raw.points,
-                    playerPts: raw.players_points ?? {},
-                });
+                const makeSlot = (raw: SleeperMatchupFull): RosterSlot => {
+                    const starterIds: string[] = [];
+                    const starterSlots: string[] = [];
+                    (raw.starters ?? []).forEach((pid, i) => {
+                        if (pid === '0') return;
+                        starterIds.push(pid);
+                        starterSlots.push(starterSlotArr[i] ?? '');
+                    });
+                    return {
+                        rosterId:  raw.roster_id,
+                        teamName:  teamDisplayName(raw.roster_id),
+                        username:  teamUsername(raw.roster_id),
+                        avatar:    teamAvatar(raw.roster_id),
+                        starters:  starterIds,
+                        starterSlots,
+                        players:   raw.players ?? [],
+                        livePts:   raw.custom_points ?? raw.points,
+                        playerPts: raw.players_points ?? {},
+                    };
+                };
 
                 const defRankForA = defRankMap.get(rawB.roster_id) ?? Math.ceil(totalTeams / 2);
                 const defRankForB = defRankMap.get(rawA.roster_id) ?? Math.ceil(totalTeams / 2);
@@ -340,12 +352,14 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
                 for (const p of resolved) {
                     if (p.livePts) playerPts[p.sleeperPlayerId!] = p.livePts;
                 }
+                const startingPlayers = resolved.filter(p => !BENCH_SLOTS.has(p.lineupSlot));
                 const slot: RosterSlot = {
                     rosterId: team.teamId,
                     teamName: team.name,
                     username: team.ownerName ?? undefined,
                     avatar:   null,
-                    starters: resolved.filter(p => !BENCH_SLOTS.has(p.lineupSlot)).map(p => p.sleeperPlayerId!),
+                    starters: startingPlayers.map(p => p.sleeperPlayerId!),
+                    starterSlots: startingPlayers.map(p => p.lineupSlot),
                     players:  resolved.map(p => p.sleeperPlayerId!),
                     livePts:  0,
                     playerPts,

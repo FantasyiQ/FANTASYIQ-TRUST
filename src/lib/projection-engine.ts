@@ -209,6 +209,24 @@ export interface RosterSlot {
     players:      string[];  // all player IDs
     livePts:      number;    // team total (fallback when per-player not available)
     playerPts:    Record<string, number>;  // playerId → live pts
+    // Real starting slot label for each entry in `starters`, same index order
+    // (e.g. 'QB','RB','WR','TE','FLEX','K','DEF','DL','LB','DB','IDP_FLEX').
+    // Optional so existing callers keep working; when present, starters are
+    // displayed in this real slot order (QB, RB, RB, WR, WR, TE, FLEX, K,
+    // DEF/ST — matching how ESPN/Sleeper themselves lay out a lineup)
+    // instead of being reshuffled by projection value.
+    starterSlots?: string[];
+}
+
+// Canonical starting-slot display order, shared by both platforms.
+const SLOT_ORDER: Record<string, number> = {
+    QB: 0, RB: 1, WR: 2, TE: 3,
+    FLEX: 4, WRRB_FLEX: 4, REC_FLEX: 4, SUPER_FLEX: 4,
+    K: 5, DEF: 6,
+    DL: 7, LB: 8, DB: 9, IDP_FLEX: 10,
+};
+function slotRank(label: string | undefined): number {
+    return label !== undefined ? (SLOT_ORDER[label] ?? 99) : 99;
 }
 
 export interface ProjectionRecord {
@@ -241,6 +259,17 @@ export function assembleTeamProjection(
     const starterSet = new Set(slot.starters.filter(id => id !== '0'));
     const allIds     = [...new Set([...slot.starters, ...slot.players])].filter(id => id !== '0');
 
+    // Real slot label per starter, when the caller provided one — falls
+    // back to the player's own position (still gives a sane grouped order,
+    // just without a distinct FLEX bucket) for any caller not yet updated.
+    const slotByPlayer = new Map<string, string>();
+    if (slot.starterSlots) {
+        slot.starters.forEach((pid, i) => {
+            const label = slot.starterSlots![i];
+            if (pid !== '0' && label) slotByPlayer.set(pid, label);
+        });
+    }
+
     const rows: PlayerProjectionRow[] = allIds.map(pid => {
         const info       = playerInfo.get(pid);
         const baseProj   = projByPlayer.get(pid) ?? 0;
@@ -270,9 +299,16 @@ export function assembleTeamProjection(
         };
     });
 
-    // Sort: starters first, then bench; within each group by fantasyIqProj desc
+    // Sort: starters first (by real roster slot order — QB, RB, RB, WR, WR,
+    // TE, FLEX, K, DEF/ST, matching how the platform itself lays out a
+    // lineup), then bench (by fantasyIqProj desc).
     rows.sort((a, b) => {
         if (a.isStarter !== b.isStarter) return a.isStarter ? -1 : 1;
+        if (a.isStarter) {
+            const rankA = slotRank(slotByPlayer.get(a.playerId) ?? a.position);
+            const rankB = slotRank(slotByPlayer.get(b.playerId) ?? b.position);
+            if (rankA !== rankB) return rankA - rankB;
+        }
         return b.fantasyIqProj - a.fantasyIqProj;
     });
 

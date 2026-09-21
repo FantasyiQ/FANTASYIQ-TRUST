@@ -175,7 +175,7 @@ export default async function ProjectionsPage({
     const defRankMap     = buildOpponentDefRankMap(standingsFpts);
     const totalTeams     = league.totalRosters;
     const rosterPositions = (league.rosterPositions as string[]) ?? [];
-    const starterSlotSet  = new Set(rosterPositions.filter(p => !BENCH_SLOTS.has(p)));
+    const starterSlotArr  = rosterPositions.filter(p => !BENCH_SLOTS.has(p));
 
     // ── Group matchup pairs ───────────────────────────────────────────────────
     const pairs = new Map<number, SleeperMatchupFull[]>();
@@ -192,16 +192,26 @@ export default async function ProjectionsPage({
         const [rawA, rawB] = pair;
         if (!rawA || !rawB) continue;
 
-        const makeSlot = (raw: SleeperMatchupFull): RosterSlot => ({
-            rosterId:  raw.roster_id,
-            teamName:  teamDisplayName(raw.roster_id),
-            username:  teamUsername(raw.roster_id),
-            avatar:    teamAvatar(raw.roster_id),
-            starters:  (raw.starters ?? []).filter(pid => pid !== '0'),
-            players:   raw.players  ?? [],
-            livePts:   raw.custom_points ?? raw.points,
-            playerPts: raw.players_points ?? {},
-        });
+        const makeSlot = (raw: SleeperMatchupFull): RosterSlot => {
+            const starterIds: string[] = [];
+            const starterSlots: string[] = [];
+            (raw.starters ?? []).forEach((pid, i) => {
+                if (pid === '0') return;
+                starterIds.push(pid);
+                starterSlots.push(starterSlotArr[i] ?? '');
+            });
+            return {
+                rosterId:  raw.roster_id,
+                teamName:  teamDisplayName(raw.roster_id),
+                username:  teamUsername(raw.roster_id),
+                avatar:    teamAvatar(raw.roster_id),
+                starters:  starterIds,
+                starterSlots,
+                players:   raw.players  ?? [],
+                livePts:   raw.custom_points ?? raw.points,
+                playerPts: raw.players_points ?? {},
+            };
+        };
 
         const slotA = makeSlot(rawA);
         const slotB = makeSlot(rawB);

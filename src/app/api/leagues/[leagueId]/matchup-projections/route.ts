@@ -49,6 +49,7 @@ export async function GET(
             season:         true,
             scoringType:    true,
             totalRosters:   true,
+            rosterPositions: true,
             standings:      true,
             platform:       true,
             assignedPlanId:   true,
@@ -161,6 +162,8 @@ export async function GET(
     const standingsFpts = standings.map(s => ({ rosterId: s.rosterId, fpts: s.fpts ?? 0 }));
     const defRankMap    = buildOpponentDefRankMap(standingsFpts);
     const totalTeams    = league.totalRosters;
+    const BENCH_SLOTS_API = new Set(['BN', 'IR']);
+    const starterSlotArr  = ((league.rosterPositions as string[]) ?? []).filter(p => !BENCH_SLOTS_API.has(p));
 
     // ── 8. Group matchups into pairs ───────────────────────────────────────────
     const pairs = new Map<number, SleeperMatchupFull[]>();
@@ -173,30 +176,32 @@ export async function GET(
     // ── 9. Assemble matchup projections ────────────────────────────────────────
     const matchups: MatchupProjection[] = [];
 
+    function makeSlot(raw: SleeperMatchupFull): RosterSlot {
+        const starterIds: string[] = [];
+        const starterSlots: string[] = [];
+        (raw.starters ?? []).forEach((pid, i) => {
+            if (pid === '0') return;
+            starterIds.push(pid);
+            starterSlots.push(starterSlotArr[i] ?? '');
+        });
+        return {
+            rosterId:   raw.roster_id,
+            teamName:   teamDisplayName(raw.roster_id),
+            username:   teamUsername(raw.roster_id),
+            avatar:     teamAvatar(raw.roster_id),
+            starters:   starterIds,
+            starterSlots,
+            players:    raw.players  ?? [],
+            livePts:    raw.custom_points ?? raw.points,
+            playerPts:  raw.players_points ?? {},
+        };
+    }
+
     for (const [matchupId, [rawA, rawB]] of pairs) {
         if (!rawA || !rawB) continue; // incomplete pair (bye)
 
-        const slotA: RosterSlot = {
-            rosterId:   rawA.roster_id,
-            teamName:   teamDisplayName(rawA.roster_id),
-            username:   teamUsername(rawA.roster_id),
-            avatar:     teamAvatar(rawA.roster_id),
-            starters:   rawA.starters ?? [],
-            players:    rawA.players  ?? [],
-            livePts:    rawA.custom_points ?? rawA.points,
-            playerPts:  rawA.players_points ?? {},
-        };
-
-        const slotB: RosterSlot = {
-            rosterId:   rawB.roster_id,
-            teamName:   teamDisplayName(rawB.roster_id),
-            username:   teamUsername(rawB.roster_id),
-            avatar:     teamAvatar(rawB.roster_id),
-            starters:   rawB.starters ?? [],
-            players:    rawB.players  ?? [],
-            livePts:    rawB.custom_points ?? rawB.points,
-            playerPts:  rawB.players_points ?? {},
-        };
+        const slotA = makeSlot(rawA);
+        const slotB = makeSlot(rawB);
 
         // Opponent def rank: team A plays against team B's defense, and vice versa
         const defRankForA = defRankMap.get(rawB.roster_id) ?? Math.ceil(totalTeams / 2);

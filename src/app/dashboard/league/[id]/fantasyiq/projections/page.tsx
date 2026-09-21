@@ -17,6 +17,7 @@ import {
 import MatchupProjections from '../../projections/MatchupProjections';
 import HubTabBar          from '../HubTabBar';
 import { computeRealProjectedPoints } from '@/lib/rankings/leagueScoringPoints';
+import { buildSleeperNameResolver } from '@/lib/sleeperNameResolver';
 
 interface SleeperMatchupFull {
     matchup_id:     number | null;
@@ -103,56 +104,39 @@ export default async function HubProjectionsPage({
 
                 const BENCH = new Set(['BN', 'IR']);
 
-                type EspnRosterName = { name: string; position: string; livePoints: number };
+                type EspnRosterName = { name: string; position: string; livePoints: number; lineupSlot: string };
                 const teamStarterNames = new Map<number, EspnRosterName[]>();
                 const teamAllNames     = new Map<number, EspnRosterName[]>();
                 const teamInfoMap      = new Map<number, { name: string }>();
 
                 for (const team of espnData.teams) {
-                    teamStarterNames.set(team.teamId, team.roster.filter(p => !BENCH.has(p.lineupSlot)).map(p => ({ name: p.fullName, position: p.position, livePoints: p.livePoints })));
-                    teamAllNames.set(team.teamId,     team.roster.map(p => ({ name: p.fullName, position: p.position, livePoints: p.livePoints })));
+                    teamStarterNames.set(team.teamId, team.roster.filter(p => !BENCH.has(p.lineupSlot)).map(p => ({ name: p.fullName, position: p.position, livePoints: p.livePoints, lineupSlot: p.lineupSlot })));
+                    teamAllNames.set(team.teamId,     team.roster.map(p => ({ name: p.fullName, position: p.position, livePoints: p.livePoints, lineupSlot: p.lineupSlot })));
                     teamInfoMap.set(team.teamId,      { name: team.name });
                 }
 
-                const allNameSet = new Set<string>();
-                for (const entries of teamAllNames.values()) for (const e of entries) allNameSet.add(e.name);
-                const allNames = [...allNameSet];
-
+                // Fetch candidates broadly (all active players) rather than
+                // pre-filtering by ESPN's own name strings — ESPN names team
+                // defenses "<Nickname> D/ST" while Sleeper stores the full
+                // team name ("Baltimore Ravens"), so an exact-name pre-filter
+                // silently drops every DEF before the resolver ever runs.
                 const sleeperRows = await prisma.sleeperPlayer.findMany({
-                    where:  { fullName: { in: allNames } },
+                    where:  { active: true },
                     select: { playerId: true, fullName: true, position: true, team: true, injuryStatus: true },
                 });
-
-                // Some real players share an exact fullName (e.g. two "Justin Jefferson"s —
-                // WR/MIN and LB/CLE). Resolve by name+position first (exact, then lowercase);
-                // only fall back to a bare name match when that name is unambiguous.
-                type SleeperRow = typeof sleeperRows[number];
-                const byNamePos      = new Map<string, SleeperRow>();
-                const byLowerNamePos = new Map<string, SleeperRow>();
-                const byNameCount      = new Map<string, number>();
-                const byName           = new Map<string, SleeperRow>();
-                const byLowerNameCount = new Map<string, number>();
-                const byLowerName      = new Map<string, SleeperRow>();
-                for (const p of sleeperRows) {
-                    const name  = p.fullName ?? '';
-                    const lower = name.toLowerCase();
-                    byNamePos.set(`${name}|${p.position}`, p);
-                    byLowerNamePos.set(`${lower}|${p.position}`, p);
-                    byNameCount.set(name, (byNameCount.get(name) ?? 0) + 1);
-                    byName.set(name, p);
-                    byLowerNameCount.set(lower, (byLowerNameCount.get(lower) ?? 0) + 1);
-                    byLowerName.set(lower, p);
-                }
+                const resolver = buildSleeperNameResolver(sleeperRows);
                 function resolveId(name: string, position: string): string | null {
-                    const lower = name.toLowerCase();
-                    const sp = byNamePos.get(`${name}|${position}`)
-                        ?? byLowerNamePos.get(`${lower}|${position}`)
-                        ?? (byNameCount.get(name) === 1 ? byName.get(name) : undefined)
-                        ?? (byLowerNameCount.get(lower) === 1 ? byLowerName.get(lower) : undefined);
-                    return sp?.playerId ?? null;
+                    return resolver(name, position)?.playerId ?? null;
                 }
 
-                const allMatchedIds = sleeperRows.map(p => p.playerId);
+                const resolvedIdSet = new Set<string>();
+                for (const entries of teamAllNames.values()) {
+                    for (const e of entries) {
+                        const pid = resolveId(e.name, e.position);
+                        if (pid) resolvedIdSet.add(pid);
+                    }
+                }
+                const allMatchedIds = [...resolvedIdSet];
                 const espnScoringSettings = league.scoringSettings as Record<string, number> | null;
 
                 const projs = await prisma.playerProjection.findMany({
@@ -169,11 +153,15 @@ export default async function HubProjectionsPage({
                     ),
                 ]));
 
+                const sleeperById = new Map(sleeperRows.map(p => [p.playerId, p]));
                 const playerInfo = new Map<string, PlayerRecord>(
-                    sleeperRows.map(p => [p.playerId, {
-                        playerId: p.playerId, name: p.fullName,
-                        position: p.position, team: p.team, injuryStatus: p.injuryStatus,
-                    }])
+                    allMatchedIds.map(pid => {
+                        const p = sleeperById.get(pid)!;
+                        return [pid, {
+                            playerId: p.playerId, name: p.fullName,
+                            position: p.position, team: p.team, injuryStatus: p.injuryStatus,
+                        }];
+                    })
                 );
 
                 type EspnStandingEntry = { teamId: number; fpts?: number };
@@ -191,12 +179,21 @@ export default async function HubProjectionsPage({
                         const pid = resolveId(e.name, e.position);
                         if (pid) playerPts[pid] = e.livePoints;
                     }
+                    const starterIds: string[] = [];
+                    const starterSlots: string[] = [];
+                    for (const e of teamStarterNames.get(teamId) ?? []) {
+                        const pid = resolveId(e.name, e.position);
+                        if (!pid) continue;
+                        starterIds.push(pid);
+                        starterSlots.push(e.lineupSlot);
+                    }
                     return {
                         rosterId: teamId,
                         teamName: teamInfoMap.get(teamId)?.name ?? `Team ${teamId}`,
                         username: undefined,
                         avatar:   null,
-                        starters: toIds(teamStarterNames.get(teamId) ?? []),
+                        starters: starterIds,
+                        starterSlots,
                         players:  toIds(allEntries),
                         livePts,
                         playerPts,
@@ -347,8 +344,11 @@ export default async function HubProjectionsPage({
     const defRankMap    = buildOpponentDefRankMap(standingsFpts);
     const totalTeams    = league.totalRosters;
     const rosterPositions = (league.rosterPositions as string[]) ?? [];
-    const starterSlotSet  = new Set(rosterPositions.filter(p => !BENCH_SLOTS.has(p)));
-    void starterSlotSet;
+    // Sleeper's `starters` array is index-aligned with the league's
+    // non-bench roster_positions (that's how Sleeper itself defines a
+    // "starter" slot) — zip them to get each starter's real slot label,
+    // so the roster displays in QB/RB/RB/WR/WR/TE/FLEX/K/DEF order.
+    const starterSlotArr = rosterPositions.filter(p => !BENCH_SLOTS.has(p));
 
     const pairs = new Map<number, SleeperMatchupFull[]>();
     for (const m of rawMatchups) {
@@ -362,16 +362,26 @@ export default async function HubProjectionsPage({
         const [rawA, rawB] = pair;
         if (!rawA || !rawB) continue;
 
-        const makeSlot = (raw: SleeperMatchupFull): RosterSlot => ({
-            rosterId: raw.roster_id,
-            teamName: teamDisplayName(raw.roster_id),
-            username: teamUsername(raw.roster_id),
-            avatar:   teamAvatar(raw.roster_id),
-            starters: (raw.starters ?? []).filter(pid => pid !== '0'),
-            players:  raw.players ?? [],
-            livePts:  raw.custom_points ?? raw.points,
-            playerPts: raw.players_points ?? {},
-        });
+        const makeSlot = (raw: SleeperMatchupFull): RosterSlot => {
+            const starterIds: string[] = [];
+            const starterSlots: string[] = [];
+            (raw.starters ?? []).forEach((pid, i) => {
+                if (pid === '0') return;
+                starterIds.push(pid);
+                starterSlots.push(starterSlotArr[i] ?? '');
+            });
+            return {
+                rosterId: raw.roster_id,
+                teamName: teamDisplayName(raw.roster_id),
+                username: teamUsername(raw.roster_id),
+                avatar:   teamAvatar(raw.roster_id),
+                starters: starterIds,
+                starterSlots,
+                players:  raw.players ?? [],
+                livePts:  raw.custom_points ?? raw.points,
+                playerPts: raw.players_points ?? {},
+            };
+        };
 
         const slotA = makeSlot(rawA);
         const slotB = makeSlot(rawB);
