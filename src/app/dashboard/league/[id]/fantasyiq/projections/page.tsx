@@ -103,14 +103,14 @@ export default async function HubProjectionsPage({
 
                 const BENCH = new Set(['BN', 'IR']);
 
-                type EspnRosterName = { name: string; position: string };
+                type EspnRosterName = { name: string; position: string; livePoints: number };
                 const teamStarterNames = new Map<number, EspnRosterName[]>();
                 const teamAllNames     = new Map<number, EspnRosterName[]>();
                 const teamInfoMap      = new Map<number, { name: string }>();
 
                 for (const team of espnData.teams) {
-                    teamStarterNames.set(team.teamId, team.roster.filter(p => !BENCH.has(p.lineupSlot)).map(p => ({ name: p.fullName, position: p.position })));
-                    teamAllNames.set(team.teamId,     team.roster.map(p => ({ name: p.fullName, position: p.position })));
+                    teamStarterNames.set(team.teamId, team.roster.filter(p => !BENCH.has(p.lineupSlot)).map(p => ({ name: p.fullName, position: p.position, livePoints: p.livePoints })));
+                    teamAllNames.set(team.teamId,     team.roster.map(p => ({ name: p.fullName, position: p.position, livePoints: p.livePoints })));
                     teamInfoMap.set(team.teamId,      { name: team.name });
                 }
 
@@ -184,15 +184,22 @@ export default async function HubProjectionsPage({
 
                 function makeSlot(teamId: number, livePts: number): RosterSlot {
                     const toIds = (entries: EspnRosterName[]) => entries.map(e => resolveId(e.name, e.position)).filter(Boolean) as string[];
+                    const allEntries = teamAllNames.get(teamId) ?? [];
+                    const playerPts: Record<string, number> = {};
+                    for (const e of allEntries) {
+                        if (!e.livePoints) continue;
+                        const pid = resolveId(e.name, e.position);
+                        if (pid) playerPts[pid] = e.livePoints;
+                    }
                     return {
                         rosterId: teamId,
                         teamName: teamInfoMap.get(teamId)?.name ?? `Team ${teamId}`,
                         username: undefined,
                         avatar:   null,
                         starters: toIds(teamStarterNames.get(teamId) ?? []),
-                        players:  toIds(teamAllNames.get(teamId) ?? []),
+                        players:  toIds(allEntries),
                         livePts,
-                        playerPts: {},
+                        playerPts,
                     };
                 }
 
