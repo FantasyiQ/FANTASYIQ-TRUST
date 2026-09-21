@@ -3,7 +3,7 @@ export const maxDuration = 60;
 
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { getNflState, getLeagueUsers } from '@/lib/sleeper';
+import { getNflState, getLeagueUsers, getNflGameCompletion } from '@/lib/sleeper';
 import {
     assembleTeamProjection,
     buildOpponentDefRankMap,
@@ -133,18 +133,21 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
         if (seasonType === 'off' || week === 0) {
             offSeason = true;
         } else {
-            const [rawMatchupsResult, leagueUsersResult] = await Promise.allSettled([
+            const [rawMatchupsResult, leagueUsersResult, gameCompletionResult] = await Promise.allSettled([
                 fetch(
                     `https://api.sleeper.app/v1/league/${league.leagueId}/matchups/${week}`,
                     { cache: 'no-store' },
                 ).then(r => r.ok ? r.json() as Promise<SleeperMatchupFull[]> : Promise.resolve([] as SleeperMatchupFull[])),
                 getLeagueUsers(league.leagueId),
+                getNflGameCompletion(season, week),
             ]);
 
             const rawMatchups: SleeperMatchupFull[] =
                 rawMatchupsResult.status === 'fulfilled' ? rawMatchupsResult.value : [];
             const users =
                 leagueUsersResult.status === 'fulfilled' ? leagueUsersResult.value : [];
+            const gameCompletionByTeam =
+                gameCompletionResult.status === 'fulfilled' ? gameCompletionResult.value : {};
 
             type StandingEntry = { rosterId: number; ownerId?: string | null; teamName?: string; fpts?: number };
             const standings   = (league.standings as StandingEntry[] | null) ?? [];
@@ -222,8 +225,8 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
                 const defRankForA = defRankMap.get(rawB.roster_id) ?? Math.ceil(totalTeams / 2);
                 const defRankForB = defRankMap.get(rawA.roster_id) ?? Math.ceil(totalTeams / 2);
 
-                const teamA = assembleTeamProjection(makeSlot(rawA), projByPlayer, playerInfo, defRankForA, totalTeams);
-                const teamB = assembleTeamProjection(makeSlot(rawB), projByPlayer, playerInfo, defRankForB, totalTeams);
+                const teamA = assembleTeamProjection(makeSlot(rawA), projByPlayer, playerInfo, defRankForA, totalTeams, gameCompletionByTeam);
+                const teamB = assembleTeamProjection(makeSlot(rawB), projByPlayer, playerInfo, defRankForB, totalTeams, gameCompletionByTeam);
 
                 const margin   = teamA.teamProjEnhanced - teamB.teamProjEnhanced;
                 const winProbA = winProbability(margin, teamA.teamVariance, teamB.teamVariance);
@@ -332,12 +335,15 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
 
             const publicScoringSettings = league.scoringSettings as Record<string, number> | null;
 
-            const { projByPlayer, playerInfo } = await buildWeeklyProjections({
-                season, week,
-                scoringSettings:   publicScoringSettings,
-                scoringType:       league.scoringType,
-                rosteredPlayerIds: allPlayerIds,
-            });
+            const [{ projByPlayer, playerInfo }, gameCompletionByTeam] = await Promise.all([
+                buildWeeklyProjections({
+                    season, week,
+                    scoringSettings:   publicScoringSettings,
+                    scoringType:       league.scoringType,
+                    rosteredPlayerIds: allPlayerIds,
+                }),
+                getNflGameCompletion(season, week),
+            ]);
 
             const totalTeams     = league.totalRosters;
             const neutralDefRank = Math.ceil(totalTeams / 2);
@@ -364,7 +370,7 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
                     livePts:  0,
                     playerPts,
                 };
-                return assembleTeamProjection(slot, projByPlayer, playerInfo, opponentDefRank, totalTeams);
+                return assembleTeamProjection(slot, projByPlayer, playerInfo, opponentDefRank, totalTeams, gameCompletionByTeam);
             };
 
             // Real opponent defRank from the cached matchup pairing where

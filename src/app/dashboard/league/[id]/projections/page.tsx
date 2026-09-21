@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import {
     getNflState,
     getLeagueUsers,
+    getNflGameCompletion,
 } from '@/lib/sleeper';
 import {
     assembleTeamProjection,
@@ -136,7 +137,7 @@ export default async function ProjectionsPage({
     // ── Fetch projections + player info ───────────────────────────────────────
     const scoringSettings = league.scoringSettings as Record<string, number> | null;
 
-    const [projections, players] = await Promise.all([
+    const [projections, players, gameCompletionByTeam] = await Promise.all([
         prisma.playerProjection.findMany({
             where: {
                 season,
@@ -149,6 +150,7 @@ export default async function ProjectionsPage({
             where:  { playerId: { in: [...allPlayerIds] } },
             select: { playerId: true, fullName: true, position: true, team: true, injuryStatus: true },
         }),
+        getNflGameCompletion(season, week),
     ]);
 
     const projByPlayer = new Map(projections.map(p => [
@@ -219,8 +221,8 @@ export default async function ProjectionsPage({
         const defRankForA = defRankMap.get(rawB.roster_id) ?? Math.ceil(totalTeams / 2);
         const defRankForB = defRankMap.get(rawA.roster_id) ?? Math.ceil(totalTeams / 2);
 
-        const teamA = assembleTeamProjection(slotA, projByPlayer, playerInfo, defRankForA, totalTeams);
-        const teamB = assembleTeamProjection(slotB, projByPlayer, playerInfo, defRankForB, totalTeams);
+        const teamA = assembleTeamProjection(slotA, projByPlayer, playerInfo, defRankForA, totalTeams, gameCompletionByTeam);
+        const teamB = assembleTeamProjection(slotB, projByPlayer, playerInfo, defRankForB, totalTeams, gameCompletionByTeam);
 
         const margin   = teamA.teamProjEnhanced - teamB.teamProjEnhanced;
         const winProbA = winProbability(margin, teamA.teamVariance, teamB.teamVariance);

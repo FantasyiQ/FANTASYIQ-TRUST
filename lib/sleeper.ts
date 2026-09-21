@@ -140,6 +140,7 @@ interface EspnGame {
     team:      string;   // Sleeper-normalized abbreviation
     opponent:  string;   // Sleeper-normalized abbreviation
     kickoffMs: number;
+    completed: boolean;  // real game-final status (event.status.type.completed)
 }
 
 /**
@@ -159,8 +160,10 @@ async function fetchEspnWeekGames(season: string, week: number): Promise<EspnGam
         const data = await resp.json() as {
             events?: Array<{
                 date?: string;
+                status?: { type?: { completed?: boolean } };
                 competitions?: Array<{
                     competitors?: Array<{ team?: { abbreviation?: string } }>;
+                    status?: { type?: { completed?: boolean } };
                 }>;
             }>;
         };
@@ -168,14 +171,17 @@ async function fetchEspnWeekGames(season: string, week: number): Promise<EspnGam
         for (const event of data.events ?? []) {
             const kickoffMs = event.date ? new Date(event.date).getTime() : NaN;
             if (!Number.isFinite(kickoffMs)) continue;
+            const completed = event.competitions?.[0]?.status?.type?.completed
+                ?? event.status?.type?.completed
+                ?? false;
             const competitors = event.competitions?.[0]?.competitors ?? [];
             const abbrevs = competitors
                 .map(c => c.team?.abbreviation)
                 .filter((a): a is string => Boolean(a))
                 .map(a => ESPN_TO_SLEEPER_TEAM[a] ?? a);
             if (abbrevs.length !== 2) continue;
-            out.push({ team: abbrevs[0], opponent: abbrevs[1], kickoffMs });
-            out.push({ team: abbrevs[1], opponent: abbrevs[0], kickoffMs });
+            out.push({ team: abbrevs[0], opponent: abbrevs[1], kickoffMs, completed });
+            out.push({ team: abbrevs[1], opponent: abbrevs[0], kickoffMs, completed });
         }
         return out;
     } catch {
@@ -194,6 +200,20 @@ export async function getNflSchedule(season: string, week: number): Promise<Reco
     for (const g of games) {
         out[g.team] = Math.min(out[g.team] ?? Infinity, g.kickoffMs);
     }
+    return out;
+}
+
+/**
+ * Returns whether each NFL team's game has gone final for a given week.
+ * Used to stop showing a nonzero "rest of game" projection once a player's
+ * real game has actually ended — a player who finished under their
+ * pre-game projection isn't going to "catch up" after the final whistle.
+ * Shape: { [teamAbbrev: string]: boolean }
+ */
+export async function getNflGameCompletion(season: string, week: number): Promise<Record<string, boolean>> {
+    const games = await fetchEspnWeekGames(season, week);
+    const out: Record<string, boolean> = {};
+    for (const g of games) out[g.team] = g.completed;
     return out;
 }
 

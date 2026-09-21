@@ -255,6 +255,11 @@ export function assembleTeamProjection(
     playerInfo:   Map<string, PlayerRecord>,
     opponentDefRank: number,
     totalTeams:   number,
+    // teamAbbrev → true once that team's real NFL game has gone final.
+    // Once a player's game is over there's no more "rest of game" left to
+    // project, and the real final score is the only number that still
+    // means anything — optional so existing callers keep working.
+    gameCompletionByTeam?: Record<string, boolean>,
 ): TeamProjection {
     const starterSet = new Set(slot.starters.filter(id => id !== '0'));
     const allIds     = [...new Set([...slot.starters, ...slot.players])].filter(id => id !== '0');
@@ -278,9 +283,13 @@ export function assembleTeamProjection(
         const position   = info?.position ?? 'UNK';
         const volatility = positionVolatility(position);
         const mods       = computeModifiers(info?.injuryStatus, opponentDefRank, totalTeams);
-        const fantasyIqProj = baseProj * (1 + mods.total);
-        const rosProj    = Math.max(0, baseProj - livePts);
-        const projTotal  = Math.max(livePts, fantasyIqProj);
+        const gameOver   = info?.team ? (gameCompletionByTeam?.[info.team] ?? false) : false;
+        // Once the real game is final, the live score IS the result — no
+        // more points are coming, and a stale pre-game-modifier projection
+        // no longer means anything, so both collapse to the real number.
+        const fantasyIqProj = gameOver ? livePts : baseProj * (1 + mods.total);
+        const rosProj    = gameOver ? 0 : Math.max(0, baseProj - livePts);
+        const projTotal  = gameOver ? livePts : Math.max(livePts, fantasyIqProj);
 
         return {
             playerId:      pid,

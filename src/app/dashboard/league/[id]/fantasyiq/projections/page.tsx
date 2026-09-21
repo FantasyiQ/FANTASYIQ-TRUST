@@ -4,7 +4,7 @@ export const maxDuration = 60;
 import { notFound, redirect } from 'next/navigation';
 import { auth }   from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getNflState, getLeagueUsers } from '@/lib/sleeper';
+import { getNflState, getLeagueUsers, getNflGameCompletion } from '@/lib/sleeper';
 import { getEspnRosters, normalizeEspnLeague, type EspnNormalizedMatchup } from '@/lib/espn';
 import {
     assembleTeamProjection,
@@ -139,10 +139,13 @@ export default async function HubProjectionsPage({
                 const allMatchedIds = [...resolvedIdSet];
                 const espnScoringSettings = league.scoringSettings as Record<string, number> | null;
 
-                const projs = await prisma.playerProjection.findMany({
-                    where:  { season, week: espnWeek, playerId: { in: allMatchedIds } },
-                    select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true, rawProjection: true },
-                });
+                const [projs, gameCompletionByTeam] = await Promise.all([
+                    prisma.playerProjection.findMany({
+                        where:  { season, week: espnWeek, playerId: { in: allMatchedIds } },
+                        select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true, rawProjection: true },
+                    }),
+                    getNflGameCompletion(season, espnWeek),
+                ]);
                 const projByPlayer = new Map(projs.map(p => [
                     p.playerId,
                     computeRealProjectedPoints(
@@ -205,8 +208,8 @@ export default async function HubProjectionsPage({
                     if (!m.awayTeamId) return;
                     const defA = defRankMap.get(m.awayTeamId) ?? Math.ceil(totalTeams / 2);
                     const defB = defRankMap.get(m.homeTeamId) ?? Math.ceil(totalTeams / 2);
-                    const teamA = assembleTeamProjection(makeSlot(m.homeTeamId, m.homeScore), projByPlayer, playerInfo, defA, totalTeams);
-                    const teamB = assembleTeamProjection(makeSlot(m.awayTeamId, m.awayScore), projByPlayer, playerInfo, defB, totalTeams);
+                    const teamA = assembleTeamProjection(makeSlot(m.homeTeamId, m.homeScore), projByPlayer, playerInfo, defA, totalTeams, gameCompletionByTeam);
+                    const teamB = assembleTeamProjection(makeSlot(m.awayTeamId, m.awayScore), projByPlayer, playerInfo, defB, totalTeams, gameCompletionByTeam);
                     const margin = teamA.teamProjEnhanced - teamB.teamProjEnhanced;
                     espnMatchups.push({
                         matchupId: i + 1,
@@ -313,7 +316,7 @@ export default async function HubProjectionsPage({
 
     const sleeperScoringSettings = league.scoringSettings as Record<string, number> | null;
 
-    const [projections, players] = await Promise.all([
+    const [projections, players, gameCompletionByTeam] = await Promise.all([
         prisma.playerProjection.findMany({
             where:  { season, week, playerId: { in: [...allPlayerIds] } },
             select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true, rawProjection: true },
@@ -322,6 +325,7 @@ export default async function HubProjectionsPage({
             where:  { playerId: { in: [...allPlayerIds] } },
             select: { playerId: true, fullName: true, position: true, team: true, injuryStatus: true },
         }),
+        getNflGameCompletion(season, week),
     ]);
 
     const projByPlayer = new Map(projections.map(p => [
@@ -389,8 +393,8 @@ export default async function HubProjectionsPage({
         const defRankForA = defRankMap.get(rawB.roster_id) ?? Math.ceil(totalTeams / 2);
         const defRankForB = defRankMap.get(rawA.roster_id) ?? Math.ceil(totalTeams / 2);
 
-        const teamA  = assembleTeamProjection(slotA, projByPlayer, playerInfo, defRankForA, totalTeams);
-        const teamB  = assembleTeamProjection(slotB, projByPlayer, playerInfo, defRankForB, totalTeams);
+        const teamA  = assembleTeamProjection(slotA, projByPlayer, playerInfo, defRankForA, totalTeams, gameCompletionByTeam);
+        const teamB  = assembleTeamProjection(slotB, projByPlayer, playerInfo, defRankForB, totalTeams, gameCompletionByTeam);
         const margin = teamA.teamProjEnhanced - teamB.teamProjEnhanced;
 
         matchups.push({
