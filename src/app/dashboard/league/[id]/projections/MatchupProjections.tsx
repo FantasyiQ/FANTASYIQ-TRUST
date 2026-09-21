@@ -66,7 +66,7 @@ function PlayerTable({ players, scoringType }: { players: PlayerProjectionRow[];
                         <th className="pb-1.5 pr-2">Player</th>
                         <th className="pb-1.5 text-right">Live</th>
                         <th className="pb-1.5 text-right">{label} Proj</th>
-                        <th className="pb-1.5 text-right">ROS</th>
+                        <th className="pb-1.5 text-right">ROG</th>
                         <th className="pb-1.5 text-right">FIQ</th>
                     </tr>
                 </thead>
@@ -222,7 +222,7 @@ function Legend() {
                 <span className="text-gray-400 font-semibold">How it works:</span>{' '}
                 <strong className="text-gray-300">Live</strong> = current fantasy points.{' '}
                 <strong className="text-gray-300">Proj</strong> = Sleeper&apos;s pre-game projection.{' '}
-                <strong className="text-gray-300">ROS</strong> = rest-of-game projection (Proj − Live, floor 0).{' '}
+                <strong className="text-gray-300">ROG</strong> = rest-of-game projection (Proj − Live, floor 0).{' '}
                 <strong className="text-[#D4AF37]">FIQ</strong> = FantasyiQ enhanced projection — applies injury,
                 opponent defensive rank, and positional volatility modifiers to the Sleeper baseline.{' '}
                 Win probability is computed via a normal distribution using each team&apos;s positional variance.

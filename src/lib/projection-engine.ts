@@ -3,7 +3,7 @@
 // Implements the 7-step model from the build spec:
 //   1. Sleeper base projections (from DB, synced by sleeper-projections cron)
 //   2. Merge with live per-player pts (from Sleeper matchup API)
-//   3. Rest-of-game (ROS) = max(0, BaseProj − LivePts)
+//   3. Rest-of-game (ROG) = max(0, BaseProj − LivePts)
 //   4. FantasyiQ enhanced projection (modifiers applied to BaseProj)
 //   5. Team-level rollup (TeamLive, TeamProjFinal, TeamProjEnhanced)
 //   6. Win probability (variance-based normal distribution CDF)
@@ -54,8 +54,8 @@ export interface TeamProjection {
     username:         string | undefined;
     avatar:           string | null | undefined;
     teamLive:         number;  // SUM(livePts) of starters
-    teamProjFinal:    number;  // Sleeper-based projected final (live + ROS)
-    teamProjEnhanced: number;  // FantasyiQ projected final (live + enhanced ROS)
+    teamProjFinal:    number;  // Sleeper-based projected final (live + ROG)
+    teamProjEnhanced: number;  // FantasyiQ projected final (live + enhanced ROG)
     teamVariance:     number;  // SUM(volatility²) for starters — used in win prob
     startingPlayers:  number;  // count of started players
     players:          PlayerProjectionRow[];
@@ -166,7 +166,7 @@ export function buildTeamProjection(
     // Live: sum of actual points scored so far
     const teamLive = starters.reduce((s, p) => s + p.livePts, 0);
 
-    // Sleeper projected final: live + Sleeper ROS for each starter
+    // Sleeper projected final: live + Sleeper ROG for each starter
     // = SUM(max(livePts, baseProj)) — i.e. take the higher of actual or projected
     const teamProjFinal = starters.reduce((s, p) => s + Math.max(p.livePts, p.baseProj), 0);
 
