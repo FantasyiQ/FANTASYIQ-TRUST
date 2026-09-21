@@ -67,6 +67,7 @@ export async function POST(request: NextRequest): Promise<Response> {
                 players:      t.roster.map(p => ({
                     name: p.fullName, position: p.position, lineupSlot: p.lineupSlot,
                     sleeperPlayerId: resolveSleeper(p.fullName, p.position)?.playerId ?? null,
+                    livePts: p.livePoints,
                 })),
             })),
             currentMatchup: currentWeekMatchups.length > 0 ? JSON.parse(JSON.stringify({

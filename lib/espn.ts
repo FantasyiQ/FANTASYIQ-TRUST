@@ -73,6 +73,15 @@ export interface EspnRosterEntry {
             proTeamId: number;
             injured?: boolean;
             injuryStatus?: string;
+            // Real per-scoring-period stat lines — statSourceId 0 = actual
+            // (live/final), 1 = ESPN's own projection. Confirmed live via
+            // the mRoster/mMatchupScore views already requested elsewhere in
+            // this file; no separate live-scoring call needed.
+            stats?: Array<{
+                scoringPeriodId: number;
+                statSourceId:    number;
+                appliedTotal?:   number;
+            }>;
         };
     };
 }
@@ -112,6 +121,7 @@ export interface EspnNormalizedPlayer {
     injured: boolean;
     injuryStatus: string;
     acquisitionType: string;
+    livePoints: number;     // real actual points this scoring period (0 if game hasn't started)
 }
 
 export interface EspnNormalizedTeam {
@@ -329,6 +339,8 @@ export function normalizeEspnLeague(raw: EspnLeagueSettings, leagueId: string): 
         if (m.id && m.displayName) memberMap.set(m.id, m.displayName);
     }
 
+    const currentWeek = raw.status?.currentMatchupPeriod ?? 0;
+
     const teams = (raw.teams ?? []).map((t): EspnNormalizedTeam => {
         const ownerId   = t.owners?.[0] ?? null;
         const ownerName = ownerId ? (memberMap.get(ownerId) ?? null) : null;
@@ -350,16 +362,22 @@ export function normalizeEspnLeague(raw: EspnLeagueSettings, leagueId: string): 
         ties:         t.record?.overall?.ties ?? 0,
         pointsFor:    t.record?.overall?.pointsFor ?? 0,
         pointsAgainst: t.record?.overall?.pointsAgainst ?? 0,
-        roster: (t.roster?.entries ?? []).map((e): EspnNormalizedPlayer => ({
-            playerId:        e.playerId,
-            fullName:        e.playerPoolEntry?.player?.fullName ?? 'Unknown',
-            position:        POSITION_MAP[e.playerPoolEntry?.player?.defaultPositionId] ?? 'N/A',
-            lineupSlot:      SLOT_MAP[e.lineupSlotId] ?? String(e.lineupSlotId),
-            proTeamId:       e.playerPoolEntry?.player?.proTeamId ?? 0,
-            injured:         e.playerPoolEntry?.player?.injured ?? false,
-            injuryStatus:    e.playerPoolEntry?.player?.injuryStatus ?? '',
-            acquisitionType: e.playerPoolEntry?.acquisitionType ?? '',
-        })),
+        roster: (t.roster?.entries ?? []).map((e): EspnNormalizedPlayer => {
+            const liveStat = e.playerPoolEntry?.player?.stats?.find(
+                s => s.scoringPeriodId === currentWeek && s.statSourceId === 0
+            );
+            return {
+                playerId:        e.playerId,
+                fullName:        e.playerPoolEntry?.player?.fullName ?? 'Unknown',
+                position:        POSITION_MAP[e.playerPoolEntry?.player?.defaultPositionId] ?? 'N/A',
+                lineupSlot:      SLOT_MAP[e.lineupSlotId] ?? String(e.lineupSlotId),
+                proTeamId:       e.playerPoolEntry?.player?.proTeamId ?? 0,
+                injured:         e.playerPoolEntry?.player?.injured ?? false,
+                injuryStatus:    e.playerPoolEntry?.player?.injuryStatus ?? '',
+                acquisitionType: e.playerPoolEntry?.acquisitionType ?? '',
+                livePoints:      liveStat?.appliedTotal ?? 0,
+            };
+        }),
         };
     });
 

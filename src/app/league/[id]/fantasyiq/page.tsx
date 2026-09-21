@@ -289,6 +289,7 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
         // the optimizer, IDP blending — is 100% platform-agnostic already.
         interface EspnStandingPlayer {
             name: string; position: string; lineupSlot: string; sleeperPlayerId: string | null;
+            livePts?: number;
         }
         interface EspnStandingTeam {
             teamId: number; name: string; ownerName: string | null;
@@ -335,6 +336,10 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
             const BENCH_SLOTS = new Set(['BN', 'IR']);
             const buildEspnTeam = (team: EspnStandingTeam, opponentDefRank: number): TeamProjection => {
                 const resolved = team.players.filter(p => p.sleeperPlayerId);
+                const playerPts: Record<string, number> = {};
+                for (const p of resolved) {
+                    if (p.livePts) playerPts[p.sleeperPlayerId!] = p.livePts;
+                }
                 const slot: RosterSlot = {
                     rosterId: team.teamId,
                     teamName: team.name,
@@ -343,7 +348,7 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
                     starters: resolved.filter(p => !BENCH_SLOTS.has(p.lineupSlot)).map(p => p.sleeperPlayerId!),
                     players:  resolved.map(p => p.sleeperPlayerId!),
                     livePts:  0,
-                    playerPts: {},
+                    playerPts,
                 };
                 return assembleTeamProjection(slot, projByPlayer, playerInfo, opponentDefRank, totalTeams);
             };

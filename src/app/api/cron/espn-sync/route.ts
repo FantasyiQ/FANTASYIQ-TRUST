@@ -70,6 +70,7 @@ export async function GET(request: Request): Promise<Response> {
                                     players: t.roster.map(p => ({
                                         name: p.fullName, position: p.position, lineupSlot: p.lineupSlot,
                                         sleeperPlayerId: resolveSleeper(p.fullName, p.position)?.playerId ?? null,
+                                        livePts: p.livePoints,
                                     })),
                                 })),
                                 currentMatchup: currentWeekMatchups.length > 0
