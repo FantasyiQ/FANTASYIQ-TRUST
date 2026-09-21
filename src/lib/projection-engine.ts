@@ -10,7 +10,9 @@
 //
 // Modifier availability:
 //   Injury Status      — real data from SleeperPlayer.injuryStatus
-//   Opp. Def. Rank     — real data derived from league standings (pts-for proxy)
+//   Opp. Def. Rank     — real data: each player's own real NFL opponent's
+//                        real season-to-date fantasy points allowed to that
+//                        specific position (see rankings/defenseVsPosition.ts)
 //   Snap Share         — no live feed; neutral (0)
 //   Usage Rate         — no live feed; neutral (0)
 //   Game Script        — no real-time game flow; neutral (0)
@@ -18,6 +20,7 @@
 //   Vegas Implied Total — no odds API; neutral (0)
 
 import { toIdpPosition } from './rankings/seedProjections';
+import { realDefRankFor, type DefenseRanking } from './rankings/defenseVsPosition';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -243,26 +246,21 @@ export interface ProjectionRecord {
 }
 
 /**
- * Rank opponent teams by their allowed fantasy points (proxy = their season fpts).
- * Lower fpts means better defense (fewer points "caused" = harder to play against).
- * Returns a Map<rosterId, defRank> where rank 1 = weakest defense.
- */
-export function buildOpponentDefRankMap(
-    standings: Array<{ rosterId: number; fpts: number }>,
-): Map<number, number> {
-    const sorted = [...standings].sort((a, b) => b.fpts - a.fpts);
-    return new Map(sorted.map((t, i) => [t.rosterId, i + 1]));
-}
-
-/**
  * Build all PlayerProjectionRow records for a roster, then return a TeamProjection.
  */
 export function assembleTeamProjection(
     slot:         RosterSlot,
     projByPlayer: Map<string, number>,   // playerId → baseProj
     playerInfo:   Map<string, PlayerRecord>,
-    opponentDefRank: number,
-    totalTeams:   number,
+    // Real NFL team → real opponent this week (each player's OWN team's
+    // real matchup, not their fantasy roster's opponent — those have no
+    // relationship to which defense a player is actually facing).
+    opponentByTeam: Record<string, string>,
+    // Real, position-specific defensive strength ranking (see
+    // defenseVsPosition.ts) — replaces the old fantasy-standings-based
+    // "opponent defense rank" proxy, which ranked a fantasy roster's own
+    // scoring, not any real defense.
+    defenseRanking: DefenseRanking,
     // teamAbbrev → true once that team's real NFL game has gone final.
     // Once a player's game is over there's no more "rest of game" left to
     // project, and the real final score is the only number that still
@@ -290,7 +288,8 @@ export function assembleTeamProjection(
         const isStarter  = starterSet.has(pid);
         const position   = info?.position ?? 'UNK';
         const volatility = positionVolatility(position);
-        const mods       = computeModifiers(info?.injuryStatus, opponentDefRank, totalTeams);
+        const { rank: realDefRank, total: realDefTotal } = realDefRankFor(info?.team, position, opponentByTeam, defenseRanking);
+        const mods       = computeModifiers(info?.injuryStatus, realDefRank, realDefTotal);
         const gameOver   = info?.team ? (gameCompletionByTeam?.[info.team] ?? false) : false;
         // Once the real game is final, the live score IS the result — no
         // more points are coming, and a stale pre-game-modifier projection

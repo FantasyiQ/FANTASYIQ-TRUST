@@ -33,6 +33,10 @@
       "schedule": "0 7 * * 2"
     },
     {
+      "path": "/api/cron/defense-vs-position",
+      "schedule": "30 7 * * 2"
+    },
+    {
       "path": "/api/cron/projection-accuracy",
       "schedule": "0 8 * * 2"
     },

@@ -8,10 +8,10 @@ import {
     getNflState,
     getLeagueUsers,
     getNflGameCompletion,
+    getWeekOpponents,
 } from '@/lib/sleeper';
 import {
     assembleTeamProjection,
-    buildOpponentDefRankMap,
     winProbability,
     type RosterSlot,
     type PlayerRecord,
@@ -19,6 +19,7 @@ import {
 } from '@/lib/projection-engine';
 import MatchupProjections from './MatchupProjections';
 import { computeRealProjectedPoints } from '@/lib/rankings/leagueScoringPoints';
+import { getDefenseRankByPosition } from '@/lib/rankings/defenseVsPosition';
 
 // Sleeper matchup response with per-player points
 interface SleeperMatchupFull {
@@ -137,7 +138,7 @@ export default async function ProjectionsPage({
     // ── Fetch projections + player info ───────────────────────────────────────
     const scoringSettings = league.scoringSettings as Record<string, number> | null;
 
-    const [projections, players, gameCompletionByTeam] = await Promise.all([
+    const [projections, players, gameCompletionByTeam, opponentByTeam, defenseRanking] = await Promise.all([
         prisma.playerProjection.findMany({
             where: {
                 season,
@@ -151,6 +152,8 @@ export default async function ProjectionsPage({
             select: { playerId: true, fullName: true, position: true, team: true, injuryStatus: true },
         }),
         getNflGameCompletion(season, week),
+        getWeekOpponents(season, week),
+        getDefenseRankByPosition(season),
     ]);
 
     const projByPlayer = new Map(projections.map(p => [
@@ -172,10 +175,6 @@ export default async function ProjectionsPage({
         }])
     );
 
-    // ── Defensive rank map ────────────────────────────────────────────────────
-    const standingsFpts  = standings.map(s => ({ rosterId: s.rosterId, fpts: s.fpts ?? 0 }));
-    const defRankMap     = buildOpponentDefRankMap(standingsFpts);
-    const totalTeams     = league.totalRosters;
     const rosterPositions = (league.rosterPositions as string[]) ?? [];
     const starterSlotArr  = rosterPositions.filter(p => !BENCH_SLOTS.has(p));
 
@@ -218,11 +217,8 @@ export default async function ProjectionsPage({
         const slotA = makeSlot(rawA);
         const slotB = makeSlot(rawB);
 
-        const defRankForA = defRankMap.get(rawB.roster_id) ?? Math.ceil(totalTeams / 2);
-        const defRankForB = defRankMap.get(rawA.roster_id) ?? Math.ceil(totalTeams / 2);
-
-        const teamA = assembleTeamProjection(slotA, projByPlayer, playerInfo, defRankForA, totalTeams, gameCompletionByTeam);
-        const teamB = assembleTeamProjection(slotB, projByPlayer, playerInfo, defRankForB, totalTeams, gameCompletionByTeam);
+        const teamA = assembleTeamProjection(slotA, projByPlayer, playerInfo, opponentByTeam, defenseRanking, gameCompletionByTeam);
+        const teamB = assembleTeamProjection(slotB, projByPlayer, playerInfo, opponentByTeam, defenseRanking, gameCompletionByTeam);
 
         const margin   = teamA.teamProjEnhanced - teamB.teamProjEnhanced;
         const winProbA = winProbability(margin, teamA.teamVariance, teamB.teamVariance);

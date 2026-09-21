@@ -732,6 +732,27 @@ model WeeklyProjectionAccuracy {
     @@index([season, week])
 }
 
+// Real fantasy points a real NFL defense allowed to a position in one week,
+// recorded from real stat lines once that week's games are final — the
+// replacement for the old "rank fantasy opponents by their own scoring"
+// proxy, which had no relationship to any actual NFL defense. Position-
+// specific (a defense can be strong vs RB and weak vs WR at the same time),
+// keyed by the real team abbreviation, so it's shared across every league —
+// one real defense doesn't have a different real strength per fantasy roster.
+model TeamDefenseVsPosition {
+    id            String   @id @default(cuid())
+    season        String
+    week          Int
+    defenseTeam   String   // real NFL team abbreviation, on defense that week
+    position      String   // QB/RB/WR/TE
+    pointsAllowed Float    // sum of real standard-PPR points the position scored against this defense
+    playersFaced  Int      // how many distinct position players had a real stat line
+    createdAt     DateTime @default(now())
+
+    @@unique([season, week, defenseTeam, position])
+    @@index([season, defenseTeam, position])
+}
+
 // Full-season fantasy point projections — populated by
 // /api/cron/sleeper-season-projections. Same shape as PlayerSeasonStats
 // (season-total raw stats + games played) rather than PlayerProjection's

@@ -7,16 +7,16 @@ import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { requireLeaguePaidAccess } from '@/lib/access';
 import { prisma } from '@/lib/prisma';
-import { getNflState, getLeagueMatchups, getLeagueUsers, getNflGameCompletion } from '@/lib/sleeper';
+import { getNflState, getLeagueMatchups, getLeagueUsers, getNflGameCompletion, getWeekOpponents } from '@/lib/sleeper';
 import {
     assembleTeamProjection,
-    buildOpponentDefRankMap,
     winProbability,
     type RosterSlot,
     type PlayerRecord,
     type MatchupProjection,
 } from '@/lib/projection-engine';
 import { computeRealProjectedPoints } from '@/lib/rankings/leagueScoringPoints';
+import { getDefenseRankByPosition } from '@/lib/rankings/defenseVsPosition';
 
 // Sleeper matchup response includes per-player points in live scoring
 interface SleeperMatchupFull {
@@ -124,7 +124,7 @@ export async function GET(
     // ── 6. Fetch projections + player info from DB in parallel ─────────────────
     const scoringSettings = league.scoringSettings as Record<string, number> | null;
 
-    const [projections, players, gameCompletionByTeam] = await Promise.all([
+    const [projections, players, gameCompletionByTeam, opponentByTeam, defenseRanking] = await Promise.all([
         prisma.playerProjection.findMany({
             where: {
                 season,
@@ -138,6 +138,8 @@ export async function GET(
             select: { playerId: true, fullName: true, position: true, team: true, injuryStatus: true },
         }),
         getNflGameCompletion(season, week),
+        getWeekOpponents(season, week),
+        getDefenseRankByPosition(season),
     ]);
 
     const projByPlayer = new Map(projections.map(p => [
@@ -159,10 +161,6 @@ export async function GET(
         }])
     );
 
-    // ── 7. Build opponent defensive rank map from standings ────────────────────
-    const standingsFpts = standings.map(s => ({ rosterId: s.rosterId, fpts: s.fpts ?? 0 }));
-    const defRankMap    = buildOpponentDefRankMap(standingsFpts);
-    const totalTeams    = league.totalRosters;
     const BENCH_SLOTS_API = new Set(['BN', 'IR']);
     const starterSlotArr  = ((league.rosterPositions as string[]) ?? []).filter(p => !BENCH_SLOTS_API.has(p));
 
@@ -204,12 +202,8 @@ export async function GET(
         const slotA = makeSlot(rawA);
         const slotB = makeSlot(rawB);
 
-        // Opponent def rank: team A plays against team B's defense, and vice versa
-        const defRankForA = defRankMap.get(rawB.roster_id) ?? Math.ceil(totalTeams / 2);
-        const defRankForB = defRankMap.get(rawA.roster_id) ?? Math.ceil(totalTeams / 2);
-
-        const teamA = assembleTeamProjection(slotA, projByPlayer, playerInfo, defRankForA, totalTeams, gameCompletionByTeam);
-        const teamB = assembleTeamProjection(slotB, projByPlayer, playerInfo, defRankForB, totalTeams, gameCompletionByTeam);
+        const teamA = assembleTeamProjection(slotA, projByPlayer, playerInfo, opponentByTeam, defenseRanking, gameCompletionByTeam);
+        const teamB = assembleTeamProjection(slotB, projByPlayer, playerInfo, opponentByTeam, defenseRanking, gameCompletionByTeam);
 
         const margin   = teamA.teamProjEnhanced - teamB.teamProjEnhanced;
         const winProbA = winProbability(margin, teamA.teamVariance, teamB.teamVariance);

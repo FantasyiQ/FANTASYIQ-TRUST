@@ -3,10 +3,9 @@ export const maxDuration = 60;
 
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { getNflState, getLeagueUsers, getNflGameCompletion } from '@/lib/sleeper';
+import { getNflState, getLeagueUsers, getNflGameCompletion, getWeekOpponents } from '@/lib/sleeper';
 import {
     assembleTeamProjection,
-    buildOpponentDefRankMap,
     winProbability,
     parseLineupRules,
     optimizeLineup,
@@ -24,6 +23,7 @@ import {
     type TeamTradeInsights,
     type RosterIntelligence,
 } from '@/lib/projection-engine';
+import { getDefenseRankByPosition, realDefRankFor } from '@/lib/rankings/defenseVsPosition';
 // Panel components live in the dashboard tree; reused here via absolute imports
 import MatchupProjections from '@/app/dashboard/league/[id]/projections/MatchupProjections';
 import OptimizedLineups from '@/app/dashboard/league/[id]/fantasyiq/OptimizedLineups';
@@ -133,13 +133,15 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
         if (seasonType === 'off' || week === 0) {
             offSeason = true;
         } else {
-            const [rawMatchupsResult, leagueUsersResult, gameCompletionResult] = await Promise.allSettled([
+            const [rawMatchupsResult, leagueUsersResult, gameCompletionResult, opponentsResult, defenseRankingResult] = await Promise.allSettled([
                 fetch(
                     `https://api.sleeper.app/v1/league/${league.leagueId}/matchups/${week}`,
                     { cache: 'no-store' },
                 ).then(r => r.ok ? r.json() as Promise<SleeperMatchupFull[]> : Promise.resolve([] as SleeperMatchupFull[])),
                 getLeagueUsers(league.leagueId),
                 getNflGameCompletion(season, week),
+                getWeekOpponents(season, week),
+                getDefenseRankByPosition(season),
             ]);
 
             const rawMatchups: SleeperMatchupFull[] =
@@ -148,6 +150,10 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
                 leagueUsersResult.status === 'fulfilled' ? leagueUsersResult.value : [];
             const gameCompletionByTeam =
                 gameCompletionResult.status === 'fulfilled' ? gameCompletionResult.value : {};
+            const opponentByTeam =
+                opponentsResult.status === 'fulfilled' ? opponentsResult.value : {};
+            const defenseRanking =
+                defenseRankingResult.status === 'fulfilled' ? defenseRankingResult.value : { rankByTeamPosition: new Map(), totalByPosition: new Map() };
 
             type StandingEntry = { rosterId: number; ownerId?: string | null; teamName?: string; fpts?: number };
             const standings   = (league.standings as StandingEntry[] | null) ?? [];
@@ -184,9 +190,6 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
                 rosteredPlayerIds: allPlayerIds,
             });
 
-            const standingsFpts = standings.map(s => ({ rosterId: s.rosterId, fpts: s.fpts ?? 0 }));
-            const defRankMap    = buildOpponentDefRankMap(standingsFpts);
-            const totalTeams    = league.totalRosters;
             const BENCH_SLOTS_SLEEPER = new Set(['BN', 'IR']);
             const starterSlotArr = ((league.rosterPositions as string[]) ?? []).filter(p => !BENCH_SLOTS_SLEEPER.has(p));
 
@@ -222,11 +225,8 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
                     };
                 };
 
-                const defRankForA = defRankMap.get(rawB.roster_id) ?? Math.ceil(totalTeams / 2);
-                const defRankForB = defRankMap.get(rawA.roster_id) ?? Math.ceil(totalTeams / 2);
-
-                const teamA = assembleTeamProjection(makeSlot(rawA), projByPlayer, playerInfo, defRankForA, totalTeams, gameCompletionByTeam);
-                const teamB = assembleTeamProjection(makeSlot(rawB), projByPlayer, playerInfo, defRankForB, totalTeams, gameCompletionByTeam);
+                const teamA = assembleTeamProjection(makeSlot(rawA), projByPlayer, playerInfo, opponentByTeam, defenseRanking, gameCompletionByTeam);
+                const teamB = assembleTeamProjection(makeSlot(rawB), projByPlayer, playerInfo, opponentByTeam, defenseRanking, gameCompletionByTeam);
 
                 const margin   = teamA.teamProjEnhanced - teamB.teamProjEnhanced;
                 const winProbA = winProbability(margin, teamA.teamVariance, teamB.teamVariance);
@@ -244,14 +244,14 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
             matchups.sort((a, b) => a.matchupId - b.matchupId);
 
             const lineupRules    = parseLineupRules(league.rosterPositions as string[]);
-            const neutralDefRank = Math.ceil(totalTeams / 2);
             const freeAgentRows: PlayerProjectionRow[] = [];
 
             for (const [pid, proj] of projByPlayer) {
                 if (allPlayerIds.has(pid)) continue;
                 const info = playerInfo.get(pid);
                 if (!info) continue;
-                const mods        = computeModifiers(info.injuryStatus, neutralDefRank, totalTeams);
+                const { rank: faDefRank, total: faDefTotal } = realDefRankFor(info.team, info.position, opponentByTeam, defenseRanking);
+                const mods        = computeModifiers(info.injuryStatus, faDefRank, faDefTotal);
                 const fiqProj     = Math.round(proj * (1 + mods.total) * 100) / 100;
                 const baseRounded = Math.round(proj * 100) / 100;
                 freeAgentRows.push({
@@ -335,7 +335,7 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
 
             const publicScoringSettings = league.scoringSettings as Record<string, number> | null;
 
-            const [{ projByPlayer, playerInfo }, gameCompletionByTeam] = await Promise.all([
+            const [{ projByPlayer, playerInfo }, gameCompletionByTeam, opponentByTeam, defenseRanking] = await Promise.all([
                 buildWeeklyProjections({
                     season, week,
                     scoringSettings:   publicScoringSettings,
@@ -343,16 +343,14 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
                     rosteredPlayerIds: allPlayerIds,
                 }),
                 getNflGameCompletion(season, week),
+                getWeekOpponents(season, week),
+                getDefenseRankByPosition(season),
             ]);
 
-            const totalTeams     = league.totalRosters;
-            const neutralDefRank = Math.ceil(totalTeams / 2);
-            const standingsFpts  = espnStandings.map(t => ({ rosterId: t.teamId, fpts: t.fpts ?? 0 }));
-            const defRankMap     = buildOpponentDefRankMap(standingsFpts);
-            const teamById       = new Map(espnStandings.map(t => [t.teamId, t]));
+            const teamById = new Map(espnStandings.map(t => [t.teamId, t]));
 
             const BENCH_SLOTS = new Set(['BN', 'IR']);
-            const buildEspnTeam = (team: EspnStandingTeam, opponentDefRank: number): TeamProjection => {
+            const buildEspnTeam = (team: EspnStandingTeam): TeamProjection => {
                 const resolved = team.players.filter(p => p.sleeperPlayerId);
                 const playerPts: Record<string, number> = {};
                 for (const p of resolved) {
@@ -370,12 +368,9 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
                     livePts:  0,
                     playerPts,
                 };
-                return assembleTeamProjection(slot, projByPlayer, playerInfo, opponentDefRank, totalTeams, gameCompletionByTeam);
+                return assembleTeamProjection(slot, projByPlayer, playerInfo, opponentByTeam, defenseRanking, gameCompletionByTeam);
             };
 
-            // Real opponent defRank from the cached matchup pairing where
-            // available; a bye/unpaired team (or a sync gap) still gets
-            // evaluated with a neutral defRank rather than being dropped.
             // Same pairing also builds the real MatchupProjection entries for
             // the Weekly Projections section — previously left empty for
             // ESPN entirely, even though the per-team projected data was
@@ -387,11 +382,11 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
                 const away = m.awayTeamId !== null ? teamById.get(m.awayTeamId) : undefined;
                 if (home) {
                     pairedIds.add(home.teamId);
-                    allTeams.push(buildEspnTeam(home, away ? (defRankMap.get(away.teamId) ?? neutralDefRank) : neutralDefRank));
+                    allTeams.push(buildEspnTeam(home));
                 }
                 if (away) {
                     pairedIds.add(away.teamId);
-                    allTeams.push(buildEspnTeam(away, home ? (defRankMap.get(home.teamId) ?? neutralDefRank) : neutralDefRank));
+                    allTeams.push(buildEspnTeam(away));
                 }
                 if (home && away) {
                     const teamA = allTeams[allTeams.length - 2];
@@ -409,7 +404,7 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
                 }
             }
             for (const t of espnStandings) {
-                if (!pairedIds.has(t.teamId)) allTeams.push(buildEspnTeam(t, neutralDefRank));
+                if (!pairedIds.has(t.teamId)) allTeams.push(buildEspnTeam(t));
             }
             matchups.sort((a, b) => a.matchupId - b.matchupId);
 
@@ -419,7 +414,8 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
                 if (allPlayerIds.has(pid)) continue;
                 const info = playerInfo.get(pid);
                 if (!info) continue;
-                const mods        = computeModifiers(info.injuryStatus, neutralDefRank, totalTeams);
+                const { rank: faDefRank, total: faDefTotal } = realDefRankFor(info.team, info.position, opponentByTeam, defenseRanking);
+                const mods        = computeModifiers(info.injuryStatus, faDefRank, faDefTotal);
                 const fiqProj     = Math.round(proj * (1 + mods.total) * 100) / 100;
                 const baseRounded = Math.round(proj * 100) / 100;
                 freeAgentRows.push({

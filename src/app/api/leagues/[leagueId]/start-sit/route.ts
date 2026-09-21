@@ -5,15 +5,15 @@ import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { requireLeaguePaidAccess } from '@/lib/access';
 import { prisma } from '@/lib/prisma';
-import { getNflState } from '@/lib/sleeper';
+import { getNflState, getWeekOpponents } from '@/lib/sleeper';
 import {
     computeModifiers,
     positionVolatility,
     winProbability,
-    buildOpponentDefRankMap,
 } from '@/lib/projection-engine';
 import { checkMutationLimit, getClientIp } from '@/lib/ratelimit';
 import { computeRealProjectedPoints } from '@/lib/rankings/leagueScoringPoints';
+import { getDefenseRankByPosition, realDefRankFor } from '@/lib/rankings/defenseVsPosition';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -244,7 +244,7 @@ export async function POST(
     const scoringSettings = league.scoringSettings as Record<string, number> | null;
 
     // ── Fetch both players ────────────────────────────────────────────────────
-    const [players, projections] = await Promise.all([
+    const [players, projections, opponentByTeam, defenseRanking] = await Promise.all([
         prisma.sleeperPlayer.findMany({
             where:  { playerId: { in: [playerAId, playerBId] } },
             select: { playerId: true, fullName: true, position: true, team: true, injuryStatus: true },
@@ -253,6 +253,8 @@ export async function POST(
             where:  { season, week, playerId: { in: [playerAId, playerBId] } },
             select: { playerId: true, pointsPpr: true, pointsStd: true, pointsHalfPpr: true, rawProjection: true },
         }),
+        getWeekOpponents(season, week),
+        getDefenseRankByPosition(season),
     ]);
 
     const playerMap = new Map(players.map(p => [p.playerId, p]));
@@ -265,14 +267,11 @@ export async function POST(
     const infoB = playerMap.get(playerBId);
     if (!infoA || !infoB) return Response.json({ error: 'One or both players not found' }, { status: 404 });
 
-    // ── Build per-player projection rows ──────────────────────────────────────
-    const totalTeams  = league.totalRosters;
-    const neutralRank = Math.ceil(totalTeams / 2);
-
     type PlayerInfo = { playerId: string; fullName: string | null; position: string | null; team: string | null; injuryStatus: string | null };
 
     function buildPlayer(info: PlayerInfo, baseProj: number): StartSitPlayer {
-        const mods       = computeModifiers(info.injuryStatus, neutralRank, totalTeams);
+        const { rank, total } = realDefRankFor(info.team ?? undefined, info.position ?? '', opponentByTeam, defenseRanking);
+        const mods       = computeModifiers(info.injuryStatus, rank, total);
         const fiqProj    = Math.round(baseProj * (1 + mods.total) * 100) / 100;
         const vol        = positionVolatility(info.position ?? '');
         return {
@@ -354,18 +353,17 @@ export async function POST(
                         const allInfoMap = new Map(allInfo.map(p => [p.playerId, p]));
 
                         const rosterPositions = league.rosterPositions;
-                        const standingsFpts = standings.map(s => ({ rosterId: s.rosterId, fpts: s.fpts ?? 0 }));
-                        const defRankMap    = buildOpponentDefRankMap(standingsFpts);
-                        const userDefRank   = defRankMap.get(userMatchup.roster_id) ?? neutralRank;
-                        const oppDefRank    = defRankMap.get(oppMatchup.roster_id)  ?? neutralRank;
 
-                        // Opponent team (fixed)
+                        // Opponent team (fixed) — each player's real defRank
+                        // comes from their OWN real NFL opponent + position,
+                        // not a single value shared across the whole roster.
                         const oppRows = oppMatchup.starters
                             .filter(id => id !== '0')
                             .map(pid => {
                                 const info = allInfoMap.get(pid);
                                 const base = allProjMap.get(pid) ?? 0;
-                                const mods = computeModifiers(info?.injuryStatus, userDefRank, totalTeams);
+                                const { rank, total } = realDefRankFor(info?.team ?? undefined, info?.position ?? '', opponentByTeam, defenseRanking);
+                                const mods = computeModifiers(info?.injuryStatus, rank, total);
                                 const fiq  = base * (1 + mods.total);
                                 const vol  = positionVolatility(info?.position ?? '');
                                 return { proj: fiq, variance: vol * vol * Math.max(0, fiq) };
@@ -380,7 +378,8 @@ export async function POST(
                             .map(pid => {
                                 const info = allInfoMap.get(pid);
                                 const base = allProjMap.get(pid) ?? 0;
-                                const mods = computeModifiers(info?.injuryStatus, oppDefRank, totalTeams);
+                                const { rank, total } = realDefRankFor(info?.team ?? undefined, info?.position ?? '', opponentByTeam, defenseRanking);
+                                const mods = computeModifiers(info?.injuryStatus, rank, total);
                                 const fiq  = base * (1 + mods.total);
                                 const vol  = positionVolatility(info?.position ?? '');
                                 return { pid, pos: info?.position ?? '', proj: fiq, variance: vol * vol * Math.max(0, fiq) };
@@ -396,7 +395,8 @@ export async function POST(
                             }
 
                             const candidateBase = allProjMap.get(candidateId) ?? 0;
-                            const candidateMods = computeModifiers(candidateInfo.injuryStatus, oppDefRank, totalTeams);
+                            const { rank: candRank, total: candTotal } = realDefRankFor(candidateInfo.team ?? undefined, candidateInfo.position ?? '', opponentByTeam, defenseRanking);
+                            const candidateMods = computeModifiers(candidateInfo.injuryStatus, candRank, candTotal);
                             const candidateProj = candidateBase * (1 + candidateMods.total);
                             const candidateVol  = positionVolatility(candidateInfo.position ?? '');
                             const candidateVar  = candidateVol * candidateVol * Math.max(0, candidateProj);
