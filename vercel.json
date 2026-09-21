@@ -33,6 +33,10 @@
       "schedule": "0 7 * * 2"
     },
     {
+      "path": "/api/cron/projection-accuracy",
+      "schedule": "0 8 * * 2"
+    },
+    {
       "path": "/api/cron/espn-sync",
       "schedule": "0 * * * *"
     },

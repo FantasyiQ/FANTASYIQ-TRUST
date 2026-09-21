@@ -709,6 +709,29 @@ model PlayerProjection {
     @@index([season, week])
 }
 
+// One row per player-week that actually got played, recorded once that
+// week's games are final. Feeds the "how accurate is FIQ, really" trust
+// feature on Weekly Projections — a real, measured track record instead of
+// a claimed one. sleeperProj/fiqProj/actual are all standard-PPR points
+// (STANDARD_SCORING in leagueScoringPoints.ts) so every row is directly
+// comparable regardless of which real league(s) rostered the player that
+// week — a league-specific FIQ number (which also factors in that league's
+// specific fantasy opponent) would make cross-league aggregation meaningless.
+model WeeklyProjectionAccuracy {
+    id          String   @id @default(cuid())
+    season      String
+    week        Int
+    playerId    String
+    position    String
+    sleeperProj Float
+    fiqProj     Float
+    actual      Float
+    createdAt   DateTime @default(now())
+
+    @@unique([season, week, playerId])
+    @@index([season, week])
+}
+
 // Full-season fantasy point projections — populated by
 // /api/cron/sleeper-season-projections. Same shape as PlayerSeasonStats
 // (season-total raw stats + games played) rather than PlayerProjection's

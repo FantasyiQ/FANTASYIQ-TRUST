@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { MatchupProjection, TeamProjection, PlayerProjectionRow } from '@/lib/projection-engine';
 
 // ── Small helpers ─────────────────────────────────────────────────────────────
@@ -244,6 +244,77 @@ function MatchupCard({ matchup, scoringType }: { matchup: MatchupProjection; sco
     );
 }
 
+// ── Season accuracy card ─────────────────────────────────────────────────────
+
+interface PositionAccuracy {
+    position:    string;
+    avgErrorPct: number;
+    sampleSize:  number;
+}
+interface AccuracySummary {
+    available:          boolean;
+    sampleSize?:        number;
+    fiqAvgErrorPct?:    number;
+    sleeperAvgErrorPct?: number;
+    byPosition?:        PositionAccuracy[];
+}
+
+function SeasonAccuracyCard({ season }: { season: string }) {
+    const [data, setData] = useState<AccuracySummary | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        fetch(`/api/projection-accuracy?season=${encodeURIComponent(season)}`)
+            .then(r => r.ok ? r.json() as Promise<AccuracySummary> : null)
+            .then(d => { if (!cancelled) setData(d); })
+            .catch(() => { if (!cancelled) setData(null); });
+        return () => { cancelled = true; };
+    }, [season]);
+
+    if (!data?.available || data.sampleSize === undefined) return null;
+
+    const fiqAcc     = 1 - (data.fiqAvgErrorPct ?? 0);
+    const sleeperAcc = 1 - (data.sleeperAvgErrorPct ?? 0);
+    const best  = data.byPosition?.[0];
+    const worst = data.byPosition && data.byPosition.length > 1 ? data.byPosition[data.byPosition.length - 1] : undefined;
+
+    return (
+        <div className="rounded-2xl bg-gray-900 border border-gray-800 p-5 space-y-3">
+            <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-white text-sm">FiQ Projection Accuracy — {season} Season</h3>
+                <span className="text-[10px] text-gray-600">{data.sampleSize.toLocaleString()} player-weeks tracked</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="rounded-xl bg-gray-800/50 border border-gray-700/50 p-3">
+                    <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">FiQ Accuracy</div>
+                    <div className="text-xl font-bold text-[#D4AF37] tabular-nums">{pct(Math.max(0, fiqAcc))}</div>
+                </div>
+                <div className="rounded-xl bg-gray-800/50 border border-gray-700/50 p-3">
+                    <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Sleeper Baseline</div>
+                    <div className="text-xl font-bold text-gray-300 tabular-nums">{pct(Math.max(0, sleeperAcc))}</div>
+                </div>
+                {best && (
+                    <div className="rounded-xl bg-gray-800/50 border border-gray-700/50 p-3">
+                        <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Most Accurate</div>
+                        <div className="text-xl font-bold text-emerald-400 tabular-nums">{best.position} · {pct(Math.max(0, 1 - best.avgErrorPct))}</div>
+                    </div>
+                )}
+                {worst && (
+                    <div className="rounded-xl bg-gray-800/50 border border-gray-700/50 p-3">
+                        <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Least Accurate</div>
+                        <div className="text-xl font-bold text-gray-400 tabular-nums">{worst.position} · {pct(Math.max(0, 1 - worst.avgErrorPct))}</div>
+                    </div>
+                )}
+            </div>
+            <p className="text-[10px] text-gray-600 leading-relaxed">
+                Measured against every started player&apos;s real final score once their game went final this season —
+                not a marketing claim. Accuracy = 1 − |projected − actual| / actual (floored at a 3-pt actual to avoid
+                near-zero games skewing the average).
+            </p>
+        </div>
+    );
+}
+
 // ── Legend ────────────────────────────────────────────────────────────────────
 
 function Legend() {
@@ -362,6 +433,7 @@ export default function MatchupProjections({ matchups, week, season, scoringType
                 </div>
             )}
 
+            <SeasonAccuracyCard season={season} />
             <Legend />
         </div>
     );
