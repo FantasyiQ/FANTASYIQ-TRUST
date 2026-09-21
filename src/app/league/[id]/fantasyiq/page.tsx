@@ -351,6 +351,10 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
             // Real opponent defRank from the cached matchup pairing where
             // available; a bye/unpaired team (or a sync gap) still gets
             // evaluated with a neutral defRank rather than being dropped.
+            // Same pairing also builds the real MatchupProjection entries for
+            // the Weekly Projections section — previously left empty for
+            // ESPN entirely, even though the per-team projected data was
+            // already being computed right here for Optimized Lineups.
             const allTeams: TeamProjection[] = [];
             const pairedIds = new Set<number>();
             for (const m of currentMatchup.matchups) {
@@ -364,10 +368,25 @@ export default async function PublicFantasyiQHubPage({ params }: { params: Promi
                     pairedIds.add(away.teamId);
                     allTeams.push(buildEspnTeam(away, home ? (defRankMap.get(home.teamId) ?? neutralDefRank) : neutralDefRank));
                 }
+                if (home && away) {
+                    const teamA = allTeams[allTeams.length - 2];
+                    const teamB = allTeams[allTeams.length - 1];
+                    const margin   = teamA.teamProjEnhanced - teamB.teamProjEnhanced;
+                    const winProbA = winProbability(margin, teamA.teamVariance, teamB.teamVariance);
+                    matchups.push({
+                        matchupId: home.teamId,
+                        week,
+                        teamA,
+                        teamB,
+                        winProbA:  Math.round(winProbA * 1000) / 1000,
+                        margin:    Math.round(margin * 100) / 100,
+                    });
+                }
             }
             for (const t of espnStandings) {
                 if (!pairedIds.has(t.teamId)) allTeams.push(buildEspnTeam(t, neutralDefRank));
             }
+            matchups.sort((a, b) => a.matchupId - b.matchupId);
 
             const lineupRules = parseLineupRules(league.rosterPositions as string[]);
             const freeAgentRows: PlayerProjectionRow[] = [];
