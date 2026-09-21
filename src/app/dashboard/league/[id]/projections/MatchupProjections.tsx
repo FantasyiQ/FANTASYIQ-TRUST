@@ -160,14 +160,11 @@ function TeamCard({
     team,
     side,
     winProb,
-    scoringType,
 }: {
-    team:        TeamProjection;
-    side:        'left' | 'right';
-    winProb:     number;
-    scoringType: string | null;
+    team:    TeamProjection;
+    side:    'left' | 'right';
+    winProb: number;
 }) {
-    const [open, setOpen] = useState(false);
     const isLeading = winProb >= 0.5;
 
     return (
@@ -193,23 +190,31 @@ function TeamCard({
                     <div>FiQ proj: <span className="text-[#D4AF37] font-semibold">{pts(team.teamProjEnhanced)}</span></div>
                 </div>
             </div>
+        </div>
+    );
+}
 
-            {/* Roster expand toggle */}
-            <button
-                onClick={() => setOpen(v => !v)}
-                className="text-[11px] text-gray-500 hover:text-gray-300 transition flex items-center gap-1"
-            >
-                {open ? 'Hide' : 'Show'} roster
-                <svg className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-            </button>
+// ── Both rosters, side by side ──────────────────────────────────────────────────
 
-            {open && (
-                <div className="w-full text-left">
-                    <PlayerTable players={team.players} scoringType={scoringType} />
-                </div>
-            )}
+function BothRosters({
+    teamA,
+    teamB,
+    scoringType,
+}: {
+    teamA:       TeamProjection;
+    teamB:       TeamProjection;
+    scoringType: string | null;
+}) {
+    return (
+        <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+                <div className="text-[11px] font-bold text-gray-400 mb-1.5 truncate">{teamA.teamName}</div>
+                <PlayerTable players={teamA.players} scoringType={scoringType} />
+            </div>
+            <div>
+                <div className="text-[11px] font-bold text-gray-400 mb-1.5 truncate">{teamB.teamName}</div>
+                <PlayerTable players={teamB.players} scoringType={scoringType} />
+            </div>
         </div>
     );
 }
@@ -217,18 +222,29 @@ function TeamCard({
 // ── Matchup card ──────────────────────────────────────────────────────────────
 
 function MatchupCard({ matchup, scoringType }: { matchup: MatchupProjection; scoringType: string | null }) {
+    const [open, setOpen] = useState(false);
+
     return (
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-4">
             {/* Header row */}
             <div className="flex items-start gap-4">
-                <TeamCard team={matchup.teamA} side="left"  winProb={matchup.winProbA}       scoringType={scoringType} />
+                <TeamCard team={matchup.teamA} side="left"  winProb={matchup.winProbA} />
 
                 <div className="shrink-0 flex flex-col items-center gap-1 pt-1">
                     <span className="text-xs font-bold text-gray-600 tracking-widest">VS</span>
                     <span className="text-[10px] text-gray-700">Wk {matchup.week}</span>
+                    <button
+                        onClick={() => setOpen(v => !v)}
+                        className="mt-1 text-[10px] text-gray-500 hover:text-gray-300 transition flex items-center gap-0.5 whitespace-nowrap"
+                    >
+                        {open ? 'Hide' : 'Show'} rosters
+                        <svg className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
                 </div>
 
-                <TeamCard team={matchup.teamB} side="right" winProb={1 - matchup.winProbA}   scoringType={scoringType} />
+                <TeamCard team={matchup.teamB} side="right" winProb={1 - matchup.winProbA} />
             </div>
 
             {/* Win probability bar */}
@@ -240,6 +256,8 @@ function MatchupCard({ matchup, scoringType }: { matchup: MatchupProjection; sco
 
             {/* Live points-needed-to-win callout */}
             <PointsNeededBar teamA={matchup.teamA} teamB={matchup.teamB} />
+
+            {open && <BothRosters teamA={matchup.teamA} teamB={matchup.teamB} scoringType={scoringType} />}
         </div>
     );
 }
