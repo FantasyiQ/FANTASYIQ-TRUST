@@ -307,9 +307,10 @@ function SeasonAccuracyCard({ season }: { season: string }) {
                 )}
             </div>
             <p className="text-[10px] text-gray-600 leading-relaxed">
-                Measured against every started player&apos;s real final score once their game went final this season —
-                not a marketing claim. Accuracy = 1 − |projected − actual| / actual (floored at a 3-pt actual to avoid
-                near-zero games skewing the average).
+                Measured against every started QB/RB/WR/TE&apos;s real final score once their game went final this
+                season — not a marketing claim. Accuracy = 1 − |projected − actual| / actual (floored at a 3-pt actual
+                to avoid near-zero games skewing the average). K/DEF/IDP aren&apos;t tracked — there&apos;s no single
+                standard scoring format for them to measure against fairly across leagues.
             </p>
         </div>
     );

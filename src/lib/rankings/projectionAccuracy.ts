@@ -28,6 +28,18 @@ function injuryModifier(status: string | null | undefined): number {
     }
 }
 
+// STANDARD_SCORING only has offensive stat keys (pass/rush/rec yards & TDs,
+// receptions) — no field-goal or IDP-tackle/sack/int keys. Feeding a K, DEF,
+// or IDP player's real stat line through it silently computes to ~0
+// regardless of their actual production, which would make them look
+// artificially "accurate" (two near-zero numbers close to each other)
+// rather than genuinely measured. There's also no single agreed-upon
+// "standard" scoring format for those positions the way PPR is for
+// offense — every league's K/DEF/IDP rules differ too much. Scope this
+// tracker to the four positions where standard PPR is a real, complete
+// scoring system.
+const TRACKED_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE']);
+
 /**
  * Records one accuracy row per player who actually played in the given
  * week — skips anyone with no real stats yet (game not final, bye, DNP).
@@ -52,7 +64,7 @@ export async function recordWeeklyProjectionAccuracy(
     if (playedIds.length === 0) return { recorded: 0 };
 
     const players = await prisma.sleeperPlayer.findMany({
-        where:  { playerId: { in: playedIds } },
+        where:  { playerId: { in: playedIds }, position: { in: [...TRACKED_POSITIONS] } },
         select: { playerId: true, position: true, injuryStatus: true },
     });
     const playerById = new Map(players.map(p => [p.playerId, p]));
