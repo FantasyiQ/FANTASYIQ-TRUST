@@ -23,16 +23,20 @@ interface League {
     assignedPlanType: string | null;
 }
 
-interface CommSub {
+// A commissioner subscription this viewer's leagues are known to be
+// covered by — may belong to a different user (whoever in the league
+// actually pays). ownedByViewer gates whether the badge can link to a
+// manage page the viewer actually has access to.
+interface AssignedSub {
     id: string;
-    leagueName: string | null;
     tier: string;
+    ownedByViewer: boolean;
 }
 
 interface Props {
     leagues: League[];
     playerTier: string;
-    commSubs: CommSub[];
+    assignedSubs: AssignedSub[];
     platform?: 'sleeper' | 'espn' | 'yahoo' | 'nfl';
     limitReachedIds?: Set<string>;
 }
@@ -41,12 +45,13 @@ interface Props {
 // assignedPlanType (the authoritative field, same one billing/auto-assign
 // uses), not a fuzzy name match. Labeled with plan TYPE + level (e.g.
 // "Commissioner ELITE ✦") since a league can be covered by either kind of
-// plan and members need to know which.
-function planBadge(league: League, playerTier: string, commSubs: CommSub[]): { label: string; className: string; href: string } | null {
+// plan and members need to know which. href is null when the covering
+// subscription belongs to a different user — nothing to link to.
+function planBadge(league: League, playerTier: string, assignedSubs: AssignedSub[]): { label: string; className: string; href: string | null } | null {
     if (league.assignedPlanType === 'commissioner' && league.assignedPlanId) {
-        const sub = commSubs.find(s => s.id === league.assignedPlanId);
+        const sub = assignedSubs.find(s => s.id === league.assignedPlanId);
         const tier = sub ? tierBadgeProps(sub.tier) : null;
-        return tier ? { label: `Commissioner ${tier.label}`, className: tier.className, href: `/dashboard/plan/commissioner/${league.assignedPlanId}` } : null;
+        return tier ? { label: `Commissioner ${tier.label}`, className: tier.className, href: sub!.ownedByViewer ? `/dashboard/plan/commissioner/${league.assignedPlanId}` : null } : null;
     }
     if (league.assignedPlanType === 'player') {
         const tier = tierBadgeProps(playerTier);
@@ -78,7 +83,7 @@ function formatSyncTime(date: Date | null): string {
     return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier, commSubs, platform = 'sleeper', limitReachedIds = new Set() }: Props) {
+export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier, assignedSubs, platform = 'sleeper', limitReachedIds = new Set() }: Props) {
     const [leagues, setLeagues] = useState<League[]>(initialLeagues);
 
     async function handleReorder(newOrder: League[]) {
@@ -117,7 +122,7 @@ export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier
             <SortableLeagueList items={leagues} getId={l => l.id} onReorder={handleReorder}>
                 {(league, drag) => {
                 const standing = (league.standings as { wins: number; losses: number }[] | null)?.[0];
-                const badge = planBadge(league, playerTier, commSubs);
+                const badge = planBadge(league, playerTier, assignedSubs);
                 return (
                     <div className={`flex items-center gap-4 px-6 py-4 hover:bg-gray-800/30 transition-colors ${drag.isDragging ? 'bg-gray-800/50' : ''}`}>
                         <DragHandle attributes={drag.attributes} listeners={drag.listeners} />
@@ -153,13 +158,22 @@ export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier
                                 {/* Plan badge (type + level) — secondary info, right side. Links to
                                     that plan's management page. */}
                                 {badge && (
-                                    <Link
-                                        href={badge.href}
-                                        onClick={e => e.stopPropagation()}
-                                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border transition hover:opacity-80 ${badge.className}`}
-                                    >
-                                        {badge.label}
-                                    </Link>
+                                    badge.href ? (
+                                        <Link
+                                            href={badge.href}
+                                            onClick={e => e.stopPropagation()}
+                                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border transition hover:opacity-80 ${badge.className}`}
+                                        >
+                                            {badge.label}
+                                        </Link>
+                                    ) : (
+                                        <span
+                                            title="Covered by another member's commissioner plan"
+                                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${badge.className}`}
+                                        >
+                                            {badge.label}
+                                        </span>
+                                    )
                                 )}
                                 {!league.assignedPlanId && !league.assignedPlanType && (
                                     limitReachedIds.has(league.id) ? (

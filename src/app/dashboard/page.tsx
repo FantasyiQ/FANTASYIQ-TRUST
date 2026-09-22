@@ -140,6 +140,27 @@ export default async function DashboardPage({
     }
     const commSubs = [..._seenCommSubs.values()].sort((a, b) => (a.leagueName ?? '').localeCompare(b.leagueName ?? ''));
 
+    // A league's assignedPlanId can point to a commissioner subscription
+    // owned by a DIFFERENT user — every member who syncs the same real
+    // league gets assignedPlanType/assignedPlanId set, but only whoever
+    // actually pays owns that Subscription row. commSubs above only has
+    // the viewer's OWN subs, so it can never resolve those — real per-
+    // league plan badges need this broader, ownership-tagged lookup.
+    const assignedCommPlanIds = [...new Set(
+        leagues
+            .filter(l => l.assignedPlanType === 'commissioner' && l.assignedPlanId)
+            .map(l => l.assignedPlanId!)
+    )];
+    const assignedCommSubs = assignedCommPlanIds.length > 0
+        ? await prisma.subscription.findMany({
+            where:  { id: { in: assignedCommPlanIds }, type: 'commissioner' },
+            select: { id: true, tier: true, userId: true },
+        })
+        : [];
+    const assignedSubs = assignedCommSubs.map(s => ({
+        id: s.id, tier: s.tier, ownedByViewer: s.userId === userId,
+    }));
+
     // Commissioner activation state — only fetch for users with a commissioner sub
     const commActivation = commSubs.length > 0
         ? await computeActivationStage(userId)
@@ -495,7 +516,7 @@ export default async function DashboardPage({
                                 <SleeperLeaguesList
                                     leagues={sleeperLeagues}
                                     playerTier={playerSubTier}
-                                    commSubs={commSubs.map(s => ({ id: s.id, leagueName: s.leagueName, tier: s.tier }))}
+                                    assignedSubs={assignedSubs}
                                     limitReachedIds={limitReachedIds}
                                 />
                             </div>
@@ -514,7 +535,7 @@ export default async function DashboardPage({
                                 <SleeperLeaguesList
                                     leagues={espnLeagues}
                                     playerTier={playerSubTier}
-                                    commSubs={commSubs.map(s => ({ id: s.id, leagueName: s.leagueName, tier: s.tier }))}
+                                    assignedSubs={assignedSubs}
                                     platform="espn"
                                     limitReachedIds={limitReachedIds}
                                 />
@@ -534,7 +555,7 @@ export default async function DashboardPage({
                                 <SleeperLeaguesList
                                     leagues={yahooLeagues}
                                     playerTier={playerSubTier}
-                                    commSubs={commSubs.map(s => ({ id: s.id, leagueName: s.leagueName, tier: s.tier }))}
+                                    assignedSubs={assignedSubs}
                                     platform="yahoo"
                                     limitReachedIds={limitReachedIds}
                                 />
@@ -554,7 +575,7 @@ export default async function DashboardPage({
                                 <SleeperLeaguesList
                                     leagues={nflLeagues}
                                     playerTier={playerSubTier}
-                                    commSubs={commSubs.map(s => ({ id: s.id, leagueName: s.leagueName, tier: s.tier }))}
+                                    assignedSubs={assignedSubs}
                                     platform="nfl"
                                     limitReachedIds={limitReachedIds}
                                 />
