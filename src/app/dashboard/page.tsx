@@ -27,10 +27,6 @@ function formatTier(tier: SubscriptionTier | string): string {
     }
 }
 
-function commLabel(tier: string, leagueSize: number | null): string {
-    return `${formatTier(tier)} — ${leagueSize ? `${leagueSize}-Team` : ''} League`;
-}
-
 const STATUS_STYLES: Record<string, string> = {
     active:    'bg-green-900/40 text-green-400 border-green-800',
     trialing:  'bg-blue-900/40 text-blue-400 border-blue-800',
@@ -583,60 +579,58 @@ export default async function DashboardPage({
                             <p className="text-gray-400 text-sm">No commissioner plans yet. Each plan covers one league you manage.</p>
                         </div>
                     ) : (
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                             {commSubs.map((sub) => (
                                 <div key={sub.id}
-                                    className="flex flex-col p-4 bg-gray-800/40 rounded-xl border border-gray-800">
-                                    <div className="flex items-start justify-between gap-4">
-                                        <div>
-                                            {sub.leagueName && (() => {
-                                                const leagueId = syncedLeagueIdByName.get(sub.leagueName.toLowerCase().trim());
-                                                // Partial match fallback — handles minor name differences
-                                                const partialMatch = !leagueId
-                                                    ? leagues.find(l => l.leagueName.toLowerCase().includes(sub.leagueName!.toLowerCase().trim()) || sub.leagueName!.toLowerCase().trim().includes(l.leagueName.toLowerCase()))
-                                                    : null;
-                                                const resolvedId = leagueId ?? partialMatch?.id;
-                                                return resolvedId ? (
-                                                    <Link href={`/dashboard/league/${resolvedId}/overview`}
-                                                        className="text-[#D4AF37] font-semibold text-sm hover:underline">
-                                                        {sub.leagueName} →
-                                                    </Link>
-                                                ) : (
-                                                    <p className="text-[#D4AF37] font-semibold text-sm">{sub.leagueName}</p>
-                                                );
-                                            })()}
-                                            <p className="font-medium text-gray-300 text-xs mt-0.5">{commLabel(sub.tier, sub.leagueSize)}</p>
-                                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${STATUS_STYLES[sub.status] ?? STATUS_STYLES.inactive}`}>
-                                                    {sub.status.replace('_', ' ')}
-                                                </span>
-                                                {periodLabel(sub) && (
-                                                    <span className="text-gray-500 text-xs">{periodLabel(sub)}</span>
-                                                )}
-                                            </div>
-                                        </div>
+                                    className="flex items-center justify-between gap-3 px-4 py-3 bg-gray-800/40 rounded-xl border border-gray-800 flex-wrap">
+                                    <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                                        {sub.leagueName && (() => {
+                                            const leagueId = syncedLeagueIdByName.get(sub.leagueName.toLowerCase().trim());
+                                            // Partial match fallback — handles minor name differences
+                                            const partialMatch = !leagueId
+                                                ? leagues.find(l => l.leagueName.toLowerCase().includes(sub.leagueName!.toLowerCase().trim()) || sub.leagueName!.toLowerCase().trim().includes(l.leagueName.toLowerCase()))
+                                                : null;
+                                            const resolvedId = leagueId ?? partialMatch?.id;
+                                            return resolvedId ? (
+                                                <Link href={`/dashboard/league/${resolvedId}/overview`}
+                                                    className="text-[#D4AF37] font-semibold text-sm hover:underline truncate">
+                                                    {sub.leagueName} →
+                                                </Link>
+                                            ) : (
+                                                <p className="text-[#D4AF37] font-semibold text-sm truncate">{sub.leagueName}</p>
+                                            );
+                                        })()}
                                         {COMM_TIER_BADGE[sub.tier] && (
                                             sub.tier === 'COMMISSIONER_ELITE' ? (
-                                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border shrink-0 ${COMM_TIER_BADGE[sub.tier].className}`}>
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold border shrink-0 ${COMM_TIER_BADGE[sub.tier].className}`}>
                                                     {COMM_TIER_BADGE[sub.tier].label}
                                                 </span>
                                             ) : (
                                                 <Link
                                                     href={`/pricing?tab=commissioner&size=${sub.leagueSize ?? 12}&leagueName=${encodeURIComponent(sub.leagueName ?? '')}`}
-                                                    className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border shrink-0 transition hover:opacity-80 ${COMM_TIER_BADGE[sub.tier].className}`}>
+                                                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold border shrink-0 transition hover:opacity-80 ${COMM_TIER_BADGE[sub.tier].className}`}>
                                                     {COMM_TIER_BADGE[sub.tier].label} ↑
                                                 </Link>
                                             )
                                         )}
+                                        {sub.leagueSize && (
+                                            <span className="text-gray-500 text-xs shrink-0">{sub.leagueSize}-Team</span>
+                                        )}
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border shrink-0 ${STATUS_STYLES[sub.status] ?? STATUS_STYLES.inactive}`}>
+                                            {sub.status.replace('_', ' ')}
+                                        </span>
+                                        {periodLabel(sub) && (
+                                            <span className="text-gray-500 text-xs shrink-0">{periodLabel(sub)}</span>
+                                        )}
                                     </div>
-                                    <div className="flex justify-end items-center gap-4 mt-3">
+                                    <div className="flex items-center gap-3 shrink-0">
                                         <Link href={`/dashboard/plan/commissioner/${sub.id}`}
-                                            className="text-[#D4AF37]/70 hover:text-[#D4AF37] text-sm font-medium transition">
+                                            className="text-[#D4AF37]/70 hover:text-[#D4AF37] text-xs font-medium transition whitespace-nowrap">
                                             View Details →
                                         </Link>
                                         <form action={createPortalSession}>
                                             <button type="submit"
-                                                className="text-gray-500 hover:text-gray-300 text-sm font-medium transition">
+                                                className="text-gray-500 hover:text-gray-300 text-xs font-medium transition whitespace-nowrap">
                                                 Manage →
                                             </button>
                                         </form>
