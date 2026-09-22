@@ -5,11 +5,8 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { stripe, priceIdToTier } from '@/lib/stripe';
 import { createPortalSession } from '@/app/actions/stripe';
-import ConnectedLeagues from '@/components/ConnectedLeagues';
 import InstallAppBanner from '@/components/pwa/InstallAppBanner';
 import SleeperLeaguesList from './SleeperLeaguesList';
-import SyncedLeaguePicker from './SyncedLeaguePicker';
-import { getLeagueLimit, tierToLimitKey, nextTierName } from '@/lib/league-limits';
 import { computeAutoAssignments } from '@/lib/auto-assign';
 import { computeActivationStage } from '@/lib/commissioner-activation';
 import type { SubscriptionTier } from '@prisma/client';
@@ -33,12 +30,6 @@ const STATUS_STYLES: Record<string, string> = {
     past_due:  'bg-yellow-900/40 text-yellow-400 border-yellow-800',
     canceled:  'bg-red-900/40 text-red-400 border-red-800',
     inactive:  'bg-gray-800 text-gray-500 border-gray-700',
-};
-
-const COMM_TIER_BADGE: Record<string, { label: string; className: string }> = {
-    COMMISSIONER_PRO:     { label: 'PRO',      className: 'bg-gray-800 text-gray-300 border-gray-600' },
-    COMMISSIONER_ALL_PRO: { label: 'ALL-PRO',  className: 'bg-[#D4AF37] text-black border-[#D4AF37]' },
-    COMMISSIONER_ELITE:   { label: 'ELITE ✦',  className: 'bg-[#D4AF37]/25 text-[#D4AF37] border-[#D4AF37]/60' },
 };
 
 function periodLabel(sub: { cancelAtPeriodEnd: boolean; currentPeriodEnd: Date | null } | undefined) {
@@ -130,19 +121,6 @@ export default async function DashboardPage({
     // Show verification banner only to credentials users who haven't verified yet
     const needsVerification = !emailVerified && !!hashedPassword;
 
-    // Enrich connected leagues with the matching League.id so links always work
-    const syncedIdByNameServer = new Map(leagues.map(l => [l.leagueName.toLowerCase().trim(), l.id]));
-    const commissionerLeagueIds = new Set(
-        leagues.filter(l => l.assignedPlanType === 'commissioner').map(l => l.id)
-    );
-    const connectedLeagues = user.connectedLeagues.map(cl => {
-        const syncedLeagueId = syncedIdByNameServer.get(cl.leagueName.toLowerCase().trim());
-        return {
-            ...cl,
-            syncedLeagueId,
-            isCommissioner: !!syncedLeagueId && commissionerLeagueIds.has(syncedLeagueId),
-        };
-    });
     const displayName = (name ?? session.user.email ?? '').split(' ')[0];
 
     const activeSubs = subscriptions.filter(
@@ -288,10 +266,6 @@ export default async function DashboardPage({
             .map(l => l.id)
     );
 
-    const syncedLeagueIdByName = new Map(
-        leagues.map(l => [l.leagueName.toLowerCase().trim(), l.id])
-    );
-
     const hasPastDueSub = subscriptions.some(s => s.status === 'past_due');
     const hasAnyActiveSub = activeSubs.length > 0;
     // When payment has failed and no subscription is active/trialing, degrade to FREE.
@@ -302,51 +276,6 @@ export default async function DashboardPage({
     ) as SubscriptionTier;
     const isElite = displayTier === 'PLAYER_ELITE' || displayTier === 'COMMISSIONER_ELITE';
 
-    const leagueLimitKey = tierToLimitKey(displayTier);
-    const leagueLimit    = getLeagueLimit(leagueLimitKey);
-    const nextTier       = nextTierName(displayTier);
-
-    // Elite = unlimited: rebuild list entirely from synced leagues so every entry has a link.
-    // Overlay existing connectedLeague records (by name) to preserve lock / createdAt info.
-    // Any connected-but-not-synced entries appear at the end (no link — they have no League.id).
-    const effectiveConnectedLeagues = leagueLimit === Infinity
-        ? (() => {
-            const connectedByName = new Map(
-                user.connectedLeagues.map(cl => [cl.leagueName.toLowerCase().trim(), cl])
-            );
-            const syncedLeagueNames = new Set(leagues.map(l => l.leagueName.toLowerCase().trim()));
-
-            // All synced leagues — exclude commissioner-covered ones (they appear in
-            // the Commissioner Plans section, not under Player Plan).
-            const fromSynced = leagues.filter(l => !commissionerLeagueIds.has(l.id)).map(l => {
-                const existing = connectedByName.get(l.leagueName.toLowerCase().trim());
-                return {
-                    id:             existing?.id ?? `auto-${l.id}`,
-                    leagueName:     l.leagueName,
-                    platform:       l.platform,
-                    createdAt:      existing ? existing.createdAt : new Date(0).toISOString(),
-                    syncedLeagueId: l.id,
-                    isCommissioner: commissionerLeagueIds.has(l.id),
-                    isAutoIncluded: !existing,
-                };
-            });
-
-            // Connected leagues with no matching synced record (show without link)
-            const orphans = user.connectedLeagues
-                .filter(cl => !syncedLeagueNames.has(cl.leagueName.toLowerCase().trim()))
-                .map(cl => ({
-                    ...cl,
-                    syncedLeagueId: undefined,
-                    isCommissioner: false,
-                    isAutoIncluded: false,
-                }));
-
-            // Both halves already reflect their own source's sortOrder-aware
-            // ordering (leagues / user.connectedLeagues) — no alpha re-sort,
-            // which would silently undo a user's drag reorder.
-            return [...fromSynced, ...orphans];
-        })()
-        : connectedLeagues.filter(cl => !cl.isCommissioner);
 
     const testDataReset = params.test_data_reset === 'true';
 
@@ -531,18 +460,6 @@ export default async function DashboardPage({
                                     </button>
                                 </form>
                             </div>
-                            <ConnectedLeagues
-                                leagues={effectiveConnectedLeagues}
-                                syncedLeagues={leagues.map(l => ({
-                                    id: l.id,
-                                    leagueName: l.leagueName,
-                                    season: l.season,
-                                    totalRosters: l.totalRosters,
-                                }))}
-                                limit={leagueLimit}
-                                nextTier={nextTier}
-                                tierLabel={formatTier(displayTier)}
-                            />
                         </>
                     ) : (
                         <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -555,91 +472,6 @@ export default async function DashboardPage({
                     )}
                 </div>
 
-                {/* ── Commissioner Plans ────────────────────────────────── */}
-                <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-                    <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
-                        <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Commissioner Plans</p>
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <SyncedLeaguePicker leagues={leagues.map(l => ({
-                                id: l.id,
-                                leagueName: l.leagueName,
-                                totalRosters: l.totalRosters,
-                                season: l.season,
-                                scoringType: l.scoringType ?? null,
-                            }))} />
-                            <Link href="/pricing?tab=commissioner&mode=new"
-                                className="text-sm border border-gray-700 hover:border-[#D4AF37]/50 text-gray-300 font-semibold px-4 py-1.5 rounded-lg transition">
-                                + Add League
-                            </Link>
-                        </div>
-                    </div>
-
-                    {commSubs.length === 0 ? (
-                        <div className="flex items-center justify-between gap-4 flex-wrap">
-                            <p className="text-gray-400 text-sm">No commissioner plans yet. Each plan covers one league you manage.</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-2">
-                            {commSubs.map((sub) => (
-                                <div key={sub.id}
-                                    className="flex items-center justify-between gap-3 px-4 py-3 bg-gray-800/40 rounded-xl border border-gray-800 flex-wrap">
-                                    <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                                        {sub.leagueName && (() => {
-                                            const leagueId = syncedLeagueIdByName.get(sub.leagueName.toLowerCase().trim());
-                                            // Partial match fallback — handles minor name differences
-                                            const partialMatch = !leagueId
-                                                ? leagues.find(l => l.leagueName.toLowerCase().includes(sub.leagueName!.toLowerCase().trim()) || sub.leagueName!.toLowerCase().trim().includes(l.leagueName.toLowerCase()))
-                                                : null;
-                                            const resolvedId = leagueId ?? partialMatch?.id;
-                                            return resolvedId ? (
-                                                <Link href={`/dashboard/league/${resolvedId}/overview`}
-                                                    className="text-[#D4AF37] font-semibold text-sm hover:underline truncate">
-                                                    {sub.leagueName} →
-                                                </Link>
-                                            ) : (
-                                                <p className="text-[#D4AF37] font-semibold text-sm truncate">{sub.leagueName}</p>
-                                            );
-                                        })()}
-                                        {COMM_TIER_BADGE[sub.tier] && (
-                                            sub.tier === 'COMMISSIONER_ELITE' ? (
-                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold border shrink-0 ${COMM_TIER_BADGE[sub.tier].className}`}>
-                                                    {COMM_TIER_BADGE[sub.tier].label}
-                                                </span>
-                                            ) : (
-                                                <Link
-                                                    href={`/pricing?tab=commissioner&size=${sub.leagueSize ?? 12}&leagueName=${encodeURIComponent(sub.leagueName ?? '')}`}
-                                                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold border shrink-0 transition hover:opacity-80 ${COMM_TIER_BADGE[sub.tier].className}`}>
-                                                    {COMM_TIER_BADGE[sub.tier].label} ↑
-                                                </Link>
-                                            )
-                                        )}
-                                        {sub.leagueSize && (
-                                            <span className="text-gray-500 text-xs shrink-0">{sub.leagueSize}-Team</span>
-                                        )}
-                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border shrink-0 ${STATUS_STYLES[sub.status] ?? STATUS_STYLES.inactive}`}>
-                                            {sub.status.replace('_', ' ')}
-                                        </span>
-                                        {periodLabel(sub) && (
-                                            <span className="text-gray-500 text-xs shrink-0">{periodLabel(sub)}</span>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-3 shrink-0">
-                                        <Link href={`/dashboard/plan/commissioner/${sub.id}`}
-                                            className="text-[#D4AF37]/70 hover:text-[#D4AF37] text-xs font-medium transition whitespace-nowrap">
-                                            View Details →
-                                        </Link>
-                                        <form action={createPortalSession}>
-                                            <button type="submit"
-                                                className="text-gray-500 hover:text-gray-300 text-xs font-medium transition whitespace-nowrap">
-                                                Manage →
-                                            </button>
-                                        </form>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
 
                 {/* ── Synced Leagues ────────────────────────────────────── */}
                 {(() => {
@@ -663,8 +495,7 @@ export default async function DashboardPage({
                                 <SleeperLeaguesList
                                     leagues={sleeperLeagues}
                                     playerTier={playerSubTier}
-                                    commSubs={commSubs.map(s => ({ leagueName: s.leagueName, tier: s.tier }))}
-                                    hasPlayerPlan={!!playerSub}
+                                    commSubs={commSubs.map(s => ({ id: s.id, leagueName: s.leagueName, tier: s.tier }))}
                                     limitReachedIds={limitReachedIds}
                                 />
                             </div>
@@ -683,9 +514,8 @@ export default async function DashboardPage({
                                 <SleeperLeaguesList
                                     leagues={espnLeagues}
                                     playerTier={playerSubTier}
-                                    commSubs={commSubs.map(s => ({ leagueName: s.leagueName, tier: s.tier }))}
+                                    commSubs={commSubs.map(s => ({ id: s.id, leagueName: s.leagueName, tier: s.tier }))}
                                     platform="espn"
-                                    hasPlayerPlan={!!playerSub}
                                     limitReachedIds={limitReachedIds}
                                 />
                             </div>
@@ -704,9 +534,8 @@ export default async function DashboardPage({
                                 <SleeperLeaguesList
                                     leagues={yahooLeagues}
                                     playerTier={playerSubTier}
-                                    commSubs={commSubs.map(s => ({ leagueName: s.leagueName, tier: s.tier }))}
+                                    commSubs={commSubs.map(s => ({ id: s.id, leagueName: s.leagueName, tier: s.tier }))}
                                     platform="yahoo"
-                                    hasPlayerPlan={!!playerSub}
                                     limitReachedIds={limitReachedIds}
                                 />
                             </div>
@@ -725,9 +554,8 @@ export default async function DashboardPage({
                                 <SleeperLeaguesList
                                     leagues={nflLeagues}
                                     playerTier={playerSubTier}
-                                    commSubs={commSubs.map(s => ({ leagueName: s.leagueName, tier: s.tier }))}
+                                    commSubs={commSubs.map(s => ({ id: s.id, leagueName: s.leagueName, tier: s.tier }))}
                                     platform="nfl"
-                                    hasPlayerPlan={!!playerSub}
                                     limitReachedIds={limitReachedIds}
                                 />
                             </div>

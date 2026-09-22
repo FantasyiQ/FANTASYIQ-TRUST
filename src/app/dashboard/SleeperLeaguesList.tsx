@@ -24,6 +24,7 @@ interface League {
 }
 
 interface CommSub {
+    id: string;
     leagueName: string | null;
     tier: string;
 }
@@ -33,15 +34,25 @@ interface Props {
     playerTier: string;
     commSubs: CommSub[];
     platform?: 'sleeper' | 'espn' | 'yahoo' | 'nfl';
-    hasPlayerPlan?: boolean;
     limitReachedIds?: Set<string>;
 }
 
-function tierLevel(tier: string): number {
-    if (tier.includes('ELITE'))   return 3;
-    if (tier.includes('ALL_PRO')) return 2;
-    if (tier.includes('_PRO'))    return 1;
-    return 0;
+// Real per-league plan badge — sourced from the league's own assignedPlanId/
+// assignedPlanType (the authoritative field, same one billing/auto-assign
+// uses), not a fuzzy name match. Labeled with plan TYPE + level (e.g.
+// "Commissioner ELITE ✦") since a league can be covered by either kind of
+// plan and members need to know which.
+function planBadge(league: League, playerTier: string, commSubs: CommSub[]): { label: string; className: string; href: string } | null {
+    if (league.assignedPlanType === 'commissioner' && league.assignedPlanId) {
+        const sub = commSubs.find(s => s.id === league.assignedPlanId);
+        const tier = sub ? tierBadgeProps(sub.tier) : null;
+        return tier ? { label: `Commissioner ${tier.label}`, className: tier.className, href: `/dashboard/plan/commissioner/${league.assignedPlanId}` } : null;
+    }
+    if (league.assignedPlanType === 'player') {
+        const tier = tierBadgeProps(playerTier);
+        return tier ? { label: `Player ${tier.label}`, className: tier.className, href: '/dashboard/plan/player' } : null;
+    }
+    return null;
 }
 
 function statusBadgeClass(status: string) {
@@ -67,7 +78,7 @@ function formatSyncTime(date: Date | null): string {
     return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier, commSubs, platform = 'sleeper', hasPlayerPlan = false, limitReachedIds = new Set() }: Props) {
+export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier, commSubs, platform = 'sleeper', limitReachedIds = new Set() }: Props) {
     const [leagues, setLeagues] = useState<League[]>(initialLeagues);
 
     async function handleReorder(newOrder: League[]) {
@@ -106,11 +117,7 @@ export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier
             <SortableLeagueList items={leagues} getId={l => l.id} onReorder={handleReorder}>
                 {(league, drag) => {
                 const standing = (league.standings as { wins: number; losses: number }[] | null)?.[0];
-                // Effective tier = highest of player plan (account-wide) vs commissioner plan (per-league).
-                // If the user paid for a higher player plan than the commissioner plan, their plan wins.
-                const commTier   = commSubs.find(s => s.leagueName?.toLowerCase().trim() === league.leagueName.toLowerCase().trim())?.tier ?? 'FREE';
-                const effectiveTier = tierLevel(playerTier) >= tierLevel(commTier) ? playerTier : commTier;
-                const badge = tierBadgeProps(effectiveTier);
+                const badge = planBadge(league, playerTier, commSubs);
                 return (
                     <div className={`flex items-center gap-4 px-6 py-4 hover:bg-gray-800/30 transition-colors ${drag.isDragging ? 'bg-gray-800/50' : ''}`}>
                         <DragHandle attributes={drag.attributes} listeners={drag.listeners} />
@@ -143,11 +150,16 @@ export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier
                                 </p>
                             </div>
                             <div className="flex items-center gap-3 shrink-0">
-                                {/* Tier badge (plan level) — secondary info, right side */}
+                                {/* Plan badge (type + level) — secondary info, right side. Links to
+                                    that plan's management page. */}
                                 {badge && (
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${badge.className}`}>
+                                    <Link
+                                        href={badge.href}
+                                        onClick={e => e.stopPropagation()}
+                                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border transition hover:opacity-80 ${badge.className}`}
+                                    >
                                         {badge.label}
-                                    </span>
+                                    </Link>
                                 )}
                                 {!league.assignedPlanId && !league.assignedPlanType && (
                                     limitReachedIds.has(league.id) ? (
@@ -158,13 +170,13 @@ export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier
                                         >
                                             Upgrade to activate
                                         </Link>
-                                    ) : hasPlayerPlan ? null : (
+                                    ) : (
                                         <Link
                                             href={`/pricing?tab=commissioner&mode=new&size=${league.totalRosters}&leagueName=${encodeURIComponent(league.leagueName)}`}
                                             onClick={e => e.stopPropagation()}
                                             className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border bg-gray-800 text-gray-400 border-gray-700 hover:border-[#D4AF37]/50 hover:text-[#D4AF37] transition"
                                         >
-                                            Add a plan
+                                            + Add a plan
                                         </Link>
                                     )
                                 )}
