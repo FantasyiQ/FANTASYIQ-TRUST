@@ -175,7 +175,12 @@ export default function SleeperLeaguesList({ leagues: initialLeagues, playerTier
                                         </span>
                                     )
                                 )}
-                                {!league.assignedPlanId && !league.assignedPlanType && (
+                                {/* A league can carry a stale assignedPlanId/assignedPlanType
+                                    pointing at a plan that no longer resolves (deleted or
+                                    inactive subscription) — !badge catches that case too, not
+                                    just the literally-unassigned one, so the row never shows
+                                    neither a badge nor an add-a-plan prompt. */}
+                                {!badge && (
                                     limitReachedIds.has(league.id) ? (
                                         <Link
                                             href={`/pricing?tab=commissioner&mode=new&size=${league.totalRosters}&leagueName=${encodeURIComponent(league.leagueName)}`}
