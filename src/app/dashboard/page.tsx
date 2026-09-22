@@ -515,7 +515,8 @@ export default async function DashboardPage({
                                 </div>
                                 <SleeperLeaguesList
                                     leagues={sleeperLeagues}
-                                    playerTier={playerSubTier}
+                                    playerTier={displayTier}
+                                    hasRealPlayerSub={!!rawPlayerSub}
                                     assignedSubs={assignedSubs}
                                     limitReachedIds={limitReachedIds}
                                 />
@@ -534,7 +535,8 @@ export default async function DashboardPage({
                                 </div>
                                 <SleeperLeaguesList
                                     leagues={espnLeagues}
-                                    playerTier={playerSubTier}
+                                    playerTier={displayTier}
+                                    hasRealPlayerSub={!!rawPlayerSub}
                                     assignedSubs={assignedSubs}
                                     platform="espn"
                                     limitReachedIds={limitReachedIds}
@@ -554,7 +556,8 @@ export default async function DashboardPage({
                                 </div>
                                 <SleeperLeaguesList
                                     leagues={yahooLeagues}
-                                    playerTier={playerSubTier}
+                                    playerTier={displayTier}
+                                    hasRealPlayerSub={!!rawPlayerSub}
                                     assignedSubs={assignedSubs}
                                     platform="yahoo"
                                     limitReachedIds={limitReachedIds}
@@ -574,7 +577,8 @@ export default async function DashboardPage({
                                 </div>
                                 <SleeperLeaguesList
                                     leagues={nflLeagues}
-                                    playerTier={playerSubTier}
+                                    playerTier={displayTier}
+                                    hasRealPlayerSub={!!rawPlayerSub}
                                     assignedSubs={assignedSubs}
                                     platform="nfl"
                                     limitReachedIds={limitReachedIds}
