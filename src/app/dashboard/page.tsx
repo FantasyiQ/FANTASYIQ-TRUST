@@ -86,17 +86,17 @@ export default async function DashboardPage({
                 },
             },
             connectedLeagues: {
-                orderBy: { createdAt: 'asc' },
-                select: { id: true, leagueName: true, platform: true, createdAt: true },
+                orderBy: [{ sortOrder: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }],
+                select: { id: true, leagueName: true, platform: true, createdAt: true, sortOrder: true },
             },
             leagues: {
                 where:   { isHistorical: false },
-                orderBy: { leagueName: 'asc' },
+                orderBy: [{ sortOrder: { sort: 'asc', nulls: 'last' } }, { leagueName: 'asc' }],
                 select: {
                     id: true, leagueId: true, leagueName: true, platform: true,
                     season: true, status: true, totalRosters: true, scoringType: true,
                     avatar: true, standings: true, lastSyncedAt: true,
-                    assignedPlanId: true, assignedPlanType: true,
+                    assignedPlanId: true, assignedPlanType: true, sortOrder: true,
                 },
             },
         },
@@ -121,13 +121,16 @@ export default async function DashboardPage({
 
     // Deduplicate: Sleeper creates a new leagueId every season for the same league name.
     // Keep only the most recent season per league name so the dashboard shows one row per league.
+    // Map preserves first-insertion order on re-set, which already matches
+    // the query's sortOrder-aware ordering — no re-sort needed (a forced
+    // alphabetical re-sort here would silently undo a user's drag reorder).
     const _seenLeagueNames = new Map<string, typeof rawLeagues[0]>();
     for (const l of rawLeagues) {
         const key = l.leagueName.toLowerCase().trim();
         const existing = _seenLeagueNames.get(key);
         if (!existing || l.season > existing.season) _seenLeagueNames.set(key, l);
     }
-    const leagues = [..._seenLeagueNames.values()].sort((a, b) => a.leagueName.localeCompare(b.leagueName));
+    const leagues = [..._seenLeagueNames.values()];
     // Show verification banner only to credentials users who haven't verified yet
     const needsVerification = !emailVerified && !!hashedPassword;
 
@@ -342,9 +345,10 @@ export default async function DashboardPage({
                     isAutoIncluded: false,
                 }));
 
-            return [...fromSynced, ...orphans].sort((a, b) =>
-                a.leagueName.localeCompare(b.leagueName)
-            );
+            // Both halves already reflect their own source's sortOrder-aware
+            // ordering (leagues / user.connectedLeagues) — no alpha re-sort,
+            // which would silently undo a user's drag reorder.
+            return [...fromSynced, ...orphans];
         })()
         : connectedLeagues.filter(cl => !cl.isCommissioner);
 

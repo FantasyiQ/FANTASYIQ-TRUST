@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
+import { SortableLeagueList, DragHandle } from '@/components/SortableLeagueList';
 
 interface ConnectedLeague {
     id: string;
@@ -125,6 +126,27 @@ export default function ConnectedLeagues({ leagues: initial, syncedLeagues = [],
         });
     }
 
+    // Elite plans rebuild this list entirely from synced leagues each render
+    // (auto-included rows have no real ConnectedLeague row to persist an
+    // order on) — reordering only makes sense, and only persists, for the
+    // real limited-plan case with actual ConnectedLeague rows.
+    const canReorder = limit !== Infinity;
+
+    async function handleReorder(newOrder: ConnectedLeague[]) {
+        const prev = leagues;
+        setLeagues(newOrder); // optimistic
+        try {
+            const res = await fetch('/api/leagues/reorder', {
+                method:  'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ leagueIds: newOrder.map(l => l.id), type: 'connected' }),
+            });
+            if (!res.ok) setLeagues(prev);
+        } catch {
+            setLeagues(prev);
+        }
+    }
+
     async function handleRemove(id: string) {
         setError(null);
         startTransition(async () => {
@@ -140,6 +162,51 @@ export default function ConnectedLeagues({ leagues: initial, syncedLeagues = [],
                 setError('Network error. Please try again.');
             }
         });
+    }
+
+    function renderLeagueRow(l: ConnectedLeague) {
+        const locked   = !l.isAutoIncluded && isLocked(l.createdAt);
+        const syncedId = l.syncedLeagueId ?? syncedIdByName.get(l.leagueName.toLowerCase());
+        const leagueHref = syncedId ? `/dashboard/league/${syncedId}/overview` : null;
+        return (
+            <>
+                <div className="min-w-0 flex-1">
+                    <span className="text-sm text-white font-medium truncate block">{l.leagueName}</span>
+                    <span className="text-gray-500 text-xs">
+                        {l.platform ? `${l.platform} · ` : ''}
+                        {l.isAutoIncluded
+                            ? 'Included with Elite'
+                            : locked
+                                ? <>🔒 Locked until {lockLabel(l.createdAt)}</>
+                                : 'Removable'}
+                    </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                    {leagueHref ? (
+                        <Link
+                            href={leagueHref}
+                            className="text-xs font-medium text-[#D4AF37] hover:underline whitespace-nowrap">
+                            View League →
+                        </Link>
+                    ) : (
+                        <Link
+                            href="/dashboard/sync"
+                            className="text-xs font-medium text-gray-500 hover:text-gray-300 whitespace-nowrap transition">
+                            Sync to access →
+                        </Link>
+                    )}
+                    {!l.isAutoIncluded && !locked && (
+                        <button
+                            onClick={() => { void handleRemove(l.id); }}
+                            disabled={isPending}
+                            className="text-gray-600 hover:text-red-400 transition text-sm px-1.5 py-0.5 rounded disabled:opacity-50"
+                            title="Remove">
+                            ✕
+                        </button>
+                    )}
+                </div>
+            </>
+        );
     }
 
     return (
@@ -284,52 +351,22 @@ export default function ConnectedLeagues({ leagues: initial, syncedLeagues = [],
             {/* League list */}
             {leagues.length > 0 && (
                 <ul className="space-y-1.5">
-                    {leagues.map(l => {
-                        const locked   = !l.isAutoIncluded && isLocked(l.createdAt);
-                        const syncedId = l.syncedLeagueId ?? syncedIdByName.get(l.leagueName.toLowerCase());
-                        const leagueHref = syncedId ? `/dashboard/league/${syncedId}/overview` : null;
-                        const actionLabel = 'View League →';
-
-                        return (
+                    {canReorder ? (
+                        <SortableLeagueList items={leagues} getId={l => l.id} onReorder={handleReorder}>
+                            {(l, drag) => (
+                                <div className={`flex items-center justify-between gap-3 px-3 py-2 bg-gray-800/50 rounded-lg ${drag.isDragging ? 'ring-1 ring-[#D4AF37]/40' : ''}`}>
+                                    <DragHandle attributes={drag.attributes} listeners={drag.listeners} />
+                                    {renderLeagueRow(l)}
+                                </div>
+                            )}
+                        </SortableLeagueList>
+                    ) : (
+                        leagues.map(l => (
                             <li key={l.id} className="flex items-center justify-between gap-3 px-3 py-2 bg-gray-800/50 rounded-lg">
-                                <div className="min-w-0 flex-1">
-                                    <span className="text-sm text-white font-medium truncate block">{l.leagueName}</span>
-                                    <span className="text-gray-500 text-xs">
-                                        {l.platform ? `${l.platform} · ` : ''}
-                                        {l.isAutoIncluded
-                                            ? 'Included with Elite'
-                                            : locked
-                                                ? <>🔒 Locked until {lockLabel(l.createdAt)}</>
-                                                : 'Removable'}
-                                    </span>
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                    {leagueHref ? (
-                                        <Link
-                                            href={leagueHref}
-                                            className="text-xs font-medium text-[#D4AF37] hover:underline whitespace-nowrap">
-                                            {actionLabel}
-                                        </Link>
-                                    ) : (
-                                        <Link
-                                            href="/dashboard/sync"
-                                            className="text-xs font-medium text-gray-500 hover:text-gray-300 whitespace-nowrap transition">
-                                            Sync to access →
-                                        </Link>
-                                    )}
-                                    {!l.isAutoIncluded && !locked && (
-                                        <button
-                                            onClick={() => { void handleRemove(l.id); }}
-                                            disabled={isPending}
-                                            className="text-gray-600 hover:text-red-400 transition text-sm px-1.5 py-0.5 rounded disabled:opacity-50"
-                                            title="Remove">
-                                            ✕
-                                        </button>
-                                    )}
-                                </div>
+                                {renderLeagueRow(l)}
                             </li>
-                        );
-                    })}
+                        ))
+                    )}
                 </ul>
             )}
         </div>
