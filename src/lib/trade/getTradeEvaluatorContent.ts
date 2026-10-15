@@ -87,6 +87,7 @@ export async function getTradeEvaluatorContent(id: string): Promise<TradeEvaluat
             where:  { id: session.user.id },
             select: {
                 sleeperUserId:    true,
+                subscriptionTier: true,
                 connectedLeagues: { select: { leagueName: true } },
                 subscriptions: {
                     where:   { status: { in: ['active', 'trialing'] } },
@@ -123,7 +124,14 @@ export async function getTradeEvaluatorContent(id: string): Promise<TradeEvaluat
 
     // ── Tier gate ─────────────────────────────────────────────────────────────
     const activePlayerSub = dbUser?.subscriptions.find(s => s.type === 'player') ?? null;
-    let playerTier = activePlayerSub?.tier ?? 'FREE';
+    // Falls back to User.subscriptionTier when there's no real active
+    // Subscription row (a comped/manually-granted tier, e.g. Stripe
+    // test-mode) — without this, a comped Elite account has no real
+    // subscription to find here, playerTier silently degrades to FREE, and
+    // this function 404s the whole page even though the account is
+    // genuinely entitled. Same gap already fixed for the dashboard's
+    // per-league plan badge (SleeperLeaguesList.tsx / displayTier).
+    let playerTier = activePlayerSub?.tier ?? dbUser?.subscriptionTier ?? 'FREE';
     if (activePlayerSub?.stripeSubscriptionId) {
         try {
             const stripeSub      = await stripe.subscriptions.retrieve(activePlayerSub.stripeSubscriptionId);
